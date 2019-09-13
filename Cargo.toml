@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "sigma-core",
+    "sigma-webgl2",
+    "renderer",
+]
+
+[profile.release]
+lto = true

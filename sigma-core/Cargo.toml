@@ -1,0 +1,12 @@
+[package]
+name = "sigma-core"
+version = "0.1.0"
+authors = ["Thomas Bénéteau <thomas@bitwise.me>"]
+description = "Sigma path tracer core"
+edition = "2018"
+
+[dependencies.cgmath]
+version = "0.17"
+
+[dependencies.zerocopy]
+version = "0.2"

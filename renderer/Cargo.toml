@@ -1,0 +1,21 @@
+[package]
+name = "webgl"
+version = "0.1.0"
+authors = ["The wasm-bindgen Developers"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies.sigma-core]
+path = "../sigma-core"
+
+[dependencies.sigma-webgl2]
+path = "../sigma-webgl2"
+
+[dependencies.wasm-bindgen]
+version = "0.2.8"
+
+[dependencies.web-sys]
+version = "0.3.4"
+features = ['WebGl2RenderingContext']
