@@ -1,6 +1,6 @@
 use cgmath::prelude::*;
-use cgmath::{vec3, Matrix3, Point3, Vector3};
-use itertools::izip;
+use cgmath::{vec3, Decomposed, Matrix3, Point3, Quaternion, Vector3};
+use itertools::{iproduct, izip};
 use log::info;
 use std::num::NonZeroU32;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
@@ -114,7 +114,8 @@ impl Camera {
             // generate four camera points
             let fz = 1.0 / (self.fov * 0.5).tan();
 
-            let mut layout: LayoutVerified<_, CameraData> = LayoutVerified::new(memory).unwrap();
+            let mut layout: LayoutVerified<_, CameraData> =
+                LayoutVerified::new_zeroed(memory).unwrap();
 
             layout.pos = [self.distance * x, self.distance * y, self.distance * z, 0.0];
             layout.fp0 = pack_vec3(Transform::<Point3<f32>>::transform_vector(
@@ -229,19 +230,25 @@ impl Scene {
 }
 
 pub struct Instance {
-    /// Index of the relevant object
     pub object: usize,
-    // instance transform matrix?
+    pub scale: f32,
+    pub rotation: Quaternion<f32>,
+    pub translation: Vector3<f32>,
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, FromBytes, AsBytes)]
 struct InstanceData {
+    transform: [f32; 12], // world transform for this instance
     hierarchy_start: u32, // where does the BVH start in the BVH data?
     hierarchy_limit: u32, // where does the BVH end? (as an absolute pos)
     triangles_start: u32, // where does the triangle data start?
-    padding: u32,
+    materials_start: u32, // where does the material data start? NOT IMPLEMENTED YET
 }
+
+// other data: material ranges? (per-instance). could replace with
+// triangles_limit (don't need, possibly never will)
+// anything else?
 
 #[derive(Clone, Copy, Default, Debug)]
 struct IndexData {
@@ -255,7 +262,6 @@ struct IndexData {
 #[derive(Default)]
 pub struct Instances {
     pub list: Vec<Instance>,
-    // top-level scene BVH constantly kept up to date
 }
 
 impl Instances {
@@ -265,22 +271,31 @@ impl Instances {
 
         let indices = Self::calculate_indices(&objects.list);
 
-        info!("indices = {:?}", indices);
-
+        // TODO: better sizing of instance data
         // let size = self.list.len() * std::mem::size_of::<InstanceData>();
         let size = 128 * std::mem::size_of::<InstanceData>();
 
         buffer.map_update(size, |memory| {
             let mut slice: LayoutVerified<_, [InstanceData]> =
-                LayoutVerified::new_slice(memory).unwrap();
+                LayoutVerified::new_slice_zeroed(memory).unwrap();
 
             for (memory, instance) in izip!(&mut *slice, &self.list) {
+                let instance_world = Decomposed {
+                    scale: instance.scale,
+                    rot: instance.rotation,
+                    disp: instance.translation,
+                };
+
+                if let Some(world_instance) = instance_world.inverse_transform() {
+                    Self::pack_xfm_row_major(world_instance.into(), &mut memory.transform);
+                }
+
                 let index_data = &indices[instance.object];
 
                 memory.hierarchy_start = index_data.hierarchy_start;
                 memory.hierarchy_limit = index_data.hierarchy_limit;
                 memory.triangles_start = index_data.triangles_start;
-                memory.padding = 0;
+                memory.materials_start = 0;
             }
         });
     }
@@ -299,6 +314,12 @@ impl Instances {
         }
 
         indices
+    }
+
+    fn pack_xfm_row_major(xfm: cgmath::Matrix4<f32>, output: &mut [f32; 12]) {
+        for (i, j) in iproduct!(0..4, 0..3) {
+            output[4 * j + i] = xfm[i][j];
+        }
     }
 }
 

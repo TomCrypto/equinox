@@ -1,3 +1,5 @@
+use cgmath::prelude::*;
+use cgmath::{Quaternion, Vector3};
 use console_log;
 use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
@@ -70,7 +72,17 @@ impl WasmRunner {
     }
 
     pub fn add_instance(&mut self, object: usize) {
-        self.scene.instances.list.push(Instance { object })
+        self.scene.instances.list.push(Instance {
+            object,
+            scale: 1.0,
+            rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
+            translation: Vector3::new(0.0, 0.0, 0.0),
+        })
+    }
+
+    pub fn move_instance_up(&mut self, index: usize, amount: f32) {
+        self.scene.instances.list[index].translation += Vector3::new(0.0, amount, 0.0);
+        self.scene.instances.list[index].scale *= 1.5;
     }
 
     pub fn set_dimensions(&mut self, width: u32, height: u32) {

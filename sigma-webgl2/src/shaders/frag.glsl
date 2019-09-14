@@ -15,10 +15,11 @@ layout (std140) uniform Camera {
 } camera;
 
 struct Instance {
+    mat4x3 transform;
     uvec4 indices;
 };
 
-layout (std140) uniform Instances {
+layout (std140, row_major) uniform Instances {
     Instance data[128];
 } instances;
 
@@ -167,9 +168,14 @@ bool intersect_world(vec3 origin, vec3 direction, out Result result) {
     result.distance = 1e10;
 
     for (uint i = uint(0); i < instance_count; ++i) {
+        mat4x3 xfm = instances.data[i].transform;
+
+        vec3 new_origin = xfm * vec4(origin, 1.0);
+        vec3 new_direction = xfm * vec4(direction, 0.0);
+
         Result tmp;
 
-        if (ray_bvh(origin, direction, instances.data[i].indices.x, instances.data[i].indices.y, instances.data[i].indices.z, tmp)) {
+        if (ray_bvh(new_origin, new_direction, instances.data[i].indices.x, instances.data[i].indices.y, instances.data[i].indices.z, tmp)) {
             if (tmp.distance < result.distance) {
                 result = tmp;
             }
@@ -181,7 +187,12 @@ bool intersect_world(vec3 origin, vec3 direction, out Result result) {
 
 bool intersect_world_occlusion(vec3 origin, vec3 direction) {
     for (uint i = uint(0); i < instance_count; ++i) {
-        if (ray_bvh_occlusion(origin, direction, instances.data[i].indices.x, instances.data[i].indices.y, instances.data[i].indices.z)) {
+        mat4x3 xfm = instances.data[i].transform;
+
+        vec3 new_origin = xfm * vec4(origin, 1.0);
+        vec3 new_direction = xfm * vec4(direction, 0.0);
+
+        if (ray_bvh_occlusion(new_origin, new_direction, instances.data[i].indices.x, instances.data[i].indices.y, instances.data[i].indices.z)) {
             return true;
         }
     }

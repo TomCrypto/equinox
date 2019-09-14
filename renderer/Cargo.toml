@@ -7,6 +7,9 @@ edition = "2018"
 [lib]
 crate-type = ["cdylib"]
 
+[dependencies.cgmath]
+version = "0.17"
+
 [dependencies.console_log]
 version = "0.1"
 

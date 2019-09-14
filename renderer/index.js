@@ -83,6 +83,12 @@ import('./pkg/webgl').catch(console.error).then(gl => {
     }
   });
 
+  document.getElementById("push-up").addEventListener("click", () => {
+    if (runner.instance_count() != 0) {
+      runner.move_instance_up(0, 10.0);
+    }
+  });
+
   canvas.addEventListener("mousemove", event => {
     if (!moving) {
       return
