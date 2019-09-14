@@ -8,11 +8,17 @@ edition = "2018"
 [dependencies.js-sys]
 version = "0.3"
 
+[dependencies.maplit]
+version = "1.0"
+
+[dependencies.rand]
+version = "0.7"
+
+[dependencies.rand_chacha]
+version = "0.2"
+
 [dependencies.sigma-core]
 path = "../sigma-core"
-
-[dependencies.wasm-bindgen]
-version = "0.2"
 
 [dependencies.web-sys]
 version = "0.3"

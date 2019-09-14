@@ -42,8 +42,7 @@ import('./pkg/webgl').catch(console.error).then(gl => {
         fetch(new Request('pkg/cat-tri.bin')).then(triResponse => {
           bvhResponse.arrayBuffer().then(bvh => {
             triResponse.arrayBuffer().then(tri => {
-              runner.set_bvh_data(new Uint8Array(bvh))
-              runner.set_tri_data(new Uint8Array(tri))
+              runner.add_model(new Uint8Array(bvh), new Uint8Array(tri))
             })
           })
         })
@@ -55,8 +54,7 @@ import('./pkg/webgl').catch(console.error).then(gl => {
         fetch(new Request('pkg/buddha-tri.bin')).then(triResponse => {
           bvhResponse.arrayBuffer().then(bvh => {
             triResponse.arrayBuffer().then(tri => {
-              runner.set_bvh_data(new Uint8Array(bvh))
-              runner.set_tri_data(new Uint8Array(tri))
+              runner.add_model(new Uint8Array(bvh), new Uint8Array(tri))
             })
           })
         })
@@ -86,8 +84,12 @@ import('./pkg/webgl').catch(console.error).then(gl => {
     })
 
     const renderLoop = () => {
-      runner.refine()
-      runner.render()
+      try {
+        runner.refine()
+        runner.render()
+      } catch (e) {
+        console.log("ERROR:", e)
+      }
 
       window.requestAnimationFrame(renderLoop)
     }

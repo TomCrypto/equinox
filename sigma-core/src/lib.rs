@@ -1,5 +1,6 @@
 use cgmath::prelude::*;
 use cgmath::{vec3, Matrix3, Point3, Vector3};
+use std::num::NonZeroU32;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 pub trait DeviceBuffer {
@@ -163,6 +164,22 @@ struct CameraData {
     pos: [f32; 4],
 }
 
+pub struct Frame {
+    pub width: NonZeroU32,
+    pub height: NonZeroU32,
+    pub seed: u64,
+}
+
+impl Default for Frame {
+    fn default() -> Self {
+        Self {
+            width: NonZeroU32::new(256).unwrap(),
+            height: NonZeroU32::new(256).unwrap(),
+            seed: 0,
+        }
+    }
+}
+
 ///
 /// # Dirty Flags
 ///
@@ -172,9 +189,8 @@ struct CameraData {
 #[derive(Default)]
 pub struct Scene {
     pub camera: Dirty<Camera>,
-    pub bvh_data: Dirty<Vec<u8>>,
-    pub tri_data: Dirty<Vec<u8>>,
-    pub dimensions: Dirty<(i32, i32)>,
+    pub frame: Dirty<Frame>,
+    pub models: Dirty<Vec<Model>>,
 }
 
 impl Scene {
@@ -204,8 +220,24 @@ impl Scene {
     /// a scene is "moved" from one device to another (not recommended).
     pub fn dirty_all(&mut self) {
         Dirty::dirty(&mut self.camera);
-        Dirty::dirty(&mut self.bvh_data);
-        Dirty::dirty(&mut self.tri_data);
-        Dirty::dirty(&mut self.dimensions);
+        Dirty::dirty(&mut self.frame);
+        Dirty::dirty(&mut self.models);
     }
+}
+
+// TODO: this should build some kind of top-level scene BVH in addition to a
+// linear array of instance elements
+pub struct Instances {}
+
+#[derive(Default)]
+pub struct Objects {
+    bvh: Vec<Vec<u8>>,
+    triangles: Vec<Vec<u8>>,
+}
+
+pub struct Model {
+    pub bvh: Vec<u8>,
+    pub triangles: Vec<u8>,
+    /* other information like: number of materials referenced by the triangles
+     * whatever else, etc... */
 }
