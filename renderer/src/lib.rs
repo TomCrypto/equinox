@@ -1,3 +1,4 @@
+use console_log;
 use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
@@ -15,6 +16,8 @@ pub struct WasmRunner {
 impl WasmRunner {
     #[wasm_bindgen(constructor)]
     pub fn new(context: WebGl2RenderingContext) -> Result<WasmRunner, JsValue> {
+        console_log::init().unwrap();
+
         Ok(Self {
             device: Device::new(context)?,
             scene: Scene::new(),
@@ -57,12 +60,17 @@ impl WasmRunner {
         self.scene.camera.zoom(factor);
     }
 
-    pub fn set_bvh_data(&mut self, data: &[u8]) {
-        *self.scene.bvh_data = data.to_vec();
+    pub fn add_object(&mut self, bvh: &[u8], tri: &[u8]) -> usize {
+        self.scene.objects.list.push(Object {
+            hierarchy: bvh.to_vec(),
+            triangles: tri.to_vec(),
+        });
+
+        self.scene.objects.list.len() - 1
     }
 
-    pub fn set_tri_data(&mut self, data: &[u8]) {
-        *self.scene.tri_data = data.to_vec();
+    pub fn add_instance(&mut self, object: usize) {
+        self.scene.instances.list.push(Instance { object })
     }
 
     pub fn set_dimensions(&mut self, width: u32, height: u32) {
@@ -74,16 +82,11 @@ impl WasmRunner {
         self.scene.frame.seed = seed;
     }
 
-    pub fn add_model(&mut self, bvh: &[u8], triangles: &[u8]) -> usize {
-        self.scene.models.push(Model {
-            bvh: bvh.to_vec(),
-            triangles: triangles.to_vec(),
-        });
-
-        self.scene.models.len() - 1
+    pub fn instance_count(&mut self) -> usize {
+        self.scene.instances.list.len()
     }
 
-    pub fn delete_model(&mut self, index: usize) {
-        self.scene.models.remove(index);
+    pub fn remove_instance(&mut self, index: usize) {
+        self.scene.instances.list.remove(index);
     }
 }

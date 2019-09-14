@@ -1,5 +1,7 @@
 use cgmath::prelude::*;
 use cgmath::{vec3, Matrix3, Point3, Vector3};
+use itertools::izip;
+use log::info;
 use std::num::NonZeroU32;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
@@ -112,8 +114,7 @@ impl Camera {
             // generate four camera points
             let fz = 1.0 / (self.fov * 0.5).tan();
 
-            let mut layout: LayoutVerified<_, CameraData> =
-                LayoutVerified::new_zeroed(memory).unwrap();
+            let mut layout: LayoutVerified<_, CameraData> = LayoutVerified::new(memory).unwrap();
 
             layout.pos = [self.distance * x, self.distance * y, self.distance * z, 0.0];
             layout.fp0 = pack_vec3(Transform::<Point3<f32>>::transform_vector(
@@ -190,7 +191,8 @@ impl Default for Frame {
 pub struct Scene {
     pub camera: Dirty<Camera>,
     pub frame: Dirty<Frame>,
-    pub models: Dirty<Vec<Model>>,
+    pub instances: Dirty<Instances>,
+    pub objects: Dirty<Objects>,
 }
 
 impl Scene {
@@ -221,23 +223,123 @@ impl Scene {
     pub fn dirty_all(&mut self) {
         Dirty::dirty(&mut self.camera);
         Dirty::dirty(&mut self.frame);
-        Dirty::dirty(&mut self.models);
+        Dirty::dirty(&mut self.instances);
+        Dirty::dirty(&mut self.objects);
     }
+}
+
+pub struct Instance {
+    /// Index of the relevant object
+    pub object: usize,
+    // instance transform matrix?
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, FromBytes, AsBytes)]
+struct InstanceData {
+    hierarchy_start: u32, // where does the BVH start in the BVH data?
+    hierarchy_limit: u32, // where does the BVH end? (as an absolute pos)
+    triangles_start: u32, // where does the triangle data start?
+    padding: u32,
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+struct IndexData {
+    hierarchy_start: u32,
+    hierarchy_limit: u32,
+    triangles_start: u32,
 }
 
 // TODO: this should build some kind of top-level scene BVH in addition to a
 // linear array of instance elements
-pub struct Instances {}
+#[derive(Default)]
+pub struct Instances {
+    pub list: Vec<Instance>,
+    // top-level scene BVH constantly kept up to date
+}
+
+impl Instances {
+    pub fn update(&self, objects: &Objects, buffer: &mut impl DeviceBuffer) {
+        // method to load the "instance list" into a (uniform) buffer
+        // for now we'll just iterate stupidly, later on throw in a BVH
+
+        let indices = Self::calculate_indices(&objects.list);
+
+        info!("indices = {:?}", indices);
+
+        // let size = self.list.len() * std::mem::size_of::<InstanceData>();
+        let size = 128 * std::mem::size_of::<InstanceData>();
+
+        buffer.map_update(size, |memory| {
+            let mut slice: LayoutVerified<_, [InstanceData]> =
+                LayoutVerified::new_slice(memory).unwrap();
+
+            for (memory, instance) in izip!(&mut *slice, &self.list) {
+                let index_data = &indices[instance.object];
+
+                memory.hierarchy_start = index_data.hierarchy_start;
+                memory.hierarchy_limit = index_data.hierarchy_limit;
+                memory.triangles_start = index_data.triangles_start;
+                memory.padding = 0;
+            }
+        });
+    }
+
+    fn calculate_indices(objects: &[Object]) -> Vec<IndexData> {
+        let mut indices = Vec::with_capacity(objects.len());
+        let mut current = IndexData::default();
+
+        for object in objects {
+            current.hierarchy_limit += object.hierarchy.len() as u32 / 32;
+
+            indices.push(current);
+
+            current.hierarchy_start += object.hierarchy.len() as u32 / 32;
+            current.triangles_start += object.triangles.len() as u32 / 64;
+        }
+
+        indices
+    }
+}
+
+pub struct Object {
+    pub hierarchy: Vec<u8>,
+    pub triangles: Vec<u8>,
+}
 
 #[derive(Default)]
 pub struct Objects {
-    bvh: Vec<Vec<u8>>,
-    triangles: Vec<Vec<u8>>,
+    pub list: Vec<Object>,
 }
 
-pub struct Model {
-    pub bvh: Vec<u8>,
-    pub triangles: Vec<u8>,
-    /* other information like: number of materials referenced by the triangles
-     * whatever else, etc... */
+impl Objects {
+    pub fn update_hierarchy(&self, buffer: &mut impl DeviceBuffer) {
+        buffer.map_update(self.hierarchy_data_size(), |mut memory| {
+            for object in &self.list {
+                let (region, rest) = memory.split_at_mut(object.hierarchy.len());
+                region.copy_from_slice(&object.hierarchy);
+                memory = rest;
+            }
+        });
+    }
+
+    pub fn update_triangles(&self, buffer: &mut impl DeviceBuffer) {
+        buffer.map_update(self.triangles_data_size(), |mut memory| {
+            for object in &self.list {
+                let (region, rest) = memory.split_at_mut(object.triangles.len());
+                region.copy_from_slice(&object.triangles);
+                memory = rest;
+            }
+        });
+    }
+
+    // TODO: might be good to check for overflow here and stuff
+
+    fn hierarchy_data_size(&self) -> usize {
+        self.list.iter().map(|obj| obj.hierarchy.len()).sum()
+    }
+
+    fn triangles_data_size(&self) -> usize {
+        self.list.iter().map(|obj| obj.triangles.len()).sum()
+    }
 }

@@ -8,6 +8,9 @@ edition = "2018"
 [dependencies.js-sys]
 version = "0.3"
 
+[dependencies.log]
+version = "0.4"
+
 [dependencies.maplit]
 version = "1.0"
 

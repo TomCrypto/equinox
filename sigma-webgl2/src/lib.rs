@@ -1,4 +1,5 @@
 use js_sys::{Error, Float32Array};
+use log::info;
 use maplit::hashmap;
 use sigma_core::{DeviceBuffer, Dirty, Scene};
 use std::cell::RefCell;
@@ -333,6 +334,8 @@ pub struct Device {
 
     camera_buffer: UniformBuffer,
 
+    instance_buffer: UniformBuffer,
+
     bvh_tex: TextureBuffer,
     tri_tex: TextureBuffer,
 
@@ -359,6 +362,7 @@ impl Device {
                     "bvh_data" => BindingPoint::Texture(0),
                     "tri_data" => BindingPoint::Texture(1),
                     "Camera" => BindingPoint::UniformBlock(0),
+                    "Instances" => BindingPoint::UniformBlock(1),
                 },
             ),
             present_program: Shader::new(
@@ -372,6 +376,7 @@ impl Device {
             camera_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
             bvh_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
             tri_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
+            instance_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
             samples: RenderTexture::new(gl.clone()),
             framebuffers: FramebufferCache::new(gl.clone()),
             lost: true,
@@ -398,27 +403,23 @@ impl Device {
             camera.update(&mut self.camera_buffer)
         });
 
-        invalidated |= Dirty::clean(&mut scene.models, |models| {
-            self.bvh_tex.map_update(bvh_data.len(), |memory| {
-                memory.copy_from_slice(&bvh_data);
-            });
+        invalidated |= Dirty::clean(&mut scene.objects, |objects| {
+            objects.update_hierarchy(&mut self.bvh_tex);
+            objects.update_triangles(&mut self.tri_tex);
+        });
 
-            let bvh_limit = (bvh_data.len() / (4 * 4 * 2)) as u32;
+        let objects = &scene.objects;
 
-            // TODO: this is annoying, what can we do about it?
-            //  -> remove need for bvh_limit
-            //  -> always upload it during refine()
-            //  -> simply make it part of the scene BVH data state!
+        invalidated |= Dirty::clean(&mut scene.instances, |instances| {
+            instances.update(objects, &mut self.instance_buffer);
+
+            // TODO: need a solution for this?
+            // (might be able to derive it from the shader eventually, but this will do for
+            // now)
 
             let shader = self.program.bind_to_pipeline();
 
-            shader.set_uniform(bvh_limit, "bvh_limit");
-        });
-
-        invalidated |= Dirty::clean(&mut scene.tri_data, |tri_data| {
-            self.tri_tex.map_update(tri_data.len(), |memory| {
-                memory.copy_from_slice(&tri_data);
-            });
+            shader.set_uniform(instances.list.len() as u32, "instance_count");
         });
 
         invalidated |= Dirty::clean(&mut scene.frame, |frame| {
@@ -452,6 +453,7 @@ impl Device {
         let shader = self.program.bind_to_pipeline();
 
         shader.bind_uniform_buffer(&self.camera_buffer, "Camera");
+        shader.bind_uniform_buffer(&self.instance_buffer, "Instances");
         shader.bind_texture_buffer(&self.bvh_tex, "bvh_data");
         shader.bind_texture_buffer(&self.tri_tex, "tri_data");
 
@@ -504,6 +506,7 @@ impl Device {
         self.tri_tex.reset();
         self.samples.reset();
         self.framebuffers.reset();
+        self.instance_buffer.reset();
 
         scene.dirty_all();
         self.lost = false;
