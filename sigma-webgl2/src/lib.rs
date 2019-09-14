@@ -1,7 +1,7 @@
 use js_sys::{Error, Float32Array};
 use log::info;
 use maplit::hashmap;
-use sigma_core::{DeviceBuffer, Dirty, Scene};
+use sigma_core::{DeviceBuffer, Dirty, RasterFilter, Scene};
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer, WebGlFramebuffer, WebGlTexture};
@@ -323,6 +323,14 @@ impl DeviceBuffer for UniformBuffer {
     }
 }
 
+#[repr(C)]
+#[derive(AsBytes, FromBytes)]
+struct Globals {
+    raster_filter_offset: [f32; 4],
+    random_state: [u32; 4],
+}
+
+use quasirandom::{Qrng, Quasirandom};
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
@@ -336,15 +344,20 @@ pub struct Device {
 
     instance_buffer: UniformBuffer,
 
+    globals_buffer: UniformBuffer,
+    raster_buffer: UniformBuffer,
+
     bvh_tex: TextureBuffer,
     tri_tex: TextureBuffer,
 
     samples: RenderTexture,
     framebuffers: FramebufferCache,
+    filter: RasterFilter,
 
     lost: bool,
 
     rng: ChaCha20Rng,
+    qrng: Qrng,
 }
 
 impl Device {
@@ -363,6 +376,8 @@ impl Device {
                     "tri_data" => BindingPoint::Texture(1),
                     "Camera" => BindingPoint::UniformBlock(0),
                     "Instances" => BindingPoint::UniformBlock(1),
+                    "Globals" => BindingPoint::UniformBlock(2),
+                    "Raster" => BindingPoint::UniformBlock(3),
                 },
             ),
             present_program: Shader::new(
@@ -377,10 +392,14 @@ impl Device {
             bvh_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
             tri_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
             instance_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
+            raster_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
+            globals_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
             samples: RenderTexture::new(gl.clone()),
             framebuffers: FramebufferCache::new(gl.clone()),
             lost: true,
             rng: ChaCha20Rng::seed_from_u64(0),
+            qrng: Qrng::new(0),
+            filter: RasterFilter::Delta, // TODO: add a default
         })
     }
 
@@ -413,23 +432,24 @@ impl Device {
         invalidated |= Dirty::clean(&mut scene.instances, |instances| {
             instances.update(objects, &mut self.instance_buffer);
 
-            // TODO: need a solution for this?
-            // (might be able to derive it from the shader eventually, but this will do for
-            // now)
+            // TODO: delete this once the scene BVH is in place (it shouldn't need a count)
 
             let shader = self.program.bind_to_pipeline();
 
             shader.set_uniform(instances.list.len() as u32, "instance_count");
         });
 
-        invalidated |= Dirty::clean(&mut scene.frame, |frame| {
+        invalidated |= Dirty::clean(&mut scene.raster, |raster| {
             self.samples
-                .resize(frame.width.get() as i32, frame.height.get() as i32);
+                .resize(raster.width.get() as i32, raster.height.get() as i32);
+
+            raster.update_raster(&mut self.raster_buffer);
+
+            self.filter = raster.filter;
         });
 
         if invalidated {
-            self.rng = ChaCha20Rng::seed_from_u64(scene.frame.seed);
-            self.clear(); // also clear all the path-traced buffers
+            self.reset();
         }
 
         Ok(())
@@ -450,21 +470,16 @@ impl Device {
 
         self.gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, fbo);
 
+        self.update_globals();
+
         let shader = self.program.bind_to_pipeline();
 
         shader.bind_uniform_buffer(&self.camera_buffer, "Camera");
         shader.bind_uniform_buffer(&self.instance_buffer, "Instances");
+        shader.bind_uniform_buffer(&self.globals_buffer, "Globals");
+        shader.bind_uniform_buffer(&self.raster_buffer, "Raster");
         shader.bind_texture_buffer(&self.bvh_tex, "bvh_data");
         shader.bind_texture_buffer(&self.tri_tex, "tri_data");
-
-        // TODO: should be a seed in some uniform buffer somewhere..
-
-        self.gl.uniform1ui(
-            self.gl
-                .get_uniform_location(self.program.resource().unwrap(), "seed")
-                .as_ref(),
-            self.rng.next_u32(),
-        );
 
         self.gl.enable(Context::BLEND);
         self.gl.blend_equation(Context::FUNC_ADD);
@@ -507,6 +522,8 @@ impl Device {
         self.samples.reset();
         self.framebuffers.reset();
         self.instance_buffer.reset();
+        self.globals_buffer.reset();
+        self.raster_buffer.reset();
 
         scene.dirty_all();
         self.lost = false;
@@ -514,7 +531,7 @@ impl Device {
         Ok(false)
     }
 
-    fn clear(&mut self) {
+    fn reset(&mut self) {
         let fbo = self
             .framebuffers
             .get_framebuffer("samples", &[&self.samples]);
@@ -523,6 +540,34 @@ impl Device {
 
         self.gl
             .clear_bufferfv_with_f32_array(Context::COLOR, 0, &[0.0, 0.0, 0.0, 0.0]);
+
+        self.rng = ChaCha20Rng::seed_from_u64(0);
+        self.qrng = Qrng::new(0);
+        self.qrng.next::<(f32, f32)>(); // drop first (0, 0), we don't want it
+    }
+
+    fn update_globals(&mut self) {
+        let (x, y) = self.qrng.next::<(f32, f32)>();
+
+        let dx = self.filter.evaluate_inverse_cdf(x);
+        let dy = self.filter.evaluate_inverse_cdf(y);
+
+        let seed1 = self.rng.next_u32();
+        let seed2 = self.rng.next_u32();
+        let seed3 = self.rng.next_u32();
+        let seed4 = self.rng.next_u32();
+
+        self.globals_buffer
+            .map_update(std::mem::size_of::<Globals>(), |memory| {
+                let mut mem: LayoutVerified<_, Globals> = LayoutVerified::new(memory).unwrap();
+
+                mem.raster_filter_offset[0] = dx;
+                mem.raster_filter_offset[1] = dy;
+                mem.random_state[0] = seed1;
+                mem.random_state[1] = seed2;
+                mem.random_state[2] = seed3;
+                mem.random_state[3] = seed4;
+            });
     }
 
     fn try_load_extension(&self, name: &str) -> Result<(), Error> {

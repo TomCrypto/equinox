@@ -2,8 +2,6 @@
 
 precision highp float;
 
-in vec2 clip;
-
 out vec4 color;
 
 layout (std140) uniform Camera {
@@ -23,13 +21,20 @@ layout (std140, row_major) uniform Instances {
     Instance data[128];
 } instances;
 
+layout (std140) uniform Globals {
+    vec4 raster_filter_offset;
+    uvec4 random_state;
+} globals;
+
+layout (std140) uniform Raster {
+    vec4 dimensions;
+} raster;
+
 
 uniform uint instance_count;
 
 uniform sampler2D bvh_data;
 uniform sampler2D tri_data;
-
-uniform uint seed;
 
 struct Result {
     float distance;
@@ -209,14 +214,12 @@ float rand(inout uint state) {
 }
 
 void main() {
-    uint random_state = (uint(gl_FragCoord.x + 0.5) * uint(7193) + uint(gl_FragCoord.y + 0.5) * uint(3719)) * seed;
+    vec2 raster_coords = (gl_FragCoord.xy + 2.0 * (globals.raster_filter_offset.xy - 0.5)) * raster.dimensions.w;
+    raster_coords.x -= (raster.dimensions.x * raster.dimensions.w - 1.0) * 0.5; // fixed center for aspect ratio
 
-    float dx = (rand(random_state) - 0.5) / 1920.0;
-    float dy = (rand(random_state) - 0.5) / 1020.0;
+    uint random_state = (uint(gl_FragCoord.x + 0.5) * uint(7193) + uint(gl_FragCoord.y + 0.5) * uint(3719)) * globals.random_state.x;
 
-    // generate a ray to trace the world against
-
-    vec3 dir = normalize(mix(mix(camera.fp0, camera.fp1, clip.x + dx), mix(camera.fp2, camera.fp3, clip.x + dx), 1.0 - clip.y - dy));
+    vec3 dir = normalize(mix(mix(camera.fp0, camera.fp1, raster_coords.x), mix(camera.fp2, camera.fp3, raster_coords.x), 1.0 - raster_coords.y));
     vec3 pos = camera.pos;
 
     Result result;

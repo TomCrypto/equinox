@@ -166,6 +166,112 @@ struct CameraData {
     pos: [f32; 4],
 }
 
+#[derive(Copy, Clone)]
+pub enum RasterFilter {
+    BlackmanHarris,
+    Delta,
+}
+
+impl RasterFilter {
+    pub fn evaluate_inverse_cdf(&self, t: f32) -> f32 {
+        match self {
+            Self::Delta => 0.0, // trivial window function
+            _ => self.evaluate_inverse_cdf_via_bisection(t),
+        }
+    }
+
+    fn evaluate_inverse_cdf_via_bisection(&self, t: f32) -> f32 {
+        let mut lo = 0.0;
+        let mut hi = 1.0;
+        let mut last = t;
+
+        loop {
+            let mid = (lo + hi) / 2.0;
+
+            let sample = self.evaluate_cdf(mid);
+
+            if sample == last {
+                return mid;
+            }
+
+            if sample < t {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+
+            last = sample;
+        }
+    }
+
+    fn evaluate_cdf(&self, t: f32) -> f32 {
+        match self {
+            Self::Delta => 1.0,
+            Self::BlackmanHarris => {
+                let s1 = 0.2166238 * (2.0 * std::f32::consts::PI * t).sin();
+                let s2 = 0.0313385 * (4.0 * std::f32::consts::PI * t).sin();
+                let s3 = 0.0017272 * (6.0 * std::f32::consts::PI * t).sin();
+                t - s1 + s2 - s3 // integral of normalized window function
+            }
+        }
+    }
+}
+
+pub struct Raster {
+    pub width: NonZeroU32,
+    pub height: NonZeroU32,
+    pub filter: RasterFilter,
+}
+
+impl Default for Raster {
+    fn default() -> Self {
+        Self {
+            width: NonZeroU32::new(256).unwrap(),
+            height: NonZeroU32::new(256).unwrap(),
+            filter: RasterFilter::BlackmanHarris,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(AsBytes, FromBytes)]
+struct RasterData {
+    width: f32,
+    height: f32,
+    inv_width: f32,
+    inv_height: f32,
+}
+
+impl Raster {
+    // TODO: this should really take a texture trait since it's meant to be sampled,
+    // not indexed into?
+    // TODO: as a result of the above this currently fills in 4 floats per pixel
+    // (RGBA32F)
+    pub fn update_filter_cdf(&self, size: usize, buffer: &mut impl DeviceBuffer) {
+        buffer.map_update(4 * size * std::mem::size_of::<f32>(), |memory| {
+            let mut slice: LayoutVerified<_, [f32]> = LayoutVerified::new_slice(memory).unwrap();
+
+            for (index, value) in slice.iter_mut().enumerate() {
+                if index % 4 == 0 {
+                    let t = (index as f32) / ((size - 1) as f32) / 4.0;
+                    *value = self.filter.evaluate_inverse_cdf(t);
+                }
+            }
+        });
+    }
+
+    pub fn update_raster(&self, buffer: &mut impl DeviceBuffer) {
+        buffer.map_update(std::mem::size_of::<RasterData>(), |memory| {
+            let mut data: LayoutVerified<_, RasterData> = LayoutVerified::new(memory).unwrap();
+
+            data.width = self.width.get() as f32;
+            data.height = self.height.get() as f32;
+            data.inv_width = 1.0 / data.width;
+            data.inv_height = 1.0 / data.height;
+        });
+    }
+}
+
 pub struct Frame {
     pub width: NonZeroU32,
     pub height: NonZeroU32,
@@ -191,7 +297,7 @@ impl Default for Frame {
 #[derive(Default)]
 pub struct Scene {
     pub camera: Dirty<Camera>,
-    pub frame: Dirty<Frame>,
+    pub raster: Dirty<Raster>,
     pub instances: Dirty<Instances>,
     pub objects: Dirty<Objects>,
 }
@@ -223,7 +329,7 @@ impl Scene {
     /// a scene is "moved" from one device to another (not recommended).
     pub fn dirty_all(&mut self) {
         Dirty::dirty(&mut self.camera);
-        Dirty::dirty(&mut self.frame);
+        Dirty::dirty(&mut self.raster);
         Dirty::dirty(&mut self.instances);
         Dirty::dirty(&mut self.objects);
     }
@@ -245,6 +351,12 @@ struct InstanceData {
     triangles_start: u32, // where does the triangle data start?
     materials_start: u32, // where does the material data start? NOT IMPLEMENTED YET
 }
+
+// 16384 floats total available
+
+// currently ew use 16 floats, so 1024 instances max...
+// though we could possibly have more space (e.g. 65536 floats) so 4096
+// instances max
 
 // other data: material ranges? (per-instance). could replace with
 // triangles_limit (don't need, possibly never will)

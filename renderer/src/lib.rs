@@ -82,16 +82,12 @@ impl WasmRunner {
 
     pub fn move_instance_up(&mut self, index: usize, amount: f32) {
         self.scene.instances.list[index].translation += Vector3::new(0.0, amount, 0.0);
-        self.scene.instances.list[index].scale *= 1.5;
     }
 
     pub fn set_dimensions(&mut self, width: u32, height: u32) {
-        self.scene.frame.width = NonZeroU32::new(width).unwrap();
-        self.scene.frame.height = NonZeroU32::new(height).unwrap();
-    }
-
-    pub fn set_seed(&mut self, seed: u64) {
-        self.scene.frame.seed = seed;
+        self.scene.raster.width = NonZeroU32::new(width).unwrap();
+        self.scene.raster.height = NonZeroU32::new(height).unwrap();
+        self.scene.raster.filter = RasterFilter::BlackmanHarris;
     }
 
     pub fn instance_count(&mut self) -> usize {

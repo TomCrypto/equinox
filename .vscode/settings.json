@@ -5,6 +5,11 @@
     "editor.tabSize": 4,
   },
 
+  "[glsl]": {
+    "editor.rulers": [120],
+    "editor.tabSize": 4,
+  },
+
   "files.exclude": {
     "**/.gitignore": true,
     "**/.vscode": true,
