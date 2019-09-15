@@ -13,8 +13,8 @@ pub enum BindingPoint {
 pub struct Shader {
     gl: Context,
     handle: Option<WebGlProgram>,
-    vertex: &'static str,
-    fragment: &'static str,
+    vertex: String,
+    fragment: String,
 
     binds: HashMap<&'static str, BindingPoint>,
 }
@@ -22,15 +22,15 @@ pub struct Shader {
 impl Shader {
     pub fn new(
         gl: Context,
-        vertex: &'static str,
-        fragment: &'static str,
+        vertex: String,
+        fragment: String,
         binds: HashMap<&'static str, BindingPoint>,
     ) -> Self {
         Self {
             gl,
             handle: None,
-            vertex,
-            fragment,
+            vertex: ["#version 300 es", &vertex].join("\n"),
+            fragment: ["#version 300 es", "precision highp float;", &fragment].join("\n"),
             binds,
         }
     }
@@ -50,8 +50,8 @@ impl Shader {
     }
 
     pub(crate) fn reset(&mut self) -> Result<(), Error> {
-        let vert = self.compile_shader(Context::VERTEX_SHADER, self.vertex)?;
-        let frag = self.compile_shader(Context::FRAGMENT_SHADER, self.fragment)?;
+        let vert = self.compile_shader(Context::VERTEX_SHADER, &self.vertex)?;
+        let frag = self.compile_shader(Context::FRAGMENT_SHADER, &self.fragment)?;
 
         if let (Some(vert), Some(frag)) = (&vert, &frag) {
             self.handle = self.link_program(vert, frag)?;

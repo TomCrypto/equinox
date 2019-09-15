@@ -1,15 +1,12 @@
-#version 300 es
-
-precision highp float;
+#define M_PI   3.14159265359
+#define M_2PI  6.28318530718
 
 out vec4 color;
 
 layout (std140) uniform Camera {
-    vec3 fp0;
-    vec3 fp1;
-    vec3 fp2;
-    vec3 fp3;
-    vec3 pos;
+    vec4 origin_plane[4];
+    vec4 target_plane[4];
+    vec4 aperture_settings;
 } camera;
 
 struct Instance {
@@ -22,9 +19,13 @@ layout (std140, row_major) uniform Instances {
 } instances;
 
 layout (std140) uniform Globals {
-    vec4 raster_filter_offset;
-    uvec4 random_state;
+    vec2 filter_delta;
+    uvec4 frame_state;
 } globals;
+
+#define FILTER_DELTA (globals.filter_delta)
+#define FRAME_RANDOM (globals.frame_state.xy)
+#define FRAME_NUMBER (globals.frame_state.z)
 
 layout (std140) uniform Raster {
     vec4 dimensions;
@@ -205,22 +206,88 @@ bool intersect_world_occlusion(vec3 origin, vec3 direction) {
     return false;
 }
 
-float rand(inout uint state) {
-    state ^= state << 13;
-    state ^= state >> 17;
-    state ^= state << 5;
+// Low-discrepancy sequence generator.
+//
+// Given a fixed, unchanging key, this will produce a low-discrepancy sequence of 2D points
+// as a function of frame number, e.g. on the next frame for the same key the next point in
+// the sequence will be produced. The key should be <= 2^16 to prevent precision problems.
 
-    return float((state / uint(65536))) / 65535.0;
+vec2 low_discrepancy_2d(uvec2 key) {
+    return fract(vec2(key + FRAME_NUMBER) * vec2(0.7548776662, 0.5698402909));
 }
 
+// end of random stuff
+
+// Begin camera stuff
+
+vec2 evaluate_circular_aperture_uv(uvec2 pixel_state) {
+    vec2 uv = low_discrepancy_2d(pixel_state >> 16U);
+
+    float a = uv.s * M_2PI;
+
+    return sqrt(uv.t) * vec2(cos(a), sin(a));
+}
+
+vec2 evaluate_polygon_aperture_uv(uvec2 pixel_state) {
+    vec2 uv = low_discrepancy_2d(pixel_state >> 16U);
+
+    float corner = floor(uv.s * camera.aperture_settings.y);
+
+    float u = 1.0 - sqrt(uv.s * camera.aperture_settings.y - corner);
+    float v = uv.t * (1.0 - u);
+
+    float a = M_PI * camera.aperture_settings.w;
+
+    float rotation = camera.aperture_settings.z + corner * 2.0 * a;
+
+    float c = cos(rotation);
+    float s = sin(rotation);
+
+    vec2 p = vec2((u + v) * cos(a), (u - v) * sin(a));
+    return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
+}
+
+vec2 evaluate_aperture_uv(uvec2 pixel_state) {
+    switch (int(camera.aperture_settings.x)) {
+        case 0: return evaluate_circular_aperture_uv(pixel_state);
+        case 1: return evaluate_polygon_aperture_uv(pixel_state);       
+    }
+
+    return vec2(0.0);
+}
+
+vec3 bilinear(vec4 p[4], vec2 uv) {
+    return mix(mix(p[0].xyz, p[1].xyz, uv.x), mix(p[2].xyz, p[3].xyz, uv.x), uv.y);
+}
+
+void evaluate_primary_ray(uvec2 pixel_state, out vec3 pos, out vec3 dir) {
+    vec2 raster_uv = (gl_FragCoord.xy + FILTER_DELTA) * raster.dimensions.w;
+    raster_uv.x -= (raster.dimensions.x * raster.dimensions.w - 1.0) * 0.5;
+
+    vec3 origin = bilinear(camera.origin_plane, evaluate_aperture_uv(pixel_state) * 0.5 + 0.5);
+
+    // TODO: this isn't quite right; this generates a flat focal plane but it should be curved
+    // (to be equidistant to the lens)
+    // maybe just generate this directly in the shader, pass in the camera kind/parameters
+    // but it will do for now, we can extend it later when it's needed
+
+    vec3 target = bilinear(camera.target_plane, raster_uv);
+
+    pos = origin;
+    dir = normalize(target - origin);
+}
+
+// End camera stuff
+
 void main() {
-    vec2 raster_coords = (gl_FragCoord.xy + 2.0 * (globals.raster_filter_offset.xy - 0.5)) * raster.dimensions.w;
-    raster_coords.x -= (raster.dimensions.x * raster.dimensions.w - 1.0) * 0.5; // fixed center for aspect ratio
+    uvec2 pixel_state = uvec2(gl_FragCoord.xy);
+    bitshuffle_full(pixel_state); // randomized
 
-    uint random_state = (uint(gl_FragCoord.x + 0.5) * uint(7193) + uint(gl_FragCoord.y + 0.5) * uint(3719)) * globals.random_state.x;
+    uvec2 frame_state = pixel_state + FRAME_RANDOM;
 
-    vec3 dir = normalize(mix(mix(camera.fp0, camera.fp1, raster_coords.x), mix(camera.fp2, camera.fp3, raster_coords.x), 1.0 - raster_coords.y));
-    vec3 pos = camera.pos;
+    vec3 pos;
+    vec3 dir;
+    evaluate_primary_ray(pixel_state, pos, dir);
 
     Result result;
 
@@ -228,11 +295,11 @@ void main() {
     if (intersect_world(pos, dir, result)) {
         pos = pos + dir * result.distance + result.normal * 1e-3;
 
-        float u = rand(random_state);
-        float v = rand(random_state);
+        vec2 rng = gen_vec2_uniform(frame_state);
+        bitshuffle_mini(frame_state);
 
-        float theta = 2.0 * 3.14159165 * u;
-        float phi = acos(2.0 * v - 1.0);
+        float theta = 2.0 * 3.14159165 * rng.x;
+        float phi = acos(2.0 * rng.y - 1.0);
 
         dir = vec3(cos(theta) * sin(phi), cos(phi), sin(theta) * sin(phi));
 

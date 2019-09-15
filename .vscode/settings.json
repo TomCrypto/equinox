@@ -6,7 +6,7 @@
   },
 
   "[glsl]": {
-    "editor.rulers": [120],
+    "editor.rulers": [100],
     "editor.tabSize": 4,
   },
 

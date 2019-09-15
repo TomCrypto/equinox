@@ -53,13 +53,29 @@ impl WasmRunner {
         Ok(())
     }
 
-    pub fn move_camera(&mut self, delta_x: f32, delta_y: f32, fov: f32) {
-        self.scene.camera.fov = fov;
-        self.scene.camera.rotate(delta_x, delta_y);
+    pub fn move_camera(&mut self, forward: f32, sideways: f32) {
+        let sideways_vector = self
+            .scene
+            .camera
+            .up_vector
+            .cross(self.scene.camera.direction)
+            .normalize();
+
+        let direction = self.scene.camera.direction;
+
+        self.scene.camera.position += forward * direction + sideways_vector * sideways;
     }
 
-    pub fn zoom(&mut self, factor: f32) {
-        self.scene.camera.zoom(factor);
+    pub fn set_camera_direction(&mut self, x: f32, y: f32, z: f32) {
+        self.scene.camera.direction = Vector3::new(x, y, z);
+    }
+
+    pub fn set_camera_aperture(&mut self, radius: f32) {
+        self.scene.camera.aperture = Aperture::Ngon {
+            radius,
+            sides: 6,
+            rotation: 0.0,
+        };
     }
 
     pub fn add_object(&mut self, bvh: &[u8], tri: &[u8]) -> usize {

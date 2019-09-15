@@ -89,16 +89,31 @@ import('./pkg/webgl').catch(console.error).then(gl => {
     }
   });
 
+  let angleX = Math.PI / 2
+  let angleY = Math.PI / 2
+  let pressed = {}
+
   canvas.addEventListener("mousemove", event => {
     if (!moving) {
       return
     }
 
-    runner.move_camera(-event.movementX * 0.001, -event.movementY * 0.001, Math.PI / 3)
-  })
+    angleX += -event.movementX * 0.001;
+    angleY += -event.movementY * 0.001;
 
-  canvas.addEventListener("wheel", event => {
-    runner.zoom(Math.pow(1.1, 0.01 * event.deltaY))
+    if (angleY > Math.PI - 0.01) {
+      angleY = Math.PI - 0.01
+    }
+
+    if (angleY < 0.01) {
+      angleY = 0.01
+    }
+
+    let x = Math.sin(angleY) * Math.cos(angleX);
+    let z = Math.sin(angleY) * Math.sin(angleX);
+    let y = Math.cos(angleY);
+
+    runner.set_camera_direction(x, y, z)
   })
 
   canvas.addEventListener("mousedown", _ => {
@@ -111,8 +126,43 @@ import('./pkg/webgl').catch(console.error).then(gl => {
     moving = false
   })
 
+  window.addEventListener("keydown", e => {
+    pressed[e.key] = true
+  })
+
+  window.addEventListener("keyup", e => {
+    delete pressed[e.key]
+  })
+
   const renderLoop = () => {
     try {
+      let dx = 0
+      let dy = 0
+
+      if (pressed['q'] == true) {
+        runner.set_camera_aperture(0.001)
+      }
+
+      if (pressed['w'] === true) {
+        dx += 0.02
+      }
+
+      if (pressed['s'] === true) {
+        dx -= 0.02
+      }
+
+      if (pressed['a'] === true) {
+        dy -= 0.02
+      }
+
+      if (pressed['d'] === true) {
+        dy += 0.02
+      }
+
+      if (dx != 0.0 || dy != 0.0) {
+        runner.move_camera(-dx, -dy)
+      }
+
       runner.refine()
       runner.render()
 

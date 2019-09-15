@@ -1,21 +1,13 @@
 use cgmath::prelude::*;
-use cgmath::{vec3, Decomposed, Matrix3, Point3, Quaternion, Vector3};
+use cgmath::{Decomposed, Point3, Quaternion, Vector3};
 use itertools::{iproduct, izip};
 use log::info;
+use smart_default::SmartDefault;
 use std::num::NonZeroU32;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 pub trait DeviceBuffer {
     fn map_update(&mut self, size: usize, f: impl FnOnce(&mut [u8]));
-}
-
-// for now no origin
-#[derive(Default)]
-pub struct Camera {
-    pub angle_x: f32,
-    pub angle_y: f32,
-    pub fov: f32,
-    pub distance: f32,
 }
 
 /// Tracks mutable access to a value with a dirty flag.
@@ -79,108 +71,129 @@ impl<T> std::ops::DerefMut for Dirty<T> {
     }
 }
 
+#[derive(Clone, Copy, SmartDefault)]
+pub enum Aperture {
+    #[default]
+    Point,
+    Circle {
+        radius: f32,
+    },
+    Ngon {
+        radius: f32,
+        sides: u32,
+        rotation: f32,
+    },
+}
+
+impl Aperture {
+    pub fn radius(&self) -> f32 {
+        match self {
+            Self::Point => 0.0,
+            Self::Circle { radius } => *radius,
+            Self::Ngon { radius, .. } => *radius,
+        }
+    }
+
+    pub(crate) fn settings(&self) -> [f32; 4] {
+        match self {
+            Self::Point => [-1.0; 4],
+            Self::Circle { .. } => [0.0, 0.0, 0.0, 0.0],
+            Self::Ngon {
+                sides, rotation, ..
+            } => [1.0, *sides as f32, *rotation as f32, 1.0 / (*sides as f32)],
+        }
+    }
+}
+
+#[derive(SmartDefault)]
+pub struct Camera {
+    #[default(Point3::new(0.0, 0.0, 0.0))]
+    pub position: Point3<f32>,
+
+    #[default(Vector3::new(0.0, 0.0, 1.0))]
+    pub direction: Vector3<f32>,
+
+    #[default(Vector3::new(0.0, 1.0, 0.0))]
+    pub up_vector: Vector3<f32>,
+
+    #[default(Aperture::Point)]
+    pub aperture: Aperture,
+
+    #[default(1.0)]
+    pub focal_distance: f32,
+
+    #[default(0.06)]
+    pub focal_length: f32,
+
+    #[default(0.024)]
+    pub film_height: f32,
+}
+
 impl Camera {
-    pub fn zoom(&mut self, factor: f32) {
-        self.distance *= factor;
-    }
-
-    pub fn rotate(&mut self, delta_x: f32, delta_y: f32) {
-        self.angle_x += delta_x;
-        self.angle_y += delta_y;
-
-        if self.angle_y > std::f32::consts::PI - 0.01 {
-            self.angle_y = std::f32::consts::PI - 0.01;
-        }
-
-        if self.angle_y < 0.01 {
-            self.angle_y = 0.01;
-        }
-    }
-
     pub fn update(&self, buffer: &mut impl DeviceBuffer) {
+        #[repr(C)]
+        #[derive(Default, AsBytes, FromBytes)]
+        struct CameraData {
+            origin_plane: [[f32; 4]; 4],
+            target_plane: [[f32; 4]; 4],
+            aperture_settings: [f32; 4],
+        }
+
         buffer.map_update(std::mem::size_of::<CameraData>(), |memory| {
-            let x = self.angle_y.sin() * self.angle_x.cos();
-            let z = self.angle_y.sin() * self.angle_x.sin();
-            let y = self.angle_y.cos();
-
-            let xfm = <Matrix3<f32> as Transform<Point3<f32>>>::look_at(
-                Point3::new(x, y, z),
-                Point3::new(0.0, 0.0, 0.0),
-                vec3(0.0, 1.0, 0.0),
-            )
-            .invert()
-            .unwrap();
-
-            // generate four camera points
-            let fz = 1.0 / (self.fov * 0.5).tan();
-
-            let mut layout: LayoutVerified<_, CameraData> =
+            let mut camera: LayoutVerified<_, CameraData> =
                 LayoutVerified::new_zeroed(memory).unwrap();
 
-            layout.pos = [self.distance * x, self.distance * y, self.distance * z, 0.0];
-            layout.fp0 = pack_vec3(Transform::<Point3<f32>>::transform_vector(
-                &xfm,
-                vec3(-1.0, 1.0, fz),
-            ));
-            layout.fp1 = pack_vec3(Transform::<Point3<f32>>::transform_vector(
-                &xfm,
-                vec3(1.0, 1.0, fz),
-            ));
-            layout.fp2 = pack_vec3(Transform::<Point3<f32>>::transform_vector(
-                &xfm,
-                vec3(-1.0, -1.0, fz),
-            ));
-            layout.fp3 = pack_vec3(Transform::<Point3<f32>>::transform_vector(
-                &xfm,
-                vec3(1.0, -1.0, fz),
-            ));
+            let fov_tan = self.film_height / (2.0 * self.focal_length);
+
+            let mut xfm: cgmath::Matrix4<f32> = Transform::look_at(
+                self.position,
+                self.position + self.direction,
+                self.up_vector,
+            );
+
+            xfm = xfm.inverse_transform().unwrap();
+
+            for (&x, &y) in iproduct!(&[-1i32, 1i32], &[-1i32, 1i32]) {
+                let plane_index = (y + 1 + (x + 1) / 2) as usize;
+
+                let origin = xfm.transform_point(Point3::new(
+                    (x as f32) * self.aperture.radius(),
+                    (y as f32) * self.aperture.radius(),
+                    0.0,
+                ));
+
+                let target = xfm.transform_point(Point3::new(
+                    (x as f32) * fov_tan * self.focal_distance,
+                    (y as f32) * fov_tan * self.focal_distance,
+                    self.focal_distance,
+                ));
+
+                camera.origin_plane[plane_index] = [origin.x, origin.y, origin.z, 1.0];
+                camera.target_plane[plane_index] = [target.x, target.y, target.z, 1.0];
+            }
+
+            camera.aperture_settings = self.aperture.settings();
         });
     }
 }
 
-trait Pack {
-    type Data;
-
-    fn pack(&self) -> Self::Data;
-}
-
-fn pack_vec3(v: Vector3<f32>) -> [f32; 4] {
-    [v.x, v.y, v.z, 0.0]
-}
-
-impl Pack for Vector3<f32> {
-    type Data = [f32; 4];
-
-    fn pack(&self) -> Self::Data {
-        [self.x, self.y, self.z, 0.0]
-    }
-}
-
-#[repr(C)]
-#[derive(Default, AsBytes, FromBytes)]
-struct CameraData {
-    fp0: [f32; 4],
-    fp1: [f32; 4],
-    fp2: [f32; 4],
-    fp3: [f32; 4],
-    pos: [f32; 4],
-}
-
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, SmartDefault)]
 pub enum RasterFilter {
+    #[default]
     BlackmanHarris,
-    Delta,
+    Dirac,
 }
 
 impl RasterFilter {
-    pub fn evaluate_inverse_cdf(&self, t: f32) -> f32 {
+    pub fn importance_sample(self, t: f32) -> f32 {
         match self {
-            Self::Delta => 0.0, // trivial window function
+            Self::Dirac => 0.0, // trivial window function
             _ => self.evaluate_inverse_cdf_via_bisection(t),
         }
     }
 
-    fn evaluate_inverse_cdf_via_bisection(&self, t: f32) -> f32 {
+    #[allow(clippy::float_cmp)]
+    fn evaluate_inverse_cdf_via_bisection(self, t: f32) -> f32 {
         let mut lo = 0.0;
         let mut hi = 1.0;
         let mut last = t;
@@ -204,33 +217,26 @@ impl RasterFilter {
         }
     }
 
-    fn evaluate_cdf(&self, t: f32) -> f32 {
+    fn evaluate_cdf(self, t: f32) -> f32 {
         match self {
-            Self::Delta => 1.0,
+            Self::Dirac => unreachable!(),
             Self::BlackmanHarris => {
-                let s1 = 0.2166238 * (2.0 * std::f32::consts::PI * t).sin();
-                let s2 = 0.0313385 * (4.0 * std::f32::consts::PI * t).sin();
-                let s3 = 0.0017272 * (6.0 * std::f32::consts::PI * t).sin();
-                t - s1 + s2 - s3 // integral of normalized window function
+                let s1 = 0.216_623_8 * (2.0 * std::f32::consts::PI * t).sin();
+                let s2 = 0.031_338_5 * (4.0 * std::f32::consts::PI * t).sin();
+                let s3 = 0.001_727_2 * (6.0 * std::f32::consts::PI * t).sin();
+                t - s1 + s2 - s3 // integral of the normalized window function
             }
         }
     }
 }
 
+#[derive(SmartDefault)]
 pub struct Raster {
+    #[default(NonZeroU32::new(256).unwrap())]
     pub width: NonZeroU32,
+    #[default(NonZeroU32::new(256).unwrap())]
     pub height: NonZeroU32,
     pub filter: RasterFilter,
-}
-
-impl Default for Raster {
-    fn default() -> Self {
-        Self {
-            width: NonZeroU32::new(256).unwrap(),
-            height: NonZeroU32::new(256).unwrap(),
-            filter: RasterFilter::BlackmanHarris,
-        }
-    }
 }
 
 #[repr(C)]
@@ -243,23 +249,6 @@ struct RasterData {
 }
 
 impl Raster {
-    // TODO: this should really take a texture trait since it's meant to be sampled,
-    // not indexed into?
-    // TODO: as a result of the above this currently fills in 4 floats per pixel
-    // (RGBA32F)
-    pub fn update_filter_cdf(&self, size: usize, buffer: &mut impl DeviceBuffer) {
-        buffer.map_update(4 * size * std::mem::size_of::<f32>(), |memory| {
-            let mut slice: LayoutVerified<_, [f32]> = LayoutVerified::new_slice(memory).unwrap();
-
-            for (index, value) in slice.iter_mut().enumerate() {
-                if index % 4 == 0 {
-                    let t = (index as f32) / ((size - 1) as f32) / 4.0;
-                    *value = self.filter.evaluate_inverse_cdf(t);
-                }
-            }
-        });
-    }
-
     pub fn update_raster(&self, buffer: &mut impl DeviceBuffer) {
         buffer.map_update(std::mem::size_of::<RasterData>(), |memory| {
             let mut data: LayoutVerified<_, RasterData> = LayoutVerified::new(memory).unwrap();
@@ -269,22 +258,6 @@ impl Raster {
             data.inv_width = 1.0 / data.width;
             data.inv_height = 1.0 / data.height;
         });
-    }
-}
-
-pub struct Frame {
-    pub width: NonZeroU32,
-    pub height: NonZeroU32,
-    pub seed: u64,
-}
-
-impl Default for Frame {
-    fn default() -> Self {
-        Self {
-            width: NonZeroU32::new(256).unwrap(),
-            height: NonZeroU32::new(256).unwrap(),
-            seed: 0,
-        }
     }
 }
 
@@ -305,20 +278,7 @@ pub struct Scene {
 impl Scene {
     /// Creates a new empty scene with a default configuration.
     pub fn new() -> Self {
-        // TODO: this should just be a call to Default in theory
-        // remove all this workaround logic when possible
-
-        let mut s = Self {
-            camera: Dirty::new(Camera::default()),
-            ..Default::default()
-        };
-
-        s.camera.distance = 1050.0;
-        s.camera.fov = std::f32::consts::PI / 3.0;
-        s.camera.angle_x = 0.491;
-        s.camera.angle_y = 0.223;
-
-        s
+        Self::default()
     }
 
     /// Marks all of this scene as dirty, forcing a complete device update.

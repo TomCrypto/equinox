@@ -1,7 +1,7 @@
 use js_sys::{Error, Float32Array};
 use log::info;
 use maplit::hashmap;
-use sigma_core::{DeviceBuffer, Dirty, RasterFilter, Scene};
+use sigma_core::{Aperture, DeviceBuffer, Dirty, RasterFilter, Scene};
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer, WebGlFramebuffer, WebGlTexture};
@@ -323,14 +323,7 @@ impl DeviceBuffer for UniformBuffer {
     }
 }
 
-#[repr(C)]
-#[derive(AsBytes, FromBytes)]
-struct Globals {
-    raster_filter_offset: [f32; 4],
-    random_state: [u32; 4],
-}
-
-use quasirandom::{Qrng, Quasirandom};
+use quasirandom::Qrng;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
@@ -352,12 +345,10 @@ pub struct Device {
 
     samples: RenderTexture,
     framebuffers: FramebufferCache,
-    filter: RasterFilter,
 
     lost: bool,
 
-    rng: ChaCha20Rng,
-    qrng: Qrng,
+    state: DeviceState,
 }
 
 impl Device {
@@ -369,8 +360,12 @@ impl Device {
             gl: gl.clone(),
             program: Shader::new(
                 gl.clone(),
-                include_str!("shaders/vert.glsl"),
-                include_str!("shaders/frag.glsl"),
+                include_str!("shaders/vert.glsl").to_string(),
+                [
+                    include_str!("shaders/random.glsl"),
+                    include_str!("shaders/frag.glsl"),
+                ]
+                .join("\n"),
                 hashmap! {
                     "bvh_data" => BindingPoint::Texture(0),
                     "tri_data" => BindingPoint::Texture(1),
@@ -382,8 +377,8 @@ impl Device {
             ),
             present_program: Shader::new(
                 gl.clone(),
-                include_str!("shaders/vert.glsl"),
-                include_str!("shaders/present.glsl"),
+                include_str!("shaders/vert.glsl").to_string(),
+                include_str!("shaders/present.glsl").to_string(),
                 hashmap! {
                     "samples" => BindingPoint::Texture(0),
                 },
@@ -397,9 +392,7 @@ impl Device {
             samples: RenderTexture::new(gl.clone()),
             framebuffers: FramebufferCache::new(gl.clone()),
             lost: true,
-            rng: ChaCha20Rng::seed_from_u64(0),
-            qrng: Qrng::new(0),
-            filter: RasterFilter::Delta, // TODO: add a default
+            state: DeviceState::new(),
         })
     }
 
@@ -419,7 +412,7 @@ impl Device {
         let mut invalidated = false;
 
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
-            camera.update(&mut self.camera_buffer)
+            camera.update(&mut self.camera_buffer);
         });
 
         invalidated |= Dirty::clean(&mut scene.objects, |objects| {
@@ -444,12 +437,11 @@ impl Device {
                 .resize(raster.width.get() as i32, raster.height.get() as i32);
 
             raster.update_raster(&mut self.raster_buffer);
-
-            self.filter = raster.filter;
         });
 
         if invalidated {
-            self.reset();
+            self.state.reset(scene);
+            self.reset_refinement();
         }
 
         Ok(())
@@ -470,7 +462,7 @@ impl Device {
 
         self.gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, fbo);
 
-        self.update_globals();
+        self.state.update(&mut self.globals_buffer);
 
         let shader = self.program.bind_to_pipeline();
 
@@ -531,7 +523,7 @@ impl Device {
         Ok(false)
     }
 
-    fn reset(&mut self) {
+    fn reset_refinement(&mut self) {
         let fbo = self
             .framebuffers
             .get_framebuffer("samples", &[&self.samples]);
@@ -540,34 +532,6 @@ impl Device {
 
         self.gl
             .clear_bufferfv_with_f32_array(Context::COLOR, 0, &[0.0, 0.0, 0.0, 0.0]);
-
-        self.rng = ChaCha20Rng::seed_from_u64(0);
-        self.qrng = Qrng::new(0);
-        self.qrng.next::<(f32, f32)>(); // drop first (0, 0), we don't want it
-    }
-
-    fn update_globals(&mut self) {
-        let (x, y) = self.qrng.next::<(f32, f32)>();
-
-        let dx = self.filter.evaluate_inverse_cdf(x);
-        let dy = self.filter.evaluate_inverse_cdf(y);
-
-        let seed1 = self.rng.next_u32();
-        let seed2 = self.rng.next_u32();
-        let seed3 = self.rng.next_u32();
-        let seed4 = self.rng.next_u32();
-
-        self.globals_buffer
-            .map_update(std::mem::size_of::<Globals>(), |memory| {
-                let mut mem: LayoutVerified<_, Globals> = LayoutVerified::new(memory).unwrap();
-
-                mem.raster_filter_offset[0] = dx;
-                mem.raster_filter_offset[1] = dy;
-                mem.random_state[0] = seed1;
-                mem.random_state[1] = seed2;
-                mem.random_state[2] = seed3;
-                mem.random_state[3] = seed4;
-            });
     }
 
     fn try_load_extension(&self, name: &str) -> Result<(), Error> {
@@ -576,5 +540,69 @@ impl Device {
         } else {
             Ok(())
         }
+    }
+}
+
+struct DeviceState {
+    rng: ChaCha20Rng,
+    filter_rng: Qrng,
+
+    filter: RasterFilter,
+    aperture: Aperture,
+
+    frame: u32,
+}
+
+impl Default for DeviceState {
+    fn default() -> Self {
+        Self {
+            rng: ChaCha20Rng::seed_from_u64(0),
+            filter_rng: Qrng::new(0),
+            filter: RasterFilter::default(),
+            aperture: Aperture::default(),
+            frame: 0,
+        }
+    }
+}
+
+impl DeviceState {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn reset(&mut self, scene: &mut Scene) {
+        *self = Self::new();
+
+        self.aperture = scene.camera.aperture;
+        self.filter = scene.raster.filter;
+    }
+
+    pub fn update(&mut self, buffer: &mut UniformBuffer) {
+        // we don't want the first (0, 0) sample from the sequence
+        let (mut x, mut y) = self.filter_rng.next::<(f32, f32)>();
+
+        if x == 0.0 && y == 0.0 {
+            x = 0.5;
+            y = 0.5;
+        }
+
+        #[repr(C)]
+        #[derive(AsBytes, FromBytes)]
+        struct GlobalData {
+            filter_delta: [f32; 4],
+            frame_state: [u32; 4],
+        }
+
+        buffer.map_update(std::mem::size_of::<GlobalData>(), |memory| {
+            let mut mem: LayoutVerified<_, GlobalData> = LayoutVerified::new(memory).unwrap();
+
+            mem.filter_delta[0] = 2.0 * self.filter.importance_sample(x) - 1.0;
+            mem.filter_delta[1] = 2.0 * self.filter.importance_sample(y) - 1.0;
+            mem.frame_state[0] = self.rng.next_u32();
+            mem.frame_state[1] = self.rng.next_u32();
+            mem.frame_state[2] = self.frame;
+        });
+
+        self.frame += 1;
     }
 }
