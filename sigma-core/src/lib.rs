@@ -1,8 +1,11 @@
+#[allow(unused_imports)]
+use log::{debug, info, warn};
+
 use cgmath::prelude::*;
 use cgmath::{Decomposed, Point3, Quaternion, Vector3};
 use itertools::{iproduct, izip};
-use log::info;
 use smart_default::SmartDefault;
+use std::mem::size_of;
 use std::num::NonZeroU32;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
@@ -94,7 +97,7 @@ impl Aperture {
         }
     }
 
-    pub(crate) fn settings(&self) -> [f32; 4] {
+    fn settings(&self) -> [f32; 4] {
         match self {
             Self::Point => [-1.0; 4],
             Self::Circle { .. } => [0.0, 0.0, 0.0, 0.0],
@@ -139,7 +142,7 @@ impl Camera {
             aperture_settings: [f32; 4],
         }
 
-        buffer.map_update(std::mem::size_of::<CameraData>(), |memory| {
+        buffer.map_update(size_of::<CameraData>(), |memory| {
             let mut camera: LayoutVerified<_, CameraData> =
                 LayoutVerified::new_zeroed(memory).unwrap();
 
@@ -187,7 +190,7 @@ pub enum RasterFilter {
 impl RasterFilter {
     pub fn importance_sample(self, t: f32) -> f32 {
         match self {
-            Self::Dirac => 0.0, // trivial window function
+            Self::Dirac => 0.0, // dirac has a trivial CDF
             _ => self.evaluate_inverse_cdf_via_bisection(t),
         }
     }
@@ -250,7 +253,7 @@ struct RasterData {
 
 impl Raster {
     pub fn update_raster(&self, buffer: &mut impl DeviceBuffer) {
-        buffer.map_update(std::mem::size_of::<RasterData>(), |memory| {
+        buffer.map_update(size_of::<RasterData>(), |memory| {
             let mut data: LayoutVerified<_, RasterData> = LayoutVerified::new(memory).unwrap();
 
             data.width = self.width.get() as f32;
@@ -312,42 +315,194 @@ struct InstanceData {
     materials_start: u32, // where does the material data start? NOT IMPLEMENTED YET
 }
 
-// 16384 floats total available
-
-// currently ew use 16 floats, so 1024 instances max...
-// though we could possibly have more space (e.g. 65536 floats) so 4096
-// instances max
-
-// other data: material ranges? (per-instance). could replace with
-// triangles_limit (don't need, possibly never will)
-// anything else?
-
 #[derive(Clone, Copy, Default, Debug)]
 struct IndexData {
     hierarchy_start: u32,
     hierarchy_limit: u32,
     triangles_start: u32,
+    materials_start: u32,
 }
 
-// TODO: this should build some kind of top-level scene BVH in addition to a
-// linear array of instance elements
+#[repr(align(64), C)]
+#[derive(AsBytes, FromBytes)]
+struct SceneHierarchyNode {
+    lhs_bmin: [f32; 3],
+    lhs_next: u32,
+    lhs_bmax: [f32; 3],
+    lhs_inst: u32,
+    rhs_bmin: [f32; 3],
+    rhs_next: u32,
+    rhs_bmax: [f32; 3],
+    rhs_inst: u32,
+}
+
 #[derive(Default)]
 pub struct Instances {
     pub list: Vec<Instance>,
 }
 
-impl Instances {
-    pub fn update(&self, objects: &Objects, buffer: &mut impl DeviceBuffer) {
-        // method to load the "instance list" into a (uniform) buffer
-        // for now we'll just iterate stupidly, later on throw in a BVH
+/// Builds an instance BVH for the scene.
+struct SceneHierarchyBuilder<'a> {
+    nodes: &'a mut [SceneHierarchyNode],
+}
 
+impl<'a> SceneHierarchyBuilder<'a> {
+    pub fn new(nodes: &'a mut [SceneHierarchyNode]) -> Self {
+        Self { nodes }
+    }
+
+    pub fn node_count_for_leaves(leaves: usize) -> usize {
+        leaves.max(2) - 1 // need at least a root node
+    }
+
+    pub fn build(&mut self, leaves: &mut [InstanceInfo]) {
+        if leaves.len() < 2 {
+            // special case (tree has an incomplete root)
+            return self.build_incomplete(leaves.first());
+        }
+
+        let total = self.build_recursive(0, leaves);
+        assert_eq!(total as usize, self.nodes.len())
+    }
+
+    fn build_incomplete(&mut self, leaf: Option<&InstanceInfo>) {
+        let node = &mut self.nodes[0];
+
+        if let Some(leaf) = leaf {
+            node.lhs_bmin = leaf.bbox.min.into();
+            node.lhs_bmax = leaf.bbox.max.into();
+            node.lhs_next = 0xffff_ffff;
+            node.lhs_inst = leaf.inst;
+        } else {
+            node.lhs_bmin = [0.0, 0.0, 0.0];
+            node.lhs_bmax = [0.0, 0.0, 0.0];
+            node.lhs_next = 0xffff_ffff;
+            node.lhs_inst = 0;
+        }
+
+        node.rhs_bmin = [0.0, 0.0, 0.0];
+        node.rhs_bmax = [0.0, 0.0, 0.0];
+        node.rhs_next = 0xffff_ffff;
+        node.rhs_inst = 0;
+    }
+
+    fn build_recursive(&mut self, mut offset: u32, leaves: &mut [InstanceInfo]) -> u32 {
+        let bbox = BoundingBox::from_extents(leaves.iter().map(|i| i.bbox));
+
+        // TODO: implement SAH heuristic here when possible (need more info from object
+        // BVHs). for now, do a median split on the largest axis
+
+        let split = leaves.len() / 2;
+
+        let dx = bbox.max.x - bbox.min.x;
+        let dy = bbox.max.y - bbox.min.y;
+        let dz = bbox.max.z - bbox.min.z;
+
+        let mut axis = 0;
+
+        if dx > dy && dx > dz {
+            axis = 0;
+        }
+
+        if dy > dx && dy > dz {
+            axis = 1;
+        }
+
+        if dz > dy && dz > dx {
+            axis = 2;
+        }
+
+        leaves.sort_by_key(|instance| {
+            let centroid = instance.bbox.centroid();
+
+            match axis {
+                0 => ordered_float::NotNan::new(centroid.x).unwrap(),
+                1 => ordered_float::NotNan::new(centroid.y).unwrap(),
+                2 => ordered_float::NotNan::new(centroid.z).unwrap(),
+                _ => unreachable!(),
+            }
+        });
+
+        let (lhs, rhs) = leaves.split_at_mut(split);
+
+        let lhs_bbox = BoundingBox::from_extents(lhs.iter().map(|i| i.bbox));
+        let rhs_bbox = BoundingBox::from_extents(rhs.iter().map(|i| i.bbox));
+
+        let curr = offset as usize;
+        offset += 1; // go to next
+
+        self.nodes[curr].lhs_bmin = lhs_bbox.min.into();
+        self.nodes[curr].lhs_bmax = lhs_bbox.max.into();
+        self.nodes[curr].rhs_bmin = rhs_bbox.min.into();
+        self.nodes[curr].rhs_bmax = rhs_bbox.max.into();
+
+        if lhs.len() > 1 {
+            self.nodes[curr].lhs_next = offset;
+            self.nodes[curr].lhs_inst = 0;
+
+            offset = self.build_recursive(offset, lhs);
+        } else {
+            self.nodes[curr].lhs_next = 0xffff_ffff;
+            self.nodes[curr].lhs_inst = lhs[0].inst;
+        }
+
+        if rhs.len() > 1 {
+            self.nodes[curr].rhs_next = offset;
+            self.nodes[curr].rhs_inst = 0;
+
+            offset = self.build_recursive(offset, rhs);
+        } else {
+            self.nodes[curr].rhs_next = 0xffff_ffff;
+            self.nodes[curr].rhs_inst = rhs[0].inst;
+        }
+
+        offset
+    }
+}
+
+struct InstanceInfo {
+    bbox: BoundingBox,
+    scale: f32,
+    surface_area: f32,
+    inst: u32,
+}
+
+impl Instances {
+    pub fn update_scene_hierarchy(&self, objects: &Objects, buffer: &mut impl DeviceBuffer) {
+        let mut instances = Vec::with_capacity(self.list.len());
+
+        for (index, instance) in self.list.iter().enumerate() {
+            let object = &objects.list[instance.object];
+
+            let instance_world = Decomposed {
+                scale: instance.scale,
+                rot: instance.rotation,
+                disp: instance.translation,
+            };
+
+            let bbox = object.bbox.transform(instance_world);
+
+            instances.push(InstanceInfo {
+                bbox,
+                scale: instance.scale, // used to scale surface area heuristic
+                surface_area: 1.0,     // obtain from object BVH
+                inst: index as u32,
+            });
+        }
+
+        let node_count = SceneHierarchyBuilder::node_count_for_leaves(self.list.len());
+
+        buffer.map_update(node_count * size_of::<SceneHierarchyNode>(), |memory| {
+            let slice = LayoutVerified::new_slice(memory).unwrap().into_mut_slice();
+
+            SceneHierarchyBuilder::new(slice).build(&mut instances);
+        });
+    }
+
+    pub fn update(&self, objects: &Objects, buffer: &mut impl DeviceBuffer) {
         let indices = Self::calculate_indices(&objects.list);
 
-        // TODO: better sizing of instance data
-        // let size = self.list.len() * std::mem::size_of::<InstanceData>();
-        let size = 128 * std::mem::size_of::<InstanceData>();
-
-        buffer.map_update(size, |memory| {
+        buffer.map_update(self.list.len() * size_of::<InstanceData>(), |memory| {
             let mut slice: LayoutVerified<_, [InstanceData]> =
                 LayoutVerified::new_slice_zeroed(memory).unwrap();
 
@@ -367,7 +522,7 @@ impl Instances {
                 memory.hierarchy_start = index_data.hierarchy_start;
                 memory.hierarchy_limit = index_data.hierarchy_limit;
                 memory.triangles_start = index_data.triangles_start;
-                memory.materials_start = 0;
+                memory.materials_start = index_data.materials_start;
             }
         });
     }
@@ -377,12 +532,14 @@ impl Instances {
         let mut current = IndexData::default();
 
         for object in objects {
+            // TODO: drop hierarchy_limit, it won't be needed eventually
             current.hierarchy_limit += object.hierarchy.len() as u32 / 32;
 
             indices.push(current);
 
             current.hierarchy_start += object.hierarchy.len() as u32 / 32;
             current.triangles_start += object.triangles.len() as u32 / 64;
+            current.materials_start += object.materials/*.len()*/ as u32;
         }
 
         indices
@@ -395,9 +552,71 @@ impl Instances {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct BoundingBox {
+    pub min: Point3<f32>,
+    pub max: Point3<f32>,
+}
+
+impl BoundingBox {
+    pub fn centroid(&self) -> Point3<f32> {
+        self.min + (self.max - self.min) / 2.0
+    }
+
+    pub fn transform(&self, xfm: impl Transform<Point3<f32>>) -> Self {
+        let vertices = [
+            Point3::new(self.min.x, self.min.y, self.min.z),
+            Point3::new(self.min.x, self.min.y, self.max.z),
+            Point3::new(self.min.x, self.max.y, self.min.z),
+            Point3::new(self.min.x, self.max.y, self.max.z),
+            Point3::new(self.max.x, self.min.y, self.min.z),
+            Point3::new(self.max.x, self.min.y, self.max.z),
+            Point3::new(self.max.x, self.max.y, self.min.z),
+            Point3::new(self.max.x, self.max.y, self.max.z),
+        ];
+
+        let mut min = Point3::new(std::f32::INFINITY, std::f32::INFINITY, std::f32::INFINITY);
+        let mut max = min * -1.0; // construct an invalid AABB to avoid needing an Option here
+
+        for vertex in &vertices {
+            let vertex = xfm.transform_point(*vertex);
+
+            min.x = min.x.min(vertex.x);
+            max.x = max.x.max(vertex.x);
+            min.y = min.y.min(vertex.y);
+            max.y = max.y.max(vertex.y);
+            min.z = min.z.min(vertex.z);
+            max.z = max.z.max(vertex.z);
+        }
+
+        Self { min, max }
+    }
+
+    pub fn from_extents(boxes: impl IntoIterator<Item = Self>) -> Self {
+        let mut min = Point3::new(std::f32::INFINITY, std::f32::INFINITY, std::f32::INFINITY);
+        let mut max = min * -1.0; // construct an invalid AABB to avoid needing an Option here
+
+        for bbox in boxes.into_iter() {
+            min.x = min.x.min(bbox.min.x);
+            max.x = max.x.max(bbox.max.x);
+            min.y = min.y.min(bbox.min.y);
+            max.y = max.y.max(bbox.max.y);
+            min.z = min.z.min(bbox.min.z);
+            max.z = max.z.max(bbox.max.z);
+        }
+
+        Self { min, max }
+    }
+}
+
+// transform + union methods
+
 pub struct Object {
     pub hierarchy: Vec<u8>,
     pub triangles: Vec<u8>,
+    pub materials: usize, // TODO: later on, specify default materials...
+
+    pub bbox: BoundingBox,
 }
 
 #[derive(Default)]

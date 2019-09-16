@@ -61,13 +61,17 @@ import('./pkg/webgl').catch(console.error).then(gl => {
 
   document.getElementById("cat").addEventListener("click", () => {
     if (cat_object != -1) {
-      runner.add_instance(cat_object)
+      runner.add_instance(cat_object, 0, 0, 0)
     }
   });
 
+  let offset = 0
+
   document.getElementById("buddha").addEventListener("click", () => {
     if (buddha_object != -1) {
-      runner.add_instance(buddha_object)
+      runner.add_instance(buddha_object, offset, 0, 0)
+
+      offset += 1.0
     }
   });
 
@@ -88,6 +92,21 @@ import('./pkg/webgl').catch(console.error).then(gl => {
       runner.move_instance_up(0, 10.0);
     }
   });
+
+  let apertureSize = document.getElementById("aperture-size")
+  apertureSize.addEventListener("input", () => {
+    runner.set_camera_aperture(apertureSize.value / 10000)
+  })
+
+  let focalDistance = document.getElementById("focal-distance")
+  focalDistance.addEventListener("input", () => {
+    runner.set_focal_distance(focalDistance.value / 1000)
+  })
+
+  let focalLength = document.getElementById("focal-length")
+  focalLength.addEventListener("input", () => {
+    runner.set_focal_length(focalLength.value / 1000)
+  })
 
   let angleX = Math.PI / 2
   let angleY = Math.PI / 2
@@ -140,7 +159,7 @@ import('./pkg/webgl').catch(console.error).then(gl => {
       let dy = 0
 
       if (pressed['q'] == true) {
-        runner.set_camera_aperture(0.001)
+        runner.set_camera_aperture(0.1)
       }
 
       if (pressed['w'] === true) {
@@ -160,9 +179,16 @@ import('./pkg/webgl').catch(console.error).then(gl => {
       }
 
       if (dx != 0.0 || dy != 0.0) {
-        runner.move_camera(-dx, -dy)
+        runner.move_camera(-dx * 5, -dy * 5)
       }
 
+      if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {
+        canvas.width = canvas.clientWidth
+        canvas.height = canvas.clientHeight
+        runner.set_dimensions(canvas.width, canvas.height)
+      }
+
+      runner.update()
       runner.refine()
       runner.render()
 

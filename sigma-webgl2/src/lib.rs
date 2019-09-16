@@ -1,10 +1,12 @@
+#[allow(unused_imports)]
+use log::{debug, info, warn};
+
 use js_sys::{Error, Float32Array};
-use log::info;
 use maplit::hashmap;
 use sigma_core::{Aperture, DeviceBuffer, Dirty, RasterFilter, Scene};
 use std::cell::RefCell;
 use std::rc::Rc;
-use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer, WebGlFramebuffer, WebGlTexture};
+use web_sys::{WebGl2RenderingContext as Context, WebGlFramebuffer, WebGlTexture};
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 mod engine;
@@ -31,6 +33,8 @@ impl RenderTexture {
 
     pub fn resize(&mut self, width: i32, height: i32) {
         if width != self.width || height != self.height || self.resource().is_none() {
+            self.gl.delete_texture(self.resource());
+
             self.handle = self.gl.create_texture();
 
             self.gl.bind_texture(Context::TEXTURE_2D, self.resource());
@@ -58,6 +62,9 @@ impl RenderTexture {
                 Context::TEXTURE_WRAP_T,
                 Context::CLAMP_TO_EDGE as i32,
             );
+
+            self.width = width;
+            self.height = height;
         }
     }
 
@@ -268,61 +275,6 @@ impl DeviceBuffer for TextureBuffer {
     }
 }
 
-pub struct UniformBuffer {
-    gl: Context,
-    scratch: Rc<RefCell<ScratchMemory>>,
-
-    handle: Option<WebGlBuffer>,
-    size: usize,
-}
-
-impl UniformBuffer {
-    pub fn new(gl: Context, scratch: Rc<RefCell<ScratchMemory>>) -> Self {
-        Self {
-            gl,
-            scratch,
-            handle: None,
-            size: 0,
-        }
-    }
-
-    pub(crate) fn resource(&self) -> Option<&WebGlBuffer> {
-        self.handle.as_ref()
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.handle = self.gl.create_buffer();
-        self.size = 0;
-    }
-}
-
-impl DeviceBuffer for UniformBuffer {
-    fn map_update(&mut self, size: usize, f: impl FnOnce(&mut [u8])) {
-        let mut memory = self.scratch.borrow_mut();
-
-        let buffer = memory.access_with_size(size);
-
-        f(buffer);
-
-        if self.size < size {
-            self.gl
-                .bind_buffer(Context::UNIFORM_BUFFER, self.resource());
-            self.gl.buffer_data_with_i32(
-                Context::UNIFORM_BUFFER,
-                size as i32,
-                Context::DYNAMIC_DRAW,
-            );
-
-            self.size = size;
-        }
-
-        self.gl
-            .bind_buffer(Context::UNIFORM_BUFFER, self.resource());
-        self.gl
-            .buffer_sub_data_with_i32_and_u8_array(Context::UNIFORM_BUFFER, 0, buffer);
-    }
-}
-
 use quasirandom::Qrng;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -336,6 +288,7 @@ pub struct Device {
     camera_buffer: UniformBuffer,
 
     instance_buffer: UniformBuffer,
+    instance_hierarchy_buffer: UniformBuffer,
 
     globals_buffer: UniformBuffer,
     raster_buffer: UniformBuffer,
@@ -371,6 +324,7 @@ impl Device {
                     "tri_data" => BindingPoint::Texture(1),
                     "Camera" => BindingPoint::UniformBlock(0),
                     "Instances" => BindingPoint::UniformBlock(1),
+                    "InstanceHierarchy" => BindingPoint::UniformBlock(4),
                     "Globals" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
                 },
@@ -386,7 +340,12 @@ impl Device {
             camera_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
             bvh_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
             tri_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
-            instance_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
+            instance_buffer: UniformBuffer::with_fixed_size(gl.clone(), scratch.clone(), 64 * 128), /* 64 = instance size, 128 = instance count */
+            instance_hierarchy_buffer: UniformBuffer::with_fixed_size(
+                gl.clone(),
+                scratch.clone(),
+                64 * 127,
+            ), /* 64 = BVH size, 127 = BVH node count */
             raster_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
             globals_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
             samples: RenderTexture::new(gl.clone()),
@@ -424,17 +383,14 @@ impl Device {
 
         invalidated |= Dirty::clean(&mut scene.instances, |instances| {
             instances.update(objects, &mut self.instance_buffer);
-
-            // TODO: delete this once the scene BVH is in place (it shouldn't need a count)
-
-            let shader = self.program.bind_to_pipeline();
-
-            shader.set_uniform(instances.list.len() as u32, "instance_count");
+            instances.update_scene_hierarchy(objects, &mut self.instance_hierarchy_buffer);
         });
 
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
             self.samples
                 .resize(raster.width.get() as i32, raster.height.get() as i32);
+
+            self.framebuffers.reset();
 
             raster.update_raster(&mut self.raster_buffer);
         });
@@ -456,6 +412,9 @@ impl Device {
             return;
         }
 
+        self.gl
+            .viewport(0, 0, self.samples.width, self.samples.height);
+
         let fbo = self
             .framebuffers
             .get_framebuffer("samples", &[&self.samples]);
@@ -468,6 +427,7 @@ impl Device {
 
         shader.bind_uniform_buffer(&self.camera_buffer, "Camera");
         shader.bind_uniform_buffer(&self.instance_buffer, "Instances");
+        shader.bind_uniform_buffer(&self.instance_hierarchy_buffer, "InstanceHierarchy");
         shader.bind_uniform_buffer(&self.globals_buffer, "Globals");
         shader.bind_uniform_buffer(&self.raster_buffer, "Raster");
         shader.bind_texture_buffer(&self.bvh_tex, "bvh_data");
@@ -486,6 +446,9 @@ impl Device {
         if self.lost {
             return;
         }
+
+        self.gl
+            .viewport(0, 0, self.samples.width, self.samples.height);
 
         self.gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, None);
 
@@ -514,6 +477,7 @@ impl Device {
         self.samples.reset();
         self.framebuffers.reset();
         self.instance_buffer.reset();
+        self.instance_hierarchy_buffer.reset();
         self.globals_buffer.reset();
         self.raster_buffer.reset();
 

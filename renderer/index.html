@@ -5,13 +5,23 @@
     <link href="styles.css" rel="stylesheet" type="text/css">
   </head>
   <body>
-    <button type="button" id="lose">Lose context</button>
-    <button type="button" id="restore">Restore context</button>
-    <button type="button" id="cat">Cat</button>
-    <button type="button" id="buddha">Buddha</button>
-    <button type="button" id="remove-first">Remove First</button>
-    <button type="button" id="remove-last">Remove Last</button>
-    <button type="button" id="push-up">Push up</button>
-    <canvas id="canvas"/>
+    <div class="editor">
+      <button type="button" id="lose">Lose context</button>
+      <button type="button" id="restore">Restore context</button>
+      <button type="button" id="cat">Cat</button>
+      <button type="button" id="buddha">Buddha</button>
+      <button type="button" id="remove-first">Remove First</button>
+      <button type="button" id="remove-last">Remove Last</button>
+      <button type="button" id="push-up">Push up</button>
+      <p>Aperture size</p>
+      <input type="range" min="0" max="1000" value="50" class="slider" id="aperture-size">
+      <p>Focal length</p>
+      <input type="range" min="0" max="200" value="60" class="slider" id="focal-length">
+      <p>Focal distance</p>
+      <input type="range" min="0" max="10000" value="1000" class="slider" id="focal-distance">
+    </div>
+    <div class="render">
+      <canvas id="canvas"></canvas>
+    </div>
   </body>
 </html>

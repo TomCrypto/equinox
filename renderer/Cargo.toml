@@ -10,6 +10,9 @@ crate-type = ["cdylib"]
 [dependencies.cgmath]
 version = "0.17"
 
+[dependencies.console_error_panic_hook]
+version = "0.1"
+
 [dependencies.console_log]
 version = "0.1"
 

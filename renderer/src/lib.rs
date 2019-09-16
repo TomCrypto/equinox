@@ -1,5 +1,5 @@
 use cgmath::prelude::*;
-use cgmath::{Quaternion, Vector3};
+use cgmath::{Point3, Quaternion, Vector3};
 use console_log;
 use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
@@ -19,6 +19,7 @@ impl WasmRunner {
     #[wasm_bindgen(constructor)]
     pub fn new(context: WebGl2RenderingContext) -> Result<WasmRunner, JsValue> {
         console_log::init().unwrap();
+        console_error_panic_hook::set_once();
 
         Ok(Self {
             device: Device::new(context)?,
@@ -38,19 +39,19 @@ impl WasmRunner {
     // perspective", "change material", etc... these are all "actions"
     // propagated to the scene
 
+    pub fn update(&mut self) -> Result<(), JsValue> {
+        Ok(self.device.update(&mut self.scene)?)
+    }
+
     // TODO: return rendering stats later (in the form of Serde-serialized data I
     // guess)
-    pub fn refine(&mut self) -> Result<(), JsValue> {
-        self.device.update(&mut self.scene)?;
+    pub fn refine(&mut self) {
         self.device.refine();
-        Ok(())
     }
 
     // TODO: return stats
-    pub fn render(&mut self) -> Result<(), JsValue> {
-        self.device.update(&mut self.scene)?;
+    pub fn render(&mut self) {
         self.device.render();
-        Ok(())
     }
 
     pub fn move_camera(&mut self, forward: f32, sideways: f32) {
@@ -82,17 +83,23 @@ impl WasmRunner {
         self.scene.objects.list.push(Object {
             hierarchy: bvh.to_vec(),
             triangles: tri.to_vec(),
+            materials: 1,
+            bbox: BoundingBox {
+                // TODO: obtain better
+                min: Point3::new(-1000.0, -1000.0, -1000.0),
+                max: Point3::new(1000.0, 1000.0, 1000.0),
+            },
         });
 
         self.scene.objects.list.len() - 1
     }
 
-    pub fn add_instance(&mut self, object: usize) {
+    pub fn add_instance(&mut self, object: usize, x: f32, y: f32, z: f32) {
         self.scene.instances.list.push(Instance {
             object,
             scale: 1.0,
             rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
-            translation: Vector3::new(0.0, 0.0, 0.0),
+            translation: Vector3::new(x, y, z),
         })
     }
 
@@ -104,6 +111,14 @@ impl WasmRunner {
         self.scene.raster.width = NonZeroU32::new(width).unwrap();
         self.scene.raster.height = NonZeroU32::new(height).unwrap();
         self.scene.raster.filter = RasterFilter::BlackmanHarris;
+    }
+
+    pub fn set_focal_distance(&mut self, value: f32) {
+        self.scene.camera.focal_distance = value;
+    }
+
+    pub fn set_focal_length(&mut self, value: f32) {
+        self.scene.camera.focal_length = value;
     }
 
     pub fn instance_count(&mut self) -> usize {

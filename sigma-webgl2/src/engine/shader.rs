@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use log::{debug, info, warn};
+
 use js_sys::Error;
 use std::collections::HashMap;
 use web_sys::{WebGl2RenderingContext as Context, WebGlProgram, WebGlShader};
@@ -40,7 +43,6 @@ impl Shader {
 
         ActiveShader {
             gl: &self.gl,
-            handle: self.handle.as_ref(),
             binds: &self.binds,
         }
     }
@@ -168,7 +170,6 @@ impl Shader {
 
 pub struct ActiveShader<'a> {
     gl: &'a Context,
-    handle: Option<&'a WebGlProgram>,
     binds: &'a HashMap<&'static str, BindingPoint>,
 }
 
@@ -199,20 +200,6 @@ impl ActiveShader<'_> {
                 .bind_texture(Context::TEXTURE_2D, resource.resource());
         } else {
             panic!("slot '{}' does not map to a binding point", slot);
-        }
-    }
-
-    // TODO: want to get rid of this eventually if possible
-
-    pub fn set_uniform(&self, value: u32, name: &str) {
-        if let Some(program) = &self.handle {
-            let location = self.gl.get_uniform_location(program, name);
-
-            if let Some(location) = location {
-                self.gl.uniform1ui(Some(&location), value);
-            } else {
-                panic!("no such uniform in shader");
-            }
         }
     }
 }

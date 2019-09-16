@@ -18,6 +18,17 @@ layout (std140, row_major) uniform Instances {
     Instance data[128];
 } instances;
 
+struct InstanceNode {
+    vec4 lhs_min;
+    vec4 lhs_max;
+    vec4 rhs_min;
+    vec4 rhs_max;
+};
+
+layout (std140) uniform InstanceHierarchy {
+    InstanceNode data[127];
+} instance_hierarchy;
+
 layout (std140) uniform Globals {
     vec2 filter_delta;
     uvec4 frame_state;
@@ -31,8 +42,6 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-
-uniform uint instance_count;
 
 uniform sampler2D bvh_data;
 uniform sampler2D tri_data;
@@ -170,20 +179,68 @@ bool ray_bvh_occlusion(vec3 origin, vec3 direction, uint offset, uint limit, uin
     return false;
 }
 
-bool intersect_world(vec3 origin, vec3 direction, out Result result) {
+bool traverse_scene_bvh(vec3 origin, vec3 direction, out Result result) {
+    uint stack[7]; // equal to max BVH depth + 1, so log2(128) = 7? TODO: find the exact number
+    
+    vec3 inv_dir = vec3(1.0) / direction;
+
     result.distance = 1e10;
 
-    for (uint i = uint(0); i < instance_count; ++i) {
-        mat4x3 xfm = instances.data[i].transform;
+    stack[0] = 0U;
+    uint idx = 1U;
 
-        vec3 new_origin = xfm * vec4(origin, 1.0);
-        vec3 new_direction = xfm * vec4(direction, 0.0);
+    while (idx != 0U) {
+        InstanceNode node = instance_hierarchy.data[stack[--idx]];
 
-        Result tmp;
+        // TODO: optimize this traversal later
 
-        if (ray_bvh(new_origin, new_direction, instances.data[i].indices.x, instances.data[i].indices.y, instances.data[i].indices.z, tmp)) {
-            if (tmp.distance < result.distance) {
-                result = tmp;
+        // do we intersect the LEFT node?
+        if (ray_bbox(origin, inv_dir, node.lhs_min.xyz, node.lhs_max.xyz)) {
+            uint next = floatBitsToUint(node.lhs_min.w);
+            uint inst = floatBitsToUint(node.lhs_max.w);
+
+            if (next == 0xffffffffU) {
+                // this is a leaf node, traverse it
+                mat4x3 xfm = instances.data[inst].transform;
+
+                vec3 new_origin = xfm * vec4(origin, 1.0);
+                vec3 new_direction = xfm * vec4(direction, 0.0);
+
+                Result tmp;
+
+                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, tmp)) {
+                    if (tmp.distance < result.distance) {
+                        result = tmp;
+                    }
+                }
+            } else {
+                // this is another node, push it on the stack
+                stack[idx++] = next;
+            }
+        }
+
+        // do we intersect the LEFT node?
+        if (ray_bbox(origin, inv_dir, node.rhs_min.xyz, node.rhs_max.xyz)) {
+            uint next = floatBitsToUint(node.rhs_min.w);
+            uint inst = floatBitsToUint(node.rhs_max.w);
+
+            if (next == 0xffffffffU) {
+                // this is a leaf node, traverse it
+                mat4x3 xfm = instances.data[inst].transform;
+
+                vec3 new_origin = xfm * vec4(origin, 1.0);
+                vec3 new_direction = xfm * vec4(direction, 0.0);
+
+                Result tmp;
+
+                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, tmp)) {
+                    if (tmp.distance < result.distance) {
+                        result = tmp;
+                    }
+                }
+            } else {
+                // this is another node, push it on the stack
+                stack[idx++] = next;
             }
         }
     }
@@ -191,15 +248,59 @@ bool intersect_world(vec3 origin, vec3 direction, out Result result) {
     return result.distance < 1e10;
 }
 
-bool intersect_world_occlusion(vec3 origin, vec3 direction) {
-    for (uint i = uint(0); i < instance_count; ++i) {
-        mat4x3 xfm = instances.data[i].transform;
+bool traverse_scene_bvh_occlusion(vec3 origin, vec3 direction) {
+    uint stack[7]; // equal to max BVH depth + 1, so log2(128) = 7? TODO: find the exact number
+    
+    vec3 inv_dir = vec3(1.0) / direction;
 
-        vec3 new_origin = xfm * vec4(origin, 1.0);
-        vec3 new_direction = xfm * vec4(direction, 0.0);
+    stack[0] = 0U;
+    uint idx = 1U;
 
-        if (ray_bvh_occlusion(new_origin, new_direction, instances.data[i].indices.x, instances.data[i].indices.y, instances.data[i].indices.z)) {
-            return true;
+    while (idx != 0U) {
+        InstanceNode node = instance_hierarchy.data[stack[--idx]];
+
+        // TODO: optimize this traversal later
+
+        // do we intersect the LEFT node?
+        if (ray_bbox(origin, inv_dir, node.lhs_min.xyz, node.lhs_max.xyz)) {
+            uint next = floatBitsToUint(node.lhs_min.w);
+            uint inst = floatBitsToUint(node.lhs_max.w);
+
+            if (next == 0xffffffffU) {
+                // this is a leaf node, traverse it
+                mat4x3 xfm = instances.data[inst].transform;
+
+                vec3 new_origin = xfm * vec4(origin, 1.0);
+                vec3 new_direction = xfm * vec4(direction, 0.0);
+
+                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z)) {
+                    return true;
+                }
+            } else {
+                // this is another node, push it on the stack
+                stack[idx++] = next;
+            }
+        }
+
+        // do we intersect the LEFT node?
+        if (ray_bbox(origin, inv_dir, node.rhs_min.xyz, node.rhs_max.xyz)) {
+            uint next = floatBitsToUint(node.rhs_min.w);
+            uint inst = floatBitsToUint(node.rhs_max.w);
+
+            if (next == 0xffffffffU) {
+                // this is a leaf node, traverse it
+                mat4x3 xfm = instances.data[inst].transform;
+
+                vec3 new_origin = xfm * vec4(origin, 1.0);
+                vec3 new_direction = xfm * vec4(direction, 0.0);
+
+                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z)) {
+                    return true;
+                }
+            } else {
+                // this is another node, push it on the stack
+                stack[idx++] = next;
+            }
         }
     }
 
@@ -215,8 +316,6 @@ bool intersect_world_occlusion(vec3 origin, vec3 direction) {
 vec2 low_discrepancy_2d(uvec2 key) {
     return fract(vec2(key + FRAME_NUMBER) * vec2(0.7548776662, 0.5698402909));
 }
-
-// end of random stuff
 
 // Begin camera stuff
 
@@ -292,7 +391,7 @@ void main() {
     Result result;
 
     // intersect the BVH
-    if (intersect_world(pos, dir, result)) {
+    if (traverse_scene_bvh(pos, dir, result)) {
         pos = pos + dir * result.distance + result.normal * 1e-3;
 
         vec2 rng = gen_vec2_uniform(frame_state);
@@ -305,7 +404,7 @@ void main() {
 
         dir *= sign(dot(dir, result.normal));
 
-        if (intersect_world_occlusion(pos, dir)) {
+        if (traverse_scene_bvh_occlusion(pos, dir)) {
             color = vec4(0.0, 0.0, 0.0, 1.0);
         } else {
             color = vec4(0.75, 0.95, 0.65, 1.0);
