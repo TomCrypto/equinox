@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use js_sys::{Error, Float32Array};
+use js_sys::Error;
 use maplit::hashmap;
 use sigma_core::{Aperture, DeviceBuffer, Dirty, RasterFilter, Scene};
 use std::cell::RefCell;
@@ -155,126 +155,6 @@ impl ScratchMemory {
     }
 }
 
-pub struct TextureBuffer {
-    gl: Context,
-    scratch: Rc<RefCell<ScratchMemory>>,
-
-    handle: Option<WebGlTexture>,
-    width: i32,
-    height: i32,
-}
-
-impl TextureBuffer {
-    pub fn new(gl: Context, scratch: Rc<RefCell<ScratchMemory>>) -> Self {
-        Self {
-            gl,
-            scratch,
-            handle: None,
-            width: 0,
-            height: 0,
-        }
-    }
-
-    pub fn pixel_count(&self) -> i32 {
-        self.width * self.height
-    }
-
-    pub(crate) fn resource(&self) -> Option<&WebGlTexture> {
-        self.handle.as_ref()
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.handle = None;
-        self.width = 0;
-        self.height = 0;
-    }
-}
-
-impl DeviceBuffer for TextureBuffer {
-    fn map_update(&mut self, size: usize, f: impl FnOnce(&mut [u8])) {
-        let pixel_count = (size / (4 * 4)) as i32;
-
-        let width = 4096;
-        // make sure we always have a valid texture
-        let height = ((pixel_count + 4095) / 4096).max(1);
-
-        let mut memory = self.scratch.borrow_mut();
-
-        let buffer = memory.access_with_size(size);
-
-        f(buffer);
-
-        // if the new height is > than the current height, we need to reallocate =
-        // recreate
-        if height > self.height {
-            self.gl.delete_texture(self.resource());
-
-            self.handle = self.gl.create_texture();
-
-            self.gl.bind_texture(Context::TEXTURE_2D, self.resource());
-
-            self.gl
-                .tex_storage_2d(Context::TEXTURE_2D, 1, Context::RGBA32F, width, height);
-
-            self.gl.tex_parameteri(
-                Context::TEXTURE_2D,
-                Context::TEXTURE_MAG_FILTER,
-                Context::NEAREST as i32,
-            );
-            self.gl.tex_parameteri(
-                Context::TEXTURE_2D,
-                Context::TEXTURE_MIN_FILTER,
-                Context::NEAREST as i32,
-            );
-            self.gl.tex_parameteri(
-                Context::TEXTURE_2D,
-                Context::TEXTURE_WRAP_S,
-                Context::CLAMP_TO_EDGE as i32,
-            );
-            self.gl.tex_parameteri(
-                Context::TEXTURE_2D,
-                Context::TEXTURE_WRAP_T,
-                Context::CLAMP_TO_EDGE as i32,
-            );
-
-            self.width = width;
-            self.height = height;
-        }
-
-        self.gl.bind_texture(Context::TEXTURE_2D, self.resource());
-
-        let float_data: LayoutVerified<_, [f32]> = LayoutVerified::new_slice(buffer).unwrap();
-
-        let mut float_offset: i32 = 0;
-
-        for y in 0..height {
-            let float_end = (float_offset + 4 * 4096).min(float_data.len() as i32);
-            let pixels = (float_end - float_offset) / 4; // 4 floats per pixel
-
-            let slice = &float_data[float_offset as usize..float_end as usize];
-
-            // safety: we only use this for the next call and that's it
-            let typed_array = unsafe { Float32Array::view(slice) };
-
-            self.gl
-                .tex_sub_image_2d_with_i32_and_i32_and_u32_and_type_and_opt_array_buffer_view(
-                    Context::TEXTURE_2D,
-                    0,
-                    0,
-                    y,
-                    pixels,
-                    1,
-                    Context::RGBA,
-                    Context::FLOAT,
-                    Some(&typed_array),
-                )
-                .unwrap();
-
-            float_offset = float_end;
-        }
-    }
-}
-
 use quasirandom::Qrng;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -318,6 +198,7 @@ impl Device {
                 gl.clone(),
                 include_str!("shaders/vert.glsl").to_string(),
                 [
+                    &format!("#define TBUF_WIDTH {}", TextureBuffer::pixels_per_row(&gl)),
                     include_str!("shaders/random.glsl"),
                     include_str!("shaders/frag.glsl"),
                 ]
@@ -343,10 +224,14 @@ impl Device {
                 },
             ),
             camera_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
-            bvh_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
-            tri_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
-            position_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
-            normal_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
+            bvh_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4, scratch.clone()),
+            tri_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4, scratch.clone()),
+            position_tex: TextureBuffer::new(
+                gl.clone(),
+                TextureBufferFormat::F32x4,
+                scratch.clone(),
+            ),
+            normal_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4, scratch.clone()),
             instance_buffer: UniformBuffer::with_fixed_size(gl.clone(), scratch.clone(), 80 * 128), /* 80 = instance size, 128 = instance count */
             instance_hierarchy_buffer: UniformBuffer::with_fixed_size(
                 gl.clone(),

@@ -45,7 +45,7 @@ layout (std140) uniform Raster {
 
 
 uniform sampler2D bvh_data;
-uniform sampler2D tri_data;
+uniform highp usampler2D tri_data;
 uniform sampler2D position_data;
 uniform sampler2D normal_data;
 
@@ -84,32 +84,20 @@ float ray_triangle(vec3 o, vec3 d, vec3 p1, vec3 e1, vec3 e2) {
     return dot(e2, s) * de;
 }
 
-struct Triangle {
-    uint v0;
-    uint v1;
-    uint v2;
-    uint material;
-};
-
-void read_triangle(uint index, out Triangle triangle) {
+uvec4 read_triangle(uint index) {
     int pixel_offset = int(index); // 1 pixel per triangle!
 
-    int w = pixel_offset % 4096;
-    int h = pixel_offset / 4096;
+    int w = pixel_offset % TBUF_WIDTH;
+    int h = pixel_offset / TBUF_WIDTH;
 
-    vec4 data = texelFetch(tri_data, ivec2(w, h), 0);
-
-    triangle.v0 = floatBitsToUint(data.x);
-    triangle.v1 = floatBitsToUint(data.y);
-    triangle.v2 = floatBitsToUint(data.z);
-    triangle.material = floatBitsToUint(data.w);
+    return texelFetch(tri_data, ivec2(w, h), 0);
 }
 
 vec3 read_vertex_position(uint index) {
     int pixel_offset = int(index); // 1 pixel per vertex
 
-    int w = pixel_offset % 4096;
-    int h = pixel_offset / 4096;
+    int w = pixel_offset % TBUF_WIDTH;
+    int h = pixel_offset / TBUF_WIDTH;
 
     return texelFetch(position_data, ivec2(w, h), 0).xyz;
 }
@@ -117,8 +105,8 @@ vec3 read_vertex_position(uint index) {
 vec3 read_vertex_normal(uint index) {
     int pixel_offset = int(index); // 1 pixel per vertex
 
-    int w = pixel_offset % 4096;
-    int h = pixel_offset / 4096;
+    int w = pixel_offset % TBUF_WIDTH;
+    int h = pixel_offset / TBUF_WIDTH;
 
     return texelFetch(normal_data, ivec2(w, h), 0).xyz;
 }
@@ -126,8 +114,8 @@ vec3 read_vertex_normal(uint index) {
 void read_bvh_node(uint offset, out vec4 value0, out vec4 value1) {
     int pixel_offset = int(offset) * 2;
 
-    int w = pixel_offset % 4096;
-    int h = pixel_offset / 4096;
+    int w = pixel_offset % TBUF_WIDTH;
+    int h = pixel_offset / TBUF_WIDTH;
 
     value0 = texelFetch(bvh_data, ivec2(w + 0, h), 0);
     value1 = texelFetch(bvh_data, ivec2(w + 1, h), 0);
@@ -149,13 +137,11 @@ bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle
             uint data = floatBitsToUint(elem2.w);
 
             if (data != uint(0)) {
-                Triangle triangle;
+                uvec4 tri = read_triangle(triangle_start + data - uint(1));
 
-                read_triangle(triangle_start + data - uint(1), triangle);
-
-                vec3 p1 = read_vertex_position(position_start + triangle.v0);
-                vec3 e1 = read_vertex_position(position_start + triangle.v1) - p1;
-                vec3 e2 = read_vertex_position(position_start + triangle.v2) - p1;
+                vec3 p1 = read_vertex_position(position_start + tri.x);
+                vec3 e1 = read_vertex_position(position_start + tri.y) - p1;
+                vec3 e2 = read_vertex_position(position_start + tri.z) - p1;
 
                 float distance = ray_triangle(origin, direction, p1, e1, e2);
 
@@ -163,9 +149,9 @@ bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle
                     // TODO: interpolate normal using (u, v) coordinates from ray_triangle!
                     // for now just average then
 
-                    vec3 n0 = read_vertex_normal(normal_start + triangle.v0);
-                    vec3 n1 = read_vertex_normal(normal_start + triangle.v1);
-                    vec3 n2 = read_vertex_normal(normal_start + triangle.v2);
+                    vec3 n0 = read_vertex_normal(normal_start + tri.x);
+                    vec3 n1 = read_vertex_normal(normal_start + tri.y);
+                    vec3 n2 = read_vertex_normal(normal_start + tri.z);
 
                     vec3 normal = normalize(n0 + n1 + n2);
 
@@ -196,13 +182,11 @@ bool ray_bvh_occlusion(vec3 origin, vec3 direction, uint offset, uint limit, uin
             uint data = floatBitsToUint(elem2.w);
 
             if (data != uint(0)) {
-                Triangle triangle;
+                uvec4 tri = read_triangle(triangle_start + data - uint(1));
 
-                read_triangle(triangle_start + data - uint(1), triangle);
-
-                vec3 p1 = read_vertex_position(position_start + triangle.v0);
-                vec3 e1 = read_vertex_position(position_start + triangle.v1) - p1;
-                vec3 e2 = read_vertex_position(position_start + triangle.v2) - p1;
+                vec3 p1 = read_vertex_position(position_start + tri.x);
+                vec3 e1 = read_vertex_position(position_start + tri.y) - p1;
+                vec3 e2 = read_vertex_position(position_start + tri.z) - p1;
 
                 float distance = ray_triangle(origin, direction, p1, e1, e2);
 
