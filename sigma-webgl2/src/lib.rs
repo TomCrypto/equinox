@@ -296,6 +296,9 @@ pub struct Device {
     bvh_tex: TextureBuffer,
     tri_tex: TextureBuffer,
 
+    position_tex: TextureBuffer,
+    normal_tex: TextureBuffer,
+
     samples: RenderTexture,
     framebuffers: FramebufferCache,
 
@@ -322,6 +325,8 @@ impl Device {
                 hashmap! {
                     "bvh_data" => BindingPoint::Texture(0),
                     "tri_data" => BindingPoint::Texture(1),
+                    "position_data" => BindingPoint::Texture(2),
+                    "normal_data" => BindingPoint::Texture(3),
                     "Camera" => BindingPoint::UniformBlock(0),
                     "Instances" => BindingPoint::UniformBlock(1),
                     "InstanceHierarchy" => BindingPoint::UniformBlock(4),
@@ -340,7 +345,9 @@ impl Device {
             camera_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
             bvh_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
             tri_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
-            instance_buffer: UniformBuffer::with_fixed_size(gl.clone(), scratch.clone(), 64 * 128), /* 64 = instance size, 128 = instance count */
+            position_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
+            normal_tex: TextureBuffer::new(gl.clone(), scratch.clone()),
+            instance_buffer: UniformBuffer::with_fixed_size(gl.clone(), scratch.clone(), 80 * 128), /* 80 = instance size, 128 = instance count */
             instance_hierarchy_buffer: UniformBuffer::with_fixed_size(
                 gl.clone(),
                 scratch.clone(),
@@ -377,6 +384,8 @@ impl Device {
         invalidated |= Dirty::clean(&mut scene.objects, |objects| {
             objects.update_hierarchy(&mut self.bvh_tex);
             objects.update_triangles(&mut self.tri_tex);
+            objects.update_positions(&mut self.position_tex);
+            objects.update_normals(&mut self.normal_tex);
         });
 
         let objects = &scene.objects;
@@ -432,6 +441,8 @@ impl Device {
         shader.bind_uniform_buffer(&self.raster_buffer, "Raster");
         shader.bind_texture_buffer(&self.bvh_tex, "bvh_data");
         shader.bind_texture_buffer(&self.tri_tex, "tri_data");
+        shader.bind_texture_buffer(&self.position_tex, "position_data");
+        shader.bind_texture_buffer(&self.normal_tex, "normal_data");
 
         self.gl.enable(Context::BLEND);
         self.gl.blend_equation(Context::FUNC_ADD);
@@ -480,6 +491,8 @@ impl Device {
         self.instance_hierarchy_buffer.reset();
         self.globals_buffer.reset();
         self.raster_buffer.reset();
+        self.position_tex.reset();
+        self.normal_tex.reset();
 
         scene.dirty_all();
         self.lost = false;

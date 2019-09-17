@@ -12,6 +12,7 @@ layout (std140) uniform Camera {
 struct Instance {
     mat4x3 transform;
     uvec4 indices;
+    uvec4 indices2;
 };
 
 layout (std140, row_major) uniform Instances {
@@ -45,6 +46,8 @@ layout (std140) uniform Raster {
 
 uniform sampler2D bvh_data;
 uniform sampler2D tri_data;
+uniform sampler2D position_data;
+uniform sampler2D normal_data;
 
 struct Result {
     float distance;
@@ -82,22 +85,42 @@ float ray_triangle(vec3 o, vec3 d, vec3 p1, vec3 e1, vec3 e2) {
 }
 
 struct Triangle {
-    vec3 p1;
-    vec3 e1;
-    vec3 e2;
-    vec3 n;
+    uint v0;
+    uint v1;
+    uint v2;
+    uint material;
 };
 
 void read_triangle(uint index, out Triangle triangle) {
-    int pixel_offset = int(index) * 4; // 4 pixels per triangle!
+    int pixel_offset = int(index); // 1 pixel per triangle!
 
     int w = pixel_offset % 4096;
     int h = pixel_offset / 4096;
 
-    triangle.p1 = texelFetch(tri_data, ivec2(w + 0, h), 0).xyz;
-    triangle.e1 = texelFetch(tri_data, ivec2(w + 1, h), 0).xyz;
-    triangle.e2 = texelFetch(tri_data, ivec2(w + 2, h), 0).xyz;
-    triangle.n  = texelFetch(tri_data, ivec2(w + 3, h), 0).xyz;
+    vec4 data = texelFetch(tri_data, ivec2(w, h), 0);
+
+    triangle.v0 = floatBitsToUint(data.x);
+    triangle.v1 = floatBitsToUint(data.y);
+    triangle.v2 = floatBitsToUint(data.z);
+    triangle.material = floatBitsToUint(data.w);
+}
+
+vec3 read_vertex_position(uint index) {
+    int pixel_offset = int(index); // 1 pixel per vertex
+
+    int w = pixel_offset % 4096;
+    int h = pixel_offset / 4096;
+
+    return texelFetch(position_data, ivec2(w, h), 0).xyz;
+}
+
+vec3 read_vertex_normal(uint index) {
+    int pixel_offset = int(index); // 1 pixel per vertex
+
+    int w = pixel_offset % 4096;
+    int h = pixel_offset / 4096;
+
+    return texelFetch(normal_data, ivec2(w, h), 0).xyz;
 }
 
 void read_bvh_node(uint offset, out vec4 value0, out vec4 value1) {
@@ -110,7 +133,8 @@ void read_bvh_node(uint offset, out vec4 value0, out vec4 value1) {
     value1 = texelFetch(bvh_data, ivec2(w + 1, h), 0);
 }
 
-bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle_start, out Result result) {
+// TODO: pass in the instance data directly...
+bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle_start, uint position_start, uint normal_start, out Result result) {
     vec3 inv_dir = vec3(1.0) / direction;
 
     result.distance = 1e10;
@@ -129,11 +153,24 @@ bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle
 
                 read_triangle(triangle_start + data - uint(1), triangle);
 
-                float distance = ray_triangle(origin, direction, triangle.p1, triangle.e1, triangle.e2);
+                vec3 p1 = read_vertex_position(position_start + triangle.v0);
+                vec3 e1 = read_vertex_position(position_start + triangle.v1) - p1;
+                vec3 e2 = read_vertex_position(position_start + triangle.v2) - p1;
+
+                float distance = ray_triangle(origin, direction, p1, e1, e2);
 
                 if (distance > 0.0 && distance < result.distance) {
+                    // TODO: interpolate normal using (u, v) coordinates from ray_triangle!
+                    // for now just average then
+
+                    vec3 n0 = read_vertex_normal(normal_start + triangle.v0);
+                    vec3 n1 = read_vertex_normal(normal_start + triangle.v1);
+                    vec3 n2 = read_vertex_normal(normal_start + triangle.v2);
+
+                    vec3 normal = normalize(n0 + n1 + n2);
+
                     result.distance = distance;
-                    result.normal = triangle.n; // TODO
+                    result.normal = normal;
                 }
             }
 
@@ -146,7 +183,7 @@ bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle
     return result.distance < 1e10;
 }
 
-bool ray_bvh_occlusion(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle_start) {
+bool ray_bvh_occlusion(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle_start, uint position_start, uint normal_start) {
     vec3 inv_dir = vec3(1.0) / direction;
 
     while (offset != limit) {
@@ -163,7 +200,11 @@ bool ray_bvh_occlusion(vec3 origin, vec3 direction, uint offset, uint limit, uin
 
                 read_triangle(triangle_start + data - uint(1), triangle);
 
-                float distance = ray_triangle(origin, direction, triangle.p1, triangle.e1, triangle.e2);
+                vec3 p1 = read_vertex_position(position_start + triangle.v0);
+                vec3 e1 = read_vertex_position(position_start + triangle.v1) - p1;
+                vec3 e2 = read_vertex_position(position_start + triangle.v2) - p1;
+
+                float distance = ray_triangle(origin, direction, p1, e1, e2);
 
                 if (distance > 0.0) {
                     return true;
@@ -208,7 +249,7 @@ bool traverse_scene_bvh(vec3 origin, vec3 direction, out Result result) {
 
                 Result tmp;
 
-                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, tmp)) {
+                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices2.x, instances.data[inst].indices2.y, tmp)) {
                     if (tmp.distance < result.distance) {
                         result = tmp;
                     }
@@ -233,7 +274,7 @@ bool traverse_scene_bvh(vec3 origin, vec3 direction, out Result result) {
 
                 Result tmp;
 
-                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, tmp)) {
+                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices2.x, instances.data[inst].indices2.y, tmp)) {
                     if (tmp.distance < result.distance) {
                         result = tmp;
                     }
@@ -273,7 +314,7 @@ bool traverse_scene_bvh_occlusion(vec3 origin, vec3 direction) {
                 vec3 new_origin = xfm * vec4(origin, 1.0);
                 vec3 new_direction = xfm * vec4(direction, 0.0);
 
-                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z)) {
+                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices2.x, instances.data[inst].indices2.y)) {
                     return true;
                 }
             } else {
@@ -294,7 +335,7 @@ bool traverse_scene_bvh_occlusion(vec3 origin, vec3 direction) {
                 vec3 new_origin = xfm * vec4(origin, 1.0);
                 vec3 new_direction = xfm * vec4(direction, 0.0);
 
-                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z)) {
+                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices2.x, instances.data[inst].indices2.y)) {
                     return true;
                 }
             } else {

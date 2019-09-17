@@ -1,4 +1,17 @@
-import('./pkg/webgl').catch(console.error).then(gl => {
+async function fetch_bytes(url) {
+  return (await fetch(new Request(url))).arrayBuffer();
+}
+
+async function load_model_data(name) {
+  hierarchy_data = new Uint8Array(await fetch_bytes(`pkg/${name}.hierarchy.bin`))
+  triangle_data = new Uint8Array(await fetch_bytes(`pkg/${name}.triangle.bin`))
+  position_data = new Uint8Array(await fetch_bytes(`pkg/${name}.position.bin`))
+  normal_data = new Uint8Array(await fetch_bytes(`pkg/${name}.normal.bin`))
+
+  return [hierarchy_data, triangle_data, position_data, normal_data]
+}
+
+import('./pkg/webgl').catch(console.error).then(async gl => {
   if (!gl) {
     throw "fail"
   }
@@ -39,25 +52,10 @@ import('./pkg/webgl').catch(console.error).then(gl => {
   let cat_object = -1
   let buddha_object = -1
 
-  fetch(new Request('pkg/cat-bvh.bin')).then(bvhResponse => {
-    fetch(new Request('pkg/cat-tri.bin')).then(triResponse => {
-      bvhResponse.arrayBuffer().then(bvh => {
-        triResponse.arrayBuffer().then(tri => {
-          cat_object = runner.add_object(new Uint8Array(bvh), new Uint8Array(tri))
-        })
-      })
-    })
-  })
-
-  fetch(new Request('pkg/buddha-bvh.bin')).then(bvhResponse => {
-    fetch(new Request('pkg/buddha-tri.bin')).then(triResponse => {
-      bvhResponse.arrayBuffer().then(bvh => {
-        triResponse.arrayBuffer().then(tri => {
-          buddha_object = runner.add_object(new Uint8Array(bvh), new Uint8Array(tri))
-        })
-      })
-    })
-  })
+  let [bvh, tri, position, normal] = await load_model_data('cat')
+  cat_object = runner.add_object(bvh, tri, position, normal, 2, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
+  let [bvh2, tri2, position2, normal2] = await load_model_data('buddha')
+  buddha_object = runner.add_object(bvh2, tri2, position2, normal2, 1, -0.188615, -0.445945, -0.224346, 0.222054, 0.554055, 0.186807)
 
   document.getElementById("cat").addEventListener("click", () => {
     if (cat_object != -1) {

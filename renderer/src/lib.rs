@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use log::{debug, info, warn};
+
 use cgmath::prelude::*;
 use cgmath::{Point3, Quaternion, Vector3};
 use console_log;
@@ -79,15 +82,29 @@ impl WasmRunner {
         };
     }
 
-    pub fn add_object(&mut self, bvh: &[u8], tri: &[u8]) -> usize {
+    pub fn add_object(
+        &mut self,
+        bvh: &[u8],
+        tri: &[u8],
+        positions: &[u8],
+        normals: &[u8],
+        materials: usize,
+        bminx: f32,
+        bminy: f32,
+        bminz: f32,
+        bmaxx: f32,
+        bmaxy: f32,
+        bmaxz: f32,
+    ) -> usize {
         self.scene.objects.list.push(Object {
             hierarchy: bvh.to_vec(),
             triangles: tri.to_vec(),
-            materials: 1,
+            positions: positions.to_vec(),
+            normals: normals.to_vec(),
+            materials,
             bbox: BoundingBox {
-                // TODO: obtain better
-                min: Point3::new(-1000.0, -1000.0, -1000.0),
-                max: Point3::new(1000.0, 1000.0, 1000.0),
+                min: [bminx, bminy, bminz].into(),
+                max: [bmaxx, bmaxy, bmaxz].into(),
             },
         });
 

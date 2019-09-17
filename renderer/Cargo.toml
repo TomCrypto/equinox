@@ -16,6 +16,9 @@ version = "0.1"
 [dependencies.console_log]
 version = "0.1"
 
+[dependencies.log]
+version = "0.4"
+
 [dependencies.sigma-core]
 path = "../sigma-core"
 

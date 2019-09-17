@@ -313,6 +313,9 @@ struct InstanceData {
     hierarchy_limit: u32, // where does the BVH end? (as an absolute pos)
     triangles_start: u32, // where does the triangle data start?
     materials_start: u32, // where does the material data start? NOT IMPLEMENTED YET
+    positions_start: u32,
+    normals_start: u32,
+    padding: [u32; 2],
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -321,6 +324,8 @@ struct IndexData {
     hierarchy_limit: u32,
     triangles_start: u32,
     materials_start: u32,
+    positions_start: u32,
+    normals_start: u32,
 }
 
 #[repr(align(64), C)]
@@ -523,6 +528,8 @@ impl Instances {
                 memory.hierarchy_limit = index_data.hierarchy_limit;
                 memory.triangles_start = index_data.triangles_start;
                 memory.materials_start = index_data.materials_start;
+                memory.positions_start = index_data.positions_start;
+                memory.normals_start = index_data.normals_start;
             }
         });
     }
@@ -538,8 +545,10 @@ impl Instances {
             indices.push(current);
 
             current.hierarchy_start += object.hierarchy.len() as u32 / 32;
-            current.triangles_start += object.triangles.len() as u32 / 64;
+            current.triangles_start += object.triangles.len() as u32 / 16;
             current.materials_start += object.materials/*.len()*/ as u32;
+            current.positions_start += object.positions.len() as u32 / 16;
+            current.normals_start += object.positions.len() as u32 / 16;
         }
 
         indices
@@ -609,11 +618,17 @@ impl BoundingBox {
     }
 }
 
-// transform + union methods
-
+// TODO: use actual types for these things later on (with methods to get to them
+// from a raw byte array for loading convenience of course... possibly defining
+// a custom "all-in-one" object format)
 pub struct Object {
     pub hierarchy: Vec<u8>,
     pub triangles: Vec<u8>,
+
+    pub positions: Vec<u8>,
+    pub normals: Vec<u8>,
+    // pub tangents: Vec<u8>,
+    // pub uvs: Vec<u8>,
     pub materials: usize, // TODO: later on, specify default materials...
 
     pub bbox: BoundingBox,
@@ -645,6 +660,26 @@ impl Objects {
         });
     }
 
+    pub fn update_positions(&self, buffer: &mut impl DeviceBuffer) {
+        buffer.map_update(self.positions_data_size(), |mut memory| {
+            for object in &self.list {
+                let (region, rest) = memory.split_at_mut(object.positions.len());
+                region.copy_from_slice(&object.positions);
+                memory = rest;
+            }
+        });
+    }
+
+    pub fn update_normals(&self, buffer: &mut impl DeviceBuffer) {
+        buffer.map_update(self.normals_data_size(), |mut memory| {
+            for object in &self.list {
+                let (region, rest) = memory.split_at_mut(object.normals.len());
+                region.copy_from_slice(&object.normals);
+                memory = rest;
+            }
+        });
+    }
+
     // TODO: might be good to check for overflow here and stuff
 
     fn hierarchy_data_size(&self) -> usize {
@@ -653,5 +688,13 @@ impl Objects {
 
     fn triangles_data_size(&self) -> usize {
         self.list.iter().map(|obj| obj.triangles.len()).sum()
+    }
+
+    fn positions_data_size(&self) -> usize {
+        self.list.iter().map(|obj| obj.positions.len()).sum()
+    }
+
+    fn normals_data_size(&self) -> usize {
+        self.list.iter().map(|obj| obj.normals.len()).sum()
     }
 }
