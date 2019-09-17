@@ -440,7 +440,7 @@ void main() {
             color = vec4(0.75, 0.95, 0.65, 1.0);
         }
 
-        color = vec4(0.5 * result.normal + 0.5, 1.0);
+        // color = vec4(0.5 * result.normal + 0.5, 1.0);
     } else {
         color = vec4(0.0, 0.0, 0.0, 1.0);
     }

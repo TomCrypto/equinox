@@ -56,6 +56,8 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
   cat_object = runner.add_object(bvh, tri, position, normal, 2, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
   let [bvh2, tri2, position2, normal2] = await load_model_data('buddha')
   buddha_object = runner.add_object(bvh2, tri2, position2, normal2, 1, -0.188615, -0.445945, -0.224346, 0.222054, 0.554055, 0.186807)
+  let [bvh3, tri3, position3, normal3] = await load_model_data('cornell')
+  cornell_object = runner.add_object(bvh3, tri3, position3, normal3, 1, 0, 0, 0, 556.0, 548.8, 559.2)
 
   document.getElementById("cat").addEventListener("click", () => {
     if (cat_object != -1) {
@@ -70,6 +72,12 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
       runner.add_instance(buddha_object, offset, 0, 0)
 
       offset += 1.0
+    }
+  });
+
+  document.getElementById("cornell").addEventListener("click", () => {
+    if (cornell_object != -1) {
+      runner.add_instance(cornell_object, 0, 0, 0)
     }
   });
 
@@ -177,7 +185,7 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
       }
 
       if (dx != 0.0 || dy != 0.0) {
-        runner.move_camera(-dx * 5, -dy * 5)
+        runner.move_camera(-dx * 500, -dy * 500)
       }
 
       if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {
