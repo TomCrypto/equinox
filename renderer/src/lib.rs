@@ -87,7 +87,7 @@ impl WasmRunner {
         bvh: &[u8],
         tri: &[u8],
         positions: &[u8],
-        normals: &[u8],
+        normal_tangent_uv: &[u8],
         materials: usize,
         bminx: f32,
         bminy: f32,
@@ -100,7 +100,7 @@ impl WasmRunner {
             hierarchy: bvh.to_vec(),
             triangles: tri.to_vec(),
             positions: positions.to_vec(),
-            normals: normals.to_vec(),
+            normal_tangent_uv: normal_tangent_uv.to_vec(),
             materials,
             bbox: BoundingBox {
                 min: [bminx, bminy, bminz].into(),

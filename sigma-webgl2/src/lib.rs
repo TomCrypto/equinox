@@ -231,7 +231,7 @@ impl Device {
                 TextureBufferFormat::F32x4,
                 scratch.clone(),
             ),
-            normal_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4, scratch.clone()),
+            normal_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4, scratch.clone()),
             instance_buffer: UniformBuffer::with_fixed_size(gl.clone(), scratch.clone(), 80 * 128), /* 80 = instance size, 128 = instance count */
             instance_hierarchy_buffer: UniformBuffer::with_fixed_size(
                 gl.clone(),
@@ -270,7 +270,7 @@ impl Device {
             objects.update_hierarchy(&mut self.bvh_tex);
             objects.update_triangles(&mut self.tri_tex);
             objects.update_positions(&mut self.position_tex);
-            objects.update_normals(&mut self.normal_tex);
+            objects.update_normal_tangent_uv(&mut self.normal_tex);
         });
 
         let objects = &scene.objects;

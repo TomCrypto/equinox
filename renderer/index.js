@@ -6,7 +6,7 @@ async function load_model_data(name) {
   hierarchy_data = new Uint8Array(await fetch_bytes(`pkg/${name}.hierarchy.bin`))
   triangle_data = new Uint8Array(await fetch_bytes(`pkg/${name}.triangle.bin`))
   position_data = new Uint8Array(await fetch_bytes(`pkg/${name}.position.bin`))
-  normal_data = new Uint8Array(await fetch_bytes(`pkg/${name}.normal.bin`))
+  normal_data = new Uint8Array(await fetch_bytes(`pkg/${name}.mapping.bin`))
 
   return [hierarchy_data, triangle_data, position_data, normal_data]
 }
