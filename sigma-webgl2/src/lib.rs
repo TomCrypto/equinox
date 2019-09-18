@@ -3,11 +3,14 @@ use log::{debug, info, warn};
 
 use js_sys::Error;
 use maplit::hashmap;
-use sigma_core::{Aperture, DeviceBuffer, Dirty, RasterFilter, Scene};
-use std::cell::RefCell;
-use std::rc::Rc;
+use sigma_core::device::*;
+use sigma_core::{
+    model::{Aperture, RasterFilter},
+    Dirty, Scene,
+};
+use std::mem::size_of;
 use web_sys::{WebGl2RenderingContext as Context, WebGlFramebuffer, WebGlTexture};
-use zerocopy::{AsBytes, FromBytes, LayoutVerified};
+use zerocopy::{AsBytes, FromBytes};
 
 mod engine;
 
@@ -79,6 +82,12 @@ impl RenderTexture {
     }
 }
 
+impl ShaderBind for RenderTexture {
+    fn handle(&self) -> ShaderBindHandle {
+        ShaderBindHandle::Texture(self.handle.as_ref())
+    }
+}
+
 use std::collections::HashMap;
 
 struct FramebufferCache {
@@ -133,25 +142,34 @@ impl FramebufferCache {
 #[derive(FromBytes, AsBytes, Clone)]
 struct Aligned([u8; 64]);
 
+impl Default for Aligned {
+    fn default() -> Self {
+        Self([0; 64])
+    }
+}
+
 /// WebGL doesn't have buffer mapping so just allocate one big resident buffer
 /// for all our needs. this is shared everywhere and is just used as an
 /// intermediate buffer for large copy operations.
-pub struct ScratchMemory {
+#[derive(Default)]
+pub struct AlignedMemory {
     memory: Vec<Aligned>,
 }
 
-impl ScratchMemory {
+impl AlignedMemory {
     pub fn new() -> Self {
-        Self { memory: vec![] }
+        Self::default()
     }
 
-    pub fn access_with_size(&mut self, size: usize) -> &mut [u8] {
-        self.memory.resize(
-            (size + std::mem::size_of::<Aligned>() - 1) / std::mem::size_of::<Aligned>(),
-            Aligned([0; 64]),
-        );
+    pub fn allocate_bytes(&mut self, size: usize) -> &mut [u8] {
+        let blocks = (size + size_of::<Aligned>() - 1) / size_of::<Aligned>();
+        self.memory.resize_with(blocks, Aligned::default); // preallocate data
 
         &mut self.memory.as_mut_slice().as_bytes_mut()[..size]
+    }
+
+    pub fn shrink_to_fit(&mut self) {
+        self.memory.shrink_to_fit();
     }
 }
 
@@ -165,22 +183,24 @@ pub struct Device {
     program: Shader,
     present_program: Shader,
 
-    camera_buffer: UniformBuffer,
+    camera_buffer: UniformBuffer<CameraData>,
 
-    instance_buffer: UniformBuffer,
-    instance_hierarchy_buffer: UniformBuffer,
+    instance_buffer: UniformBuffer<[InstanceData]>,
+    instance_hierarchy_buffer: UniformBuffer<[SceneHierarchyNode]>,
 
-    globals_buffer: UniformBuffer,
-    raster_buffer: UniformBuffer,
+    globals_buffer: UniformBuffer<GlobalData>,
+    raster_buffer: UniformBuffer<RasterData>,
 
-    bvh_tex: TextureBuffer,
-    tri_tex: TextureBuffer,
+    bvh_tex: TextureBuffer<HierarchyData>,
+    tri_tex: TextureBuffer<TriangleData>,
 
-    position_tex: TextureBuffer,
-    normal_tex: TextureBuffer,
+    position_tex: TextureBuffer<VertexPositionData>,
+    normal_tex: TextureBuffer<VertexMappingData>,
 
     samples: RenderTexture,
     framebuffers: FramebufferCache,
+
+    scratch: AlignedMemory,
 
     lost: bool,
 
@@ -190,15 +210,14 @@ pub struct Device {
 impl Device {
     /// Creates a new device using a WebGL2 context.
     pub fn new(gl: Context) -> Result<Self, Error> {
-        let scratch = Rc::new(RefCell::new(ScratchMemory::new()));
-
         Ok(Self {
+            scratch: AlignedMemory::new(),
             gl: gl.clone(),
             program: Shader::new(
                 gl.clone(),
                 include_str!("shaders/vert.glsl").to_string(),
                 [
-                    &format!("#define TBUF_WIDTH {}", TextureBuffer::pixels_per_row(&gl)),
+                    &format!("#define TBUF_WIDTH {}", pixels_per_texture_buffer_row(&gl)),
                     include_str!("shaders/random.glsl"),
                     include_str!("shaders/frag.glsl"),
                 ]
@@ -223,23 +242,18 @@ impl Device {
                     "samples" => BindingPoint::Texture(0),
                 },
             ),
-            camera_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
-            bvh_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4, scratch.clone()),
-            tri_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4, scratch.clone()),
-            position_tex: TextureBuffer::new(
-                gl.clone(),
-                TextureBufferFormat::F32x4,
-                scratch.clone(),
-            ),
-            normal_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4, scratch.clone()),
-            instance_buffer: UniformBuffer::with_fixed_size(gl.clone(), scratch.clone(), 80 * 128), /* 80 = instance size, 128 = instance count */
-            instance_hierarchy_buffer: UniformBuffer::with_fixed_size(
-                gl.clone(),
-                scratch.clone(),
-                64 * 127,
-            ), /* 64 = BVH size, 127 = BVH node count */
-            raster_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
-            globals_buffer: UniformBuffer::new(gl.clone(), scratch.clone()),
+            camera_buffer: UniformBuffer::new(gl.clone()),
+            bvh_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
+            tri_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4),
+            position_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
+            normal_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4),
+            // TODO: get these from the shader?? (not really easily doable I think)
+            //  -> #define them in the shader from some shared value obtained from the WebGL
+            // context!
+            instance_buffer: UniformBuffer::new_array(gl.clone(), 128),
+            instance_hierarchy_buffer: UniformBuffer::new_array(gl.clone(), 127),
+            raster_buffer: UniformBuffer::new(gl.clone()),
+            globals_buffer: UniformBuffer::new(gl.clone()),
             samples: RenderTexture::new(gl.clone()),
             framebuffers: FramebufferCache::new(gl.clone()),
             lost: true,
@@ -252,9 +266,7 @@ impl Device {
         self.lost = true;
     }
 
-    /// Updates this device to render a scene.
-    ///
-    /// Returns an error if a graphics error occurs.
+    /// Updates this device to render some scene, or returns an error.
     pub fn update(&mut self, scene: &mut Scene) -> Result<(), Error> {
         if self.lost && self.try_restore(scene)? {
             return Ok(()); // context still lost
@@ -263,36 +275,46 @@ impl Device {
         let mut invalidated = false;
 
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
-            camera.update(&mut self.camera_buffer);
+            self.camera_buffer.write(&mut self.scratch, camera);
         });
 
         invalidated |= Dirty::clean(&mut scene.objects, |objects| {
-            objects.update_hierarchy(&mut self.bvh_tex);
-            objects.update_triangles(&mut self.tri_tex);
-            objects.update_positions(&mut self.position_tex);
-            objects.update_normal_tangent_uv(&mut self.normal_tex);
+            self.bvh_tex.write(&mut self.scratch, objects);
+            self.tri_tex.write(&mut self.scratch, objects);
+            self.position_tex.write(&mut self.scratch, objects);
+            self.normal_tex.write(&mut self.scratch, objects);
         });
 
         let objects = &scene.objects;
 
         invalidated |= Dirty::clean(&mut scene.instances, |instances| {
-            instances.update(objects, &mut self.instance_buffer);
-            instances.update_scene_hierarchy(objects, &mut self.instance_hierarchy_buffer);
+            let instances = InstancesWithObjects {
+                instances,
+                objects: &objects.list,
+            };
+
+            self.instance_buffer
+                .write_array(&mut self.scratch, &instances);
+
+            self.instance_hierarchy_buffer
+                .write_array(&mut self.scratch, &instances);
         });
 
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
+            self.raster_buffer.write(&mut self.scratch, raster);
+
             self.samples
                 .resize(raster.width.get() as i32, raster.height.get() as i32);
 
             self.framebuffers.reset();
-
-            raster.update_raster(&mut self.raster_buffer);
         });
 
         if invalidated {
             self.state.reset(scene);
             self.reset_refinement();
         }
+
+        self.scratch.shrink_to_fit();
 
         Ok(())
     }
@@ -315,19 +337,21 @@ impl Device {
 
         self.gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, fbo);
 
-        self.state.update(&mut self.globals_buffer);
+        // TODO: not happy with this, can we improve it
+        self.state
+            .update(&mut self.scratch, &mut self.globals_buffer);
 
         let shader = self.program.bind_to_pipeline();
 
-        shader.bind_uniform_buffer(&self.camera_buffer, "Camera");
-        shader.bind_uniform_buffer(&self.instance_buffer, "Instances");
-        shader.bind_uniform_buffer(&self.instance_hierarchy_buffer, "InstanceHierarchy");
-        shader.bind_uniform_buffer(&self.globals_buffer, "Globals");
-        shader.bind_uniform_buffer(&self.raster_buffer, "Raster");
-        shader.bind_texture_buffer(&self.bvh_tex, "bvh_data");
-        shader.bind_texture_buffer(&self.tri_tex, "tri_data");
-        shader.bind_texture_buffer(&self.position_tex, "position_data");
-        shader.bind_texture_buffer(&self.normal_tex, "normal_data");
+        shader.bind(&self.camera_buffer, "Camera");
+        shader.bind(&self.instance_buffer, "Instances");
+        shader.bind(&self.instance_hierarchy_buffer, "InstanceHierarchy");
+        shader.bind(&self.globals_buffer, "Globals");
+        shader.bind(&self.raster_buffer, "Raster");
+        shader.bind(&self.bvh_tex, "bvh_data");
+        shader.bind(&self.tri_tex, "tri_data");
+        shader.bind(&self.position_tex, "position_data");
+        shader.bind(&self.normal_tex, "normal_data");
 
         self.gl.enable(Context::BLEND);
         self.gl.blend_equation(Context::FUNC_ADD);
@@ -350,7 +374,7 @@ impl Device {
 
         let shader = self.present_program.bind_to_pipeline();
 
-        shader.bind_render_texture(&self.samples, "samples");
+        shader.bind(&self.samples, "samples");
 
         self.gl.disable(Context::BLEND);
 
@@ -439,7 +463,7 @@ impl DeviceState {
         self.filter = scene.raster.filter;
     }
 
-    pub fn update(&mut self, buffer: &mut UniformBuffer) {
+    pub fn update(&mut self, scratch: &mut AlignedMemory, buffer: &mut UniformBuffer<GlobalData>) {
         // we don't want the first (0, 0) sample from the sequence
         let (mut x, mut y) = self.filter_rng.next::<(f32, f32)>();
 
@@ -448,23 +472,21 @@ impl DeviceState {
             y = 0.5;
         }
 
-        #[repr(C)]
-        #[derive(AsBytes, FromBytes)]
-        struct GlobalData {
-            filter_delta: [f32; 4],
-            frame_state: [u32; 4],
-        }
-
-        buffer.map_update(std::mem::size_of::<GlobalData>(), |memory| {
-            let mut mem: LayoutVerified<_, GlobalData> = LayoutVerified::new(memory).unwrap();
-
-            mem.filter_delta[0] = 2.0 * self.filter.importance_sample(x) - 1.0;
-            mem.filter_delta[1] = 2.0 * self.filter.importance_sample(y) - 1.0;
-            mem.frame_state[0] = self.rng.next_u32();
-            mem.frame_state[1] = self.rng.next_u32();
-            mem.frame_state[2] = self.frame;
+        buffer.write_direct(scratch, |data| {
+            data.filter_delta[0] = 2.0 * self.filter.importance_sample(x) - 1.0;
+            data.filter_delta[1] = 2.0 * self.filter.importance_sample(y) - 1.0;
+            data.frame_state[0] = self.rng.next_u32();
+            data.frame_state[1] = self.rng.next_u32();
+            data.frame_state[2] = self.frame;
         });
 
         self.frame += 1;
     }
+}
+
+#[repr(C)]
+#[derive(AsBytes, FromBytes)]
+struct GlobalData {
+    filter_delta: [f32; 4],
+    frame_state: [u32; 4],
 }

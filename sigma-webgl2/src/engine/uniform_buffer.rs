@@ -1,114 +1,106 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::ScratchMemory;
-
-use sigma_core::DeviceBuffer;
-
+use crate::AlignedMemory;
+use crate::{ShaderBind, ShaderBindHandle};
+use std::marker::PhantomData;
 use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer};
+use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use sigma_core::device::ToDevice;
 
-pub struct UniformBuffer {
+pub struct UniformBuffer<T: ?Sized> {
     gl: Context,
-    scratch: Rc<RefCell<ScratchMemory>>,
-
     handle: Option<WebGlBuffer>,
     size: usize,
-
-    fixed_size: Option<usize>,
+    phantom: PhantomData<T>,
 }
 
-impl UniformBuffer {
-    pub fn new(gl: Context, scratch: Rc<RefCell<ScratchMemory>>) -> Self {
+impl<T: AsBytes + FromBytes> UniformBuffer<[T]> {
+    pub fn new_array(gl: Context, count: usize) -> Self {
         Self {
             gl,
-            scratch,
             handle: None,
-            size: 0,
-            fixed_size: None,
+            size: count * std::mem::size_of::<T>(),
+            phantom: PhantomData,
         }
     }
 
-    pub fn with_fixed_size(
-        gl: Context,
-        scratch: Rc<RefCell<ScratchMemory>>,
-        fixed_size: usize,
-    ) -> Self {
+    pub fn write_array(&mut self, buffer: &mut AlignedMemory, source: &impl ToDevice<[T]>) {
+        self.bind_and_upload(buffer.allocate_bytes(self.size), |bytes| {
+            source.to_device(
+                LayoutVerified::<_, [T]>::new_slice_zeroed(bytes)
+                    .unwrap()
+                    .into_mut_slice(),
+            );
+        });
+    }
+}
+
+impl<T: AsBytes + FromBytes> UniformBuffer<T> {
+    pub fn new(gl: Context) -> Self {
         Self {
             gl,
-            scratch,
             handle: None,
-            size: 0,
-            fixed_size: Some(fixed_size),
+            size: std::mem::size_of::<T>(),
+            phantom: PhantomData,
         }
     }
 
-    pub(crate) fn resource(&self) -> Option<&WebGlBuffer> {
-        self.handle.as_ref()
+    pub fn write(&mut self, buffer: &mut AlignedMemory, source: &impl ToDevice<T>) {
+        self.bind_and_upload(buffer.allocate_bytes(self.size), |bytes| {
+            source.to_device(
+                LayoutVerified::<_, T>::new_zeroed(bytes)
+                    .unwrap()
+                    .into_mut(),
+            );
+        });
     }
 
+    // TODO: find a way to remove this later on
+    pub fn write_direct(&mut self, buffer: &mut AlignedMemory, writer: impl FnOnce(&mut T)) {
+        self.bind_and_upload(buffer.allocate_bytes(self.size), |bytes| {
+            writer(
+                LayoutVerified::<_, T>::new_zeroed(bytes)
+                    .unwrap()
+                    .into_mut(),
+            );
+        });
+    }
+}
+
+impl<T: ?Sized> UniformBuffer<T> {
     pub(crate) fn reset(&mut self) {
         self.handle = self.gl.create_buffer();
 
-        if let Some(fixed_size) = self.fixed_size {
-            self.allocate_buffer(fixed_size);
-        } else {
-            self.size = 0;
-        }
+        self.gl
+            .bind_buffer(Context::UNIFORM_BUFFER, self.handle.as_ref());
+        self.gl.buffer_data_with_i32(
+            Context::UNIFORM_BUFFER,
+            self.size as i32,
+            Context::DYNAMIC_DRAW,
+        );
     }
 
-    fn allocate_buffer(&mut self, size: usize) {
+    fn bind_and_upload(&mut self, bytes: &mut [u8], writer: impl FnOnce(&mut [u8])) {
         self.gl
-            .bind_buffer(Context::UNIFORM_BUFFER, self.resource());
-        self.gl
-            .buffer_data_with_i32(Context::UNIFORM_BUFFER, size as i32, Context::DYNAMIC_DRAW);
+            .bind_buffer(Context::UNIFORM_BUFFER, self.handle.as_ref());
 
-        self.size = size;
-    }
-
-    fn map_update_dynamic(&mut self, size: usize, f: impl FnOnce(&mut [u8])) {
-        if self.size < size {
-            self.allocate_buffer(size);
-        }
-
-        let mut memory = self.scratch.borrow_mut();
-
-        let buffer = memory.access_with_size(size);
-
-        f(buffer);
+        writer(&mut bytes[..]);
 
         self.gl
-            .bind_buffer(Context::UNIFORM_BUFFER, self.resource());
-        self.gl
-            .buffer_sub_data_with_i32_and_u8_array(Context::UNIFORM_BUFFER, 0, buffer);
-    }
-
-    fn map_update_fixed(&mut self, size: usize, f: impl FnOnce(&mut [u8])) {
-        if self.size < size {
-            panic!("uniform buffer does not have enough capacity");
-        }
-
-        let mut memory = self.scratch.borrow_mut();
-
-        let buffer = memory.access_with_size(self.size);
-
-        f(&mut buffer[..size]);
-
-        self.gl
-            .bind_buffer(Context::UNIFORM_BUFFER, self.resource());
-        self.gl
-            .buffer_sub_data_with_i32_and_u8_array(Context::UNIFORM_BUFFER, 0, buffer);
+            .buffer_sub_data_with_i32_and_u8_array(Context::UNIFORM_BUFFER, 0, bytes);
     }
 }
 
-impl DeviceBuffer for UniformBuffer {
-    fn map_update(&mut self, size: usize, f: impl FnOnce(&mut [u8])) {
-        if self.fixed_size.is_some() {
-            self.map_update_fixed(size, f);
-        } else {
-            self.map_update_dynamic(size, f);
-        }
+impl<T: ?Sized> Drop for UniformBuffer<T> {
+    fn drop(&mut self) {
+        self.gl.delete_buffer(self.handle.as_ref());
+    }
+}
+
+impl<T: ?Sized> ShaderBind for UniformBuffer<T> {
+    fn handle(&self) -> ShaderBindHandle {
+        ShaderBindHandle::UniformBuffer(self.handle.as_ref())
     }
 }

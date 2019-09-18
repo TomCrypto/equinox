@@ -2,13 +2,13 @@
 use log::{debug, info, warn};
 
 use cgmath::prelude::*;
-use cgmath::{Point3, Quaternion, Vector3};
+use cgmath::{Quaternion, Vector3};
 use console_log;
 use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
 
-use sigma_core::*;
+use sigma_core::{model::*, *};
 use sigma_webgl2::*;
 
 #[wasm_bindgen]

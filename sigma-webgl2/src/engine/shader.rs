@@ -3,9 +3,9 @@ use log::{debug, info, warn};
 
 use js_sys::Error;
 use std::collections::HashMap;
-use web_sys::{WebGl2RenderingContext as Context, WebGlProgram, WebGlShader};
-
-use crate::{RenderTexture, TextureBuffer, UniformBuffer};
+use web_sys::{
+    WebGl2RenderingContext as Context, WebGlBuffer, WebGlProgram, WebGlShader, WebGlTexture,
+};
 
 #[derive(Clone, Copy)]
 pub enum BindingPoint {
@@ -39,16 +39,12 @@ impl Shader {
     }
 
     pub fn bind_to_pipeline(&self) -> ActiveShader {
-        self.gl.use_program(self.resource());
+        self.gl.use_program(self.handle.as_ref());
 
         ActiveShader {
             gl: &self.gl,
             binds: &self.binds,
         }
-    }
-
-    pub(crate) fn resource(&self) -> Option<&WebGlProgram> {
-        self.handle.as_ref()
     }
 
     pub(crate) fn reset(&mut self) -> Result<(), Error> {
@@ -173,31 +169,39 @@ pub struct ActiveShader<'a> {
     binds: &'a HashMap<&'static str, BindingPoint>,
 }
 
+// TODO: use a ShaderBind trait or something to only have a single method
+// here...
+
+pub enum ShaderBindHandle<'a> {
+    UniformBuffer(Option<&'a WebGlBuffer>),
+    Texture(Option<&'a WebGlTexture>),
+}
+
+pub trait ShaderBind {
+    fn handle(&self) -> ShaderBindHandle;
+}
+
 impl ActiveShader<'_> {
-    pub fn bind_uniform_buffer(&self, resource: &UniformBuffer, slot: &str) {
+    pub fn bind(&self, target: &dyn ShaderBind, slot: &str) {
+        match target.handle() {
+            ShaderBindHandle::UniformBuffer(handle) => self.bind_uniform_buffer(handle, slot),
+            ShaderBindHandle::Texture(handle) => self.bind_texture(handle, slot),
+        }
+    }
+
+    fn bind_uniform_buffer(&self, handle: Option<&WebGlBuffer>, slot: &str) {
         if let Some(&BindingPoint::UniformBlock(slot)) = self.binds.get(slot) {
             self.gl
-                .bind_buffer_base(Context::UNIFORM_BUFFER, slot, resource.resource());
+                .bind_buffer_base(Context::UNIFORM_BUFFER, slot, handle);
         } else {
             panic!("slot '{}' does not map to a binding point", slot);
         }
     }
 
-    pub fn bind_texture_buffer(&self, resource: &TextureBuffer, slot: &str) {
+    fn bind_texture(&self, handle: Option<&WebGlTexture>, slot: &str) {
         if let Some(&BindingPoint::Texture(slot)) = self.binds.get(slot) {
             self.gl.active_texture(Context::TEXTURE0 + slot);
-            self.gl
-                .bind_texture(Context::TEXTURE_2D, resource.resource());
-        } else {
-            panic!("slot '{}' does not map to a binding point", slot);
-        }
-    }
-
-    pub fn bind_render_texture(&self, resource: &RenderTexture, slot: &str) {
-        if let Some(&BindingPoint::Texture(slot)) = self.binds.get(slot) {
-            self.gl.active_texture(Context::TEXTURE0 + slot as u32);
-            self.gl
-                .bind_texture(Context::TEXTURE_2D, resource.resource());
+            self.gl.bind_texture(Context::TEXTURE_2D, handle);
         } else {
             panic!("slot '{}' does not map to a binding point", slot);
         }
