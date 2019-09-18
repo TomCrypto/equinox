@@ -2,16 +2,13 @@
 use log::{debug, info, warn};
 
 mod shaders {
-    include!(concat!(env!("OUT_DIR"), "/processed_glsl_shaders.rs"));
+    include!(concat!(env!("OUT_DIR"), "/glsl_shaders.rs"));
 }
 
 use js_sys::Error;
 use maplit::hashmap;
 use sigma_core::device::*;
-use sigma_core::{
-    model::{Aperture, RasterFilter},
-    Dirty, Scene,
-};
+use sigma_core::{model::RasterFilter, Dirty, Scene};
 use std::mem::size_of;
 use web_sys::{WebGl2RenderingContext as Context, WebGlFramebuffer, WebGlTexture};
 use zerocopy::{AsBytes, FromBytes};
@@ -436,7 +433,6 @@ struct DeviceState {
     filter_rng: Qrng,
 
     filter: RasterFilter,
-    aperture: Aperture,
 
     frame: u32,
 }
@@ -447,7 +443,6 @@ impl Default for DeviceState {
             rng: ChaCha20Rng::seed_from_u64(0),
             filter_rng: Qrng::new(0),
             filter: RasterFilter::default(),
-            aperture: Aperture::default(),
             frame: 0,
         }
     }
@@ -461,7 +456,6 @@ impl DeviceState {
     pub fn reset(&mut self, scene: &mut Scene) {
         *self = Self::new();
 
-        self.aperture = scene.camera.aperture;
         self.filter = scene.raster.filter;
     }
 
