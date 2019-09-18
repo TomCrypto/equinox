@@ -1,6 +1,10 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
+mod shaders {
+    include!(concat!(env!("OUT_DIR"), "/processed_glsl_shaders.rs"));
+}
+
 use js_sys::Error;
 use maplit::hashmap;
 use sigma_core::device::*;
@@ -209,19 +213,17 @@ pub struct Device {
 
 impl Device {
     /// Creates a new device using a WebGL2 context.
-    pub fn new(gl: Context) -> Result<Self, Error> {
+    pub fn new(gl: &Context) -> Result<Self, Error> {
         Ok(Self {
             scratch: AlignedMemory::new(),
             gl: gl.clone(),
             program: Shader::new(
                 gl.clone(),
-                include_str!("shaders/vert.glsl").to_string(),
-                [
-                    &format!("#define TBUF_WIDTH {}", pixels_per_texture_buffer_row(&gl)),
-                    include_str!("shaders/random.glsl"),
-                    include_str!("shaders/frag.glsl"),
-                ]
-                .join("\n"),
+                ShaderInput::new(shaders::VERT),
+                ShaderInput::with_defines(
+                    shaders::FRAG,
+                    hashmap! { "TBUF_WIDTH" => format!("{}", pixels_per_texture_buffer_row(&gl)) },
+                ),
                 hashmap! {
                     "bvh_data" => BindingPoint::Texture(0),
                     "tri_data" => BindingPoint::Texture(1),
@@ -236,8 +238,8 @@ impl Device {
             ),
             present_program: Shader::new(
                 gl.clone(),
-                include_str!("shaders/vert.glsl").to_string(),
-                include_str!("shaders/present.glsl").to_string(),
+                ShaderInput::new(shaders::VERT),
+                ShaderInput::new(shaders::PRESENT),
                 hashmap! {
                     "samples" => BindingPoint::Texture(0),
                 },

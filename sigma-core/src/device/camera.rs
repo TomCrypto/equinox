@@ -3,8 +3,7 @@ use crate::model::{Aperture, Camera};
 use cgmath::prelude::*;
 use cgmath::Point3;
 use itertools::iproduct;
-use std::mem::size_of;
-use zerocopy::{AsBytes, FromBytes, LayoutVerified};
+use zerocopy::{AsBytes, FromBytes};
 
 impl Aperture {
     fn settings(&self) -> [f32; 4] {

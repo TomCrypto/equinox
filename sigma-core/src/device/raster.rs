@@ -1,7 +1,6 @@
 use crate::device::ToDevice;
 use crate::model::Raster;
-use std::mem::size_of;
-use zerocopy::{AsBytes, FromBytes, LayoutVerified};
+use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]
 #[derive(AsBytes, FromBytes)]

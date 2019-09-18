@@ -3,9 +3,54 @@ use log::{debug, info, warn};
 
 use js_sys::Error;
 use std::collections::HashMap;
+use std::fmt::Write;
 use web_sys::{
     WebGl2RenderingContext as Context, WebGlBuffer, WebGlProgram, WebGlShader, WebGlTexture,
 };
+
+pub struct ShaderInput {
+    source: String,
+}
+
+impl ShaderInput {
+    pub fn new(source: &'static str) -> Self {
+        Self::with_defines(source, HashMap::new())
+    }
+
+    pub fn with_defines(source: &'static str, defines: HashMap<&'static str, String>) -> Self {
+        Self {
+            source: Self::process_source(source, defines),
+        }
+    }
+
+    /// Finds the file/line position in the source before preprocessing.
+    pub fn determine_true_position(&self, line: u32) -> (String, u32) {
+        let pattern = regex::Regex::new(r#"^// __POS__ ([^:]+):(\d+)$"#).unwrap();
+
+        let lines: Vec<&str> = self.source.lines().collect();
+
+        for index in (0..=line).rev() {
+            if let Some(captures) = pattern.captures(lines[index as usize]) {
+                return (
+                    captures.get(1).unwrap().as_str().to_owned(),
+                    captures.get(2).unwrap().as_str().parse::<u32>().unwrap() + line - index - 1,
+                );
+            }
+        }
+
+        (String::from("<unknown>"), 0)
+    }
+
+    fn process_source(source: &'static str, defines: HashMap<&'static str, String>) -> String {
+        let mut header = String::from("#version 300 es\n");
+
+        for (k, v) in defines {
+            write!(header, "#define {} {}\n", k, v).unwrap();
+        }
+
+        header + source
+    }
+}
 
 #[derive(Clone, Copy)]
 pub enum BindingPoint {
@@ -16,8 +61,8 @@ pub enum BindingPoint {
 pub struct Shader {
     gl: Context,
     handle: Option<WebGlProgram>,
-    vertex: String,
-    fragment: String,
+    vertex: ShaderInput,
+    fragment: ShaderInput,
 
     binds: HashMap<&'static str, BindingPoint>,
 }
@@ -25,15 +70,15 @@ pub struct Shader {
 impl Shader {
     pub fn new(
         gl: Context,
-        vertex: String,
-        fragment: String,
+        vertex: ShaderInput,
+        fragment: ShaderInput,
         binds: HashMap<&'static str, BindingPoint>,
     ) -> Self {
         Self {
             gl,
             handle: None,
-            vertex: ["#version 300 es", &vertex].join("\n"),
-            fragment: ["#version 300 es", "precision highp float;", &fragment].join("\n"),
+            vertex,
+            fragment,
             binds,
         }
     }
@@ -90,15 +135,25 @@ impl Shader {
         }
     }
 
-    fn compile_shader(&self, kind: u32, source: &str) -> Result<Option<WebGlShader>, Error> {
+    fn compile_shader(&self, kind: u32, input: &ShaderInput) -> Result<Option<WebGlShader>, Error> {
+        let pattern = regex::Regex::new(r#"0:(\d+):"#).unwrap();
+
         let shader = self.gl.create_shader(kind);
 
         if let Some(shader) = &shader {
-            self.gl.shader_source(shader, source);
+            self.gl.shader_source(shader, &input.source);
             self.gl.compile_shader(shader);
 
             if let Some(error) = self.get_shader_build_error(shader) {
-                return Err(Error::new(&format!("shader build error: {}", error)));
+                let error = pattern.replace_all(&error, |caps: &regex::Captures| {
+                    let line: u32 = caps.get(1).unwrap().as_str().parse().unwrap();
+
+                    let (file, line) = input.determine_true_position(line);
+
+                    format!("{}:{}:", file, line)
+                });
+
+                return Err(Error::new(&error));
             }
         }
 

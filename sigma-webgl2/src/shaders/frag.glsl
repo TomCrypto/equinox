@@ -1,3 +1,7 @@
+precision highp float;
+
+#include <random.glsl>
+
 #define M_PI   3.14159265359
 #define M_2PI  6.28318530718
 

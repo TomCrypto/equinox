@@ -1,12 +1,10 @@
 use crate::device::ToDevice;
-use crate::model::{Instance, Instances, Object};
+use crate::model::{Instances, Object};
 use crate::BoundingBox;
 use cgmath::prelude::*;
 use cgmath::Decomposed;
-use cgmath::Point3;
 use itertools::{iproduct, izip};
-use std::mem::size_of;
-use zerocopy::{AsBytes, FromBytes, LayoutVerified};
+use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]
 #[derive(Clone, Copy, FromBytes, AsBytes)]

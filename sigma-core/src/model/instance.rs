@@ -1,8 +1,4 @@
-use crate::model::Object;
-use crate::BoundingBox;
-use crate::Dirty;
-use cgmath::{Point3, Quaternion, Vector3};
-use smart_default::SmartDefault;
+use cgmath::{Quaternion, Vector3};
 
 // TODO: convert usize to Arc<Object> later on once we're further along
 

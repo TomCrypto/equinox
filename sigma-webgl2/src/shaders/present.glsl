@@ -1,3 +1,5 @@
+precision highp float;
+
 uniform sampler2D samples;
 
 out vec4 color;
