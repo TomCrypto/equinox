@@ -265,10 +265,10 @@ impl Device {
         self.lost = true;
     }
 
-    /// Updates this device to render some scene, or returns an error.
-    pub fn update(&mut self, scene: &mut Scene) -> Result<(), Error> {
+    /// Updates this device to render a given scene or returns an error.
+    pub fn update(&mut self, scene: &mut Scene) -> Result<bool, Error> {
         if self.lost && self.try_restore(scene)? {
-            return Ok(()); // context still lost
+            return Ok(false); // context is lost
         }
 
         let mut invalidated = false;
@@ -315,7 +315,7 @@ impl Device {
 
         self.scratch.shrink_to_fit();
 
-        Ok(())
+        Ok(invalidated)
     }
 
     // TODO: return stats (e.g. measured with performance counters and so on)

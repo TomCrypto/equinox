@@ -185,7 +185,7 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
       }
 
       if (dx != 0.0 || dy != 0.0) {
-        runner.move_camera(-dx * 5, -dy * 5)
+        runner.move_camera(-dx * 500, -dy * 500)
       }
 
       if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {

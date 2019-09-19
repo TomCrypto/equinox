@@ -42,7 +42,7 @@ impl WasmRunner {
     // perspective", "change material", etc... these are all "actions"
     // propagated to the scene
 
-    pub fn update(&mut self) -> Result<(), JsValue> {
+    pub fn update(&mut self) -> Result<bool, JsValue> {
         Ok(self.device.update(&mut self.scene)?)
     }
 
