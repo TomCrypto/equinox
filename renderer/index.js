@@ -94,12 +94,6 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
     }
   });
 
-  document.getElementById("push-up").addEventListener("click", () => {
-    if (runner.instance_count() != 0) {
-      runner.move_instance_up(0, 10.0);
-    }
-  });
-
   let apertureSize = document.getElementById("aperture-size")
   apertureSize.addEventListener("input", () => {
     runner.set_camera_aperture(apertureSize.value / 10000)
