@@ -50,36 +50,30 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
     ctx.restoreContext();
   });
 
-  let cat_object = -1
-  let buddha_object = -1
-
   let [bvh, tri, position, normal] = await load_model_data('cat')
-  cat_object = runner.add_object(bvh, tri, position, normal, 2, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
+  let cat_object = runner.add_object(bvh, tri, position, normal, 2, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
   let [bvh2, tri2, position2, normal2] = await load_model_data('buddha')
-  buddha_object = runner.add_object(bvh2, tri2, position2, normal2, 1, -0.188615, -0.445945, -0.224346, 0.222054, 0.554055, 0.186807)
+  let buddha_object = runner.add_object(bvh2, tri2, position2, normal2, 1, -0.188615, -0.445945, -0.224346, 0.222054, 0.554055, 0.186807)
   let [bvh3, tri3, position3, normal3] = await load_model_data('cornell')
-  cornell_object = runner.add_object(bvh3, tri3, position3, normal3, 1, 0, 0, 0, 556.0, 548.8, 559.2)
+  let cornell_object = runner.add_object(bvh3, tri3, position3, normal3, 1, 0, 0, 0, 556.0, 548.8, 559.2)
+
+  runner.add_instance(cornell_object, 0, 0, 0, 1)
+  runner.set_camera_position(338.34976, 698.74335, -1202.723)
 
   document.getElementById("cat").addEventListener("click", () => {
-    if (cat_object != -1) {
-      runner.add_instance(cat_object, 0, 0, 0)
-    }
+    runner.add_instance(cat_object, 0, 0, 0, 1)
   });
 
   let offset = 0
 
   document.getElementById("buddha").addEventListener("click", () => {
-    if (buddha_object != -1) {
-      runner.add_instance(buddha_object, offset, 0, 0)
+    runner.add_instance(buddha_object, offset, 0, 0, 300)
 
-      offset += 1.0
-    }
+    offset += 1.0
   });
 
   document.getElementById("cornell").addEventListener("click", () => {
-    if (cornell_object != -1) {
-      runner.add_instance(cornell_object, 0, 0, 0)
-    }
+    runner.add_instance(cornell_object, 0, 0, 0, 1)
   });
 
   document.getElementById("remove-first").addEventListener("click", () => {
@@ -109,9 +103,15 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
     runner.set_focal_length(focalLength.value / 1000)
   })
 
-  let angleX = Math.PI / 2
-  let angleY = Math.PI / 2
+  let angleX = 4.758
+  let angleY = 1.238
   let pressed = {}
+
+  let x = Math.sin(angleY) * Math.cos(angleX);
+  let z = Math.sin(angleY) * Math.sin(angleX);
+  let y = Math.cos(angleY);
+
+  runner.set_camera_direction(x, y, z)
 
   canvas.addEventListener("mousemove", event => {
     if (!moving) {
@@ -207,7 +207,7 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
       let refineCount = 1
 
       if (isFinite(refineEMA.average()) && isFinite(renderEMA.average())) {
-        refineCount = Math.floor((1000000.0 / 60.0 - 1000.0 - renderEMA.average()) / refineEMA.average())
+        refineCount = Math.floor((1000000.0 / 60.0 - 2000.0 - renderEMA.average()) / refineEMA.average())
       }
 
       refineCount = Math.min(99, Math.max(refineCount, 1))

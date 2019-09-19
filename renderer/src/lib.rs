@@ -2,7 +2,7 @@
 use log::{debug, info, warn};
 
 use cgmath::prelude::*;
-use cgmath::{Quaternion, Vector3};
+use cgmath::{Point3, Quaternion, Vector3};
 use console_log;
 use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
@@ -80,6 +80,10 @@ impl WasmRunner {
         self.scene.camera.position += forward * direction + sideways_vector * sideways;
     }
 
+    pub fn set_camera_position(&mut self, x: f32, y: f32, z: f32) {
+        self.scene.camera.position = Point3::new(x, y, z);
+    }
+
     pub fn set_camera_direction(&mut self, x: f32, y: f32, z: f32) {
         self.scene.camera.direction = Vector3::new(x, y, z);
     }
@@ -117,10 +121,10 @@ impl WasmRunner {
         self.scene.objects.list.len() - 1
     }
 
-    pub fn add_instance(&mut self, object: usize, x: f32, y: f32, z: f32) {
+    pub fn add_instance(&mut self, object: usize, x: f32, y: f32, z: f32, scale: f32) {
         self.scene.instances.list.push(Instance {
             object,
-            scale: 1.0,
+            scale,
             rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
             translation: Vector3::new(x, y, z),
         })
