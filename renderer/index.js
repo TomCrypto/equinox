@@ -107,7 +107,7 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
 
   let focalDistance = document.getElementById("focal-distance")
   focalDistance.addEventListener("input", () => {
-    runner.set_focal_distance(focalDistance.value / 1000)
+    runner.set_focal_distance(focalDistance.value / 10000)
   })
 
   let focalLength = document.getElementById("focal-length")

@@ -71,21 +71,21 @@ bool ray_bbox(vec3 origin, vec3 inv_dir, vec3 bmin, vec3 bmax) {
     return (near <= far) && (far > 0.0);
 }
 
-float ray_triangle(vec3 o, vec3 d, vec3 p1, vec3 e1, vec3 e2) {
+vec3 ray_triangle(vec3 o, vec3 d, vec3 p1, vec3 e1, vec3 e2) {
     o -= p1;
     vec3 s = cross(d, e2);
     float de = 1.0f / dot(s, e1);
 
     float u = dot(o, s) * de;
 
-    if ((u < 0.0) || (u > 1.0)) return -1.0;
+    if ((u < 0.0) || (u > 1.0)) return vec3(0.0, 0.0, -1.0);
 
     s = cross(o, e1);
     float v = dot(d, s) * de;
 
-    if ((v < 0.0) || (u + v > 1.0)) return -1.0;
+    if ((v < 0.0) || (u + v > 1.0)) return vec3(0.0, 0.0, -1.0);
 
-    return dot(e2, s) * de;
+    return vec3(u, v, dot(e2, s) * de);
 }
 
 uvec4 read_triangle(uint index) {
@@ -152,9 +152,9 @@ bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle
                 vec3 e1 = read_vertex_position(vertex_start + tri.y) - p1;
                 vec3 e2 = read_vertex_position(vertex_start + tri.z) - p1;
 
-                float distance = ray_triangle(origin, direction, p1, e1, e2);
+                vec3 hit = ray_triangle(origin, direction, p1, e1, e2);
 
-                if (distance > 0.0 && distance < result.distance) {
+                if (hit.z > 0.0 && hit.z < result.distance) {
                     // TODO: interpolate normal using (u, v) coordinates from ray_triangle!
                     // for now just average then
 
@@ -162,9 +162,9 @@ bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle
                     vec3 n1 = read_vertex_normal(vertex_start + tri.y);
                     vec3 n2 = read_vertex_normal(vertex_start + tri.z);
 
-                    vec3 normal = normalize(n0 + n1 + n2);
+                    vec3 normal = normalize(n1 * hit.x + n2 * hit.y + n0 * (1.0 - hit.x - hit.y));
 
-                    result.distance = distance;
+                    result.distance = hit.z;
                     result.normal = normal;
                 }
             }
@@ -197,9 +197,9 @@ bool ray_bvh_occlusion(vec3 origin, vec3 direction, uint offset, uint limit, uin
                 vec3 e1 = read_vertex_position(vertex_start + tri.y) - p1;
                 vec3 e2 = read_vertex_position(vertex_start + tri.z) - p1;
 
-                float distance = ray_triangle(origin, direction, p1, e1, e2);
+                vec3 hit = ray_triangle(origin, direction, p1, e1, e2);
 
-                if (distance > 0.0) {
+                if (hit.z > 0.0) {
                     return true;
                 }
             }
