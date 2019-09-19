@@ -123,7 +123,7 @@ impl Scene {
     /// such as device loss. However because the dirty flags stored by scenes
     /// are associated with a device's current state, you should call this if
     /// a scene is "moved" from one device to another (not recommended).
-    pub fn dirty_all(&mut self) {
+    pub fn dirty_all_fields(&mut self) {
         Dirty::dirty(&mut self.camera);
         Dirty::dirty(&mut self.raster);
         Dirty::dirty(&mut self.instances);

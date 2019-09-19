@@ -39,18 +39,16 @@ version = "0.2"
 [dependencies.web-sys]
 version = "0.3"
 features = [
-  'Document',
-  'Element',
   'WebGlBuffer',
   'WebGlRenderingContext',
   'WebGl2RenderingContext',
   'WebGlProgram',
   'WebGlShader',
   'WebGlTexture',
-  'Window',
+  'WebGlQuery',
   'WebGlUniformLocation',
+  'ExtDisjointTimerQuery',
   'WebGlFramebuffer',
-  'Crypto',
 ]
 
 [dependencies.zerocopy]

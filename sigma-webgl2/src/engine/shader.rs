@@ -224,9 +224,6 @@ pub struct ActiveShader<'a> {
     binds: &'a HashMap<&'static str, BindingPoint>,
 }
 
-// TODO: use a ShaderBind trait or something to only have a single method
-// here...
-
 pub enum ShaderBindHandle<'a> {
     UniformBuffer(Option<&'a WebGlBuffer>),
     Texture(Option<&'a WebGlTexture>),

@@ -15,6 +15,9 @@ use sigma_webgl2::*;
 pub struct WasmRunner {
     device: Device,
     scene: Scene,
+
+    render_stats: Option<RenderStatistics>,
+    refine_stats: Option<RefineStatistics>,
 }
 
 #[wasm_bindgen]
@@ -27,6 +30,8 @@ impl WasmRunner {
         Ok(Self {
             device: Device::new(context)?,
             scene: Scene::new(),
+            render_stats: None,
+            refine_stats: None,
         })
     }
 
@@ -46,15 +51,20 @@ impl WasmRunner {
         Ok(self.device.update(&mut self.scene)?)
     }
 
-    // TODO: return rendering stats later (in the form of Serde-serialized data I
-    // guess)
     pub fn refine(&mut self) {
-        self.device.refine();
+        self.refine_stats = self.device.refine();
     }
 
-    // TODO: return stats
     pub fn render(&mut self) {
-        self.device.render();
+        self.render_stats = self.device.render();
+    }
+
+    pub fn get_refine_frame_time(&self) -> Option<f32> {
+        Some(self.refine_stats?.frame_time_us)
+    }
+
+    pub fn get_render_frame_time(&self) -> Option<f32> {
+        Some(self.render_stats?.frame_time_us)
     }
 
     pub fn move_camera(&mut self, forward: f32, sideways: f32) {

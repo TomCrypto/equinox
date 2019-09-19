@@ -23,4 +23,60 @@ body {
 canvas {
     width: 100%;
     height: 100%;
+    position: relative;
+}
+
+.status {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 18px !important;
+    border-top: 1px solid #777777;
+    background-color: black;
+    opacity: 0.6667;
+    z-index: 1;
+    display: flex;
+
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+.frame-rate {
+    width: 70px;
+    border-right: 1px solid #777777;
+}
+
+.frame-time {
+    width: 60px;
+    border-right: 1px solid #777777;
+}
+
+.resolution {
+    width: 80px;
+    border-right: 1px solid #777777;
+}
+
+.sample-rate {
+    width: 100px;
+    border-right: 1px solid #777777;
+}
+
+.frame-info {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+p {
+    user-select: none;
+    color: #ffffff;
+    margin: 0;
+    padding: auto;
+    font-size: 0.8em;
+    line-height: 18px;
+    text-align: center;
+    font-family: monospace;
+}
+
+pre {
+    margin: 0;
 }

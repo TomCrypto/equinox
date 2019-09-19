@@ -32,6 +32,7 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
   }))
 
   runner.set_dimensions(canvas.width, canvas.height)
+  document.getElementById("resolution").innerText = `${canvas.width} × ${canvas.height}`
 
   canvas.addEventListener("webglcontextlost", e => {
     runner.context_lost();
@@ -159,7 +160,20 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
     delete pressed[e.key]
   })
 
+  let start = performance.now()
+  let times = []
+  let updateEMA = new ExponentialMovingAverage(0.12)
+  let renderEMA = new ExponentialMovingAverage(0.08)
+  let refineEMA = new ExponentialMovingAverage(0.08)
+
   const renderLoop = () => {
+    let oldStart = start
+    start = performance.now()
+
+    addToSeries(times, 30, start - oldStart)
+
+    document.getElementById("frame-rate").innerText = `${(1000 / seriesAverage(times)).toFixed(0)} FPS`
+    
     try {
       let dx = 0
       let dy = 0
@@ -192,11 +206,48 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
         canvas.width = canvas.clientWidth
         canvas.height = canvas.clientHeight
         runner.set_dimensions(canvas.width, canvas.height)
+
+        document.getElementById("resolution").innerText = `${canvas.width} × ${canvas.height}`
+      }
+      
+      let refineCount = 1
+
+      if (isFinite(refineEMA.average()) && isFinite(renderEMA.average())) {
+        refineCount = Math.floor((1000000.0 / 60.0 - 1000.0 - renderEMA.average()) / refineEMA.average())
       }
 
+      refineCount = Math.min(99, Math.max(refineCount, 1))
+
+      let now = performance.now()
       runner.update()
-      runner.refine()
+      let elapsed = performance.now() - now
+      updateEMA.append(elapsed)
+      for (let i = 0; i < refineCount; ++i) {
+        runner.refine()
+
+        let refineTime = runner.get_refine_frame_time()
+
+        if (refineTime !== 0) {
+          refineEMA.append(refineTime)
+        }
+      }
       runner.render()
+
+      let renderTime = runner.get_render_frame_time()
+      
+
+      if (renderTime !== 0) {
+        renderEMA.append(renderTime)
+      }
+
+      
+
+      let updateAvg = displayTime(updateEMA.average())
+      let refineAvg = displayTime(refineEMA.average() / 1000.0)
+      let renderAvg = displayTime(renderEMA.average() / 1000.0)
+
+      document.getElementById("frame-info").innerText = ` [update: ${updateAvg}] ➜ [refine: ${refineAvg} × ${refineCount.toFixed(0).padStart(2, ' ')}] ➜ [render: ${renderAvg}]`
+      document.getElementById("frame-rate").innerText = `${(1000 / seriesAverage(times)).toFixed(0)} fps`
 
       window.requestAnimationFrame(renderLoop)
     } catch (e) {
@@ -206,3 +257,58 @@ import('./pkg/webgl').catch(console.error).then(async gl => {
 
   window.requestAnimationFrame(renderLoop)
 })
+
+function displayTime(milliseconds) {
+  if (!isFinite(milliseconds)) {
+    return '---- ms'
+  }
+
+  if (milliseconds <= 0.099) {
+    return `${(milliseconds * 1000.0).toFixed(0).padStart(4, ' ')} μs`
+  }
+
+  if (milliseconds <= 99) {
+    return `${(milliseconds).toFixed(1).padStart(4, ' ')} ms`
+  }
+
+  return `${(milliseconds).toFixed(0).padStart(4, ' ')} ms`
+}
+
+function addToSeries(series, max, value) {
+  let avg = seriesAverage(series)
+
+  series.push(value)
+
+  while (series.length > max) {
+    series.shift()
+  }
+}
+
+function seriesAverage(series) {
+  let average = 0
+
+  for (value of series) {
+    average += value / series.length
+  }
+
+  return average
+}
+
+class ExponentialMovingAverage {
+  constructor (alpha) {
+    this.alpha = alpha
+    this.value = NaN
+  }
+
+  append(value) {
+    if (!isFinite(this.value)) {
+      this.value = value
+    } else {
+      this.value = this.value * (1 - this.alpha) + value * this.alpha
+    }
+  }
+
+  average() {
+    return this.value
+  }
+}

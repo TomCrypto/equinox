@@ -7,6 +7,9 @@ mod shaders {
 
 use js_sys::Error;
 use maplit::hashmap;
+use quasirandom::Qrng;
+use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use sigma_core::device::*;
 use sigma_core::{model::RasterFilter, Dirty, Scene};
 use std::mem::size_of;
@@ -174,9 +177,15 @@ impl AlignedMemory {
     }
 }
 
-use quasirandom::Qrng;
-use rand::{RngCore, SeedableRng};
-use rand_chacha::ChaCha20Rng;
+#[derive(Clone, Copy, Debug)]
+pub struct RefineStatistics {
+    pub frame_time_us: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct RenderStatistics {
+    pub frame_time_us: f32,
+}
 
 pub struct Device {
     pub gl: Context,
@@ -201,9 +210,12 @@ pub struct Device {
     samples: RenderTexture,
     framebuffers: FramebufferCache,
 
+    refine_query: Query,
+    render_query: Query,
+
     scratch: AlignedMemory,
 
-    lost: bool,
+    device_lost: bool,
 
     state: DeviceState,
 }
@@ -253,22 +265,24 @@ impl Device {
             instance_hierarchy_buffer: UniformBuffer::new_array(gl.clone(), 127),
             raster_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
+            refine_query: Query::new(gl.clone()),
+            render_query: Query::new(gl.clone()),
             samples: RenderTexture::new(gl.clone()),
             framebuffers: FramebufferCache::new(gl.clone()),
-            lost: true,
+            device_lost: true,
             state: DeviceState::new(),
         })
     }
 
     /// Signals the context was lost.
     pub fn context_lost(&mut self) {
-        self.lost = true;
+        self.device_lost = true;
     }
 
     /// Updates this device to render a given scene or returns an error.
     pub fn update(&mut self, scene: &mut Scene) -> Result<bool, Error> {
-        if self.lost && self.try_restore(scene)? {
-            return Ok(false); // context is lost
+        if self.device_lost && self.try_restore(scene)? {
+            return Ok(false); // context is still lost
         }
 
         let mut invalidated = false;
@@ -318,14 +332,13 @@ impl Device {
         Ok(invalidated)
     }
 
-    // TODO: return stats (e.g. measured with performance counters and so on)
-    // (make this optional)
-
     /// Further refines the path-traced render buffer.
-    pub fn refine(&mut self) {
-        if self.lost {
-            return;
+    pub fn refine(&mut self) -> Option<RefineStatistics> {
+        if self.device_lost {
+            return None;
         }
+
+        let refine_query = self.refine_query.query_time_elapsed();
 
         self.gl
             .viewport(0, 0, self.samples.width, self.samples.height);
@@ -358,13 +371,23 @@ impl Device {
 
         self.gl.bind_buffer(Context::ARRAY_BUFFER, None);
         self.gl.draw_arrays(Context::TRIANGLES, 0, 3);
+
+        if !Query::is_supported(&self.gl) {
+            return None; // no statistics
+        }
+
+        Some(RefineStatistics {
+            frame_time_us: refine_query.end().unwrap_or_default() / 1000.0,
+        })
     }
 
     /// Displays the current render buffer to the screen.
-    pub fn render(&mut self) {
-        if self.lost {
-            return;
+    pub fn render(&mut self) -> Option<RenderStatistics> {
+        if self.device_lost {
+            return None;
         }
+
+        let render_query = self.render_query.query_time_elapsed();
 
         self.gl
             .viewport(0, 0, self.samples.width, self.samples.height);
@@ -379,6 +402,14 @@ impl Device {
 
         self.gl.bind_buffer(Context::ARRAY_BUFFER, None);
         self.gl.draw_arrays(Context::TRIANGLES, 0, 3);
+
+        if !Query::is_supported(&self.gl) {
+            return None; // no statistics
+        }
+
+        Some(RenderStatistics {
+            frame_time_us: render_query.end().unwrap_or_default() / 1000.0,
+        })
     }
 
     fn try_restore(&mut self, scene: &mut Scene) -> Result<bool, Error> {
@@ -401,9 +432,11 @@ impl Device {
         self.raster_buffer.reset();
         self.position_tex.reset();
         self.normal_tex.reset();
+        self.refine_query.reset();
+        self.render_query.reset();
 
-        scene.dirty_all();
-        self.lost = false;
+        scene.dirty_all_fields();
+        self.device_lost = false;
 
         Ok(false)
     }
