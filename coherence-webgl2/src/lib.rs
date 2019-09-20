@@ -5,13 +5,13 @@ mod shaders {
     include!(concat!(env!("OUT_DIR"), "/glsl_shaders.rs"));
 }
 
+use coherence_base::device::*;
+use coherence_base::{model::RasterFilter, Dirty, Scene};
 use js_sys::Error;
 use maplit::hashmap;
 use quasirandom::Qrng;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-use sigma_core::device::*;
-use sigma_core::{model::RasterFilter, Dirty, Scene};
 use std::mem::size_of;
 use web_sys::{WebGl2RenderingContext as Context, WebGlFramebuffer, WebGlTexture};
 use zerocopy::{AsBytes, FromBytes};

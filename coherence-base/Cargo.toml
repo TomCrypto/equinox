@@ -1,8 +1,8 @@
 [package]
-name = "sigma-core"
+name = "coherence-base"
 version = "0.1.0"
 authors = ["Thomas Bénéteau <thomas@bitwise.me>"]
-description = "Sigma path tracer core"
+description = "Common logic for the Coherence path tracer"
 edition = "2018"
 
 [dependencies.cgmath]

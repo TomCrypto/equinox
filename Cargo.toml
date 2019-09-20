@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "sigma-core",
-    "sigma-webgl2",
-    "renderer",
+    "coherence-base",
+    "coherence-webgl2",
+    "coherence-webgl2-wasm",
 ]
 
 [profile.release]

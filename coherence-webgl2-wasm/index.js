@@ -11,7 +11,7 @@ async function load_model_data(name) {
   return [hierarchy_data, triangle_data, position_data, normal_data]
 }
 
-import('./pkg/webgl').catch(console.error).then(async gl => {
+import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
   if (!gl) {
     throw "fail"
   }

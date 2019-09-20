@@ -1,7 +1,10 @@
 [package]
-name = "webgl"
+name = "coherence-webgl2-wasm"
 version = "0.1.0"
-authors = ["The wasm-bindgen Developers"]
+authors = ["Thomas Bénéteau <thomas@bitwise.me>"]
+description = "WASM module for the Coherence path tracer via WebGL2"
+license = "MIT"
+repository = "https://github.com/TomCrypto/coherence"
 edition = "2018"
 
 [lib]
@@ -19,11 +22,13 @@ version = "0.1"
 [dependencies.log]
 version = "0.4"
 
-[dependencies.sigma-core]
-path = "../sigma-core"
+[dependencies.coherence-base]
+path = "../coherence-base"
+version = "0.1"
 
-[dependencies.sigma-webgl2]
-path = "../sigma-webgl2"
+[dependencies.coherence-webgl2]
+path = "../coherence-webgl2"
+version = "0.1"
 
 [dependencies.wasm-bindgen]
 version = "0.2.8"

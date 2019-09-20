@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer};
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
-use sigma_core::device::ToDevice;
+use coherence_base::device::ToDevice;
 
 pub struct UniformBuffer<T: ?Sized> {
     gl: Context,

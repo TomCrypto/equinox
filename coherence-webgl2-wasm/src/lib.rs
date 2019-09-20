@@ -8,8 +8,8 @@ use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
 
-use sigma_core::{model::*, *};
-use sigma_webgl2::*;
+use coherence_base::{model::*, *};
+use coherence_webgl2::*;
 
 #[wasm_bindgen]
 pub struct WasmRunner {

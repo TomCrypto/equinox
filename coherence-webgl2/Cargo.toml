@@ -1,8 +1,8 @@
 [package]
-name = "sigma-webgl2"
+name = "coherence-webgl2"
 version = "0.1.0"
 authors = ["Thomas Bénéteau <thomas@bitwise.me>"]
-description = "WebGL2 device implementation for the Sigma path tracer"
+description = "WebGL2 device implementation for the Coherence path tracer"
 edition = "2018"
 build = "build.rs"
 
@@ -30,8 +30,9 @@ version = "0.2"
 [dependencies.regex]
 version = "1.3"
 
-[dependencies.sigma-core]
-path = "../sigma-core"
+[dependencies.coherence-base]
+path = "../coherence-base"
+version = "0.1"
 
 [dependencies.quasirandom]
 version = "0.2"

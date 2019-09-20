@@ -3,8 +3,8 @@ use log::{debug, info, warn};
 
 use crate::engine::{ShaderBind, ShaderBindHandle};
 use crate::AlignedMemory;
+use coherence_base::device::ToDevice;
 use js_sys::{Float32Array, Uint32Array};
-use sigma_core::device::ToDevice;
 use std::marker::PhantomData;
 use std::mem::size_of;
 use web_sys::{WebGl2RenderingContext as Context, WebGlTexture};
