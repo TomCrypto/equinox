@@ -47,7 +47,7 @@ impl RenderTexture {
             self.gl.bind_texture(Context::TEXTURE_2D, self.resource());
 
             self.gl
-                .tex_storage_2d(Context::TEXTURE_2D, 1, Context::RGBA32F, width, height);
+                .tex_storage_2d(Context::TEXTURE_2D, 1, Context::RGBA16F, width, height);
 
             self.gl.tex_parameteri(
                 Context::TEXTURE_2D,
@@ -382,9 +382,17 @@ impl Device {
         shader.bind(&self.position_tex, "position_data");
         shader.bind(&self.normal_tex, "normal_data");
 
+        // need new RGB = ((RGB * frames) + (new RGB * 1)) / (frames + 1)
+        // i.e. RGB = w * RGB + (1 - w) * new RGB
+        // where w = frames / (frames + 1)
+
+        let weight = (self.state.frame as f32) / ((1 + self.state.frame) as f32);
+
         self.gl.enable(Context::BLEND);
         self.gl.blend_equation(Context::FUNC_ADD);
-        self.gl.blend_func(Context::ONE, Context::ONE);
+        self.gl
+            .blend_func(Context::CONSTANT_ALPHA, Context::ONE_MINUS_CONSTANT_ALPHA);
+        self.gl.blend_color(0.0, 0.0, 0.0, 1.0 - weight);
 
         self.gl.bind_buffer(Context::ARRAY_BUFFER, None);
         self.gl.draw_arrays(Context::TRIANGLES, 0, 3);
