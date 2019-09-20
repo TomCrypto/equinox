@@ -201,6 +201,9 @@ pub struct Device {
     globals_buffer: UniformBuffer<GlobalData>,
     raster_buffer: UniformBuffer<RasterData>,
 
+    material_lookup_buffer: UniformBuffer<[MaterialIndex]>,
+    material_buffer: UniformBuffer<[MaterialData]>,
+
     bvh_tex: TextureBuffer<HierarchyData>,
     tri_tex: TextureBuffer<TriangleData>,
 
@@ -241,6 +244,8 @@ impl Device {
                     "Camera" => BindingPoint::UniformBlock(0),
                     "Instances" => BindingPoint::UniformBlock(1),
                     "InstanceHierarchy" => BindingPoint::UniformBlock(4),
+                    "MaterialLookup" => BindingPoint::UniformBlock(5),
+                    "Materials" => BindingPoint::UniformBlock(6),
                     "Globals" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
                 },
@@ -265,6 +270,8 @@ impl Device {
             instance_hierarchy_buffer: UniformBuffer::new_array(gl.clone(), 127),
             raster_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
+            material_lookup_buffer: UniformBuffer::new_array(gl.clone(), 128),
+            material_buffer: UniformBuffer::new_array(gl.clone(), 128),
             refine_query: Query::new(gl.clone()),
             render_query: Query::new(gl.clone()),
             samples: RenderTexture::new(gl.clone()),
@@ -311,6 +318,14 @@ impl Device {
 
             self.instance_hierarchy_buffer
                 .write_array(&mut self.scratch, &instances);
+
+            self.material_lookup_buffer
+                .write_array(&mut self.scratch, &instances);
+        });
+
+        invalidated |= Dirty::clean(&mut scene.materials, |materials| {
+            self.material_buffer
+                .write_array(&mut self.scratch, materials);
         });
 
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
@@ -360,6 +375,8 @@ impl Device {
         shader.bind(&self.instance_hierarchy_buffer, "InstanceHierarchy");
         shader.bind(&self.globals_buffer, "Globals");
         shader.bind(&self.raster_buffer, "Raster");
+        shader.bind(&self.material_buffer, "Materials");
+        shader.bind(&self.material_lookup_buffer, "MaterialLookup");
         shader.bind(&self.bvh_tex, "bvh_data");
         shader.bind(&self.tri_tex, "tri_data");
         shader.bind(&self.position_tex, "position_data");
@@ -434,6 +451,8 @@ impl Device {
         self.normal_tex.reset();
         self.refine_query.reset();
         self.render_query.reset();
+        self.material_buffer.reset();
+        self.material_lookup_buffer.reset();
 
         scene.dirty_all_fields();
         self.device_lost = false;
@@ -510,6 +529,8 @@ impl DeviceState {
         });
 
         self.frame += 1;
+
+        info!("frame = {}", self.frame);
     }
 }
 

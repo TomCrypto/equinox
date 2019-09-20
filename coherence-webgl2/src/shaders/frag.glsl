@@ -38,6 +38,18 @@ layout (std140) uniform Globals {
     uvec4 frame_state;
 } globals;
 
+struct Material {
+    vec4 info;
+};
+
+layout (std140) uniform MaterialLookup {
+    uint index[128];
+} material_lookup;
+
+layout (std140) uniform Materials {
+    Material data[128];
+} materials;
+
 #define FILTER_DELTA (globals.filter_delta)
 #define FRAME_RANDOM (globals.frame_state.xy)
 #define FRAME_NUMBER (globals.frame_state.z)
@@ -55,6 +67,7 @@ uniform highp usampler2D normal_data;
 struct Result {
     float distance;
     vec3 normal;
+    uint material_index;
 };
 
 bool ray_bbox(vec3 origin, vec3 inv_dir, vec3 bmin, vec3 bmax) {
@@ -130,7 +143,7 @@ void read_bvh_node(uint offset, out vec4 value0, out vec4 value1) {
 }
 
 // TODO: pass in the instance data directly...
-bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint triangle_start, uint vertex_start, out Result result) {
+bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint triangle_start, uint vertex_start, uint material_start, out Result result) {
     vec3 inv_dir = vec3(1.0) / direction;
 
     result.distance = 1e10;
@@ -164,6 +177,7 @@ bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint triangle_start, uint
 
                     result.distance = hit.z;
                     result.normal = normal;
+                    result.material_index = material_start + tri.w;
                 }
             }
 
@@ -258,7 +272,7 @@ bool traverse_scene_bvh(vec3 origin, vec3 direction, out Result result) {
 
                 Result tmp;
 
-                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, tmp)) {
+                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices.w, tmp)) {
                     if (tmp.distance < result.distance) {
                         result = tmp;
                     }
@@ -283,7 +297,7 @@ bool traverse_scene_bvh(vec3 origin, vec3 direction, out Result result) {
 
                 Result tmp;
 
-                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, tmp)) {
+                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices.w, tmp)) {
                     if (tmp.distance < result.distance) {
                         result = tmp;
                     }
@@ -438,30 +452,85 @@ void main() {
     vec3 dir;
     evaluate_primary_ray(pixel_state, pos, dir);
 
-    Result result;
+    vec3 accumulated = vec3(0.0);
+    vec3 factor = vec3(1.0);
 
-    // intersect the BVH
-    if (traverse_scene_bvh(pos, dir, result)) {
-        pos = pos + dir * result.distance + result.normal * 1e-3;
+    // many bounces (with russian roulette)
+    for (int i = 0; i < 10; ++i) {
+        Result result;
+
+        if (traverse_scene_bvh(pos, dir, result)) {
+            pos = pos + dir * (result.distance - 1e-3);
+
+            // grab the corresponding material
+            uint true_material_index = material_lookup.index[result.material_index];
+            vec4 material_info = materials.data[true_material_index].info;
+
+            if (material_info.x == 0.0) {
+                // diffuse
+                // pick a random direction in the hemisphere and adjust factor
+
+                vec2 rng = gen_vec2_uniform(frame_state);
+                bitshuffle_mini(frame_state);
+
+                /*float r = sqrt(1.0 - rng.x * rng.x);
+                float phi = M_2PI * rng.y;
+
+                vec3 a = vec3(cos(phi) * r, rng.x, sin(phi) * r);*/
+
+                // importance sampling through cosine weighting
+
+                float r = sqrt(rng.x);
+                float phi = M_2PI * rng.y;
+
+                vec3 a = vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi));
+
+                // basis transform
+
+                vec3 v = result.normal - vec3(0.0, 1.0, 0.0);
+                dir = a - 2.0 * v * (dot(a, v) / max(1e-5, dot(v, v)));
+
+
+                factor *= material_info.yzw;
+
+                // if NOT importance-sampling
+                // factor *= 2.0 * dot(dir, result.normal);
+
+            } else if (material_info.x == 1.0) {
+                // specular
+                // reflect the ray off the normal and continue; assume perfect reflection so no change
+                // in factor
+
+                dir = reflect(dir, result.normal);
+            } else if (material_info.x == 2.0) {
+                // emissive
+                // terminate the ray
+
+                accumulated += factor * material_info.yzw;
+                factor = vec3(0.0);
+                break;
+            } else {
+                break;
+            }
+        } else {
+            // we've escaped, break out
+            break;
+        }
+
+        // russian roulette
 
         vec2 rng = gen_vec2_uniform(frame_state);
         bitshuffle_mini(frame_state);
+        float p = max(factor.x, max(factor.y, factor.z)); // dot(factor, vec3(1.0 / 3.0));
 
-        float theta = 2.0 * 3.14159165 * rng.x;
-        float phi = acos(2.0 * rng.y - 1.0);
-
-        dir = vec3(cos(theta) * sin(phi), cos(phi), sin(theta) * sin(phi));
-
-        dir *= sign(dot(dir, result.normal));
-
-        if (traverse_scene_bvh_occlusion(pos, dir)) {
-            color = vec4(0.0, 0.0, 0.0, 1.0);
+        if (rng.x > p) {
+            factor = vec3(0.0);
+            break;
         } else {
-            color = vec4(0.75, 0.95, 0.65, 1.0);
+            factor /= p;
         }
-
-        // color = vec4(0.5 * result.normal + 0.5, 1.0);
-    } else {
-        color = vec4(0.0, 0.0, 0.0, 1.0);
     }
+
+    // brightness...
+    color = vec4(accumulated + vec3(0.0) * factor, 1.0);
 }

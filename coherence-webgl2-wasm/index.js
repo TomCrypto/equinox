@@ -34,6 +34,17 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
   runner.set_dimensions(canvas.width, canvas.height)
   document.getElementById("resolution").innerText = `${canvas.width} × ${canvas.height}`
 
+  // add materials
+
+  let white_mat = runner.add_material(0, 0.75, 0.75, 0.75)
+  let red_mat = runner.add_material(0, 0.75, 0.25, 0.25)
+  let green_mat = runner.add_material(0, 0.25, 0.75, 0.25)
+  let blue_mat = runner.add_material(0, 0.25, 0.25, 0.75)
+  let yellow_mat = runner.add_material(0, 0.75, 0.75, 0.25)
+  let mirror = runner.add_material(1, 0, 0, 0)
+  let light = runner.add_material(2, 20.0, 0.0, 0.0)
+  let furnace = runner.add_material(0, 0.18, 0.18, 0.18)
+
   canvas.addEventListener("webglcontextlost", e => {
     runner.context_lost();
 
@@ -51,29 +62,35 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
   });
 
   let [bvh, tri, position, normal] = await load_model_data('cat')
-  let cat_object = runner.add_object(bvh, tri, position, normal, 2, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
+  let cat_object = runner.add_object(bvh, tri, position, normal, 1, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
   let [bvh2, tri2, position2, normal2] = await load_model_data('buddha')
   let buddha_object = runner.add_object(bvh2, tri2, position2, normal2, 1, -0.188615, -0.445945, -0.224346, 0.222054, 0.554055, 0.186807)
   let [bvh3, tri3, position3, normal3] = await load_model_data('cornell')
-  let cornell_object = runner.add_object(bvh3, tri3, position3, normal3, 1, 0, 0, 0, 556.0, 548.8, 559.2)
+  let cornell_object = runner.add_object(bvh3, tri3, position3, normal3, 9, 0, 0, 0, 556.0, 548.8, 559.2)
+  let [bvh4, tri4, position4, normal4] = await load_model_data('sphere')
+  let sphere_object = runner.add_object(bvh4, tri4, position4, normal4, 1, -19.74, -19.74, -19.74, 19.74, 19.74, 19.74)
 
-  runner.add_instance(cornell_object, 0, 0, 0, 1)
+  runner.add_instance(cornell_object, 0, 0, 0, 1, [white_mat, light, white_mat, white_mat, white_mat, green_mat, red_mat, blue_mat, yellow_mat])
   runner.set_camera_position(338.34976, 698.74335, -1202.723)
 
   document.getElementById("cat").addEventListener("click", () => {
-    runner.add_instance(cat_object, 0, 0, 0, 1)
+    runner.add_instance(cat_object, 0, 0, 0, 1, [blue_mat])
   });
 
   let offset = 0
 
   document.getElementById("buddha").addEventListener("click", () => {
-    runner.add_instance(buddha_object, offset, 0, 0, 300)
+    runner.add_instance(buddha_object, offset, 0, 0, 300, [mirror])
 
     offset += 1.0
   });
 
   document.getElementById("cornell").addEventListener("click", () => {
-    runner.add_instance(cornell_object, 0, 0, 0, 1)
+    // runner.add_instance(cornell_object, 0, 0, 0, 1, [red_mat])
+  });
+
+  document.getElementById("sphere").addEventListener("click", () => {
+    runner.add_instance(sphere_object, 0, 0, 0, 5.0, [furnace])
   });
 
   document.getElementById("remove-first").addEventListener("click", () => {
@@ -95,7 +112,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
 
   let focalDistance = document.getElementById("focal-distance")
   focalDistance.addEventListener("input", () => {
-    runner.set_focal_distance(focalDistance.value / 10000)
+    runner.set_focal_distance(focalDistance.value / 100)
   })
 
   let focalLength = document.getElementById("focal-length")

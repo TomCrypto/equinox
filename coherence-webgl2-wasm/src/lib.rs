@@ -121,12 +121,40 @@ impl WasmRunner {
         self.scene.objects.list.len() - 1
     }
 
-    pub fn add_instance(&mut self, object: usize, x: f32, y: f32, z: f32, scale: f32) {
+    pub fn add_material(&mut self, kind: u32, r: f32, g: f32, b: f32) -> usize {
+        if kind == 0 {
+            self.scene.materials.list.push(Material::Diffuse {
+                color: Vector3::new(r, g, b),
+            });
+        } else if kind == 1 {
+            self.scene.materials.list.push(Material::Specular);
+        } else if kind == 2 {
+            self.scene
+                .materials
+                .list
+                .push(Material::Emissive { strength: r })
+        } else {
+            panic!("bad kind")
+        }
+
+        self.scene.materials.list.len() - 1
+    }
+
+    pub fn add_instance(
+        &mut self,
+        object: usize,
+        x: f32,
+        y: f32,
+        z: f32,
+        scale: f32,
+        materials: &[usize],
+    ) {
         self.scene.instances.list.push(Instance {
             object,
             scale,
             rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
             translation: Vector3::new(x, y, z),
+            materials: materials.to_vec(),
         })
     }
 

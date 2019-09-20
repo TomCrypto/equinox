@@ -19,12 +19,12 @@ macro_rules! export {
 
 /// Types and definitions to model a scene to be ray-traced.
 pub mod model {
-    export![camera, raster, object, instance];
+    export![camera, raster, object, instance, material];
 }
 
 /// Data formats and encoders to upload scene data to a device.
 pub mod device {
-    export![camera, raster, object, instance];
+    export![camera, raster, object, instance, material];
 
     pub trait ToDevice<T: ?Sized> {
         /// Encodes this object's contents into device memory.
@@ -109,6 +109,7 @@ pub struct Scene {
     pub raster: Dirty<model::Raster>,
     pub instances: Dirty<model::Instances>,
     pub objects: Dirty<model::Objects>,
+    pub materials: Dirty<model::Materials>,
 }
 
 impl Scene {
@@ -128,6 +129,7 @@ impl Scene {
         Dirty::dirty(&mut self.raster);
         Dirty::dirty(&mut self.instances);
         Dirty::dirty(&mut self.objects);
+        Dirty::dirty(&mut self.materials);
     }
 }
 

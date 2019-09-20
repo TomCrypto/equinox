@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use log::{debug, info, warn};
+
 use crate::device::ToDevice;
 use crate::model::{Instances, Object};
 use crate::BoundingBox;
@@ -26,7 +29,6 @@ pub struct IndexData {
     accel_root_node: u32,
     topology_offset: u32,
     geometry_offset: u32,
-    material_offset: u32,
 }
 
 #[repr(align(64), C)]
@@ -48,6 +50,10 @@ struct InstanceInfo {
     surface_area: f32,
     inst: u32,
 }
+
+#[repr(transparent)]
+#[derive(AsBytes, FromBytes, Copy, Clone)]
+pub struct MaterialIndex([u32; 4]);
 
 /// Builds an instance BVH for the scene.
 struct SceneHierarchyBuilder<'a> {
@@ -239,12 +245,39 @@ impl ToDevice<[InstanceData]> for InstancesWithObjects<'_> {
             // We always store a one-to-one mapping between instance materials and object
             // materials inside the lookup array (which might point to shared materials).
 
+            if instance.materials.len() != self.objects[instance.object].materials {
+                panic!("one-to-one mapping required between instance & object materials");
+            }
+
             material_offset += self.objects[instance.object].materials as u32;
         }
     }
 
     fn requested_count(&self) -> usize {
         self.instances.list.len()
+    }
+}
+
+impl ToDevice<[MaterialIndex]> for InstancesWithObjects<'_> {
+    fn to_device(&self, slice: &mut [MaterialIndex]) {
+        let mut index = 0;
+
+        for instance in &self.instances.list {
+            for &material in &instance.materials {
+                // 16-byte alignment...
+                slice[index] = MaterialIndex([material as u32, 0, 0, 0]);
+
+                index += 1;
+            }
+        }
+    }
+
+    fn requested_count(&self) -> usize {
+        self.instances
+            .list
+            .iter()
+            .map(|inst| inst.materials.len())
+            .sum()
     }
 }
 
@@ -256,7 +289,6 @@ impl InstancesWithObjects<'_> {
             state.accel_root_node += obj.hierarchy.len() as u32 / 32;
             state.topology_offset += obj.triangles.len() as u32 / 16;
             state.geometry_offset += obj.positions.len() as u32 / 16;
-            state.material_offset += obj.materials/*.len()*/ as u32;
 
             Some(current)
         });

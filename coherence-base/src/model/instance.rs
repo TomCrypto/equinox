@@ -10,7 +10,8 @@ pub struct Instance {
     pub rotation: Quaternion<f32>,
     /// Translation of this instance.
     pub translation: Vector3<f32>,
-    // TODO: list of material indices here?
+    /// List of material indices.
+    pub materials: Vec<usize>,
 }
 
 #[derive(Default)]
