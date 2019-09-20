@@ -9,19 +9,24 @@ use zerocopy::{AsBytes, FromBytes};
 #[repr(C)]
 #[derive(Clone, Copy, FromBytes, AsBytes)]
 pub struct InstanceData {
-    transform: [f32; 12], // world transform for this instance
-    hierarchy_start: u32, // where does the BVH start in the BVH data?
-    triangles_start: u32, // where does the triangle data start?
-    vertices_start: u32,  // where does the vertex data start?
-    materials_start: u32, // where does the material data start? NOT IMPLEMENTED YET
+    /// Row-major matrix representation of the instance's affine transformation.
+    transform: [f32; 12],
+    /// Index of this instance's root node in the acceleration structure array.
+    accel_root_node: u32,
+    /// Absolute offset into the per-face data array for this instance.
+    topology_offset: u32,
+    /// Absolute offset into the per-vertex data array for this instance.
+    geometry_offset: u32,
+    /// Absolute offset into the material lookup array for this instance.
+    material_offset: u32,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct IndexData {
-    hierarchy_start: u32,
-    triangles_start: u32,
-    materials_start: u32,
-    vertices_start: u32,
+    accel_root_node: u32,
+    topology_offset: u32,
+    geometry_offset: u32,
+    material_offset: u32,
 }
 
 #[repr(align(64), C)]
@@ -163,10 +168,6 @@ impl<'a> SceneHierarchyBuilder<'a> {
     }
 }
 
-// when do we update the object/material list?
-//  -> if it is dirty, it has to have been updated already
-// it's public though, but that's the user's fault
-
 pub struct InstancesWithObjects<'a> {
     pub instances: &'a Instances,
     pub objects: &'a [Object],
@@ -208,6 +209,7 @@ impl ToDevice<[SceneHierarchyNode]> for InstancesWithObjects<'_> {
 impl ToDevice<[InstanceData]> for InstancesWithObjects<'_> {
     fn to_device(&self, slice: &mut [InstanceData]) {
         let indices = Self::calculate_indices(&self.objects);
+        let mut material_offset = 0; // this is per-instance
 
         for (memory, instance) in izip!(&mut *slice, &self.instances.list) {
             let instance_world = Decomposed {
@@ -218,14 +220,26 @@ impl ToDevice<[InstanceData]> for InstancesWithObjects<'_> {
 
             if let Some(world_instance) = instance_world.inverse_transform() {
                 Self::pack_xfm_row_major(world_instance.into(), &mut memory.transform);
+            } else {
+                panic!("instance has a non-invertible affine transform (is scale zero?)");
             }
+
+            // TODO: add indexing checks here... or use Rc or something?
+
+            // None of the static geometry offsets depend on the instance itself, we just
+            // always duplicate them for every instance since we have the space for them.
 
             let index_data = &indices[instance.object];
 
-            memory.hierarchy_start = index_data.hierarchy_start;
-            memory.triangles_start = index_data.triangles_start;
-            memory.vertices_start = index_data.vertices_start;
-            memory.materials_start = index_data.materials_start;
+            memory.accel_root_node = index_data.accel_root_node;
+            memory.topology_offset = index_data.topology_offset;
+            memory.geometry_offset = index_data.geometry_offset;
+            memory.material_offset = material_offset;
+
+            // We always store a one-to-one mapping between instance materials and object
+            // materials inside the lookup array (which might point to shared materials).
+
+            material_offset += self.objects[instance.object].materials as u32;
         }
     }
 
@@ -236,19 +250,18 @@ impl ToDevice<[InstanceData]> for InstancesWithObjects<'_> {
 
 impl InstancesWithObjects<'_> {
     fn calculate_indices(objects: &[Object]) -> Vec<IndexData> {
-        let mut indices = Vec::with_capacity(objects.len());
-        let mut current = IndexData::default();
+        let indices = objects.iter().scan(IndexData::default(), |state, obj| {
+            let current = *state;
 
-        for object in objects {
-            indices.push(current);
+            state.accel_root_node += obj.hierarchy.len() as u32 / 32;
+            state.topology_offset += obj.triangles.len() as u32 / 16;
+            state.geometry_offset += obj.positions.len() as u32 / 16;
+            state.material_offset += obj.materials/*.len()*/ as u32;
 
-            current.hierarchy_start += object.hierarchy.len() as u32 / 32;
-            current.triangles_start += object.triangles.len() as u32 / 16;
-            current.vertices_start += object.positions.len() as u32 / 16;
-            current.materials_start += object.materials/*.len()*/ as u32;
-        }
+            Some(current)
+        });
 
-        indices
+        indices.collect()
     }
 
     fn pack_xfm_row_major(xfm: cgmath::Matrix4<f32>, output: &mut [f32; 12]) {
