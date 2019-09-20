@@ -47,7 +47,7 @@ impl RenderTexture {
             self.gl.bind_texture(Context::TEXTURE_2D, self.resource());
 
             self.gl
-                .tex_storage_2d(Context::TEXTURE_2D, 1, Context::RGBA16F, width, height);
+                .tex_storage_2d(Context::TEXTURE_2D, 1, Context::RGBA32F, width, height);
 
             self.gl.tex_parameteri(
                 Context::TEXTURE_2D,

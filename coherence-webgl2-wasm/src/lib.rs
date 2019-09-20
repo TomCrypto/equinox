@@ -89,7 +89,11 @@ impl WasmRunner {
     }
 
     pub fn set_camera_aperture(&mut self, radius: f32) {
-        self.scene.camera.aperture = Aperture::Circle { radius };
+        self.scene.camera.aperture = Aperture::Ngon {
+            radius,
+            sides: 6,
+            rotation: 0.0,
+        };
     }
 
     pub fn add_object(
