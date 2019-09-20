@@ -11,17 +11,14 @@ use zerocopy::{AsBytes, FromBytes};
 pub struct InstanceData {
     transform: [f32; 12], // world transform for this instance
     hierarchy_start: u32, // where does the BVH start in the BVH data?
-    hierarchy_limit: u32, // where does the BVH end? (as an absolute pos) - TODO: GET RID OF THIS!
     triangles_start: u32, // where does the triangle data start?
+    vertices_start: u32,  // where does the vertex data start?
     materials_start: u32, // where does the material data start? NOT IMPLEMENTED YET
-    vertices_start: u32,
-    padding: [u32; 3],
 }
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct IndexData {
     hierarchy_start: u32,
-    hierarchy_limit: u32,
     triangles_start: u32,
     materials_start: u32,
     vertices_start: u32,
@@ -226,10 +223,9 @@ impl ToDevice<[InstanceData]> for InstancesWithObjects<'_> {
             let index_data = &indices[instance.object];
 
             memory.hierarchy_start = index_data.hierarchy_start;
-            memory.hierarchy_limit = index_data.hierarchy_limit;
             memory.triangles_start = index_data.triangles_start;
-            memory.materials_start = index_data.materials_start;
             memory.vertices_start = index_data.vertices_start;
+            memory.materials_start = index_data.materials_start;
         }
     }
 
@@ -244,15 +240,12 @@ impl InstancesWithObjects<'_> {
         let mut current = IndexData::default();
 
         for object in objects {
-            // TODO: drop hierarchy_limit, it won't be needed eventually
-            current.hierarchy_limit += object.hierarchy.len() as u32 / 32;
-
             indices.push(current);
 
             current.hierarchy_start += object.hierarchy.len() as u32 / 32;
             current.triangles_start += object.triangles.len() as u32 / 16;
-            current.materials_start += object.materials/*.len()*/ as u32;
             current.vertices_start += object.positions.len() as u32 / 16;
+            current.materials_start += object.materials/*.len()*/ as u32;
         }
 
         indices

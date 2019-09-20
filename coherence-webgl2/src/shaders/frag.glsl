@@ -16,7 +16,6 @@ layout (std140) uniform Camera {
 struct Instance {
     mat4x3 transform;
     uvec4 indices;
-    uvec4 indices2;
 };
 
 layout (std140, row_major) uniform Instances {
@@ -131,16 +130,18 @@ void read_bvh_node(uint offset, out vec4 value0, out vec4 value1) {
 }
 
 // TODO: pass in the instance data directly...
-bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle_start, uint vertex_start, out Result result) {
+bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint triangle_start, uint vertex_start, out Result result) {
     vec3 inv_dir = vec3(1.0) / direction;
 
     result.distance = 1e10;
 
-    while (offset != limit) {
+    while (true) {
         vec4 elem1;
         vec4 elem2;
 
         read_bvh_node(offset, elem1, elem2);
+        
+        uint skip = floatBitsToUint(elem1.w);
 
         if (ray_bbox(origin, inv_dir, elem1.xyz, elem2.xyz)) {
             uint data = floatBitsToUint(elem2.w);
@@ -155,9 +156,6 @@ bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle
                 vec3 hit = ray_triangle(origin, direction, p1, e1, e2);
 
                 if (hit.z > 0.0 && hit.z < result.distance) {
-                    // TODO: interpolate normal using (u, v) coordinates from ray_triangle!
-                    // for now just average then
-
                     vec3 n0 = read_vertex_normal(vertex_start + tri.x);
                     vec3 n1 = read_vertex_normal(vertex_start + tri.y);
                     vec3 n2 = read_vertex_normal(vertex_start + tri.z);
@@ -169,23 +167,33 @@ bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle
                 }
             }
 
+            if ((skip & 0x80000000U) != 0U) {
+                break;
+            }
+
             offset += uint(1);
         } else {
-            offset += floatBitsToUint(elem1.w);
+            if ((skip & 0x40000000U) != 0U) {
+                break;
+            }
+
+            offset += skip & ~0xC0000000U;
         }
     }
 
     return result.distance < 1e10;
 }
 
-bool ray_bvh_occlusion(vec3 origin, vec3 direction, uint offset, uint limit, uint triangle_start, uint vertex_start) {
+bool ray_bvh_occlusion(vec3 origin, vec3 direction, uint offset, uint triangle_start, uint vertex_start) {
     vec3 inv_dir = vec3(1.0) / direction;
 
-    while (offset != limit) {
+    while (true) {
         vec4 elem1;
         vec4 elem2;
 
         read_bvh_node(offset, elem1, elem2);
+
+        uint skip = floatBitsToUint(elem1.w);
 
         if (ray_bbox(origin, inv_dir, elem1.xyz, elem2.xyz)) {
             uint data = floatBitsToUint(elem2.w);
@@ -204,9 +212,17 @@ bool ray_bvh_occlusion(vec3 origin, vec3 direction, uint offset, uint limit, uin
                 }
             }
 
+            if ((skip & 0x80000000U) != 0U) {
+                break;
+            }
+
             offset += uint(1);
         } else {
-            offset += floatBitsToUint(elem1.w);
+            if ((skip & 0x40000000U) != 0U) {
+                break;
+            }
+
+            offset += skip & ~0xC0000000U;
         }
     }
 
@@ -242,7 +258,7 @@ bool traverse_scene_bvh(vec3 origin, vec3 direction, out Result result) {
 
                 Result tmp;
 
-                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices2.x, tmp)) {
+                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, tmp)) {
                     if (tmp.distance < result.distance) {
                         result = tmp;
                     }
@@ -267,7 +283,7 @@ bool traverse_scene_bvh(vec3 origin, vec3 direction, out Result result) {
 
                 Result tmp;
 
-                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices2.x, tmp)) {
+                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, tmp)) {
                     if (tmp.distance < result.distance) {
                         result = tmp;
                     }
@@ -307,7 +323,7 @@ bool traverse_scene_bvh_occlusion(vec3 origin, vec3 direction) {
                 vec3 new_origin = xfm * vec4(origin, 1.0);
                 vec3 new_direction = xfm * vec4(direction, 0.0);
 
-                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices2.x)) {
+                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z)) {
                     return true;
                 }
             } else {
@@ -328,7 +344,7 @@ bool traverse_scene_bvh_occlusion(vec3 origin, vec3 direction) {
                 vec3 new_origin = xfm * vec4(origin, 1.0);
                 vec3 new_direction = xfm * vec4(direction, 0.0);
 
-                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices2.x)) {
+                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z)) {
                     return true;
                 }
             } else {
