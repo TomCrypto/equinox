@@ -1,6 +1,7 @@
 precision highp float;
 
 #include <random.glsl>
+#include <object.glsl>
 
 #define M_PI   3.14159265359
 #define M_2PI  6.28318530718
@@ -58,197 +59,14 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-
-uniform sampler2D bvh_data;
-uniform highp usampler2D tri_data;
-uniform sampler2D position_data;
-uniform highp usampler2D normal_data;
-
-struct Result {
-    float distance;
-    vec3 normal;
-    uint material_index;
-};
-
-bool ray_bbox(vec3 origin, vec3 inv_dir, vec3 bmin, vec3 bmax) {
-    vec3 bot = (bmin - origin) * inv_dir;
-    vec3 top = (bmax - origin) * inv_dir;
-
-    vec3 tmin = min(bot, top);
-    vec3 tmax = max(bot, top);
-
-    float near = max(max(tmin.x, tmin.y), tmin.z);
-    float far = min(min(tmax.x, tmax.y), tmax.z);
-
-    return (near <= far) && (far > 0.0);
-}
-
-vec3 ray_triangle(vec3 o, vec3 d, vec3 p1, vec3 e1, vec3 e2) {
-    o -= p1;
-    vec3 s = cross(d, e2);
-    float de = 1.0f / dot(s, e1);
-
-    float u = dot(o, s) * de;
-
-    if ((u < 0.0) || (u > 1.0)) return vec3(0.0, 0.0, -1.0);
-
-    s = cross(o, e1);
-    float v = dot(d, s) * de;
-
-    if ((v < 0.0) || (u + v > 1.0)) return vec3(0.0, 0.0, -1.0);
-
-    return vec3(u, v, dot(e2, s) * de);
-}
-
-uvec4 read_triangle(uint index) {
-    int pixel_offset = int(index); // 1 pixel per triangle!
-
-    int w = pixel_offset % TBUF_WIDTH;
-    int h = pixel_offset / TBUF_WIDTH;
-
-    return texelFetch(tri_data, ivec2(w, h), 0);
-}
-
-vec3 read_vertex_position(uint index) {
-    int pixel_offset = int(index); // 1 pixel per vertex
-
-    int w = pixel_offset % TBUF_WIDTH;
-    int h = pixel_offset / TBUF_WIDTH;
-
-    return texelFetch(position_data, ivec2(w, h), 0).xyz;
-}
-
-vec3 read_vertex_normal(uint index) {
-    int pixel_offset = int(index); // 1 pixel per vertex
-
-    int w = pixel_offset % TBUF_WIDTH;
-    int h = pixel_offset / TBUF_WIDTH;
-
-    uvec4 data = texelFetch(normal_data, ivec2(w, h), 0);
-
-    vec2 nxny = unpackHalf2x16(data.x);
-    float nz = unpackHalf2x16(data.y).x;
-
-    return vec3(nxny, nz);
-}
-
-void read_bvh_node(uint offset, out vec4 value0, out vec4 value1) {
-    int pixel_offset = int(offset) * 2;
-
-    int w = pixel_offset % TBUF_WIDTH;
-    int h = pixel_offset / TBUF_WIDTH;
-
-    value0 = texelFetch(bvh_data, ivec2(w + 0, h), 0);
-    value1 = texelFetch(bvh_data, ivec2(w + 1, h), 0);
-}
-
-// TODO: pass in the instance data directly...
-bool ray_bvh(vec3 origin, vec3 direction, uint offset, uint triangle_start, uint vertex_start, uint material_start, out Result result) {
-    vec3 inv_dir = vec3(1.0) / direction;
-
-    result.distance = 1e10;
-
-    while (true) {
-        vec4 elem1;
-        vec4 elem2;
-
-        read_bvh_node(offset, elem1, elem2);
-        
-        uint skip = floatBitsToUint(elem1.w);
-
-        if (ray_bbox(origin, inv_dir, elem1.xyz, elem2.xyz)) {
-            uint data = floatBitsToUint(elem2.w);
-
-            if (data != uint(0)) {
-                uvec4 tri = read_triangle(triangle_start + data - uint(1));
-
-                vec3 p1 = read_vertex_position(vertex_start + tri.x);
-                vec3 e1 = read_vertex_position(vertex_start + tri.y) - p1;
-                vec3 e2 = read_vertex_position(vertex_start + tri.z) - p1;
-
-                vec3 hit = ray_triangle(origin, direction, p1, e1, e2);
-
-                if (hit.z > 0.0 && hit.z < result.distance) {
-                    vec3 n0 = read_vertex_normal(vertex_start + tri.x);
-                    vec3 n1 = read_vertex_normal(vertex_start + tri.y);
-                    vec3 n2 = read_vertex_normal(vertex_start + tri.z);
-
-                    vec3 normal = normalize(n1 * hit.x + n2 * hit.y + n0 * (1.0 - hit.x - hit.y));
-
-                    result.distance = hit.z;
-                    result.normal = normal;
-                    result.material_index = material_start + tri.w;
-                }
-            }
-
-            if ((skip & 0x80000000U) != 0U) {
-                break;
-            }
-
-            offset += uint(1);
-        } else {
-            if ((skip & 0x40000000U) != 0U) {
-                break;
-            }
-
-            offset += skip & ~0xC0000000U;
-        }
-    }
-
-    return result.distance < 1e10;
-}
-
-bool ray_bvh_occlusion(vec3 origin, vec3 direction, uint offset, uint triangle_start, uint vertex_start) {
-    vec3 inv_dir = vec3(1.0) / direction;
-
-    while (true) {
-        vec4 elem1;
-        vec4 elem2;
-
-        read_bvh_node(offset, elem1, elem2);
-
-        uint skip = floatBitsToUint(elem1.w);
-
-        if (ray_bbox(origin, inv_dir, elem1.xyz, elem2.xyz)) {
-            uint data = floatBitsToUint(elem2.w);
-
-            if (data != uint(0)) {
-                uvec4 tri = read_triangle(triangle_start + data - uint(1));
-
-                vec3 p1 = read_vertex_position(vertex_start + tri.x);
-                vec3 e1 = read_vertex_position(vertex_start + tri.y) - p1;
-                vec3 e2 = read_vertex_position(vertex_start + tri.z) - p1;
-
-                vec3 hit = ray_triangle(origin, direction, p1, e1, e2);
-
-                if (hit.z > 0.0) {
-                    return true;
-                }
-            }
-
-            if ((skip & 0x80000000U) != 0U) {
-                break;
-            }
-
-            offset += uint(1);
-        } else {
-            if ((skip & 0x40000000U) != 0U) {
-                break;
-            }
-
-            offset += skip & ~0xC0000000U;
-        }
-    }
-
-    return false;
-}
-
-bool traverse_scene_bvh(vec3 origin, vec3 direction, out Result result) {
+// this can return true if a triangle is actually intersected, for convenience
+bool traverse_scene_bvh(ray_t ray, inout traversal_t traversal) {
     uint stack[7]; // equal to max BVH depth + 1, so log2(128) = 7? TODO: find the exact number
     
-    vec3 inv_dir = vec3(1.0) / direction;
+    traversal.triangle.w = 0xffffffffU;
+    traversal.hit.xy = vec2(1e-3, 1e10); // initial (min, max) range for the ray
 
-    result.distance = 1e10;
+    vec3 idir = vec3(1.0) / ray.dir;
 
     stack[0] = 0U;
     uint idx = 1U;
@@ -259,116 +77,54 @@ bool traverse_scene_bvh(vec3 origin, vec3 direction, out Result result) {
         // TODO: optimize this traversal later
 
         // do we intersect the LEFT node?
-        if (ray_bbox(origin, inv_dir, node.lhs_min.xyz, node.lhs_max.xyz)) {
+        if (ray_bbox(ray.org, idir, node.lhs_min.xyz, node.lhs_max.xyz, traversal)) {
             uint next = floatBitsToUint(node.lhs_min.w);
             uint inst = floatBitsToUint(node.lhs_max.w);
 
             if (next == 0xffffffffU) {
                 // this is a leaf node, traverse it
                 mat4x3 xfm = instances.data[inst].transform;
+                uvec4 indices = instances.data[inst].indices;
 
-                vec3 new_origin = xfm * vec4(origin, 1.0);
-                vec3 new_direction = xfm * vec4(direction, 0.0);
+                ray_t new_ray;
 
-                Result tmp;
+                new_ray.org = xfm * vec4(ray.org, 1.0);
+                new_ray.dir = xfm * vec4(ray.dir, 0.0); // TODO: need to normalize this if scaling?? (not sure)
 
-                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices.w, tmp)) {
-                    if (tmp.distance < result.distance) {
-                        result = tmp;
-                    }
-                }
+                ray_bvh(new_ray, indices, traversal);
             } else {
                 // this is another node, push it on the stack
                 stack[idx++] = next;
             }
         }
 
-        // do we intersect the LEFT node?
-        if (ray_bbox(origin, inv_dir, node.rhs_min.xyz, node.rhs_max.xyz)) {
+        // do we intersect the RIGHT node?
+        if (ray_bbox(ray.org, idir, node.rhs_min.xyz, node.rhs_max.xyz, traversal)) {
             uint next = floatBitsToUint(node.rhs_min.w);
             uint inst = floatBitsToUint(node.rhs_max.w);
 
             if (next == 0xffffffffU) {
                 // this is a leaf node, traverse it
                 mat4x3 xfm = instances.data[inst].transform;
+                uvec4 indices = instances.data[inst].indices;
 
-                vec3 new_origin = xfm * vec4(origin, 1.0);
-                vec3 new_direction = xfm * vec4(direction, 0.0);
+                ray_t new_ray;
 
-                Result tmp;
+                new_ray.org = xfm * vec4(ray.org, 1.0);
+                new_ray.dir = xfm * vec4(ray.dir, 0.0); // TODO: need to normalize this if scaling?? (not sure)
 
-                if (ray_bvh(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z, instances.data[inst].indices.w, tmp)) {
-                    if (tmp.distance < result.distance) {
-                        result = tmp;
-                    }
-                }
+                ray_bvh(new_ray, indices, traversal);
             } else {
                 // this is another node, push it on the stack
                 stack[idx++] = next;
             }
+
+            // TODO: optimization: if LEFT is closer than RIGHT, swap the two
+            // (need a ray_bbox function with distance then)
         }
     }
 
-    return result.distance < 1e10;
-}
-
-bool traverse_scene_bvh_occlusion(vec3 origin, vec3 direction) {
-    uint stack[7]; // equal to max BVH depth + 1, so log2(128) = 7? TODO: find the exact number
-    
-    vec3 inv_dir = vec3(1.0) / direction;
-
-    stack[0] = 0U;
-    uint idx = 1U;
-
-    while (idx != 0U) {
-        InstanceNode node = instance_hierarchy.data[stack[--idx]];
-
-        // TODO: optimize this traversal later
-
-        // do we intersect the LEFT node?
-        if (ray_bbox(origin, inv_dir, node.lhs_min.xyz, node.lhs_max.xyz)) {
-            uint next = floatBitsToUint(node.lhs_min.w);
-            uint inst = floatBitsToUint(node.lhs_max.w);
-
-            if (next == 0xffffffffU) {
-                // this is a leaf node, traverse it
-                mat4x3 xfm = instances.data[inst].transform;
-
-                vec3 new_origin = xfm * vec4(origin, 1.0);
-                vec3 new_direction = xfm * vec4(direction, 0.0);
-
-                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z)) {
-                    return true;
-                }
-            } else {
-                // this is another node, push it on the stack
-                stack[idx++] = next;
-            }
-        }
-
-        // do we intersect the LEFT node?
-        if (ray_bbox(origin, inv_dir, node.rhs_min.xyz, node.rhs_max.xyz)) {
-            uint next = floatBitsToUint(node.rhs_min.w);
-            uint inst = floatBitsToUint(node.rhs_max.w);
-
-            if (next == 0xffffffffU) {
-                // this is a leaf node, traverse it
-                mat4x3 xfm = instances.data[inst].transform;
-
-                vec3 new_origin = xfm * vec4(origin, 1.0);
-                vec3 new_direction = xfm * vec4(direction, 0.0);
-
-                if (ray_bvh_occlusion(new_origin, new_direction, instances.data[inst].indices.x, instances.data[inst].indices.y, instances.data[inst].indices.z)) {
-                    return true;
-                }
-            } else {
-                // this is another node, push it on the stack
-                stack[idx++] = next;
-            }
-        }
-    }
-
-    return false;
+    return traversal.triangle.w != 0xffffffffU;
 }
 
 // Low-discrepancy sequence generator.
@@ -451,22 +207,26 @@ void main() {
 
     uvec2 frame_state = pixel_state + FRAME_RANDOM;
 
-    vec3 pos;
-    vec3 dir;
-    evaluate_primary_ray(pixel_state, pos, dir);
+    ray_t ray;
+    evaluate_primary_ray(pixel_state, ray.org, ray.dir);
 
     vec3 accumulated = vec3(0.0);
     vec3 factor = vec3(1.0);
 
     // many bounces (with russian roulette)
     for (int i = 0; i < 10; ++i) {
-        Result result;
+        traversal_t traversal;
 
-        if (traverse_scene_bvh(pos, dir, result)) {
-            pos = pos + dir * (result.distance - 1e-3);
+        if (traverse_scene_bvh(ray, traversal)) {
+            ray.org += ray.dir * traversal.hit.y; // closest distance to triangle
+
+            vec3 normal, tangent;
+            vec2 uv;
+
+            read_triangle_attributes(traversal, normal, uv, tangent);
 
             // grab the corresponding material
-            uint true_material_index = material_lookup.index[result.material_index];
+            uint true_material_index = material_lookup.index[traversal.triangle.w];
             vec4 material_info = materials.data[true_material_index].info;
 
             if (material_info.x == 0.0) {
@@ -490,8 +250,8 @@ void main() {
 
                 // basis transform
 
-                vec3 v = result.normal - vec3(0.0, 1.0, 0.0);
-                dir = a - 2.0 * v * (dot(a, v) / max(1e-5, dot(v, v)));
+                vec3 v = normal - vec3(0.0, 1.0, 0.0);
+                ray.dir = a - 2.0 * v * (dot(a, v) / max(1e-5, dot(v, v)));
 
 
                 factor *= material_info.yzw;
@@ -504,7 +264,7 @@ void main() {
                 // reflect the ray off the normal and continue; assume perfect reflection so no change
                 // in factor
 
-                dir = reflect(dir, result.normal);
+                ray.dir = reflect(ray.dir, normal);
             } else if (material_info.x == 2.0) {
                 // emissive
                 // terminate the ray

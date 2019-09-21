@@ -17,7 +17,7 @@ pub enum TextureBufferFormat {
     F32x4,
 }
 
-pub struct TextureBuffer<T> {
+pub struct TextureBuffer<T: ?Sized> {
     gl: Context,
 
     handle: Option<WebGlTexture>,
@@ -40,7 +40,7 @@ pub fn pixels_per_texture_buffer_row(gl: &Context) -> i32 {
     param.as_f64().unwrap() as i32 // this really shouldn't ever fail
 }
 
-impl<T> TextureBuffer<T> {
+impl<T> TextureBuffer<[T]> {
     pub fn new(gl: Context, format: TextureBufferFormat) -> Self {
         let pixels_per_row = pixels_per_texture_buffer_row(&gl);
 
@@ -71,7 +71,7 @@ impl<T> TextureBuffer<T> {
     }
 }
 
-impl<T: AsBytes + FromBytes> TextureBuffer<T> {
+impl<T: AsBytes + FromBytes> TextureBuffer<[T]> {
     pub fn write(&mut self, buffer: &mut AlignedMemory, source: &impl ToDevice<[T]>) {
         let size = source.requested_count() * size_of::<T>();
 
@@ -214,13 +214,13 @@ impl<T: AsBytes + FromBytes> TextureBuffer<T> {
     }
 }
 
-impl<T> Drop for TextureBuffer<T> {
+impl<T: ?Sized> Drop for TextureBuffer<T> {
     fn drop(&mut self) {
         self.gl.delete_texture(self.handle.as_ref());
     }
 }
 
-impl<T> ShaderBind for TextureBuffer<T> {
+impl<T: ?Sized> ShaderBind for TextureBuffer<T> {
     fn handle(&self) -> ShaderBindHandle {
         ShaderBindHandle::Texture(self.handle.as_ref())
     }

@@ -204,11 +204,11 @@ pub struct Device {
     material_lookup_buffer: UniformBuffer<[MaterialIndex]>,
     material_buffer: UniformBuffer<[MaterialData]>,
 
-    bvh_tex: TextureBuffer<HierarchyData>,
-    tri_tex: TextureBuffer<TriangleData>,
+    bvh_tex: TextureBuffer<[HierarchyData]>,
+    tri_tex: TextureBuffer<[TriangleData]>,
 
-    position_tex: TextureBuffer<VertexPositionData>,
-    normal_tex: TextureBuffer<VertexMappingData>,
+    position_tex: TextureBuffer<[VertexPositionData]>,
+    normal_tex: TextureBuffer<[VertexMappingData]>,
 
     samples: RenderTexture,
     framebuffers: FramebufferCache,
@@ -237,10 +237,10 @@ impl Device {
                     hashmap! { "TBUF_WIDTH" => format!("{}", pixels_per_texture_buffer_row(&gl)) },
                 ),
                 hashmap! {
-                    "bvh_data" => BindingPoint::Texture(0),
-                    "tri_data" => BindingPoint::Texture(1),
-                    "position_data" => BindingPoint::Texture(2),
-                    "normal_data" => BindingPoint::Texture(3),
+                    "tex_hierarchy" => BindingPoint::Texture(0),
+                    "tex_triangles" => BindingPoint::Texture(1),
+                    "tex_vertex_positions" => BindingPoint::Texture(2),
+                    "tex_vertex_attributes" => BindingPoint::Texture(3),
                     "Camera" => BindingPoint::UniformBlock(0),
                     "Instances" => BindingPoint::UniformBlock(1),
                     "InstanceHierarchy" => BindingPoint::UniformBlock(4),
@@ -377,10 +377,10 @@ impl Device {
         shader.bind(&self.raster_buffer, "Raster");
         shader.bind(&self.material_buffer, "Materials");
         shader.bind(&self.material_lookup_buffer, "MaterialLookup");
-        shader.bind(&self.bvh_tex, "bvh_data");
-        shader.bind(&self.tri_tex, "tri_data");
-        shader.bind(&self.position_tex, "position_data");
-        shader.bind(&self.normal_tex, "normal_data");
+        shader.bind(&self.bvh_tex, "tex_hierarchy");
+        shader.bind(&self.tri_tex, "tex_triangles");
+        shader.bind(&self.position_tex, "tex_vertex_positions");
+        shader.bind(&self.normal_tex, "tex_vertex_attributes");
 
         // need new RGB = ((RGB * frames) + (new RGB * 1)) / (frames + 1)
         // i.e. RGB = w * RGB + (1 - w) * new RGB
