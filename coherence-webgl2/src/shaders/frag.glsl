@@ -375,16 +375,16 @@ bool traverse_scene_bvh_occlusion(vec3 origin, vec3 direction) {
 //
 // Given a fixed, unchanging key, this will produce a low-discrepancy sequence of 2D points
 // as a function of frame number, e.g. on the next frame for the same key the next point in
-// the sequence will be produced. The key should be <= 2^16 to prevent precision problems.
+// the sequence will be produced.
 
 vec2 low_discrepancy_2d(uvec2 key) {
-    return fract(vec2(key + FRAME_NUMBER) * vec2(0.7548776662, 0.5698402909));
+    return fract(vec2((key + FRAME_NUMBER) % 8192U) * vec2(0.7548776662, 0.5698402909));
 }
 
 // Begin camera stuff
 
 vec2 evaluate_circular_aperture_uv(uvec2 pixel_state) {
-    vec2 uv = low_discrepancy_2d(pixel_state >> 16U);
+    vec2 uv = low_discrepancy_2d(pixel_state);
 
     float a = uv.s * M_2PI;
 
@@ -392,7 +392,10 @@ vec2 evaluate_circular_aperture_uv(uvec2 pixel_state) {
 }
 
 vec2 evaluate_polygon_aperture_uv(uvec2 pixel_state) {
-    vec2 uv = low_discrepancy_2d(pixel_state >> 16U);
+    pixel_state += FRAME_RANDOM;
+    bitshuffle_mini(pixel_state);
+
+    vec2 uv = gen_vec2_uniform(pixel_state); // low_discrepancy_2d(pixel_state);
 
     float corner = floor(uv.s * camera.aperture_settings.y);
 
