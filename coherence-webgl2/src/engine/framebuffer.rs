@@ -45,19 +45,39 @@ impl Framebuffer {
         }
 
         self.gl.draw_buffers(&array);
-
-        // TODO: validate FBO and die if it's wrong? (or let the implementation
-        // do it?)
     }
 
-    pub fn bind_to_pipeline(&mut self) {
+    pub fn bind_to_pipeline(&mut self) -> BoundFramebuffer {
         self.gl
             .bind_framebuffer(Context::DRAW_FRAMEBUFFER, self.handle.as_ref());
+
+        BoundFramebuffer::new(self)
     }
 
     pub fn bind_canvas_to_pipeline(gl: &Context) {
         gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, None);
     }
+}
+
+// TODO: some way to unify this with the canvas framebuffer...
+
+pub struct BoundFramebuffer<'a> {
+    framebuffer: &'a mut Framebuffer,
+}
+
+impl<'a> BoundFramebuffer<'a> {
+    fn new(framebuffer: &'a mut Framebuffer) -> Self {
+        Self { framebuffer }
+    }
+
+    pub fn clear(&mut self, attachment: i32, rgba: &[f32]) {
+        self.framebuffer
+            .gl
+            .clear_bufferfv_with_f32_array(Context::COLOR, attachment, rgba);
+    }
+
+    // TODO: APIs to set the blend state, set viewport/scissor, issue draw calls
+    // etc.
 }
 
 impl Drop for Framebuffer {

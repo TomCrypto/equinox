@@ -13,42 +13,10 @@ layout (std140) uniform Camera {
     vec4 aperture_settings;
 } camera;
 
-struct Instance {
-    mat4x3 transform;
-    uvec4 indices;
-};
-
-/*layout (std140, row_major) uniform Instances {
-    Instance data[128];
-} instances;*/
-
-struct InstanceNode {
-    vec4 lhs_min;
-    vec4 lhs_max;
-    vec4 rhs_min;
-    vec4 rhs_max;
-};
-
-/*layout (std140) uniform InstanceHierarchy {
-    InstanceNode data[127];
-} instance_hierarchy;*/
-
 layout (std140) uniform Globals {
     vec2 filter_delta;
     uvec4 frame_state;
 } globals;
-
-struct Material {
-    vec4 info;
-};
-
-/*layout (std140) uniform MaterialLookup {
-    uint index[128];
-} material_lookup;
-
-layout (std140) uniform Materials {
-    Material data[128];
-} materials;*/
 
 #define FILTER_DELTA (globals.filter_delta)
 #define FRAME_RANDOM (globals.frame_state.xy)
@@ -58,22 +26,22 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-layout (std140) uniform GeometryValues {
+layout (std140) uniform Geometry {
     vec4 data[64];
-} geometry_values;
+} geometry_buffer;
 
-layout (std140) uniform MaterialValues {
+layout (std140) uniform Material {
     vec4 data[64];
-} material_values;
+} material_buffer;
 
 struct BvhNode {
     vec4 data1;
     vec4 data2;
 };
 
-layout (std140) uniform InstanceHierarchy {
+layout (std140) uniform Instance {
     BvhNode data[256];
-} instance_hierarchy;
+} instance_buffer;
 
 #define PREC 1e-5
 
@@ -97,6 +65,7 @@ bool eval_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
 // termination condition is adjusted to stop as soon as you encounter the starting offset
 // again.
 // this only holds true if the ray origin is actually inside the starting offset's AABB...
+// (to within the specified precision, i.e. it must be othervise visited during traversal)
 // (if not this MAY LOOP FOREVER! must be absolutely surely, provably inside the AABB)
 // if this property is not needed we can do some more micro-optimizations
 
@@ -107,7 +76,7 @@ traversal_t traverse_scene(ray_t ray) {
     uint index = 0U;
 
     do {
-        BvhNode node = instance_hierarchy.data[index++];
+        BvhNode node = instance_buffer.data[index++];
 
         uint word1 = floatBitsToUint(node.data1.w);
         uint word2 = floatBitsToUint(node.data2.w);
@@ -248,7 +217,7 @@ void main() {
                     ray.dir = a - 2.0 * v * (dot(a, v) / max(1e-5, dot(v, v)));
 
 
-                    factor *= material_values.data[offset + 0U].xyz;
+                    factor *= material_buffer.data[offset + 0U].xyz;
                     break;
                 }
                 case 1U: {
@@ -264,7 +233,7 @@ void main() {
                     // emissive
                     // terminate the ray
 
-                    accumulated += factor * material_values.data[offset + 0U].xyz;
+                    accumulated += factor * material_buffer.data[offset + 0U].xyz;
                     factor = vec3(0.0);
                     break;
                 }

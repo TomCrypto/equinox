@@ -140,22 +140,13 @@ pub struct Device {
 
     camera_buffer: UniformBuffer<CameraData>,
 
-    geometry_values_buffer: UniformBuffer<[GeometryParameter]>,
-    material_values_buffer: UniformBuffer<[MaterialParameter]>,
+    geometry_buffer: UniformBuffer<[GeometryParameter]>,
+    material_buffer: UniformBuffer<[MaterialParameter]>,
+    instance_buffer: UniformBuffer<[SceneInstanceNode]>,
 
-    //instance_buffer: UniformBuffer<[InstanceData]>,
-    instance_hierarchy_buffer: UniformBuffer<[SceneHierarchyNode]>,
     globals_buffer: UniformBuffer<GlobalData>,
     raster_buffer: UniformBuffer<RasterData>,
 
-    //material_lookup_buffer: UniformBuffer<[MaterialIndex]>,
-    //material_buffer: UniformBuffer<[MaterialData]>,
-
-    //bvh_tex: TextureBuffer<[HierarchyData]>,
-    //tri_tex: TextureBuffer<[TriangleData]>,
-
-    //position_tex: TextureBuffer<[VertexPositionData]>,
-    //normal_tex: TextureBuffer<[VertexMappingData]>,
     samples: RenderTexture,
     samples_fbo: Framebuffer,
 
@@ -183,17 +174,10 @@ impl Device {
                     hashmap! { "TBUF_WIDTH" => format!("{}", pixels_per_texture_buffer_row(&gl)) },
                 ),
                 hashmap! {
-                    /*"tex_hierarchy" => BindingPoint::Texture(0),
-                    "tex_triangles" => BindingPoint::Texture(1),
-                    "tex_vertex_positions" => BindingPoint::Texture(2),
-                    "tex_vertex_attributes" => BindingPoint::Texture(3),*/
                     "Camera" => BindingPoint::UniformBlock(0),
-                    //"Instances" => BindingPoint::UniformBlock(1),
-                    "InstanceHierarchy" => BindingPoint::UniformBlock(4),
-                    //"MaterialLookup" => BindingPoint::UniformBlock(5),
-                    //"Materials" => BindingPoint::UniformBlock(6),
-                    "GeometryValues" => BindingPoint::UniformBlock(7),
-                    "MaterialValues" => BindingPoint::UniformBlock(8),
+                    "Instance" => BindingPoint::UniformBlock(4),
+                    "Geometry" => BindingPoint::UniformBlock(7),
+                    "Material" => BindingPoint::UniformBlock(8),
                     "Globals" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
                 },
@@ -207,21 +191,14 @@ impl Device {
                 },
             ),
             camera_buffer: UniformBuffer::new(gl.clone()),
-            geometry_values_buffer: UniformBuffer::new_array(gl.clone(), 256),
-            material_values_buffer: UniformBuffer::new_array(gl.clone(), 256),
-            //bvh_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
-            //tri_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4),
-            //position_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
-            //normal_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4),
+            geometry_buffer: UniformBuffer::new_array(gl.clone(), 256),
+            material_buffer: UniformBuffer::new_array(gl.clone(), 256),
             // TODO: get these from the shader?? (not really easily doable I think)
             //  -> #define them in the shader from some shared value obtained from the WebGL
             // context!
-            //instance_buffer: UniformBuffer::new_array(gl.clone(), 128),
-            instance_hierarchy_buffer: UniformBuffer::new_array(gl.clone(), 256),
+            instance_buffer: UniformBuffer::new_array(gl.clone(), 256),
             raster_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
-            //material_lookup_buffer: UniformBuffer::new_array(gl.clone(), 128),
-            //material_buffer: UniformBuffer::new_array(gl.clone(), 128),
             samples_fbo: Framebuffer::new(gl.clone()),
             refine_query: Query::new(gl.clone()),
             render_query: Query::new(gl.clone()),
@@ -249,21 +226,9 @@ impl Device {
         });
 
         invalidated |= Dirty::clean(&mut scene.objects, |objects| {
-            /*self.bvh_tex.write(&mut self.scratch, objects);
-            self.tri_tex.write(&mut self.scratch, objects);
-            self.position_tex.write(&mut self.scratch, objects);
-            self.normal_tex.write(&mut self.scratch, objects);*/
-
             // in here, update the GLSL code! (rebuild the shader?)
             // generate the actual GLSL code properly from the objects geometry
             // paste that into the shader and use that for rendering
-
-            /*
-
-            in principle this should construct a single GLSL function that takes a geometry ID
-            and a position "x" and returns the signed distance, but we can tweak this later on
-
-            */
 
             let mut code = String::from("float sdf(uint geometry, uint instance, vec3 x) {");
             let mut functions = String::new();
@@ -309,22 +274,13 @@ impl Device {
                 objects: &objects.list,
             };
 
-            /*self.instance_buffer
+            self.instance_buffer
                 .write_array(&mut self.scratch, &instances);
 
-            self.instance_hierarchy_buffer
+            self.geometry_buffer
                 .write_array(&mut self.scratch, &instances);
 
-            self.material_lookup_buffer
-                .write_array(&mut self.scratch, &instances);*/
-
-            self.instance_hierarchy_buffer
-                .write_array(&mut self.scratch, &instances);
-
-            self.geometry_values_buffer
-                .write_array(&mut self.scratch, &instances);
-
-            self.material_values_buffer
+            self.material_buffer
                 .write_array(&mut self.scratch, &instances);
         });
 
@@ -363,7 +319,7 @@ impl Device {
         self.gl
             .viewport(0, 0, self.samples.width, self.samples.height);
 
-        self.samples_fbo.bind_to_pipeline();
+        let mut fbo = self.samples_fbo.bind_to_pipeline();
 
         // TODO: not happy with this, can we improve it
         self.state
@@ -372,18 +328,11 @@ impl Device {
         let shader = self.program.bind_to_pipeline();
 
         shader.bind(&self.camera_buffer, "Camera");
-        shader.bind(&self.geometry_values_buffer, "GeometryValues");
-        shader.bind(&self.material_values_buffer, "MaterialValues");
-        //shader.bind(&self.instance_buffer, "Instances");
-        shader.bind(&self.instance_hierarchy_buffer, "InstanceHierarchy");
+        shader.bind(&self.geometry_buffer, "Geometry");
+        shader.bind(&self.material_buffer, "Material");
+        shader.bind(&self.instance_buffer, "Instance");
         shader.bind(&self.globals_buffer, "Globals");
         shader.bind(&self.raster_buffer, "Raster");
-        //shader.bind(&self.material_buffer, "Materials");
-        //shader.bind(&self.material_lookup_buffer, "MaterialLookup");
-        //shader.bind(&self.bvh_tex, "tex_hierarchy");
-        //shader.bind(&self.tri_tex, "tex_triangles");
-        //shader.bind(&self.position_tex, "tex_vertex_positions");
-        //shader.bind(&self.normal_tex, "tex_vertex_attributes");
 
         let weight = (self.state.frame as f32) / ((1 + self.state.frame) as f32);
 
@@ -441,9 +390,6 @@ impl Device {
             return Ok(false);
         }
 
-        // TODO: this should probably be associated with the framebuffer cache
-        // (or whatever it becomes in the future)
-
         self.samples_fbo.invalidate(&[&self.samples]);
 
         // TODO: remove shader reset once we've cleaned up the #define system
@@ -461,18 +407,9 @@ impl Device {
     }
 
     fn reset_refinement(&mut self) {
-        self.samples_fbo.bind_to_pipeline();
+        let mut fbo = self.samples_fbo.bind_to_pipeline();
 
-        self.gl
-            .clear_bufferfv_with_f32_array(Context::COLOR, 0, &[0.0, 0.0, 0.0, 0.0]);
-    }
-
-    fn try_load_extension(&self, name: &str) -> Result<(), Error> {
-        if let Err(_) | Ok(None) = self.gl.get_extension(name) {
-            Err(Error::new(&format!("missing extension '{}'", name)))
-        } else {
-            Ok(())
-        }
+        fbo.clear(0, &[0.0, 0.0, 0.0, 0.0]);
     }
 }
 

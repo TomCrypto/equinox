@@ -130,10 +130,10 @@ fn parameter_access(index: usize) -> String {
     let array_idx = index / 4;
 
     match index % 4 {
-        0 => format!("geometry_values.data[inst + {}U].x", array_idx),
-        1 => format!("geometry_values.data[inst + {}U].y", array_idx),
-        2 => format!("geometry_values.data[inst + {}U].z", array_idx),
-        _ => format!("geometry_values.data[inst + {}U].w", array_idx),
+        0 => format!("geometry_buffer.data[inst + {}U].x", array_idx),
+        1 => format!("geometry_buffer.data[inst + {}U].y", array_idx),
+        2 => format!("geometry_buffer.data[inst + {}U].z", array_idx),
+        _ => format!("geometry_buffer.data[inst + {}U].w", array_idx),
     }
 }
 

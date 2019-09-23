@@ -17,7 +17,7 @@ pub struct IndexData {
 
 #[repr(align(32), C)]
 #[derive(AsBytes, FromBytes, Debug, Default)]
-pub struct SceneHierarchyNode {
+pub struct SceneInstanceNode {
     min: [f32; 3],
     packed1: u32, // "skip" pointer + "parameter offset" << 16
     max: [f32; 3],
@@ -27,7 +27,7 @@ pub struct SceneHierarchyNode {
 // TODO: check bits 15 are never used for any u16 here because we rely on some
 // assumptions
 
-impl SceneHierarchyNode {
+impl SceneInstanceNode {
     pub fn make_leaf(
         min: [f32; 3],
         max: [f32; 3],
@@ -83,11 +83,11 @@ pub struct MaterialIndex([u32; 4]);
 
 /// Builds an instance BVH for the scene.
 struct SceneHierarchyBuilder<'a> {
-    nodes: &'a mut [SceneHierarchyNode],
+    nodes: &'a mut [SceneInstanceNode],
 }
 
 impl<'a> SceneHierarchyBuilder<'a> {
-    pub fn new(nodes: &'a mut [SceneHierarchyNode]) -> Self {
+    pub fn new(nodes: &'a mut [SceneInstanceNode]) -> Self {
         Self { nodes }
     }
 
@@ -115,7 +115,7 @@ impl<'a> SceneHierarchyBuilder<'a> {
             // if there are no leaves, set the root AABB to just be all zeroes
             // and set the skip to the limit so we bail out instantly
 
-            self.nodes[curr] = SceneHierarchyNode::make_node([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0);
+            self.nodes[curr] = SceneInstanceNode::make_node([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0);
 
             return offset;
         }
@@ -135,7 +135,7 @@ impl<'a> SceneHierarchyBuilder<'a> {
         if leaves.len() == 1 {
             let leaf = &leaves[0];
 
-            self.nodes[curr] = SceneHierarchyNode::make_leaf(
+            self.nodes[curr] = SceneInstanceNode::make_leaf(
                 bbox.min.into(),
                 bbox.max.into(),
                 leaf.geometry,
@@ -189,7 +189,7 @@ impl<'a> SceneHierarchyBuilder<'a> {
 
         // for nodes, packed2 is always zero and packed1 just contains the skip
 
-        self.nodes[curr] = SceneHierarchyNode::make_node(
+        self.nodes[curr] = SceneInstanceNode::make_node(
             bbox.min.into(),
             bbox.max.into(),
             (rhs_offset as u16) % (self.nodes.len() as u16),
@@ -199,8 +199,8 @@ impl<'a> SceneHierarchyBuilder<'a> {
     }
 }
 
-impl ToDevice<[SceneHierarchyNode]> for InstancesWithObjects<'_> {
-    fn to_device(&self, memory: &mut [SceneHierarchyNode]) {
+impl ToDevice<[SceneInstanceNode]> for InstancesWithObjects<'_> {
+    fn to_device(&self, memory: &mut [SceneInstanceNode]) {
         let mut instances = Vec::with_capacity(self.instances.list.len());
         let mut geometry_start = 0;
         let mut material_start = 0;

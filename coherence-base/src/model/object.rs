@@ -97,12 +97,7 @@ impl Geometry {
             Self::Round { f, radius } => {
                 let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
 
-                // TODO: not sure how to get this right
-
                 let radius = radius.value(symbolic_values)?;
-
-                /* min *= 1.0 + radius.value(symbolic_values)?;
-                max *= 1.0 + radius.value(symbolic_values)?; */
 
                 min.x -= radius;
                 min.y -= radius;
