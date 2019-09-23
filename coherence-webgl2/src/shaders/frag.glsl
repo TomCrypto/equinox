@@ -61,12 +61,16 @@ layout (std140) uniform Raster {
 
 // this can return true if a triangle is actually intersected, for convenience
 bool traverse_scene_bvh(ray_t ray, inout traversal_t traversal) {
-    uint stack[7]; // equal to max BVH depth + 1, so log2(128) = 7? TODO: find the exact number
-    
-    traversal.triangle.w = 0xffffffffU;
-    traversal.hit.xy = vec2(1e-3, 1e10); // initial (min, max) range for the ray
+    traversal.triangle = 0xffffffffU;
+    traversal.hit.xy = vec2(1e-2, 1e10); // initial (min, max) range for the ray
+
+    ray_bvh(ray, instances.data[0].indices, traversal);
+
+#if 0
 
     vec3 idir = vec3(1.0) / ray.dir;
+
+    uint stack[7]; // equal to max BVH depth + 1, so log2(128) = 7? TODO: find the exact number
 
     stack[0] = 0U;
     uint idx = 1U;
@@ -123,8 +127,9 @@ bool traverse_scene_bvh(ray_t ray, inout traversal_t traversal) {
             // (need a ray_bbox function with distance then)
         }
     }
+#endif
 
-    return traversal.triangle.w != 0xffffffffU;
+    return traversal.triangle != 0xffffffffU;
 }
 
 // Low-discrepancy sequence generator.
@@ -218,15 +223,16 @@ void main() {
         traversal_t traversal;
 
         if (traverse_scene_bvh(ray, traversal)) {
-            ray.org += ray.dir * traversal.hit.y; // closest distance to triangle
+            ray.org += ray.dir * traversal.hit.y; // closest distance to triangles
 
             vec3 normal, tangent;
             vec2 uv;
+            uint material_index;
 
-            read_triangle_attributes(traversal, normal, uv, tangent);
+            read_triangle_attributes(traversal, normal, uv, tangent, material_index);
 
             // grab the corresponding material
-            uint true_material_index = material_lookup.index[traversal.triangle.w];
+            uint true_material_index = material_lookup.index[material_index];
             vec4 material_info = materials.data[true_material_index].info;
 
             if (material_info.x == 0.0) {
@@ -295,5 +301,5 @@ void main() {
     }
 
     // brightness...
-    color = vec4(accumulated + vec3(0.0) * factor, 1.0);
+    color = vec4(accumulated + vec3(1.0) * factor, 1.0);
 }

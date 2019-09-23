@@ -3,8 +3,10 @@ async function fetch_bytes(url) {
 }
 
 async function load_model_data(name) {
-  hierarchy_data = new Uint8Array(await fetch_bytes(`pkg/${name}.hierarchy.bin`))
-  triangle_data = new Uint8Array(await fetch_bytes(`pkg/${name}.triangle.bin`))
+  //hierarchy_data = new Uint8Array(await fetch_bytes(`pkg/${name}.hierarchy.bin`))
+  //triangle_data = new Uint8Array(await fetch_bytes(`pkg/${name}.triangle.bin`))
+  hierarchy_data = new Uint8Array(await fetch_bytes(`pkg/${name}.triangle.embree.bin.embree.hierarchy`))
+  triangle_data = new Uint8Array(await fetch_bytes(`pkg/${name}.triangle.embree.bin.embree.triangles`))
   position_data = new Uint8Array(await fetch_bytes(`pkg/${name}.position.bin`))
   normal_data = new Uint8Array(await fetch_bytes(`pkg/${name}.mapping.bin`))
 
@@ -61,17 +63,18 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
     ctx.restoreContext();
   });
 
-  let [bvh, tri, position, normal] = await load_model_data('cat')
-  let cat_object = runner.add_object(bvh, tri, position, normal, 1, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
+  //let [bvh, tri, position, normal] = await load_model_data('cat')
+  //let cat_object = runner.add_object(bvh, tri, position, normal, 1, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
   let [bvh2, tri2, position2, normal2] = await load_model_data('buddha')
   let buddha_object = runner.add_object(bvh2, tri2, position2, normal2, 1, -0.188615, -0.445945, -0.224346, 0.222054, 0.554055, 0.186807)
-  let [bvh3, tri3, position3, normal3] = await load_model_data('cornell')
-  let cornell_object = runner.add_object(bvh3, tri3, position3, normal3, 9, 0, 0, 0, 556.0, 548.8, 559.2)
-  let [bvh4, tri4, position4, normal4] = await load_model_data('sphere')
-  let sphere_object = runner.add_object(bvh4, tri4, position4, normal4, 1, -19.74, -19.74, -19.74, 19.74, 19.74, 19.74)
+  //let [bvh3, tri3, position3, normal3] = await load_model_data('cornell')
+  //let cornell_object = runner.add_object(bvh3, tri3, position3, normal3, 9, 0, 0, 0, 556.0, 548.8, 559.2)
+  //let [bvh4, tri4, position4, normal4] = await load_model_data('sphere')
+  //let sphere_object = runner.add_object(bvh4, tri4, position4, normal4, 1, -19.74, -19.74, -19.74, 19.74, 19.74, 19.74)
 
-  runner.add_instance(cornell_object, 0, 0, 0, 1, [white_mat, light, white_mat, white_mat, white_mat, green_mat, red_mat, blue_mat, yellow_mat])
-  runner.set_camera_position(338.34976, 698.74335, -1202.723)
+  //runner.add_instance(cornell_object, 0, 0, 0, 1, [white_mat, light, white_mat, white_mat, white_mat, green_mat, red_mat, blue_mat, yellow_mat])
+  //runner.set_camera_position(338.34976, 698.74335, -1202.723)
+  runner.add_instance(buddha_object, 0, 0, 0, 1, [yellow_mat])
 
   document.getElementById("cat").addEventListener("click", () => {
     runner.add_instance(cat_object, 0, 0, 0, 1, [blue_mat])
@@ -210,7 +213,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
       }
 
       if (dx != 0.0 || dy != 0.0) {
-        runner.move_camera(-dx * 500, -dy * 500)
+        runner.move_camera(-dx * 5, -dy * 5)
       }
 
       if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {

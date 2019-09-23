@@ -118,7 +118,7 @@ impl Shader {
                         if let Some(location) = location {
                             self.gl.uniform1i(Some(&location), slot as i32);
                         } else {
-                            panic!("no such binding point {} in shader", name);
+                            warn!("no such binding point {} in shader", name);
                         }
                     }
                     BindingPoint::UniformBlock(slot) => {
@@ -127,7 +127,7 @@ impl Shader {
                         if index != Context::INVALID_INDEX {
                             self.gl.uniform_block_binding(program, index, slot as u32);
                         } else {
-                            panic!("no such binding point {} in shader", name);
+                            warn!("no such binding point {} in shader", name);
                         }
                     }
                 }

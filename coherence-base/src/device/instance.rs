@@ -286,8 +286,8 @@ impl InstancesWithObjects<'_> {
         let indices = objects.iter().scan(IndexData::default(), |state, obj| {
             let current = *state;
 
-            state.accel_root_node += obj.hierarchy.len() as u32 / 32;
-            state.topology_offset += obj.triangles.len() as u32 / 16;
+            state.accel_root_node += obj.hierarchy.len() as u32 / 64;
+            state.topology_offset += obj.triangles.len() as u32 / 64;
             state.geometry_offset += obj.positions.len() as u32 / 16;
 
             Some(current)

@@ -260,7 +260,7 @@ impl Device {
             ),
             camera_buffer: UniformBuffer::new(gl.clone()),
             bvh_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
-            tri_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4),
+            tri_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
             position_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
             normal_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4),
             // TODO: get these from the shader?? (not really easily doable I think)
