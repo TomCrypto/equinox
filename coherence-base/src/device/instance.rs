@@ -2,53 +2,36 @@
 use log::{debug, info, warn};
 
 use crate::device::ToDevice;
-use crate::model::{Instances, Object};
+use crate::model::{Geometry, Instances};
 use crate::BoundingBox;
 use cgmath::prelude::*;
 use cgmath::Decomposed;
+use cgmath::Point3;
 use itertools::{iproduct, izip};
 use zerocopy::{AsBytes, FromBytes};
 
-#[repr(C)]
-#[derive(Clone, Copy, FromBytes, AsBytes)]
-pub struct InstanceData {
-    /// Row-major matrix representation of the instance's affine transformation.
-    transform: [f32; 12],
-    /// Index of this instance's root node in the acceleration structure array.
-    accel_root_node: u32,
-    /// Absolute offset into the per-face data array for this instance.
-    topology_offset: u32,
-    /// Absolute offset into the per-vertex data array for this instance.
-    geometry_offset: u32,
-    /// Absolute offset into the material lookup array for this instance.
-    material_offset: u32,
-}
-
 #[derive(Clone, Copy, Default, Debug)]
 pub struct IndexData {
-    accel_root_node: u32,
-    topology_offset: u32,
-    geometry_offset: u32,
+    geometry_offset: u32, // offset into the parameter array
 }
 
-#[repr(align(64), C)]
-#[derive(AsBytes, FromBytes)]
+#[repr(align(32), C)]
+#[derive(AsBytes, FromBytes, Debug)]
 pub struct SceneHierarchyNode {
-    lhs_bmin: [f32; 3],
-    lhs_next: u32,
-    lhs_bmax: [f32; 3],
-    lhs_inst: u32,
-    rhs_bmin: [f32; 3],
-    rhs_next: u32,
-    rhs_bmax: [f32; 3],
-    rhs_inst: u32,
+    bmin: [f32; 3],
+    packed1: u32, // "skip" pointer + "parameter offset" << 16
+    bmax: [f32; 3],
+    packed2: u32, // geometry ID + material ID << 16  == 0 if it's not a leaf
 }
 
+#[derive(Debug)]
 struct InstanceInfo {
     bbox: BoundingBox,
-    scale: f32,
-    surface_area: f32,
-    inst: u32,
+    surface_area: f32, // TODO: can we ever actually compute this? might be doable actually
+    geometry: u16,
+    material: u16,
+    geo_start: u16,
+    mat_start: u16,
 }
 
 #[repr(transparent)]
@@ -66,42 +49,81 @@ impl<'a> SceneHierarchyBuilder<'a> {
     }
 
     pub fn node_count_for_leaves(leaves: usize) -> usize {
-        leaves.max(2) - 1 // need at least a root node
+        // if leaves is 0, then node count is -1, and 1 past the end is 0, it will be
+        // detected instantly
+
+        if leaves == 0 {
+            return 1;
+        }
+
+        2 * leaves - 1
     }
 
     pub fn build(&mut self, leaves: &mut [InstanceInfo]) {
-        if leaves.len() < 2 {
-            // special case (tree has an incomplete root)
-            return self.build_incomplete(leaves.first());
-        }
-
         let total = self.build_recursive(0, leaves);
+
+        info!("{:?}", self.nodes);
+
         assert_eq!(total as usize, self.nodes.len())
     }
 
-    fn build_incomplete(&mut self, leaf: Option<&InstanceInfo>) {
-        let node = &mut self.nodes[0];
+    fn build_recursive(&mut self, mut offset: u32, leaves: &mut [InstanceInfo]) -> u32 {
+        let curr = offset as usize;
+        offset += 1; // go to next
 
-        if let Some(leaf) = leaf {
-            node.lhs_bmin = leaf.bbox.min.into();
-            node.lhs_bmax = leaf.bbox.max.into();
-            node.lhs_next = 0xffff_ffff;
-            node.lhs_inst = leaf.inst;
-        } else {
-            node.lhs_bmin = [0.0, 0.0, 0.0];
-            node.lhs_bmax = [0.0, 0.0, 0.0];
-            node.lhs_next = 0xffff_ffff;
-            node.lhs_inst = 0;
+        if leaves.is_empty() {
+            // if there are no leaves, set the root AABB to just be all zeroes
+            // and set the skip to the limit so we bail out instantly
+
+            self.nodes[curr].bmin = [0.0, 0.0, 0.0];
+            self.nodes[curr].bmax = [0.0, 0.0, 0.0];
+            self.nodes[curr].packed2 = 0xffffffff;
+            self.nodes[curr].packed1 = self.nodes.len() as u32;
+
+            return offset;
         }
 
-        node.rhs_bmin = [0.0, 0.0, 0.0];
-        node.rhs_bmax = [0.0, 0.0, 0.0];
-        node.rhs_next = 0xffff_ffff;
-        node.rhs_inst = 0;
-    }
+        info!("leaves = {:?}", leaves);
 
-    fn build_recursive(&mut self, mut offset: u32, leaves: &mut [InstanceInfo]) -> u32 {
         let bbox = BoundingBox::from_extents(leaves.iter().map(|i| i.bbox));
+
+        /*
+
+        algorithm to build the roped BVH is simple:
+
+            1. get bbox of all children here
+            2. set it on this node
+            3. if there's only one child, this is a LEAF node, populate the relevant fields
+
+        */
+
+        self.nodes[curr].bmin = bbox.min.into();
+        self.nodes[curr].bmax = bbox.max.into();
+
+        if leaves.len() == 1 {
+            let leaf = &leaves[0];
+
+            // NOTE: for leaves, the "skip" pointer is always 1
+
+            /*
+
+            PACKED1 contains:
+
+                lower 16 bits: the "geometry" ID, i.e. leaf.geometry
+                upper 16 bits: the "instance" ID, i.e. leaf geo_start
+
+            PACKED2 contains:
+
+                lower 16 bits: the "material" ID, i.e. leaf.material
+                upper 16 bits: the "mat_inst" ID, i.e. leaf.mat_start
+
+            */
+
+            self.nodes[curr].packed2 = leaf.material as u32 | ((leaf.mat_start as u32) << 16);
+            self.nodes[curr].packed1 = leaf.geometry as u32 | ((leaf.geo_start as u32) << 16);
+
+            return offset;
+        }
 
         // TODO: implement SAH heuristic here when possible (need more info from object
         // BVHs). for now, do a median split on the largest axis
@@ -139,67 +161,46 @@ impl<'a> SceneHierarchyBuilder<'a> {
 
         let (lhs, rhs) = leaves.split_at_mut(split);
 
-        let lhs_bbox = BoundingBox::from_extents(lhs.iter().map(|i| i.bbox));
-        let rhs_bbox = BoundingBox::from_extents(rhs.iter().map(|i| i.bbox));
+        let lhs_offset = self.build_recursive(offset, lhs);
+        let rhs_offset = self.build_recursive(lhs_offset, rhs);
 
-        let curr = offset as usize;
-        offset += 1; // go to next
+        // for nodes, packed2 is always zero and packed1 just contains the skip
 
-        self.nodes[curr].lhs_bmin = lhs_bbox.min.into();
-        self.nodes[curr].lhs_bmax = lhs_bbox.max.into();
-        self.nodes[curr].rhs_bmin = rhs_bbox.min.into();
-        self.nodes[curr].rhs_bmax = rhs_bbox.max.into();
+        self.nodes[curr].packed2 = 0xffffffff;
+        self.nodes[curr].packed1 = rhs_offset; // is this +1 ?? or -1?
 
-        if lhs.len() > 1 {
-            self.nodes[curr].lhs_next = offset;
-            self.nodes[curr].lhs_inst = 0;
-
-            offset = self.build_recursive(offset, lhs);
-        } else {
-            self.nodes[curr].lhs_next = 0xffff_ffff;
-            self.nodes[curr].lhs_inst = lhs[0].inst;
-        }
-
-        if rhs.len() > 1 {
-            self.nodes[curr].rhs_next = offset;
-            self.nodes[curr].rhs_inst = 0;
-
-            offset = self.build_recursive(offset, rhs);
-        } else {
-            self.nodes[curr].rhs_next = 0xffff_ffff;
-            self.nodes[curr].rhs_inst = rhs[0].inst;
-        }
-
-        offset
+        rhs_offset
     }
-}
-
-pub struct InstancesWithObjects<'a> {
-    pub instances: &'a Instances,
-    pub objects: &'a [Object],
 }
 
 impl ToDevice<[SceneHierarchyNode]> for InstancesWithObjects<'_> {
     fn to_device(&self, memory: &mut [SceneHierarchyNode]) {
         let mut instances = Vec::with_capacity(self.instances.list.len());
+        let mut geometry_start = 0;
+        let mut material_start = 0;
 
         for (index, instance) in self.instances.list.iter().enumerate() {
-            let object = &self.objects[instance.object];
+            let object = &self.objects[instance.geometry];
 
-            let instance_world = Decomposed {
-                scale: instance.scale,
-                rot: instance.rotation,
-                disp: instance.translation,
-            };
+            // TODO: handle errors gracefully here somehow? it would indicate bad data
+            let bbox = object.bounding_box(&instance.geometry_values).unwrap();
 
-            let bbox = object.bbox.transform(instance_world);
+            // need to divide all starts by 4 because we use vec4 buffers...
+            // (note: this is an implementation detail)
 
             instances.push(InstanceInfo {
                 bbox,
-                scale: instance.scale, // used to scale surface area heuristic
-                surface_area: 1.0,     // obtain from object BVH
-                inst: index as u32,
+                surface_area: 1.0, // obtain from the geometry somehow (at least an approximation)
+                geometry: instance.geometry as u16,
+                material: instance.material as u16,
+                geo_start: geometry_start / 4, /* how to obtain? for now we can sum up the
+                                                * parameter
+                                                * list */
+                mat_start: material_start / 4,
             });
+
+            geometry_start += instance.geometry_values.len() as u16;
+            material_start += instance.material_values.len() as u16;
         }
 
         let node_count = SceneHierarchyBuilder::node_count_for_leaves(self.instances.list.len());
@@ -211,6 +212,7 @@ impl ToDevice<[SceneHierarchyNode]> for InstancesWithObjects<'_> {
         SceneHierarchyBuilder::node_count_for_leaves(self.instances.list.len())
     }
 }
+/*
 
 impl ToDevice<[InstanceData]> for InstancesWithObjects<'_> {
     fn to_device(&self, slice: &mut [InstanceData]) {
@@ -281,24 +283,73 @@ impl ToDevice<[MaterialIndex]> for InstancesWithObjects<'_> {
     }
 }
 
+*/
+
 impl InstancesWithObjects<'_> {
-    fn calculate_indices(objects: &[Object]) -> Vec<IndexData> {
-        let indices = objects.iter().scan(IndexData::default(), |state, obj| {
-            let current = *state;
-
-            state.accel_root_node += obj.hierarchy.len() as u32 / 32;
-            state.topology_offset += obj.triangles.len() as u32 / 16;
-            state.geometry_offset += obj.positions.len() as u32 / 16;
-
-            Some(current)
-        });
-
-        indices.collect()
-    }
-
-    fn pack_xfm_row_major(xfm: cgmath::Matrix4<f32>, output: &mut [f32; 12]) {
+    /*fn pack_xfm_row_major(xfm: cgmath::Matrix4<f32>, output: &mut [f32; 12]) {
         for (i, j) in iproduct!(0..4, 0..3) {
             output[4 * j + i] = xfm[i][j];
         }
+    }*/
+}
+
+pub struct InstancesWithObjects<'a> {
+    pub instances: &'a Instances,
+    pub objects: &'a [Geometry],
+}
+
+// We will need the GLSL code for the primitive of course, but also the list of
+// symbolic values which can just go into some UBO array as an array of f32. We
+// need the GLSL code to be generated to reference these indices efficiently
+
+#[repr(transparent)]
+#[derive(AsBytes, FromBytes)]
+pub struct GeometryParameter(f32);
+
+#[repr(transparent)]
+#[derive(AsBytes, FromBytes)]
+pub struct MaterialParameter(f32);
+
+impl ToDevice<[GeometryParameter]> for InstancesWithObjects<'_> {
+    fn to_device(&self, slice: &mut [GeometryParameter]) {
+        let mut index = 0;
+
+        for instance in &self.instances.list {
+            for &value in &instance.geometry_values {
+                slice[index] = GeometryParameter(value);
+
+                index += 1;
+            }
+        }
+    }
+
+    fn requested_count(&self) -> usize {
+        self.instances
+            .list
+            .iter()
+            .map(|inst| inst.geometry_values.len())
+            .sum()
+    }
+}
+
+impl ToDevice<[MaterialParameter]> for InstancesWithObjects<'_> {
+    fn to_device(&self, slice: &mut [MaterialParameter]) {
+        let mut index = 0;
+
+        for instance in &self.instances.list {
+            for &value in &instance.material_values {
+                slice[index] = MaterialParameter(value);
+
+                index += 1;
+            }
+        }
+    }
+
+    fn requested_count(&self) -> usize {
+        self.instances
+            .list
+            .iter()
+            .map(|inst| inst.material_values.len())
+            .sum()
     }
 }

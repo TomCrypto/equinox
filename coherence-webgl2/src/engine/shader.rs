@@ -42,7 +42,7 @@ impl ShaderInput {
     }
 
     fn process_source(source: &'static str, defines: HashMap<&'static str, String>) -> String {
-        let mut header = String::from("#version 300 es\n");
+        let mut header = String::new();
 
         for (k, v) in defines {
             write!(header, "#define {} {}\n", k, v).unwrap();
@@ -92,9 +92,9 @@ impl Shader {
         }
     }
 
-    pub(crate) fn reset(&mut self) -> Result<(), Error> {
-        let vert = self.compile_shader(Context::VERTEX_SHADER, &self.vertex)?;
-        let frag = self.compile_shader(Context::FRAGMENT_SHADER, &self.fragment)?;
+    pub(crate) fn reset(&mut self, v_header: &str, f_header: &str) -> Result<(), Error> {
+        let vert = self.compile_shader(Context::VERTEX_SHADER, v_header, &self.vertex)?;
+        let frag = self.compile_shader(Context::FRAGMENT_SHADER, f_header, &self.fragment)?;
 
         if let (Some(vert), Some(frag)) = (&vert, &frag) {
             self.handle = self.link_program(vert, frag)?;
@@ -118,7 +118,7 @@ impl Shader {
                         if let Some(location) = location {
                             self.gl.uniform1i(Some(&location), slot as i32);
                         } else {
-                            panic!("no such binding point {} in shader", name);
+                            warn!("no such shader binding point: {}", name);
                         }
                     }
                     BindingPoint::UniformBlock(slot) => {
@@ -127,7 +127,7 @@ impl Shader {
                         if index != Context::INVALID_INDEX {
                             self.gl.uniform_block_binding(program, index, slot as u32);
                         } else {
-                            panic!("no such binding point {} in shader", name);
+                            warn!("no such shader binding point: {}", name);
                         }
                     }
                 }
@@ -135,13 +135,23 @@ impl Shader {
         }
     }
 
-    fn compile_shader(&self, kind: u32, input: &ShaderInput) -> Result<Option<WebGlShader>, Error> {
+    fn compile_shader(
+        &self,
+        kind: u32,
+        header: &str,
+        input: &ShaderInput,
+    ) -> Result<Option<WebGlShader>, Error> {
         let pattern = regex::Regex::new(r#"0:(\d+):"#).unwrap();
 
         let shader = self.gl.create_shader(kind);
 
         if let Some(shader) = &shader {
-            self.gl.shader_source(shader, &input.source);
+            let source = format!(
+                "#version 300 es\nprecision highp float;\n{}\n{}",
+                header, input.source
+            );
+
+            self.gl.shader_source(shader, &source);
             self.gl.compile_shader(shader);
 
             if let Some(error) = self.get_shader_build_error(shader) {

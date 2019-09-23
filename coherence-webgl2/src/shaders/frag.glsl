@@ -1,7 +1,6 @@
-precision highp float;
-
+#include <common.glsl>
 #include <random.glsl>
-#include <object.glsl>
+// #include <object.glsl>
 
 #define M_PI   3.14159265359
 #define M_2PI  6.28318530718
@@ -19,9 +18,9 @@ struct Instance {
     uvec4 indices;
 };
 
-layout (std140, row_major) uniform Instances {
+/*layout (std140, row_major) uniform Instances {
     Instance data[128];
-} instances;
+} instances;*/
 
 struct InstanceNode {
     vec4 lhs_min;
@@ -30,9 +29,9 @@ struct InstanceNode {
     vec4 rhs_max;
 };
 
-layout (std140) uniform InstanceHierarchy {
+/*layout (std140) uniform InstanceHierarchy {
     InstanceNode data[127];
-} instance_hierarchy;
+} instance_hierarchy;*/
 
 layout (std140) uniform Globals {
     vec2 filter_delta;
@@ -43,13 +42,13 @@ struct Material {
     vec4 info;
 };
 
-layout (std140) uniform MaterialLookup {
+/*layout (std140) uniform MaterialLookup {
     uint index[128];
 } material_lookup;
 
 layout (std140) uniform Materials {
     Material data[128];
-} materials;
+} materials;*/
 
 #define FILTER_DELTA (globals.filter_delta)
 #define FRAME_RANDOM (globals.frame_state.xy)
@@ -59,72 +58,76 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-// this can return true if a triangle is actually intersected, for convenience
-bool traverse_scene_bvh(ray_t ray, inout traversal_t traversal) {
-    uint stack[7]; // equal to max BVH depth + 1, so log2(128) = 7? TODO: find the exact number
-    
-    traversal.triangle.w = 0xffffffffU;
-    traversal.hit.xy = vec2(1e-3, 1e10); // initial (min, max) range for the ray
+layout (std140) uniform GeometryValues {
+    vec4 data[64];
+} geometry_values;
 
-    vec3 idir = vec3(1.0) / ray.dir;
+layout (std140) uniform MaterialValues {
+    vec4 data[64];
+} material_values;
 
-    stack[0] = 0U;
-    uint idx = 1U;
+struct BvhNode {
+    vec4 data1;
+    vec4 data2;
+};
 
-    while (idx != 0U) {
-        InstanceNode node = instance_hierarchy.data[stack[--idx]];
+layout (std140) uniform InstanceHierarchy {
+    BvhNode data[256];
+} instance_hierarchy;
 
-        // TODO: optimize this traversal later
+// TODO: put this somewhere else eventually... we need to know the BVH size to traverse it
+// unfortunately or we have no idea when to stop
+#define BVH_LIMIT 3U
 
-        // do we intersect the LEFT node?
-        if (ray_bbox(ray.org, idir, node.lhs_min.xyz, node.lhs_max.xyz, traversal)) {
-            uint next = floatBitsToUint(node.lhs_min.w);
-            uint inst = floatBitsToUint(node.lhs_max.w);
+#define PREC 1e-5
 
-            if (next == 0xffffffffU) {
-                // this is a leaf node, traverse it
-                mat4x3 xfm = instances.data[inst].transform;
-                uvec4 indices = instances.data[inst].indices;
+SDF_CODE
 
-                ray_t new_ray;
+bool traverse_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
+    while (range.x < range.y) {
+        float dist = sdf(geometry, instance, ray.org + range.x * ray.dir);
 
-                new_ray.org = xfm * vec4(ray.org, 1.0);
-                new_ray.dir = xfm * vec4(ray.dir, 0.0); // TODO: need to normalize this if scaling?? (not sure)
-
-                ray_bvh(new_ray, indices, traversal);
-            } else {
-                // this is another node, push it on the stack
-                stack[idx++] = next;
-            }
+        if (dist < PREC) {
+            return true;
         }
 
-        // do we intersect the RIGHT node?
-        if (ray_bbox(ray.org, idir, node.rhs_min.xyz, node.rhs_max.xyz, traversal)) {
-            uint next = floatBitsToUint(node.rhs_min.w);
-            uint inst = floatBitsToUint(node.rhs_max.w);
-
-            if (next == 0xffffffffU) {
-                // this is a leaf node, traverse it
-                mat4x3 xfm = instances.data[inst].transform;
-                uvec4 indices = instances.data[inst].indices;
-
-                ray_t new_ray;
-
-                new_ray.org = xfm * vec4(ray.org, 1.0);
-                new_ray.dir = xfm * vec4(ray.dir, 0.0); // TODO: need to normalize this if scaling?? (not sure)
-
-                ray_bvh(new_ray, indices, traversal);
-            } else {
-                // this is another node, push it on the stack
-                stack[idx++] = next;
-            }
-
-            // TODO: optimization: if LEFT is closer than RIGHT, swap the two
-            // (need a ray_bbox function with distance then)
-        }
+        range.x += dist;
     }
 
-    return traversal.triangle.w != 0xffffffffU;
+    return false;
+}
+
+bool traverse_scene_bvh(ray_t ray, inout traversal_t traversal) {
+    vec3 idir = vec3(1.0) / ray.dir;
+
+    traversal.hit = uvec2(0U, 0U);
+    traversal.range = vec2(PREC * 100.0, 1e10);
+
+    uint offset = 0U;
+
+    do {
+        BvhNode node = instance_hierarchy.data[offset];
+
+        uint packed1 = floatBitsToUint(node.data1.w);
+        uint packed2 = floatBitsToUint(node.data2.w);
+
+        vec2 range = traversal.range;
+
+        if (ray_bbox(ray.org, idir, node.data1.xyz, node.data2.xyz, range)) {
+            if (packed2 != 0xffffffffU) {
+                if (traverse_sdf(ray, packed1 & 0xffffU, packed1 >> 16U, range)) {
+                    traversal.range.y = range.x; // new closest
+                    traversal.hit = uvec2(packed1, packed2);
+                }
+            }
+
+            offset += 1U;
+        } else {
+            offset = (packed2 == 0xffffffffU) ? packed1 : (offset + 1U);
+        }
+    } while (offset != BVH_LIMIT);
+
+    return traversal.range.y != 1e10;
 }
 
 // Low-discrepancy sequence generator.
@@ -218,63 +221,59 @@ void main() {
         traversal_t traversal;
 
         if (traverse_scene_bvh(ray, traversal)) {
-            ray.org += ray.dir * traversal.hit.y; // closest distance to triangle
+            ray.org += ray.dir * traversal.range.y; // closest distance to triangle
 
-            vec3 normal, tangent;
-            vec2 uv;
+            vec3 normal = sdf_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
 
-            read_triangle_attributes(traversal, normal, uv, tangent);
+            uint material = traversal.hit.y & 0xffffU;
+            uint offset = traversal.hit.y >> 16U;
 
-            // grab the corresponding material
-            uint true_material_index = material_lookup.index[traversal.triangle.w];
-            vec4 material_info = materials.data[true_material_index].info;
+            switch (material) {
+                case 0U: {
+                    // diffuse
+                    // pick a random direction in the hemisphere and adjust factor
 
-            if (material_info.x == 0.0) {
-                // diffuse
-                // pick a random direction in the hemisphere and adjust factor
+                    vec2 rng = gen_vec2_uniform(frame_state);
+                    bitshuffle_mini(frame_state);
 
-                vec2 rng = gen_vec2_uniform(frame_state);
-                bitshuffle_mini(frame_state);
+                    // importance sampling through cosine weighting
 
-                /*float r = sqrt(1.0 - rng.x * rng.x);
-                float phi = M_2PI * rng.y;
+                    float r = sqrt(rng.x);
+                    float phi = M_2PI * rng.y;
 
-                vec3 a = vec3(cos(phi) * r, rng.x, sin(phi) * r);*/
+                    vec3 a = vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi));
 
-                // importance sampling through cosine weighting
+                    // basis transform
 
-                float r = sqrt(rng.x);
-                float phi = M_2PI * rng.y;
-
-                vec3 a = vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi));
-
-                // basis transform
-
-                vec3 v = normal - vec3(0.0, 1.0, 0.0);
-                ray.dir = a - 2.0 * v * (dot(a, v) / max(1e-5, dot(v, v)));
+                    vec3 v = normal - vec3(0.0, 1.0, 0.0);
+                    ray.dir = a - 2.0 * v * (dot(a, v) / max(1e-5, dot(v, v)));
 
 
-                factor *= material_info.yzw;
+                    factor *= material_values.data[offset + 0U].xyz;
+                    break;
+                }
+                case 1U: {
+                    // specular
+                    // reflect the ray off the normal and continue; assume perfect reflection so no change
+                    // in factor
 
-                // if NOT importance-sampling
-                // factor *= 2.0 * dot(dir, result.normal);
+                    ray.dir = reflect(ray.dir, normal);
+                    break;
+                }
+                case 2U: {
+                    // emissive
+                    // terminate the ray
 
-            } else if (material_info.x == 1.0) {
-                // specular
-                // reflect the ray off the normal and continue; assume perfect reflection so no change
-                // in factor
-
-                ray.dir = reflect(ray.dir, normal);
-            } else if (material_info.x == 2.0) {
-                // emissive
-                // terminate the ray
-
-                accumulated += factor * material_info.yzw;
-                factor = vec3(0.0);
-                break;
-            } else {
-                break;
+                    accumulated += factor * material_values.data[offset + 0U].xyz;
+                    factor = vec3(0.0);
+                    break;
+                }
+                default:
+                    return; // bug (TODO: do something coherent on these kinds of bugs)
             }
+
+            // color = vec4(normal * 0.5 + 0.5, 1.0);
+            // return;
         } else {
             // we've escaped, break out
             break;

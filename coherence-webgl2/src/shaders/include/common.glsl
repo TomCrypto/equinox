@@ -14,8 +14,8 @@ struct instance_indices_t {
 
 // Maintains closest-hit information during a traversal.
 struct traversal_t {
-    vec4 hit;       // (minimum ray distance, maximum ray distance, barycentric u, barycentric v)
-    uvec4 triangle; // (absolute vertex offsets, absolute material offset) for closest triangle
+    vec2 range; // min/max of the ray distance
+    uvec2 hit; // packed data for the closest SDF hit (geometry/material ID + parameter offsets)
 };
 
 bool ray_bbox(vec3 org, vec3 idir, vec3 bmin, vec3 bmax, in traversal_t traversal) {
@@ -28,5 +28,27 @@ bool ray_bbox(vec3 org, vec3 idir, vec3 bmin, vec3 bmax, in traversal_t traversa
     float near = max(max(tmin.x, tmin.y), tmin.z);
     float far = min(min(tmax.x, tmax.y), tmax.z);
 
-    return (near <= far) && (far > traversal.hit.x) && (near < traversal.hit.y);
+    return (near <= far) && (far > traversal.range.x) && (near < traversal.range.y);
+}
+
+// takes in a ray range, and constrains the range to the actual intersection
+// returns false if no intersection took place, of course
+bool ray_bbox(vec3 org, vec3 idir, vec3 bmin, vec3 bmax, inout vec2 range) {
+    vec3 bot = (bmin - org) * idir;
+    vec3 top = (bmax - org) * idir;
+
+    vec3 tmin = min(bot, top);
+    vec3 tmax = max(bot, top);
+
+    float near = max(max(tmin.x, tmin.y), tmin.z);
+    float far = min(min(tmax.x, tmax.y), tmax.z);
+
+    if (near > far) {
+        return false;
+    }
+
+    range.x = max(near, range.x);
+    range.y = min(far, range.y);
+
+    return range.x <= range.y;
 }

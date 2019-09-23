@@ -195,21 +195,22 @@ pub struct Device {
 
     camera_buffer: UniformBuffer<CameraData>,
 
-    instance_buffer: UniformBuffer<[InstanceData]>,
-    instance_hierarchy_buffer: UniformBuffer<[SceneHierarchyNode]>,
+    geometry_values_buffer: UniformBuffer<[GeometryParameter]>,
+    material_values_buffer: UniformBuffer<[MaterialParameter]>,
 
+    //instance_buffer: UniformBuffer<[InstanceData]>,
+    instance_hierarchy_buffer: UniformBuffer<[SceneHierarchyNode]>,
     globals_buffer: UniformBuffer<GlobalData>,
     raster_buffer: UniformBuffer<RasterData>,
 
-    material_lookup_buffer: UniformBuffer<[MaterialIndex]>,
-    material_buffer: UniformBuffer<[MaterialData]>,
+    //material_lookup_buffer: UniformBuffer<[MaterialIndex]>,
+    //material_buffer: UniformBuffer<[MaterialData]>,
 
-    bvh_tex: TextureBuffer<[HierarchyData]>,
-    tri_tex: TextureBuffer<[TriangleData]>,
+    //bvh_tex: TextureBuffer<[HierarchyData]>,
+    //tri_tex: TextureBuffer<[TriangleData]>,
 
-    position_tex: TextureBuffer<[VertexPositionData]>,
-    normal_tex: TextureBuffer<[VertexMappingData]>,
-
+    //position_tex: TextureBuffer<[VertexPositionData]>,
+    //normal_tex: TextureBuffer<[VertexMappingData]>,
     samples: RenderTexture,
     framebuffers: FramebufferCache,
 
@@ -237,15 +238,17 @@ impl Device {
                     hashmap! { "TBUF_WIDTH" => format!("{}", pixels_per_texture_buffer_row(&gl)) },
                 ),
                 hashmap! {
-                    "tex_hierarchy" => BindingPoint::Texture(0),
+                    /*"tex_hierarchy" => BindingPoint::Texture(0),
                     "tex_triangles" => BindingPoint::Texture(1),
                     "tex_vertex_positions" => BindingPoint::Texture(2),
-                    "tex_vertex_attributes" => BindingPoint::Texture(3),
+                    "tex_vertex_attributes" => BindingPoint::Texture(3),*/
                     "Camera" => BindingPoint::UniformBlock(0),
-                    "Instances" => BindingPoint::UniformBlock(1),
+                    //"Instances" => BindingPoint::UniformBlock(1),
                     "InstanceHierarchy" => BindingPoint::UniformBlock(4),
-                    "MaterialLookup" => BindingPoint::UniformBlock(5),
-                    "Materials" => BindingPoint::UniformBlock(6),
+                    //"MaterialLookup" => BindingPoint::UniformBlock(5),
+                    //"Materials" => BindingPoint::UniformBlock(6),
+                    "GeometryValues" => BindingPoint::UniformBlock(7),
+                    "MaterialValues" => BindingPoint::UniformBlock(8),
                     "Globals" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
                 },
@@ -259,19 +262,21 @@ impl Device {
                 },
             ),
             camera_buffer: UniformBuffer::new(gl.clone()),
-            bvh_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
-            tri_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4),
-            position_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
-            normal_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4),
+            geometry_values_buffer: UniformBuffer::new_array(gl.clone(), 256),
+            material_values_buffer: UniformBuffer::new_array(gl.clone(), 256),
+            //bvh_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
+            //tri_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4),
+            //position_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
+            //normal_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::U32x4),
             // TODO: get these from the shader?? (not really easily doable I think)
             //  -> #define them in the shader from some shared value obtained from the WebGL
             // context!
-            instance_buffer: UniformBuffer::new_array(gl.clone(), 128),
-            instance_hierarchy_buffer: UniformBuffer::new_array(gl.clone(), 127),
+            //instance_buffer: UniformBuffer::new_array(gl.clone(), 128),
+            instance_hierarchy_buffer: UniformBuffer::new_array(gl.clone(), 256),
             raster_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
-            material_lookup_buffer: UniformBuffer::new_array(gl.clone(), 128),
-            material_buffer: UniformBuffer::new_array(gl.clone(), 128),
+            //material_lookup_buffer: UniformBuffer::new_array(gl.clone(), 128),
+            //material_buffer: UniformBuffer::new_array(gl.clone(), 128),
             refine_query: Query::new(gl.clone()),
             render_query: Query::new(gl.clone()),
             samples: RenderTexture::new(gl.clone()),
@@ -299,10 +304,56 @@ impl Device {
         });
 
         invalidated |= Dirty::clean(&mut scene.objects, |objects| {
-            self.bvh_tex.write(&mut self.scratch, objects);
+            /*self.bvh_tex.write(&mut self.scratch, objects);
             self.tri_tex.write(&mut self.scratch, objects);
             self.position_tex.write(&mut self.scratch, objects);
-            self.normal_tex.write(&mut self.scratch, objects);
+            self.normal_tex.write(&mut self.scratch, objects);*/
+
+            // in here, update the GLSL code! (rebuild the shader?)
+            // generate the actual GLSL code properly from the objects geometry
+            // paste that into the shader and use that for rendering
+
+            /*
+
+            in principle this should construct a single GLSL function that takes a geometry ID
+            and a position "x" and returns the signed distance, but we can tweak this later on
+
+            */
+
+            let mut code = String::from("float sdf(uint geometry, uint instance, vec3 x) {");
+            let mut functions = String::new();
+            let mut code_index = 0;
+
+            code += "switch (geometry) {";
+
+            for (index, geometry) in objects.list.iter().enumerate() {
+                let name = geometry.as_glsl_function(&mut functions, &mut code_index);
+
+                code += &format!("case {}U: return {}(x, instance);", index, name);
+            }
+
+            code += "} return 1.0 / 0.0; }";
+
+            code += "vec3 sdf_normal(uint geometry, uint instance, vec3 x) {";
+
+            code += "switch (geometry) {";
+
+            for (index, geometry) in objects.list.iter().enumerate() {
+                let name = geometry.as_glsl_function(&mut functions, &mut code_index);
+
+                code += &format!("case {}U: return normalize(vec3({}(vec3(x.x + PREC, x.y, x.z), instance) - {}(vec3(x.x - PREC, x.y, x.z), instance), {}(vec3(x.x, x.y + PREC, x.z), instance) - {}(vec3(x.x, x.y - PREC, x.z), instance), {}(vec3(x.x, x.y, x.z + PREC), instance) - {}(vec3(x.x, x.y, x.z - PREC), instance)));", index, name, name, name, name, name, name);
+            }
+
+            code += "} return vec3(0.0); }";
+
+            info!("{}", functions);
+            info!("{}", code);
+
+            // TODO: error handling!
+
+            self.program
+                .reset("", &format!("#define SDF_CODE {}{}", functions, code))
+                .unwrap();
         });
 
         let objects = &scene.objects;
@@ -313,19 +364,28 @@ impl Device {
                 objects: &objects.list,
             };
 
-            self.instance_buffer
+            /*self.instance_buffer
                 .write_array(&mut self.scratch, &instances);
 
             self.instance_hierarchy_buffer
                 .write_array(&mut self.scratch, &instances);
 
             self.material_lookup_buffer
+                .write_array(&mut self.scratch, &instances);*/
+
+            self.instance_hierarchy_buffer
+                .write_array(&mut self.scratch, &instances);
+
+            self.geometry_values_buffer
+                .write_array(&mut self.scratch, &instances);
+
+            self.material_values_buffer
                 .write_array(&mut self.scratch, &instances);
         });
 
         invalidated |= Dirty::clean(&mut scene.materials, |materials| {
-            self.material_buffer
-                .write_array(&mut self.scratch, materials);
+            /*self.material_buffer
+            .write_array(&mut self.scratch, materials);*/
         });
 
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
@@ -371,16 +431,18 @@ impl Device {
         let shader = self.program.bind_to_pipeline();
 
         shader.bind(&self.camera_buffer, "Camera");
-        shader.bind(&self.instance_buffer, "Instances");
+        shader.bind(&self.geometry_values_buffer, "GeometryValues");
+        shader.bind(&self.material_values_buffer, "MaterialValues");
+        //shader.bind(&self.instance_buffer, "Instances");
         shader.bind(&self.instance_hierarchy_buffer, "InstanceHierarchy");
         shader.bind(&self.globals_buffer, "Globals");
         shader.bind(&self.raster_buffer, "Raster");
-        shader.bind(&self.material_buffer, "Materials");
-        shader.bind(&self.material_lookup_buffer, "MaterialLookup");
-        shader.bind(&self.bvh_tex, "tex_hierarchy");
-        shader.bind(&self.tri_tex, "tex_triangles");
-        shader.bind(&self.position_tex, "tex_vertex_positions");
-        shader.bind(&self.normal_tex, "tex_vertex_attributes");
+        //shader.bind(&self.material_buffer, "Materials");
+        //shader.bind(&self.material_lookup_buffer, "MaterialLookup");
+        //shader.bind(&self.bvh_tex, "tex_hierarchy");
+        //shader.bind(&self.tri_tex, "tex_triangles");
+        //shader.bind(&self.position_tex, "tex_vertex_positions");
+        //shader.bind(&self.normal_tex, "tex_vertex_attributes");
 
         // need new RGB = ((RGB * frames) + (new RGB * 1)) / (frames + 1)
         // i.e. RGB = w * RGB + (1 - w) * new RGB
@@ -444,23 +506,24 @@ impl Device {
 
         self.try_load_extension("EXT_color_buffer_float")?;
 
-        self.program.reset()?;
-        self.present_program.reset()?;
+        self.present_program.reset("", "")?;
         self.camera_buffer.reset();
-        self.bvh_tex.reset();
-        self.tri_tex.reset();
+        self.geometry_values_buffer.reset();
+        self.material_values_buffer.reset();
+        //self.bvh_tex.reset();
+        //self.tri_tex.reset();
         self.samples.reset();
         self.framebuffers.reset();
-        self.instance_buffer.reset();
+        //self.instance_buffer.reset();
         self.instance_hierarchy_buffer.reset();
         self.globals_buffer.reset();
         self.raster_buffer.reset();
-        self.position_tex.reset();
-        self.normal_tex.reset();
+        //self.position_tex.reset();
+        //self.normal_tex.reset();
         self.refine_query.reset();
         self.render_query.reset();
-        self.material_buffer.reset();
-        self.material_lookup_buffer.reset();
+        //self.material_buffer.reset();
+        //self.material_lookup_buffer.reset();
 
         scene.dirty_all_fields();
         self.device_lost = false;
@@ -538,7 +601,7 @@ impl DeviceState {
 
         self.frame += 1;
 
-        info!("frame = {}", self.frame);
+        // info!("frame = {}", self.frame);
     }
 }
 

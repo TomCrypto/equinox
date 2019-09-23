@@ -36,14 +36,14 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
 
   // add materials
 
-  let white_mat = runner.add_material(0, 0.75, 0.75, 0.75)
+  /*let white_mat = runner.add_material(0, 0.75, 0.75, 0.75)
   let red_mat = runner.add_material(0, 0.75, 0.25, 0.25)
   let green_mat = runner.add_material(0, 0.25, 0.75, 0.25)
   let blue_mat = runner.add_material(0, 0.25, 0.25, 0.75)
   let yellow_mat = runner.add_material(0, 0.75, 0.75, 0.25)
   let mirror = runner.add_material(1, 0, 0, 0)
   let light = runner.add_material(2, 20.0, 0.0, 0.0)
-  let furnace = runner.add_material(0, 0.18, 0.18, 0.18)
+  let furnace = runner.add_material(0, 0.18, 0.18, 0.18)*/
 
   canvas.addEventListener("webglcontextlost", e => {
     runner.context_lost();
@@ -61,17 +61,25 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
     ctx.restoreContext();
   });
 
-  let [bvh, tri, position, normal] = await load_model_data('cat')
+  /*let [bvh, tri, position, normal] = await load_model_data('cat')
   let cat_object = runner.add_object(bvh, tri, position, normal, 1, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
   let [bvh2, tri2, position2, normal2] = await load_model_data('buddha')
   let buddha_object = runner.add_object(bvh2, tri2, position2, normal2, 1, -0.188615, -0.445945, -0.224346, 0.222054, 0.554055, 0.186807)
   let [bvh3, tri3, position3, normal3] = await load_model_data('cornell')
   let cornell_object = runner.add_object(bvh3, tri3, position3, normal3, 9, 0, 0, 0, 556.0, 548.8, 559.2)
   let [bvh4, tri4, position4, normal4] = await load_model_data('sphere')
-  let sphere_object = runner.add_object(bvh4, tri4, position4, normal4, 1, -19.74, -19.74, -19.74, 19.74, 19.74, 19.74)
+  let sphere_object = runner.add_object(bvh4, tri4, position4, normal4, 1, -19.74, -19.74, -19.74, 19.74, 19.74, 19.74)*/
 
-  runner.add_instance(cornell_object, 0, 0, 0, 1, [white_mat, light, white_mat, white_mat, white_mat, green_mat, red_mat, blue_mat, yellow_mat])
-  runner.set_camera_position(338.34976, 698.74335, -1202.723)
+  //runner.add_instance(cornell_object, 0, 0, 0, 1, [white_mat, light, white_mat, white_mat, white_mat, green_mat, red_mat, blue_mat, yellow_mat])
+  //runner.set_camera_position(338.34976, 698.74335, -1202.723)
+
+  let sphere = runner.add_object();
+  let other = runner.add_other_object();
+
+  // s1 x1 y1 z1 s2 x2 y2 z2
+
+  runner.add_instance(sphere, 0, [0.1, 0.0, 0.0, 0.0, 0.5, 0.0, -0.5, 0.0], [0.75, 0.25, 0.25, 0.0]);
+  runner.add_instance(other, 2, [], [10.75, 10.75, 10.75, 0.0]);
 
   document.getElementById("cat").addEventListener("click", () => {
     runner.add_instance(cat_object, 0, 0, 0, 1, [blue_mat])
@@ -210,7 +218,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
       }
 
       if (dx != 0.0 || dy != 0.0) {
-        runner.move_camera(-dx * 500, -dy * 500)
+        runner.move_camera(-dx * 1, -dy * 1)
       }
 
       if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {
@@ -227,7 +235,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
         refineCount = Math.floor((1000000.0 / 60.0 - 2000.0 - renderEMA.average()) / refineEMA.average())
       }
 
-      refineCount = Math.min(99, Math.max(refineCount, 1))
+      refineCount = Math.min(9, Math.max(refineCount, 1))
 
       let now = performance.now()
       runner.update()

@@ -96,7 +96,7 @@ impl WasmRunner {
         };
     }
 
-    pub fn add_object(
+    /*pub fn add_object(
         &mut self,
         bvh: &[u8],
         tri: &[u8],
@@ -164,6 +164,71 @@ impl WasmRunner {
 
     pub fn move_instance_up(&mut self, index: usize, amount: f32) {
         self.scene.instances.list[index].translation += Vector3::new(0.0, amount, 0.0);
+    }*/
+
+    pub fn add_other_object(&mut self) -> usize {
+        // elongated cube
+
+        self.scene.objects.list.push(Geometry::Translate {
+            translation: [
+                Parameter::Constant(1.5),
+                Parameter::Constant(0.0),
+                Parameter::Constant(0.0),
+            ],
+            f: Box::new(Geometry::Scale {
+                factor: Parameter::Constant(0.5),
+                f: Box::new(Geometry::UnitCube),
+            }),
+        });
+
+        self.scene.objects.list.len() - 1
+    }
+
+    pub fn add_object(&mut self) -> usize {
+        // for now, just add a sphere
+        self.scene.objects.list.push(Geometry::Union {
+            children: vec![
+                Box::new(Geometry::Translate {
+                    translation: [
+                        Parameter::Symbolic(1),
+                        Parameter::Symbolic(2),
+                        Parameter::Symbolic(3),
+                    ],
+                    f: Box::new(Geometry::Scale {
+                        factor: Parameter::Symbolic(0),
+                        f: Box::new(Geometry::UnitCube),
+                    }),
+                }),
+                Box::new(Geometry::Translate {
+                    translation: [
+                        Parameter::Symbolic(5),
+                        Parameter::Symbolic(6),
+                        Parameter::Symbolic(7),
+                    ],
+                    f: Box::new(Geometry::Scale {
+                        factor: Parameter::Symbolic(4),
+                        f: Box::new(Geometry::UnitSphere),
+                    }),
+                }),
+            ],
+        });
+
+        self.scene.objects.list.len() - 1
+    }
+
+    pub fn add_instance(
+        &mut self,
+        geometry: usize,
+        material: usize,
+        parameters: &[f32],
+        materials: &[f32],
+    ) {
+        self.scene.instances.list.push(Instance {
+            geometry,
+            material,
+            geometry_values: parameters.to_vec(),
+            material_values: materials.to_vec(),
+        });
     }
 
     pub fn set_dimensions(&mut self, width: u32, height: u32) {

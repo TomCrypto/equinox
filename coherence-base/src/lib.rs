@@ -133,7 +133,7 @@ impl Scene {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct BoundingBox {
     pub min: Point3<f32>,
     pub max: Point3<f32>,
@@ -167,6 +167,28 @@ impl BoundingBox {
             min: point,
             max: point,
         }
+    }
+
+    pub fn union(boxes: impl IntoIterator<Item = Self>) -> Self {
+        Self::from_extents(boxes)
+    }
+
+    pub fn intersection(boxes: impl IntoIterator<Item = Self>) -> Self {
+        let max = Point3::new(std::f32::INFINITY, std::f32::INFINITY, std::f32::INFINITY);
+        let min = max * -1.0; // this ensures that any min/max operation updates the bbox
+
+        let mut extents = Self { max, min };
+
+        for bbox in boxes.into_iter() {
+            extents.min.x = extents.min.x.max(bbox.min.x);
+            extents.min.y = extents.min.y.max(bbox.min.y);
+            extents.min.z = extents.min.z.max(bbox.min.z);
+            extents.max.x = extents.max.x.min(bbox.max.x);
+            extents.max.y = extents.max.y.min(bbox.max.y);
+            extents.max.z = extents.max.z.min(bbox.max.z);
+        }
+
+        extents
     }
 
     pub fn from_extents(boxes: impl IntoIterator<Item = Self>) -> Self {

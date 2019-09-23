@@ -1,20 +1,18 @@
-use cgmath::{Quaternion, Vector3};
-
-// TODO: convert usize to Arc<Object> later on once we're further along
-
-pub struct Instance {
-    pub object: usize,
-    /// Scale of this instance (should be positive).
-    pub scale: f32,
-    /// Rotation of this instance.
-    pub rotation: Quaternion<f32>,
-    /// Translation of this instance.
-    pub translation: Vector3<f32>,
-    /// List of material indices.
-    pub materials: Vec<usize>,
-}
-
 #[derive(Default)]
 pub struct Instances {
     pub list: Vec<Instance>,
+}
+
+// transforms are baked into the SDF nature of the geometry, so it's unnecessary
+// to include it here. all we need here is a reference to the geometry, and a
+// reference to the material
+
+// what about multiple materials? don't bother for now
+
+pub struct Instance {
+    pub geometry: usize,
+    pub material: usize,
+
+    pub geometry_values: Vec<f32>,
+    pub material_values: Vec<f32>,
 }
