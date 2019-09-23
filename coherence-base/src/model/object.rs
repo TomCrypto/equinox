@@ -46,6 +46,10 @@ pub enum Geometry {
         translation: [Parameter; 3],
         f: Box<Geometry>,
     },
+    Round {
+        radius: Parameter,
+        f: Box<Geometry>,
+    },
 }
 
 impl Geometry {
@@ -87,6 +91,25 @@ impl Geometry {
                 max.x += translation[0].value(symbolic_values)?;
                 max.y += translation[1].value(symbolic_values)?;
                 max.z += translation[2].value(symbolic_values)?;
+
+                Some(BoundingBox { min, max })
+            }
+            Self::Round { f, radius } => {
+                let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
+
+                // TODO: not sure how to get this right
+
+                let radius = radius.value(symbolic_values)?;
+
+                /* min *= 1.0 + radius.value(symbolic_values)?;
+                max *= 1.0 + radius.value(symbolic_values)?; */
+
+                min.x -= radius;
+                min.y -= radius;
+                min.z -= radius;
+                max.x += radius;
+                max.y += radius;
+                max.z += radius;
 
                 Some(BoundingBox { min, max })
             }

@@ -18,45 +18,29 @@ struct traversal_t {
     vec2 range; // min/max of the ray distance
 };
 
-traversal_t new_traversal(float near) {
+traversal_t traversal_prepare(float near) {
     return traversal_t(uvec2(0xffffffffU), vec2(near, 1.0 / 0.0));
+}
+
+void traversal_record_hit(inout traversal_t traversal, float distance, uvec2 hit) {
+    traversal = traversal_t(hit, vec2(traversal.range.x, distance));
 }
 
 bool traversal_has_hit(traversal_t traversal) {
     return traversal.hit.x != 0xffffffffU;
 }
 
-bool ray_bbox(vec3 org, vec3 idir, vec3 bmin, vec3 bmax, in traversal_t traversal) {
-    vec3 bot = (bmin - org) * idir;
-    vec3 top = (bmax - org) * idir;
+// Takes a ray segment and a bounding box and cuts the ray to be fully contained
+// inside the bounding box. Returns true if the ray intersects the bounding box.
+bool ray_bbox(vec3 org, vec3 idir, inout vec2 range, vec3 bbmin, vec3 bbmax) {
+    vec3 bot = (bbmin - org) * idir;
+    vec3 top = (bbmax - org) * idir;
 
     vec3 tmin = min(bot, top);
     vec3 tmax = max(bot, top);
 
-    float near = max(max(tmin.x, tmin.y), tmin.z);
-    float far = min(min(tmax.x, tmax.y), tmax.z);
-
-    return (near <= far) && (far > traversal.range.x) && (near < traversal.range.y);
-}
-
-// takes in a ray range, and constrains the range to the actual intersection
-// returns false if no intersection took place, of course
-bool ray_bbox(vec3 org, vec3 idir, vec3 bmin, vec3 bmax, inout vec2 range) {
-    vec3 bot = (bmin - org) * idir;
-    vec3 top = (bmax - org) * idir;
-
-    vec3 tmin = min(bot, top);
-    vec3 tmax = max(bot, top);
-
-    float near = max(max(tmin.x, tmin.y), tmin.z);
-    float far = min(min(tmax.x, tmax.y), tmax.z);
-
-    if (near > far) {
-        return false;
-    }
-
-    range.x = max(near, range.x);
-    range.y = min(far, range.y);
+    range.x = max(max(max(tmin.x, tmin.y), tmin.z), range.x);
+    range.y = min(min(min(tmax.x, tmax.y), tmax.z), range.y);
 
     return range.x <= range.y;
 }

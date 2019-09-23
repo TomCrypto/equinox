@@ -75,15 +75,11 @@ layout (std140) uniform InstanceHierarchy {
     BvhNode data[256];
 } instance_hierarchy;
 
-// TODO: put this somewhere else eventually... we need to know the BVH size to traverse it
-// unfortunately or we have no idea when to stop
-#define BVH_LIMIT 3U
-
 #define PREC 1e-5
 
 SDF_CODE
 
-bool traverse_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
+bool eval_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
     while (range.x < range.y) {
         float dist = sdf(geometry, instance, ray.org + range.x * ray.dir);
 
@@ -97,7 +93,7 @@ bool traverse_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
     return false;
 }
 
-// NOTE: this algorithm now actually works whether starting offset you use, as long as the
+// NOTE: this algorithm now actually works whichever starting offset you use, as long as the
 // termination condition is adjusted to stop as soon as you encounter the starting offset
 // again.
 // this only holds true if the ray origin is actually inside the starting offset's AABB...
@@ -105,8 +101,8 @@ bool traverse_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
 // if this property is not needed we can do some more micro-optimizations
 
 traversal_t traverse_scene(ray_t ray) {
-    traversal_t traversal = new_traversal(PREC * 100.0);
-    vec3 idir = vec3(1.0) / ray.dir; // faster ray-bbox
+    traversal_t traversal = traversal_prepare(PREC * 100.0);
+    vec3 idir = vec3(1.0) / ray.dir; // precomputed inverse
 
     uint index = 0U;
 
@@ -121,10 +117,9 @@ traversal_t traverse_scene(ray_t ray) {
 
         vec2 range = traversal.range;
 
-        if (ray_bbox(ray.org, idir, node.data1.xyz, node.data2.xyz, range)) {
-            if (word2 != 0xffffffffU && traverse_sdf(ray, word1 & 0xffffU, word1 >> 16U, range)) {
-                traversal.range.y = range.x;
-                traversal.hit = uvec2(word1, word2);
+        if (ray_bbox(ray.org, idir, range, node.data1.xyz, node.data2.xyz)) {
+            if (word2 != 0xffffffffU && eval_sdf(ray, word1 & 0xffffU, word1 >> 16U, range)) {
+                traversal_record_hit(traversal, range.x, uvec2(word1, word2));
             }
         } else if (word2 == 0xffffffffU) {
             index = word1; // skip branch
@@ -225,7 +220,7 @@ void main() {
         traversal_t traversal = traverse_scene(ray);
 
         if (traversal_has_hit(traversal)) {
-            ray.org += ray.dir * traversal.range.y; // closest distance to triangle
+            ray.org += ray.dir * traversal.range.y; // closest distance to hit
 
             vec3 normal = sdf_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
 
@@ -262,6 +257,7 @@ void main() {
                     // in factor
 
                     ray.dir = reflect(ray.dir, normal);
+                    factor *= 0.75;
                     break;
                 }
                 case 2U: {
@@ -298,5 +294,5 @@ void main() {
     }
 
     // brightness...
-    color = vec4(accumulated + vec3(0.0) * factor, 1.0);
+    color = vec4(accumulated + vec3(1.0) * factor, 1.0);
 }

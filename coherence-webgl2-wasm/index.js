@@ -79,7 +79,8 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
   // s1 x1 y1 z1 s2 x2 y2 z2
 
   runner.add_instance(sphere, 0, [0.1, 0.0, 0.0, 0.0, 0.5, 0.0, -0.5, 0.0], [0.75, 0.25, 0.25, 0.0]);
-  runner.add_instance(other, 2, [], [10.75, 10.75, 10.75, 0.0]);
+  runner.add_instance(other, 0, [], [0.25, 0.75, 0.25, 0.0]);
+  runner.add_instance(sphere, 1, [1.0, 0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 2.0], []);
 
   document.getElementById("cat").addEventListener("click", () => {
     runner.add_instance(cat_object, 0, 0, 0, 1, [blue_mat])

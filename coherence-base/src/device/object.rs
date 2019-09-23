@@ -213,6 +213,20 @@ impl Geometry {
                     index,
                     &format!("return {}(x - {}, inst);", name, translation_code),
                 )
+            },
+            Self::Round { radius, f } => {
+                let name = f.as_glsl_function(code, index);
+
+                let radius_code = match radius {
+                    Parameter::Constant(value) => format!("{:+e}", value),
+                    Parameter::Symbolic(index) => parameter_access(*index),
+                };
+
+                emit_function(
+                    code,
+                    index,
+                    &format!("return {}(x, inst) - {};", name, radius_code),
+                )
             }
         }
     }

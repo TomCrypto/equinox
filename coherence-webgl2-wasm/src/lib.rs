@@ -196,7 +196,10 @@ impl WasmRunner {
                     ],
                     f: Box::new(Geometry::Scale {
                         factor: Parameter::Symbolic(0),
-                        f: Box::new(Geometry::UnitCube),
+                        f: Box::new(Geometry::Round {
+                            f: Box::new(Geometry::UnitCube),
+                            radius: Parameter::Constant(0.125),
+                        }),
                     }),
                 }),
                 Box::new(Geometry::Translate {
