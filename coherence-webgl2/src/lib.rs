@@ -13,7 +13,7 @@ use quasirandom::Qrng;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::mem::size_of;
-use web_sys::{WebGl2RenderingContext as Context, WebGlFramebuffer, WebGlTexture};
+use web_sys::{WebGl2RenderingContext as Context, WebGlTexture};
 use zerocopy::{AsBytes, FromBytes};
 
 mod engine;
@@ -87,56 +87,6 @@ impl ShaderBind for RenderTexture {
     }
 }
 
-use std::collections::HashMap;
-
-struct FramebufferCache {
-    gl: Context,
-
-    cache: HashMap<&'static str, Option<WebGlFramebuffer>>,
-}
-
-impl FramebufferCache {
-    pub fn new(gl: Context) -> Self {
-        Self {
-            gl,
-            cache: HashMap::new(),
-        }
-    }
-
-    pub fn get_framebuffer(
-        &mut self,
-        name: &'static str,
-        textures: &[&RenderTexture],
-    ) -> Option<&WebGlFramebuffer> {
-        let gl = &self.gl;
-
-        self.cache
-            .entry(name)
-            .or_insert_with(|| {
-                let fbo = gl.create_framebuffer();
-
-                gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, fbo.as_ref());
-
-                for (index, texture) in textures.iter().enumerate() {
-                    gl.framebuffer_texture_2d(
-                        Context::DRAW_FRAMEBUFFER,
-                        Context::COLOR_ATTACHMENT0 + index as u32,
-                        Context::TEXTURE_2D,
-                        texture.handle.as_ref(),
-                        0,
-                    );
-                }
-
-                fbo
-            })
-            .as_ref()
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.cache.clear();
-    }
-}
-
 #[repr(align(64), C)]
 #[derive(FromBytes, AsBytes, Clone)]
 struct Aligned([u8; 64]);
@@ -207,7 +157,7 @@ pub struct Device {
     //position_tex: TextureBuffer<[VertexPositionData]>,
     //normal_tex: TextureBuffer<[VertexMappingData]>,
     samples: RenderTexture,
-    framebuffers: FramebufferCache,
+    samples_fbo: Framebuffer,
 
     refine_query: Query,
     render_query: Query,
@@ -272,10 +222,10 @@ impl Device {
             globals_buffer: UniformBuffer::new(gl.clone()),
             //material_lookup_buffer: UniformBuffer::new_array(gl.clone(), 128),
             //material_buffer: UniformBuffer::new_array(gl.clone(), 128),
+            samples_fbo: Framebuffer::new(gl.clone()),
             refine_query: Query::new(gl.clone()),
             render_query: Query::new(gl.clone()),
             samples: RenderTexture::new(gl.clone()),
-            framebuffers: FramebufferCache::new(gl.clone()),
             device_lost: true,
             state: DeviceState::new(),
         })
@@ -389,7 +339,7 @@ impl Device {
             self.samples
                 .resize(raster.width.get() as i32, raster.height.get() as i32);
 
-            self.framebuffers.reset();
+            self.samples_fbo.invalidate(&[&self.samples]);
         });
 
         if invalidated {
@@ -413,11 +363,7 @@ impl Device {
         self.gl
             .viewport(0, 0, self.samples.width, self.samples.height);
 
-        let fbo = self
-            .framebuffers
-            .get_framebuffer("samples", &[&self.samples]);
-
-        self.gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, fbo);
+        self.samples_fbo.bind_to_pipeline();
 
         // TODO: not happy with this, can we improve it
         self.state
@@ -438,10 +384,6 @@ impl Device {
         //shader.bind(&self.tri_tex, "tex_triangles");
         //shader.bind(&self.position_tex, "tex_vertex_positions");
         //shader.bind(&self.normal_tex, "tex_vertex_attributes");
-
-        // need new RGB = ((RGB * frames) + (new RGB * 1)) / (frames + 1)
-        // i.e. RGB = w * RGB + (1 - w) * new RGB
-        // where w = frames / (frames + 1)
 
         let weight = (self.state.frame as f32) / ((1 + self.state.frame) as f32);
 
@@ -474,7 +416,7 @@ impl Device {
         self.gl
             .viewport(0, 0, self.samples.width, self.samples.height);
 
-        self.gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, None);
+        Framebuffer::bind_canvas_to_pipeline(&self.gl);
 
         let shader = self.present_program.bind_to_pipeline();
 
@@ -501,10 +443,8 @@ impl Device {
 
         // TODO: this should probably be associated with the framebuffer cache
         // (or whatever it becomes in the future)
-        self.try_load_extension("EXT_color_buffer_float")?;
 
-        // should be able to use the same principle as the others...
-        self.framebuffers.reset();
+        self.samples_fbo.invalidate(&[&self.samples]);
 
         // TODO: remove shader reset once we've cleaned up the #define system
         self.present_program.reset("", "")?;
@@ -521,11 +461,7 @@ impl Device {
     }
 
     fn reset_refinement(&mut self) {
-        let fbo = self
-            .framebuffers
-            .get_framebuffer("samples", &[&self.samples]);
-
-        self.gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, fbo);
+        self.samples_fbo.bind_to_pipeline();
 
         self.gl
             .clear_bufferfv_with_f32_array(Context::COLOR, 0, &[0.0, 0.0, 0.0, 0.0]);
