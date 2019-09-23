@@ -14,9 +14,17 @@ struct instance_indices_t {
 
 // Maintains closest-hit information during a traversal.
 struct traversal_t {
-    vec2 range; // min/max of the ray distance
     uvec2 hit; // packed data for the closest SDF hit (geometry/material ID + parameter offsets)
+    vec2 range; // min/max of the ray distance
 };
+
+traversal_t new_traversal(float near) {
+    return traversal_t(uvec2(0xffffffffU), vec2(near, 1.0 / 0.0));
+}
+
+bool traversal_has_hit(traversal_t traversal) {
+    return traversal.hit.x != 0xffffffffU;
+}
 
 bool ray_bbox(vec3 org, vec3 idir, vec3 bmin, vec3 bmax, in traversal_t traversal) {
     vec3 bot = (bmin - org) * idir;

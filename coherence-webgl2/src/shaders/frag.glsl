@@ -97,37 +97,41 @@ bool traverse_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
     return false;
 }
 
-bool traverse_scene_bvh(ray_t ray, inout traversal_t traversal) {
-    vec3 idir = vec3(1.0) / ray.dir;
+// NOTE: this algorithm now actually works whether starting offset you use, as long as the
+// termination condition is adjusted to stop as soon as you encounter the starting offset
+// again.
+// this only holds true if the ray origin is actually inside the starting offset's AABB...
+// (if not this MAY LOOP FOREVER! must be absolutely surely, provably inside the AABB)
+// if this property is not needed we can do some more micro-optimizations
 
-    traversal.hit = uvec2(0U, 0U);
-    traversal.range = vec2(PREC * 100.0, 1e10);
+traversal_t traverse_scene(ray_t ray) {
+    traversal_t traversal = new_traversal(PREC * 100.0);
+    vec3 idir = vec3(1.0) / ray.dir; // faster ray-bbox
 
-    uint offset = 0U;
+    uint index = 0U;
 
     do {
-        BvhNode node = instance_hierarchy.data[offset];
+        BvhNode node = instance_hierarchy.data[index++];
 
-        uint packed1 = floatBitsToUint(node.data1.w);
-        uint packed2 = floatBitsToUint(node.data2.w);
+        uint word1 = floatBitsToUint(node.data1.w);
+        uint word2 = floatBitsToUint(node.data2.w);
+
+        index *= uint((word1 & 0x00008000U) == 0U);
+        word1 &= 0xffff7fffU; // remove cyclic bit
 
         vec2 range = traversal.range;
 
         if (ray_bbox(ray.org, idir, node.data1.xyz, node.data2.xyz, range)) {
-            if (packed2 != 0xffffffffU) {
-                if (traverse_sdf(ray, packed1 & 0xffffU, packed1 >> 16U, range)) {
-                    traversal.range.y = range.x; // new closest
-                    traversal.hit = uvec2(packed1, packed2);
-                }
+            if (word2 != 0xffffffffU && traverse_sdf(ray, word1 & 0xffffU, word1 >> 16U, range)) {
+                traversal.range.y = range.x;
+                traversal.hit = uvec2(word1, word2);
             }
-
-            offset += 1U;
-        } else {
-            offset = (packed2 == 0xffffffffU) ? packed1 : (offset + 1U);
+        } else if (word2 == 0xffffffffU) {
+            index = word1; // skip branch
         }
-    } while (offset != BVH_LIMIT);
+    } while (index != 0U);
 
-    return traversal.range.y != 1e10;
+    return traversal;
 }
 
 // Low-discrepancy sequence generator.
@@ -218,9 +222,9 @@ void main() {
 
     // many bounces (with russian roulette)
     for (int i = 0; i < 10; ++i) {
-        traversal_t traversal;
+        traversal_t traversal = traverse_scene(ray);
 
-        if (traverse_scene_bvh(ray, traversal)) {
+        if (traversal_has_hit(traversal)) {
             ray.org += ray.dir * traversal.range.y; // closest distance to triangle
 
             vec3 normal = sdf_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);

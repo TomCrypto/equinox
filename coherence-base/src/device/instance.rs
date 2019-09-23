@@ -16,12 +16,55 @@ pub struct IndexData {
 }
 
 #[repr(align(32), C)]
-#[derive(AsBytes, FromBytes, Debug)]
+#[derive(AsBytes, FromBytes, Debug, Default)]
 pub struct SceneHierarchyNode {
-    bmin: [f32; 3],
+    min: [f32; 3],
     packed1: u32, // "skip" pointer + "parameter offset" << 16
-    bmax: [f32; 3],
+    max: [f32; 3],
     packed2: u32, // geometry ID + material ID << 16  == 0 if it's not a leaf
+}
+
+// TODO: check bits 15 are never used for any u16 here because we rely on some
+// assumptions
+
+impl SceneHierarchyNode {
+    pub fn make_leaf(
+        min: [f32; 3],
+        max: [f32; 3],
+        geometry: u16,
+        geo_data: u16,
+        material: u16,
+        mat_data: u16,
+        is_last: bool,
+    ) -> Self {
+        Self {
+            min,
+            max,
+            packed1: Self::pack_u32(geo_data, geometry) | Self::is_last_bit(is_last),
+            packed2: Self::pack_u32(mat_data, material),
+        }
+    }
+
+    pub fn make_node(min: [f32; 3], max: [f32; 3], skip_val: u16) -> Self {
+        Self {
+            min,
+            max,
+            packed1: skip_val as u32,
+            packed2: 0xffffffff,
+        }
+    }
+
+    fn is_last_bit(is_last: bool) -> u32 {
+        if is_last {
+            0x8000
+        } else {
+            0x0000
+        }
+    }
+
+    fn pack_u32(hi: u16, lo: u16) -> u32 {
+        (u32::from(hi) << 16) | u32::from(lo)
+    }
 }
 
 #[derive(Debug)]
@@ -62,7 +105,7 @@ impl<'a> SceneHierarchyBuilder<'a> {
     pub fn build(&mut self, leaves: &mut [InstanceInfo]) {
         let total = self.build_recursive(0, leaves);
 
-        info!("{:?}", self.nodes);
+        info!("{:x?}", self.nodes);
 
         assert_eq!(total as usize, self.nodes.len())
     }
@@ -75,10 +118,7 @@ impl<'a> SceneHierarchyBuilder<'a> {
             // if there are no leaves, set the root AABB to just be all zeroes
             // and set the skip to the limit so we bail out instantly
 
-            self.nodes[curr].bmin = [0.0, 0.0, 0.0];
-            self.nodes[curr].bmax = [0.0, 0.0, 0.0];
-            self.nodes[curr].packed2 = 0xffffffff;
-            self.nodes[curr].packed1 = self.nodes.len() as u32;
+            self.nodes[curr] = SceneHierarchyNode::make_node([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0);
 
             return offset;
         }
@@ -97,30 +137,18 @@ impl<'a> SceneHierarchyBuilder<'a> {
 
         */
 
-        self.nodes[curr].bmin = bbox.min.into();
-        self.nodes[curr].bmax = bbox.max.into();
-
         if leaves.len() == 1 {
             let leaf = &leaves[0];
 
-            // NOTE: for leaves, the "skip" pointer is always 1
-
-            /*
-
-            PACKED1 contains:
-
-                lower 16 bits: the "geometry" ID, i.e. leaf.geometry
-                upper 16 bits: the "instance" ID, i.e. leaf geo_start
-
-            PACKED2 contains:
-
-                lower 16 bits: the "material" ID, i.e. leaf.material
-                upper 16 bits: the "mat_inst" ID, i.e. leaf.mat_start
-
-            */
-
-            self.nodes[curr].packed2 = leaf.material as u32 | ((leaf.mat_start as u32) << 16);
-            self.nodes[curr].packed1 = leaf.geometry as u32 | ((leaf.geo_start as u32) << 16);
+            self.nodes[curr] = SceneHierarchyNode::make_leaf(
+                bbox.min.into(),
+                bbox.max.into(),
+                leaf.geometry,
+                leaf.geo_start,
+                leaf.material,
+                leaf.mat_start,
+                offset as usize == self.nodes.len(),
+            );
 
             return offset;
         }
@@ -166,8 +194,11 @@ impl<'a> SceneHierarchyBuilder<'a> {
 
         // for nodes, packed2 is always zero and packed1 just contains the skip
 
-        self.nodes[curr].packed2 = 0xffffffff;
-        self.nodes[curr].packed1 = rhs_offset; // is this +1 ?? or -1?
+        self.nodes[curr] = SceneHierarchyNode::make_node(
+            bbox.min.into(),
+            bbox.max.into(),
+            (rhs_offset as u16) % (self.nodes.len() as u16),
+        );
 
         rhs_offset
     }
