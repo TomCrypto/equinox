@@ -57,12 +57,6 @@ impl<T> TextureBuffer<[T]> {
         }
     }
 
-    pub(crate) fn reset(&mut self) {
-        self.handle = None;
-        self.storage_w = 0;
-        self.storage_h = 0;
-    }
-
     fn pixel_size(format: TextureBufferFormat) -> usize {
         match format {
             TextureBufferFormat::U32x4 => 16,
@@ -105,6 +99,12 @@ impl<T: AsBytes + FromBytes> TextureBuffer<[T]> {
     }
 
     fn reallocate_if_necessary(&mut self, size: usize) {
+        if !self.gl.is_texture(self.handle.as_ref()) {
+            self.handle = None;
+            self.storage_w = 0;
+            self.storage_h = 0;
+        }
+
         let (new_w, new_h) = self.dimensions_for_size(size);
 
         if new_w != self.storage_w || new_h != self.storage_h {

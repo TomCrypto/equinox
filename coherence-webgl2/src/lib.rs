@@ -39,12 +39,17 @@ impl RenderTexture {
     }
 
     pub fn resize(&mut self, width: i32, height: i32) {
-        if width != self.width || height != self.height || self.resource().is_none() {
-            self.gl.delete_texture(self.resource());
+        if !self.gl.is_texture(self.handle.as_ref()) {
+            self.handle = None;
+        }
+
+        if width != self.width || height != self.height || self.handle.is_none() {
+            self.gl.delete_texture(self.handle.as_ref());
 
             self.handle = self.gl.create_texture();
 
-            self.gl.bind_texture(Context::TEXTURE_2D, self.resource());
+            self.gl
+                .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
 
             self.gl
                 .tex_storage_2d(Context::TEXTURE_2D, 1, Context::RGBA32F, width, height);
@@ -73,16 +78,6 @@ impl RenderTexture {
             self.width = width;
             self.height = height;
         }
-    }
-
-    pub(crate) fn resource(&self) -> Option<&WebGlTexture> {
-        self.handle.as_ref()
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.handle = None;
-        self.width = 0;
-        self.height = 0;
     }
 }
 
@@ -127,7 +122,7 @@ impl FramebufferCache {
                         Context::DRAW_FRAMEBUFFER,
                         Context::COLOR_ATTACHMENT0 + index as u32,
                         Context::TEXTURE_2D,
-                        texture.resource(),
+                        texture.handle.as_ref(),
                         0,
                     );
                 }
@@ -293,8 +288,8 @@ impl Device {
 
     /// Updates this device to render a given scene or returns an error.
     pub fn update(&mut self, scene: &mut Scene) -> Result<bool, Error> {
-        if self.device_lost && self.try_restore(scene)? {
-            return Ok(false); // context is still lost
+        if self.device_lost && !self.try_restore(scene)? {
+            return Ok(false); // context currently lost
         }
 
         let mut invalidated = false;
@@ -501,34 +496,28 @@ impl Device {
 
     fn try_restore(&mut self, scene: &mut Scene) -> Result<bool, Error> {
         if self.gl.is_context_lost() {
-            return Ok(true);
+            return Ok(false);
         }
 
+        // TODO: this should probably be associated with the framebuffer cache
+        // (or whatever it becomes in the future)
         self.try_load_extension("EXT_color_buffer_float")?;
 
-        self.present_program.reset("", "")?;
-        self.camera_buffer.reset();
-        self.geometry_values_buffer.reset();
-        self.material_values_buffer.reset();
-        //self.bvh_tex.reset();
-        //self.tri_tex.reset();
-        self.samples.reset();
+        // should be able to use the same principle as the others...
         self.framebuffers.reset();
-        //self.instance_buffer.reset();
-        self.instance_hierarchy_buffer.reset();
-        self.globals_buffer.reset();
-        self.raster_buffer.reset();
-        //self.position_tex.reset();
-        //self.normal_tex.reset();
+
+        // TODO: remove shader reset once we've cleaned up the #define system
+        self.present_program.reset("", "")?;
+
+        // TODO: try to fix this somehow, can we afford to check per frame? (probably
+        // not that bad)
         self.refine_query.reset();
         self.render_query.reset();
-        //self.material_buffer.reset();
-        //self.material_lookup_buffer.reset();
 
         scene.dirty_all_fields();
         self.device_lost = false;
 
-        Ok(false)
+        Ok(true)
     }
 
     fn reset_refinement(&mut self) {

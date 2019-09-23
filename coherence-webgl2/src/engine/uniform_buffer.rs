@@ -27,6 +27,10 @@ impl<T: AsBytes + FromBytes> UniformBuffer<[T]> {
     }
 
     pub fn write_array(&mut self, buffer: &mut AlignedMemory, source: &impl ToDevice<[T]>) {
+        if !self.gl.is_buffer(self.handle.as_ref()) {
+            self.create_and_allocate();
+        }
+
         self.bind_and_upload(buffer.allocate_bytes(self.size), |bytes| {
             source.to_device(
                 LayoutVerified::<_, [T]>::new_slice_zeroed(bytes)
@@ -48,6 +52,10 @@ impl<T: AsBytes + FromBytes> UniformBuffer<T> {
     }
 
     pub fn write(&mut self, buffer: &mut AlignedMemory, source: &impl ToDevice<T>) {
+        if !self.gl.is_buffer(self.handle.as_ref()) {
+            self.create_and_allocate();
+        }
+
         self.bind_and_upload(buffer.allocate_bytes(self.size), |bytes| {
             source.to_device(
                 LayoutVerified::<_, T>::new_zeroed(bytes)
@@ -59,6 +67,10 @@ impl<T: AsBytes + FromBytes> UniformBuffer<T> {
 
     // TODO: find a way to remove this later on
     pub fn write_direct(&mut self, buffer: &mut AlignedMemory, writer: impl FnOnce(&mut T)) {
+        if !self.gl.is_buffer(self.handle.as_ref()) {
+            self.create_and_allocate();
+        }
+
         self.bind_and_upload(buffer.allocate_bytes(self.size), |bytes| {
             writer(
                 LayoutVerified::<_, T>::new_zeroed(bytes)
@@ -70,7 +82,7 @@ impl<T: AsBytes + FromBytes> UniformBuffer<T> {
 }
 
 impl<T: ?Sized> UniformBuffer<T> {
-    pub(crate) fn reset(&mut self) {
+    fn create_and_allocate(&mut self) {
         self.handle = self.gl.create_buffer();
 
         self.gl

@@ -104,9 +104,6 @@ impl<'a> SceneHierarchyBuilder<'a> {
 
     pub fn build(&mut self, leaves: &mut [InstanceInfo]) {
         let total = self.build_recursive(0, leaves);
-
-        info!("{:x?}", self.nodes);
-
         assert_eq!(total as usize, self.nodes.len())
     }
 
@@ -122,8 +119,6 @@ impl<'a> SceneHierarchyBuilder<'a> {
 
             return offset;
         }
-
-        info!("leaves = {:?}", leaves);
 
         let bbox = BoundingBox::from_extents(leaves.iter().map(|i| i.bbox));
 
@@ -224,9 +219,7 @@ impl ToDevice<[SceneHierarchyNode]> for InstancesWithObjects<'_> {
                 surface_area: 1.0, // obtain from the geometry somehow (at least an approximation)
                 geometry: instance.geometry as u16,
                 material: instance.material as u16,
-                geo_start: geometry_start / 4, /* how to obtain? for now we can sum up the
-                                                * parameter
-                                                * list */
+                geo_start: geometry_start / 4,
                 mat_start: material_start / 4,
             });
 
