@@ -144,6 +144,9 @@ pub struct Device {
     material_buffer: UniformBuffer<[MaterialParameter]>,
     instance_buffer: UniformBuffer<[SceneInstanceNode]>,
 
+    envmap_cdf_tex: TextureBuffer<[EnvironmentMapCdfData]>,
+    envmap_pix_tex: TextureBuffer<[EnvironmentMapPixelData]>,
+
     globals_buffer: UniformBuffer<GlobalData>,
     raster_buffer: UniformBuffer<RasterData>,
 
@@ -180,6 +183,8 @@ impl Device {
                     "Material" => BindingPoint::UniformBlock(8),
                     "Globals" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
+                    "envmap_cdf_tex" => BindingPoint::Texture(0),
+                    "envmap_pix_tex" => BindingPoint::Texture(1),
                 },
             ),
             present_program: Shader::new(
@@ -199,6 +204,8 @@ impl Device {
             instance_buffer: UniformBuffer::new_array(gl.clone(), 256),
             raster_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
+            envmap_cdf_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
+            envmap_pix_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
             samples_fbo: Framebuffer::new(gl.clone()),
             refine_query: Query::new(gl.clone()),
             render_query: Query::new(gl.clone()),
@@ -283,6 +290,20 @@ impl Device {
             .write_array(&mut self.scratch, materials);*/
         });
 
+        invalidated |= Dirty::clean(&mut scene.environment, |environment| {
+            // TODO: maybe avoid invalidating the shader if the define hasn't actually
+            // changed... there is probably a nicer way to do this honestly
+
+            if let Some(map) = &environment.map {
+                self.program.frag_shader().set_define("HAS_ENVMAP", "1");
+
+                self.envmap_cdf_tex.write(&mut self.scratch, map);
+                self.envmap_pix_tex.write(&mut self.scratch, map);
+            } else {
+                self.program.frag_shader().set_define("HAS_ENVMAP", "0");
+            }
+        });
+
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
             self.raster_buffer.write(&mut self.scratch, raster);
 
@@ -330,6 +351,8 @@ impl Device {
         shader.bind(&self.instance_buffer, "Instance");
         shader.bind(&self.globals_buffer, "Globals");
         shader.bind(&self.raster_buffer, "Raster");
+        shader.bind(&self.envmap_cdf_tex, "envmap_cdf_tex");
+        shader.bind(&self.envmap_pix_tex, "envmap_pix_tex");
 
         let weight = (self.state.frame as f32) / ((1 + self.state.frame) as f32);
 

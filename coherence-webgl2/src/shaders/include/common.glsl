@@ -3,14 +3,8 @@ struct ray_t {
     vec3 dir;
 };
 
-struct instance_indices_t {
-    uvec4 instance_indices;
-};
-
-#define ACCEL_ROOT_NODE(indices) (indices.instance_indices.x)
-#define TOPOLOGY_OFFSET(indices) (indices.instance_indices.y)
-#define GEOMETRY_OFFSET(indices) (indices.instance_indices.z)
-#define MATERIAL_OFFSET(indices) (indices.instance_indices.w)
+#define M_PI   3.14159265359
+#define M_2PI  6.28318530718
 
 // Maintains closest-hit information during a traversal.
 struct traversal_t {
@@ -43,4 +37,24 @@ bool ray_bbox(vec3 org, vec3 idir, inout vec2 range, vec3 bbmin, vec3 bbmax) {
     range.y = min(min(min(tmax.x, tmax.y), tmax.z), range.y);
 
     return range.x <= range.y;
+}
+
+vec3 _spherical_coordinates(float phi, float theta) {
+    float sin_theta = sin(theta);
+
+    return vec3(sin_theta * cos(phi), cos(theta), sin_theta * sin(phi));
+}
+
+// Transforms equirectangular coordinates into a unit direction vector with
+// an optional custom rotation. The V = 0.5 line corresponds to a direction
+// on the XZ plane, and (0.0, 0.5) will correspond to (1, 0, 0) by default.
+vec3 equirectangular_to_direction(vec2 uv, float rotation) {
+    return _spherical_coordinates(uv.x * M_2PI + rotation, uv.y * M_PI);
+}
+
+// Transforms a unit vector into equirectangular coordinates with a custom
+// rotation. If a non-zero rotation is provided, the u-coordinate returned
+// may be outside of the [0, 1] range and can be taken modulo 1 as needed.
+vec2 direction_to_equirectangular(vec3 dir, float rotation) {
+    return vec2((atan(dir.z, dir.x) - rotation) / M_2PI + 0.5, acos(dir.y) / M_PI);
 }

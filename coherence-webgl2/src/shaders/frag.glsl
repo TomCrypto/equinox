@@ -2,9 +2,6 @@
 #include <random.glsl>
 // #include <object.glsl>
 
-#define M_PI   3.14159265359
-#define M_2PI  6.28318530718
-
 out vec4 color;
 
 layout (std140) uniform Camera {
@@ -109,6 +106,71 @@ traversal_t traverse_scene(ray_t ray) {
 vec2 low_discrepancy_2d(uvec2 key) {
     return fract(vec2((key + FRAME_NUMBER) % 8192U) * vec2(0.7548776662, 0.5698402909));
 }
+
+// Begin envmap stuff
+
+uniform sampler2D envmap_cdf_tex;
+uniform sampler2D envmap_pix_tex;
+
+#define ENVMAP_W 4096
+#define ENVMAP_H 2048
+
+// assume 32768
+
+vec3 sample_envmap(vec3 direction) {
+    vec2 uv = direction_to_equirectangular(direction, 0.0);
+
+    int x = int(uv.x * float(ENVMAP_W));
+    int y = int(uv.y * float(ENVMAP_H));
+
+    int i = y * ENVMAP_W + x;
+
+    int px = i % 32768;
+    int py = i / 32768;
+
+    // return texture(envmap_pix_tex, dir_to_envmap_uv(direction)).xyz;
+    return texelFetch(envmap_pix_tex, ivec2(px, py), 0).xyz;
+}
+
+// returns (U, V) of the sampled environment map
+vec3 importance_sample_envmap(float u) {
+    // do a binary search on the data until we find the right value...
+    int lo = 0;
+    int hi = ENVMAP_W * ENVMAP_H - 1;
+    int DEBUG = 0;
+
+    int first = 0;
+    int count = ENVMAP_W * ENVMAP_H;
+
+    while (count > 0) {
+        DEBUG += 1;
+
+        if (DEBUG > 100) {
+            discard;
+        }
+
+        int step = count >> 1;
+        int middle = first + step;
+
+        vec3 data = texelFetch(envmap_cdf_tex, ivec2(middle % ENVMAP_W, middle / ENVMAP_W), 0).xyz;
+
+        if (data.z < u) {
+            first = middle + 1;
+            count -= step + 1;
+        } else {
+            count = step;
+        }
+    }
+
+    int index = max(0, first - 1);
+
+    vec3 data = texelFetch(envmap_cdf_tex, ivec2(index % ENVMAP_W, index / ENVMAP_W), 0).xyz;
+
+    return equirectangular_to_direction(data.xy, 0.0);
+}
+
+
+// End envmap stuff
 
 // Begin camera stuff
 
@@ -228,7 +290,7 @@ void main() {
                     // in factor
 
                     ray.dir = reflect(ray.dir, normal);
-                    factor *= 0.75;
+                    factor *= 0.5;
                     break;
                 }
                 case 2U: {
@@ -246,6 +308,10 @@ void main() {
             // color = vec4(normal * 0.5 + 0.5, 1.0);
             // return;
         } else {
+            // we've escaped; accumulate environment map and break out
+
+            accumulated += factor * sample_envmap(ray.dir);
+
             // we've escaped, break out
             break;
         }
@@ -257,13 +323,11 @@ void main() {
         float p = max(factor.x, max(factor.y, factor.z)); // dot(factor, vec3(1.0 / 3.0));
 
         if (rng.x > p) {
-            factor = vec3(0.0);
             break;
         } else {
             factor /= p;
         }
     }
 
-    // brightness...
-    color = vec4(accumulated + vec3(1.0) * factor, 1.0);
+    color = vec4(accumulated, 1.0);
 }

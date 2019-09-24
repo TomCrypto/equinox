@@ -61,6 +61,11 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
     ctx.restoreContext();
   });
 
+  let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap.dat"))
+  runner.set_envmap(envmap_data, 4096, 2048)
+
+  runner.set_camera_position(0.5, 2, -5)
+
   /*let [bvh, tri, position, normal] = await load_model_data('cat')
   let cat_object = runner.add_object(bvh, tri, position, normal, 1, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
   let [bvh2, tri2, position2, normal2] = await load_model_data('buddha')
