@@ -37,32 +37,31 @@ fn preprocess(
         }
 
         if let Some(captures) = REGEX.captures(line) {
-            let capture = captures.get(1).or(captures.get(2)).unwrap();
-            let include = capture.as_str(); // captures either <> or ""
+            let header = captures.get(1).unwrap().as_str();
 
-            if vec_contains(processed, &include) {
-                continue; // assume #pragma once
+            if vec_contains(processed, &header) {
+                continue; // was included twice
             }
 
-            if vec_contains(expanding, &include) {
-                panic!("circular #include involving {} detected", capture.as_str());
+            if vec_contains(expanding, &header) {
+                panic!("circular #include involving {} detected", header);
             }
 
             // If we don't find the file, simply leave the #include in there to be populated
-            // dynamically by the engine, but still insert line/file markers (since we can).
+            // dynamically by the renderer, but always insert the file/line marker comments.
 
-            let result = read_to_string(&relative_path.join(includes_path.join(&include)));
+            let result = read_to_string(&relative_path.join(includes_path.join(&header)));
 
             let (text, placeholder) = match result {
                 Err(err) if err.kind() == ErrorKind::NotFound => {
-                    (format!("#include <{}>", include), true)
+                    (format!("#include <{}>", header), true)
                 }
                 result => (result?, false),
             };
 
             let included = preprocess(
                 &text,
-                &include,
+                &header,
                 relative_path,
                 includes_path,
                 expanding,

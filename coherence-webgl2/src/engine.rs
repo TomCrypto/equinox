@@ -6,6 +6,6 @@ mod uniform_buffer;
 
 pub use framebuffer::Framebuffer;
 pub use query::Query;
-pub use shader::{BindingPoint, Shader, ShaderBind, ShaderBindHandle, ShaderInput};
+pub use shader::{BindingPoint, Shader, ShaderBind, ShaderBindHandle, ShaderBuilder};
 pub use texture_buffer::{pixels_per_texture_buffer_row, TextureBuffer, TextureBufferFormat};
 pub use uniform_buffer::UniformBuffer;

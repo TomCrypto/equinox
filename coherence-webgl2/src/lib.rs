@@ -163,16 +163,16 @@ pub struct Device {
 impl Device {
     /// Creates a new device using a WebGL2 context.
     pub fn new(gl: &Context) -> Result<Self, Error> {
+        // hashmap! { "TBUF_WIDTH" => format!("{}", pixels_per_texture_buffer_row(&gl))
+        // }
+
         Ok(Self {
             scratch: AlignedMemory::new(),
             gl: gl.clone(),
             program: Shader::new(
                 gl.clone(),
-                ShaderInput::new(shaders::VERT),
-                ShaderInput::with_defines(
-                    shaders::FRAG,
-                    hashmap! { "TBUF_WIDTH" => format!("{}", pixels_per_texture_buffer_row(&gl)) },
-                ),
+                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::FRAG),
                 hashmap! {
                     "Camera" => BindingPoint::UniformBlock(0),
                     "Instance" => BindingPoint::UniformBlock(4),
@@ -184,8 +184,8 @@ impl Device {
             ),
             present_program: Shader::new(
                 gl.clone(),
-                ShaderInput::new(shaders::VERT),
-                ShaderInput::new(shaders::PRESENT),
+                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::PRESENT),
                 hashmap! {
                     "samples" => BindingPoint::Texture(0),
                 },
@@ -226,9 +226,7 @@ impl Device {
         });
 
         invalidated |= Dirty::clean(&mut scene.objects, |objects| {
-            // in here, update the GLSL code! (rebuild the shader?)
-            // generate the actual GLSL code properly from the objects geometry
-            // paste that into the shader and use that for rendering
+            // TODO: generate this elsewhere
 
             let mut code = String::from("float sdf(uint geometry, uint instance, vec3 x) {");
             let mut code_normal =
@@ -257,14 +255,9 @@ impl Device {
             info!("{}", functions);
             info!("{}{}", code, code_normal);
 
-            // TODO: error handling!
-
             self.program
-                .reset(
-                    "",
-                    &format!("#define SDF_CODE {}{}", functions, code + &code_normal),
-                )
-                .unwrap();
+                .frag_shader()
+                .set_header("geometry.glsl", functions + &code + &code_normal);
         });
 
         let objects = &scene.objects;
@@ -298,6 +291,9 @@ impl Device {
 
             self.samples_fbo.invalidate(&[&self.samples]);
         });
+
+        self.program.rebuild()?;
+        self.present_program.rebuild()?;
 
         if invalidated {
             self.state.reset(scene);
@@ -391,13 +387,18 @@ impl Device {
             return Ok(false);
         }
 
+        // Framebuffers are special in that they depend on existing WebGL resources, so
+        // we can't just recreate them on the fly. Just flag them for invalidation when
+        // the context is lost, and also whenever an attachment gets resized/recreated.
+
         self.samples_fbo.invalidate(&[&self.samples]);
 
-        // TODO: remove shader reset once we've cleaned up the #define system
-        self.present_program.reset("", "")?;
+        // Unfortunately the isProgram call is extremely slow so we can't use it to
+        // lazily check for context loss on the programs; manually invalidate them.
 
-        // TODO: try to fix this somehow, can we afford to check per frame? (probably
-        // not that bad)
+        self.program.invalidate();
+        self.present_program.invalidate();
+
         self.refine_query.reset();
         self.render_query.reset();
 

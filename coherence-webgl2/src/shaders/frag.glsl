@@ -5,8 +5,6 @@
 #define M_PI   3.14159265359
 #define M_2PI  6.28318530718
 
-#include <unknown.glsl>
-
 out vec4 color;
 
 layout (std140) uniform Camera {
@@ -47,7 +45,7 @@ layout (std140) uniform Instance {
 
 #define PREC 1e-5
 
-SDF_CODE
+#include <geometry.glsl>
 
 bool eval_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
     // TODO: possibly dynamically adjust precision based on initial distance?
