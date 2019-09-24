@@ -48,6 +48,8 @@ layout (std140) uniform Instance {
 SDF_CODE
 
 bool eval_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
+    // TODO: possibly dynamically adjust precision based on initial distance?
+
     while (range.x < range.y) {
         float dist = sdf(geometry, instance, ray.org + range.x * ray.dir);
 
