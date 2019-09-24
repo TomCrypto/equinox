@@ -4,7 +4,7 @@ use std::env::var_os;
 use std::ffi::OsStr;
 use std::fmt::Write;
 use std::fs::{read_dir, read_to_string, write};
-use std::io::Result;
+use std::io::{ErrorKind, Result};
 use std::path::{Path, PathBuf};
 
 fn vec_contains(vec: &Vec<String>, item: &str) -> bool {
@@ -12,8 +12,7 @@ fn vec_contains(vec: &Vec<String>, item: &str) -> bool {
 }
 
 lazy_static! {
-    static ref REGEX: Regex =
-        Regex::new(r#"^\s*#\s*include\s+(?:<([[:graph:]]*)>)|(?:"([[:graph:]]*)")\s*$"#).unwrap();
+    static ref REGEX: Regex = Regex::new(r#"^\s*#\s*include\s+<([[:graph:]]*)>\s*$"#).unwrap();
 }
 
 fn preprocess(
@@ -23,11 +22,20 @@ fn preprocess(
     includes_path: &Path,
     expanding: &mut Vec<String>,
     processed: &mut Vec<String>,
+    placeholder: bool,
 ) -> Result<String> {
     let mut shader = format!("// __POS__ {}:0\n", name);
     expanding.push(name.to_owned()); // now inside here
 
+    if placeholder {
+        shader += text;
+    }
+
     for (index, line) in text.lines().enumerate() {
+        if placeholder {
+            break;
+        }
+
         if let Some(captures) = REGEX.captures(line) {
             let capture = captures.get(1).or(captures.get(2)).unwrap();
             let include = capture.as_str(); // captures either <> or ""
@@ -40,13 +48,26 @@ fn preprocess(
                 panic!("circular #include involving {} detected", capture.as_str());
             }
 
+            // If we don't find the file, simply leave the #include in there to be populated
+            // dynamically by the engine, but still insert line/file markers (since we can).
+
+            let result = read_to_string(&relative_path.join(includes_path.join(&include)));
+
+            let (text, placeholder) = match result {
+                Err(err) if err.kind() == ErrorKind::NotFound => {
+                    (format!("#include <{}>", include), true)
+                }
+                result => (result?, false),
+            };
+
             let included = preprocess(
-                &read_to_string(&relative_path.join(includes_path.join(&include)))?,
+                &text,
                 &include,
                 relative_path,
                 includes_path,
                 expanding,
                 processed,
+                placeholder,
             )?;
 
             write!(shader, "{}\n// __POS__ {}:{}\n", included, name, index + 1).unwrap();
@@ -70,6 +91,7 @@ fn preprocess_glsl_shader(path: PathBuf, include_path: &str) -> Result<()> {
         &PathBuf::from(include_path),
         &mut expanding,
         &mut processed,
+        false,
     )?;
 
     let out_dir: PathBuf = var_os("OUT_DIR").unwrap().into();
