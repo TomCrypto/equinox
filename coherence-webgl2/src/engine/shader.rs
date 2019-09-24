@@ -52,6 +52,7 @@ impl ShaderBuilder {
 
                 if let Some(code) = self.headers.get(header) {
                     source += code;
+                    source += "\n";
                     continue;
                 }
             }
