@@ -354,7 +354,7 @@ impl Device {
         shader.bind(&self.envmap_cdf_tex, "envmap_cdf_tex");
         shader.bind(&self.envmap_pix_tex, "envmap_pix_tex");
 
-        let weight = (self.state.frame as f32) / ((1 + self.state.frame) as f32);
+        let weight = (self.state.frame as f32 - 1.0) / (self.state.frame as f32);
 
         self.gl.enable(Context::BLEND);
         self.gl.blend_equation(Context::FUNC_ADD);
