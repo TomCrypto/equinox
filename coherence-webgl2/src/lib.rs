@@ -191,7 +191,7 @@ impl Device {
                 },
             ),
             camera_buffer: UniformBuffer::new(gl.clone()),
-            geometry_buffer: UniformBuffer::new_array(gl.clone(), 256),
+            geometry_buffer: UniformBuffer::new_array(gl.clone(), 64),
             material_buffer: UniformBuffer::new_array(gl.clone(), 256),
             // TODO: get these from the shader?? (not really easily doable I think)
             //  -> #define them in the shader from some shared value obtained from the WebGL
@@ -231,38 +231,39 @@ impl Device {
             // paste that into the shader and use that for rendering
 
             let mut code = String::from("float sdf(uint geometry, uint instance, vec3 x) {");
+            let mut code_normal =
+                String::from("vec3 sdf_normal(uint geometry, uint instance, vec3 x) {");
             let mut functions = String::new();
             let mut code_index = 0;
+            let mut parameter_index = 0;
 
             code += "switch (geometry) {";
+            code_normal += "switch (geometry) {";
 
             for (index, geometry) in objects.list.iter().enumerate() {
-                let name = geometry.as_glsl_function(&mut functions, &mut code_index);
+                let name = geometry.as_glsl_function(
+                    &mut functions,
+                    &mut code_index,
+                    &mut parameter_index,
+                );
 
                 code += &format!("case {}U: return {}(x, instance);", index, name);
+                code_normal += &format!("case {}U: return normalize(vec3({}(vec3(x.x + PREC, x.y, x.z), instance) - {}(vec3(x.x - PREC, x.y, x.z), instance), {}(vec3(x.x, x.y + PREC, x.z), instance) - {}(vec3(x.x, x.y - PREC, x.z), instance), {}(vec3(x.x, x.y, x.z + PREC), instance) - {}(vec3(x.x, x.y, x.z - PREC), instance)));", index, name, name, name, name, name, name);
             }
 
             code += "} return 1.0 / 0.0; }";
-
-            code += "vec3 sdf_normal(uint geometry, uint instance, vec3 x) {";
-
-            code += "switch (geometry) {";
-
-            for (index, geometry) in objects.list.iter().enumerate() {
-                let name = geometry.as_glsl_function(&mut functions, &mut code_index);
-
-                code += &format!("case {}U: return normalize(vec3({}(vec3(x.x + PREC, x.y, x.z), instance) - {}(vec3(x.x - PREC, x.y, x.z), instance), {}(vec3(x.x, x.y + PREC, x.z), instance) - {}(vec3(x.x, x.y - PREC, x.z), instance), {}(vec3(x.x, x.y, x.z + PREC), instance) - {}(vec3(x.x, x.y, x.z - PREC), instance)));", index, name, name, name, name, name, name);
-            }
-
-            code += "} return vec3(0.0); }";
+            code_normal += "} return vec3(0.0); }";
 
             info!("{}", functions);
-            info!("{}", code);
+            info!("{}{}", code, code_normal);
 
             // TODO: error handling!
 
             self.program
-                .reset("", &format!("#define SDF_CODE {}{}", functions, code))
+                .reset(
+                    "",
+                    &format!("#define SDF_CODE {}{}", functions, code + &code_normal),
+                )
                 .unwrap();
         });
 

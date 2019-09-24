@@ -4,16 +4,7 @@ use log::{debug, info, warn};
 use crate::device::ToDevice;
 use crate::model::{Geometry, Instances};
 use crate::BoundingBox;
-use cgmath::prelude::*;
-use cgmath::Decomposed;
-use cgmath::Point3;
-use itertools::{iproduct, izip};
 use zerocopy::{AsBytes, FromBytes};
-
-#[derive(Clone, Copy, Default, Debug)]
-pub struct IndexData {
-    geometry_offset: u32, // offset into the parameter array
-}
 
 #[repr(align(32), C)]
 #[derive(AsBytes, FromBytes, Debug, Default)]
@@ -82,11 +73,11 @@ struct InstanceInfo {
 pub struct MaterialIndex([u32; 4]);
 
 /// Builds an instance BVH for the scene.
-struct SceneHierarchyBuilder<'a> {
+struct HierarchyBuilder<'a> {
     nodes: &'a mut [SceneInstanceNode],
 }
 
-impl<'a> SceneHierarchyBuilder<'a> {
+impl<'a> HierarchyBuilder<'a> {
     pub fn new(nodes: &'a mut [SceneInstanceNode]) -> Self {
         Self { nodes }
     }
@@ -205,116 +196,39 @@ impl ToDevice<[SceneInstanceNode]> for InstancesWithObjects<'_> {
         let mut geometry_start = 0;
         let mut material_start = 0;
 
-        for (index, instance) in self.instances.list.iter().enumerate() {
+        for instance in &self.instances.list {
             let object = &self.objects[instance.geometry];
 
             // TODO: handle errors gracefully here somehow? it would indicate bad data
             let bbox = object.bounding_box(&instance.geometry_values).unwrap();
-
-            // need to divide all starts by 4 because we use vec4 buffers...
-            // (note: this is an implementation detail)
 
             instances.push(InstanceInfo {
                 bbox,
                 surface_area: 1.0, // obtain from the geometry somehow (at least an approximation)
                 geometry: instance.geometry as u16,
                 material: instance.material as u16,
-                geo_start: geometry_start / 4,
+                geo_start: geometry_start,
                 mat_start: material_start / 4,
             });
 
-            geometry_start += instance.geometry_values.len() as u16;
+            // need to divide all starts by 4 because we use vec4 buffers...
+            // (note: this is an implementation detail)
+
+            // in this case we KNOW there are only that many, so we don't really need to do
+            // renumbering here; we just take the total number of values and go with that
+
+            geometry_start += (instance.geometry_values.len() as u16) / 4;
             material_start += instance.material_values.len() as u16;
         }
 
-        let node_count = SceneHierarchyBuilder::node_count_for_leaves(self.instances.list.len());
+        let node_count = HierarchyBuilder::node_count_for_leaves(self.instances.list.len());
 
-        SceneHierarchyBuilder::new(&mut memory[..node_count]).build(&mut instances);
+        HierarchyBuilder::new(&mut memory[..node_count]).build(&mut instances);
     }
 
     fn requested_count(&self) -> usize {
-        SceneHierarchyBuilder::node_count_for_leaves(self.instances.list.len())
+        HierarchyBuilder::node_count_for_leaves(self.instances.list.len())
     }
-}
-/*
-
-impl ToDevice<[InstanceData]> for InstancesWithObjects<'_> {
-    fn to_device(&self, slice: &mut [InstanceData]) {
-        let indices = Self::calculate_indices(&self.objects);
-        let mut material_offset = 0; // this is per-instance
-
-        for (memory, instance) in izip!(&mut *slice, &self.instances.list) {
-            let instance_world = Decomposed {
-                scale: instance.scale,
-                rot: instance.rotation,
-                disp: instance.translation,
-            };
-
-            if let Some(world_instance) = instance_world.inverse_transform() {
-                Self::pack_xfm_row_major(world_instance.into(), &mut memory.transform);
-            } else {
-                panic!("instance has a non-invertible affine transform (is scale zero?)");
-            }
-
-            // TODO: add indexing checks here... or use Rc or something?
-
-            // None of the static geometry offsets depend on the instance itself, we just
-            // always duplicate them for every instance since we have the space for them.
-
-            let index_data = &indices[instance.object];
-
-            memory.accel_root_node = index_data.accel_root_node;
-            memory.topology_offset = index_data.topology_offset;
-            memory.geometry_offset = index_data.geometry_offset;
-            memory.material_offset = material_offset;
-
-            // We always store a one-to-one mapping between instance materials and object
-            // materials inside the lookup array (which might point to shared materials).
-
-            if instance.materials.len() != self.objects[instance.object].materials {
-                panic!("one-to-one mapping required between instance & object materials");
-            }
-
-            material_offset += self.objects[instance.object].materials as u32;
-        }
-    }
-
-    fn requested_count(&self) -> usize {
-        self.instances.list.len()
-    }
-}
-
-impl ToDevice<[MaterialIndex]> for InstancesWithObjects<'_> {
-    fn to_device(&self, slice: &mut [MaterialIndex]) {
-        let mut index = 0;
-
-        for instance in &self.instances.list {
-            for &material in &instance.materials {
-                // 16-byte alignment...
-                slice[index] = MaterialIndex([material as u32, 0, 0, 0]);
-
-                index += 1;
-            }
-        }
-    }
-
-    fn requested_count(&self) -> usize {
-        self.instances
-            .list
-            .iter()
-            .map(|inst| inst.materials.len())
-            .sum()
-    }
-}
-
-*/
-
-impl InstancesWithObjects<'_> {
-    /*fn pack_xfm_row_major(xfm: cgmath::Matrix4<f32>, output: &mut [f32; 12]) {
-        for (i, j) in iproduct!(0..4, 0..3) {
-            output[4 * j + i] = xfm[i][j];
-        }
-    }*/
 }
 
 pub struct InstancesWithObjects<'a> {
@@ -326,24 +240,37 @@ pub struct InstancesWithObjects<'a> {
 // symbolic values which can just go into some UBO array as an array of f32. We
 // need the GLSL code to be generated to reference these indices efficiently
 
-#[repr(transparent)]
+#[repr(align(16), C)]
 #[derive(AsBytes, FromBytes)]
-pub struct GeometryParameter(f32);
+pub struct GeometryParameter([f32; 4]);
 
 #[repr(transparent)]
 #[derive(AsBytes, FromBytes)]
 pub struct MaterialParameter(f32);
 
+use itertools::izip;
+
 impl ToDevice<[GeometryParameter]> for InstancesWithObjects<'_> {
-    fn to_device(&self, slice: &mut [GeometryParameter]) {
-        let mut index = 0;
+    fn to_device(&self, mut slice: &mut [GeometryParameter]) {
+        // This implements parameter renumbering to ensure that all memory accesses in
+        // the parameter array are coherent and that all fields are nicely packed into
+        // individual vec4 elements. Out-of-bounds parameter indices are checked here.
 
         for instance in &self.instances.list {
-            for &value in &instance.geometry_values {
-                slice[index] = GeometryParameter(value);
+            let indices = self.objects[instance.geometry].symbolic_parameter_indices();
+            let (region, remaining_data) = slice.split_at_mut((indices.len() + 3) / 4);
 
-                index += 1;
+            for (data, indices) in izip!(region, indices.chunks(4)) {
+                for i in 0..4 {
+                    if let Some(&index) = indices.get(i) {
+                        data.0[i] = instance.geometry_values[index];
+                    } else {
+                        data.0[i] = 0.0; // unused (for vec4 padding)
+                    }
+                }
             }
+
+            slice = remaining_data;
         }
     }
 
