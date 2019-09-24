@@ -34,6 +34,10 @@ pub enum Geometry {
     Intersection {
         children: Vec<Box<Geometry>>,
     },
+    Subtraction {
+        lhs: Box<Geometry>,
+        rhs: Box<Geometry>,
+    },
     Scale {
         factor: Parameter,
         f: Box<Geometry>,
@@ -84,6 +88,15 @@ impl Geometry {
                     .map(|c| c.bounding_box(symbolic_values))
                     .collect::<Option<Vec<_>>>()?,
             )),
+            // TODO: can we be smarter here? can we get a better AABB in general??
+            Self::Subtraction { lhs, rhs } => Some(BoundingBox::union(
+                [
+                    lhs.bounding_box(symbolic_values)?,
+                    rhs.bounding_box(symbolic_values)?,
+                ]
+                .into_iter()
+                .copied(),
+            )),
             Self::Scale { factor, f } => {
                 let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
 
@@ -127,6 +140,10 @@ impl Geometry {
             Self::Union { children } | Self::Intersection { children } => children
                 .iter()
                 .for_each(|child| child.symbolic_parameters_indices_recursive(parameters)),
+            Self::Subtraction { lhs, rhs } => {
+                lhs.symbolic_parameters_indices_recursive(parameters);
+                rhs.symbolic_parameters_indices_recursive(parameters);
+            }
             Self::Scale { factor, f } => {
                 if let Parameter::Symbolic(index) = factor {
                     parameters.push(*index);

@@ -62,6 +62,16 @@ impl Geometry {
                     &format!("return max({}(x, inst), {}(x, inst));", name1, name2),
                 )
             }
+            Self::Subtraction { lhs, rhs } => {
+                let name1 = lhs.as_glsl_function(code, index, parameter_index);
+                let name2 = rhs.as_glsl_function(code, index, parameter_index);
+
+                emit_function(
+                    code,
+                    index,
+                    &format!("return max({}(x, inst), -{}(x, inst));", name1, name2),
+                )
+            }
             Self::Scale { factor, f } => {
                 let factor_code = match factor {
                     Parameter::Constant(value) => format!("{:+e}", value),
