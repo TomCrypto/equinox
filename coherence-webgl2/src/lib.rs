@@ -94,12 +94,15 @@ pub struct Device {
 
     envmap_cdf_tex: TextureBuffer<[EnvironmentMapCdfData]>,
 
-    envmap_texture: TextureImage<F32x4>,
+    envmap_marginal_cdf: TextureImage<R32F>,
+    envmap_conditional_cdfs: TextureImage<R32F>,
+
+    envmap_texture: TextureImage<RGBA32F>,
 
     globals_buffer: UniformBuffer<GlobalData>,
     raster_buffer: UniformBuffer<RasterData>,
 
-    samples: TextureImage<F32x4>,
+    samples: TextureImage<RGBA32F>,
     samples_fbo: Framebuffer,
 
     refine_query: Query,
@@ -134,6 +137,8 @@ impl Device {
                     "Raster" => BindingPoint::UniformBlock(3),
                     "envmap_cdf_tex" => BindingPoint::Texture(0),
                     "envmap_pix_tex" => BindingPoint::Texture(1),
+                    "envmap_marginal_cdf" => BindingPoint::Texture(2),
+                    "envmap_conditional_cdfs" => BindingPoint::Texture(3),
                 },
             ),
             present_program: Shader::new(
@@ -153,8 +158,10 @@ impl Device {
             instance_buffer: UniformBuffer::new_array(gl.clone(), 256),
             raster_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
-            envmap_cdf_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
+            envmap_cdf_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::RGBA32F),
             envmap_texture: TextureImage::new(gl.clone()),
+            envmap_marginal_cdf: TextureImage::new(gl.clone()),
+            envmap_conditional_cdfs: TextureImage::new(gl.clone()),
             samples_fbo: Framebuffer::new(gl.clone()),
             refine_query: Query::new(gl.clone()),
             render_query: Query::new(gl.clone()),
@@ -296,6 +303,8 @@ impl Device {
             shader.bind(&self.raster_buffer, "Raster");
             shader.bind(&self.envmap_cdf_tex, "envmap_cdf_tex");
             shader.bind(&self.envmap_texture, "envmap_pix_tex");
+            shader.bind(&self.envmap_marginal_cdf, "envmap_marginal_cdf");
+            shader.bind(&self.envmap_conditional_cdfs, "envmap_conditional_cdfs");
         });
 
         let weight = (self.state.frame as f32 - 1.0) / (self.state.frame as f32);

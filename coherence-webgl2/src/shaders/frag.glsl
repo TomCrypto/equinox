@@ -112,10 +112,13 @@ vec2 low_discrepancy_2d(uvec2 key) {
 uniform sampler2D envmap_cdf_tex;
 uniform sampler2D envmap_pix_tex;
 
+uniform sampler2D envmap_marginal_cdf;
+uniform sampler2D envmap_conditional_cdfs;
+
 #define ENVMAP_W 4096
 #define ENVMAP_H 2048
 
-// assume 32768
+// TODO: add PDFs later on (see the PBR book for correct values...)
 
 vec3 sample_envmap(vec3 direction) {
     vec2 uv = direction_to_equirectangular(direction, 0.0);
@@ -123,41 +126,100 @@ vec3 sample_envmap(vec3 direction) {
     return texture(envmap_pix_tex, uv).xyz;
 }
 
-// returns (U, V) of the sampled environment map
-vec3 importance_sample_envmap(float u) {
-    // do a binary search on the data until we find the right value...
-    int lo = 0;
-    int hi = ENVMAP_W * ENVMAP_H - 1;
+uint find_interval(sampler2D texture, int y, float u) {
+    uint first = 0U;
+    uint size = uint(textureSize(texture, 0).x);
+    uint len = size;
+
     int DEBUG = 0;
 
-    int first = 0;
-    int count = ENVMAP_W * ENVMAP_H;
-
-    while (count > 0) {
+    while (len > 0U) {
         DEBUG += 1;
 
         if (DEBUG > 100) {
             discard;
         }
 
-        int step = count >> 1;
-        int middle = first + step;
+        uint _half = len >> 1U;
+        uint middle = first + _half;
 
-        vec3 data = texelFetch(envmap_cdf_tex, ivec2(middle % ENVMAP_W, middle / ENVMAP_W), 0).xyz;
+        float value = texelFetch(texture, ivec2(int(middle), y), 0).x;
 
-        if (data.z < u) {
-            first = middle + 1;
-            count -= step + 1;
+        if (value <= u) {
+            first = middle + 1U;
+            len -= _half + 1U;
         } else {
-            count = step;
+            len = _half;
         }
     }
 
-    int index = max(0, first - 1);
+    return clamp(first - 1U, 0U, size - 2U);
+}
 
-    vec3 data = texelFetch(envmap_cdf_tex, ivec2(index % ENVMAP_W, index / ENVMAP_W), 0).xyz;
+/*
 
-    return equirectangular_to_direction(data.xy, 0.0);
+marginal CDF = [
+    0.0,
+    0.028975997,
+    0.63967484,
+    0.74944526,
+    0.83684194,
+    0.906162,
+    0.95527494,
+    0.9882174,
+    1.0,
+]
+
+*/
+
+// returns (U, V) of the sampled environment map
+vec3 importance_sample_envmap(float u, float v, out float pdf) {
+    // V DIRECTION (marginal CDF)
+
+    uint v_offset = find_interval(envmap_marginal_cdf, 0, u);
+
+    float v_cdf_at_offset = texelFetch(envmap_marginal_cdf, ivec2(int(v_offset), 0), 0).x;
+    float v_cdf_at_offset_next = texelFetch(envmap_marginal_cdf, ivec2(int(v_offset) + 1, 0), 0).x;
+
+    // linearly interpolate between u_offset and u_offset + 1 based on position of u between cdf_at_offset and u_cdf_at_offset_next
+    float dv = (u - v_cdf_at_offset) / (v_cdf_at_offset_next - v_cdf_at_offset);
+
+    pdf = (v_cdf_at_offset_next - v_cdf_at_offset);
+
+    /*float dv = v - v_cdf_at_offset;
+
+    if (v_cdf_at_offset_next != v_cdf_at_offset) {
+        dv /= (v_cdf_at_offset_next - v_cdf_at_offset);
+    }*/
+
+    // PDF is func[offset] / funcInt which (IIUC) is just (cdf_at_offset_next - cdf_at_offset)
+
+    float sampled_v = (float(v_offset) + dv) / float(textureSize(envmap_marginal_cdf, 0).x - 1);
+
+    // U DIRECTION (conditional CDF)
+
+    uint u_offset = find_interval(envmap_conditional_cdfs, int(v_offset), v);
+
+    float u_cdf_at_offset = texelFetch(envmap_conditional_cdfs, ivec2(int(u_offset), v_offset), 0).x;
+    float u_cdf_at_offset_next = texelFetch(envmap_conditional_cdfs, ivec2(int(u_offset) + 1, v_offset), 0).x;
+
+    /*float du = v - u_cdf_at_offset;
+
+    if (u_cdf_at_offset_next != u_cdf_at_offset) {
+        du /= (u_cdf_at_offset_next - u_cdf_at_offset);
+    }*/
+
+    float du = (v - u_cdf_at_offset) / (u_cdf_at_offset_next - u_cdf_at_offset);
+
+    pdf *= (u_cdf_at_offset_next - u_cdf_at_offset);
+
+    // See V direction for PDF
+
+    float sampled_u = (float(u_offset) + du) / float(textureSize(envmap_conditional_cdfs, 0).x - 1);
+
+    // float sampled_u = v;
+
+    return equirectangular_to_direction(vec2(fract(sampled_u + 0.5), sampled_v), 0.0);
 }
 
 
@@ -273,6 +335,20 @@ void main() {
 
 
                     factor *= material_buffer.data[offset + 0U].xyz;
+
+                    vec2 rng2 = gen_vec2_uniform(frame_state);
+                    bitshuffle_mini(frame_state);
+                    float pdf;
+                    vec3 dir_to_envmap = importance_sample_envmap(rng2.x, rng2.y, pdf);
+
+                    traversal_t traversal2 = traverse_scene(ray_t(ray.org, dir_to_envmap));
+
+                    if (!traversal_has_hit(traversal2)) {
+                        pdf /= (M_2PI * M_PI);
+
+                        accumulated += factor * sample_envmap(dir_to_envmap) * max(0.0, dot(dir_to_envmap, normal)) / pdf;
+                    }
+
                     break;
                 }
                 case 1U: {
@@ -301,7 +377,7 @@ void main() {
         } else {
             // we've escaped; accumulate environment map and break out
 
-            accumulated += factor * sample_envmap(ray.dir);
+            // accumulated += factor * sample_envmap(ray.dir) / (M_2PI * M_PI);
 
             // we've escaped, break out
             break;
@@ -320,5 +396,5 @@ void main() {
         }
     }
 
-    color = vec4(accumulated, 1.0);
+    color = vec4(accumulated * 0.000001, 1.0);
 }

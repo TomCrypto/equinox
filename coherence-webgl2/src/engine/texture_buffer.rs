@@ -13,8 +13,8 @@ use zerocopy::{AsBytes, FromBytes};
 
 #[derive(Clone, Copy, Debug)]
 pub enum TextureBufferFormat {
-    U32x4,
-    F32x4,
+    RGBA32UI,
+    RGBA32F,
 }
 
 pub struct TextureBuffer<T: ?Sized> {
@@ -59,8 +59,8 @@ impl<T> TextureBuffer<[T]> {
 
     fn pixel_size(format: TextureBufferFormat) -> usize {
         match format {
-            TextureBufferFormat::U32x4 => 16,
-            TextureBufferFormat::F32x4 => 16,
+            TextureBufferFormat::RGBA32UI => 16,
+            TextureBufferFormat::RGBA32F => 16,
         }
     }
 }
@@ -84,8 +84,8 @@ impl<T: AsBytes + FromBytes> TextureBuffer<[T]> {
         writer(&mut bytes[..]);
 
         match self.format {
-            TextureBufferFormat::U32x4 => self.upload_u32x4(bytes),
-            TextureBufferFormat::F32x4 => self.upload_f32x4(bytes),
+            TextureBufferFormat::RGBA32UI => self.upload_RGBA32UI(bytes),
+            TextureBufferFormat::RGBA32F => self.upload_RGBA32F(bytes),
         }
     }
 
@@ -124,7 +124,7 @@ impl<T: AsBytes + FromBytes> TextureBuffer<[T]> {
             .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
 
         match self.format {
-            TextureBufferFormat::U32x4 => {
+            TextureBufferFormat::RGBA32UI => {
                 self.gl.tex_storage_2d(
                     Context::TEXTURE_2D,
                     1,
@@ -133,7 +133,7 @@ impl<T: AsBytes + FromBytes> TextureBuffer<[T]> {
                     storage_h,
                 );
             }
-            TextureBufferFormat::F32x4 => {
+            TextureBufferFormat::RGBA32F => {
                 self.gl.tex_storage_2d(
                     Context::TEXTURE_2D,
                     1,
@@ -169,7 +169,7 @@ impl<T: AsBytes + FromBytes> TextureBuffer<[T]> {
         self.storage_h = storage_h;
     }
 
-    fn upload_u32x4(&self, bytes: &[u8]) {
+    fn upload_RGBA32UI(&self, bytes: &[u8]) {
         let data: LayoutVerified<_, [u32]> = LayoutVerified::new_slice(bytes).unwrap();
 
         for (y, row) in data.chunks(4 * self.storage_w as usize).enumerate() {
@@ -191,7 +191,7 @@ impl<T: AsBytes + FromBytes> TextureBuffer<[T]> {
         }
     }
 
-    fn upload_f32x4(&self, bytes: &[u8]) {
+    fn upload_RGBA32F(&self, bytes: &[u8]) {
         let data: LayoutVerified<_, [f32]> = LayoutVerified::new_slice(bytes).unwrap();
 
         for (y, row) in data.chunks(4 * self.storage_w as usize).enumerate() {
