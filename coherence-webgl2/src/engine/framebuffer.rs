@@ -2,9 +2,15 @@
 use log::{debug, info, warn};
 
 use js_sys::Array;
-use web_sys::{WebGl2RenderingContext as Context, WebGlFramebuffer};
+use web_sys::{WebGl2RenderingContext as Context, WebGlFramebuffer, WebGlTexture};
 
-use crate::RenderTexture;
+pub enum Attachment<'a> {
+    Texture(Option<&'a WebGlTexture>),
+}
+
+pub trait AsAttachment {
+    fn as_attachment(&self) -> Attachment;
+}
 
 pub struct Framebuffer {
     gl: Context,
@@ -16,9 +22,9 @@ impl Framebuffer {
         Self { gl, handle: None }
     }
 
-    pub fn invalidate(&mut self, attachments: &[&RenderTexture]) {
+    pub fn invalidate(&mut self, attachments: &[&dyn AsAttachment]) {
         if let Err(_) | Ok(None) = self.gl.get_extension("EXT_color_buffer_float") {
-            panic!("the WebGL2 extension EXT_color_buffer_float is unavailable");
+            panic!("the WebGL2 extension `EXT_color_buffer_float' is unavailable");
         }
 
         self.gl.delete_framebuffer(self.handle.as_ref());
@@ -30,18 +36,22 @@ impl Framebuffer {
 
         let array = Array::new();
 
-        for (index, texture) in attachments.iter().enumerate() {
-            let attachment = Context::COLOR_ATTACHMENT0 + index as u32;
+        for (index, attachment) in attachments.iter().enumerate() {
+            let attachment_index = Context::COLOR_ATTACHMENT0 + index as u32;
 
-            self.gl.framebuffer_texture_2d(
-                Context::DRAW_FRAMEBUFFER,
-                attachment,
-                Context::TEXTURE_2D,
-                texture.handle.as_ref(),
-                0,
-            );
+            match attachment.as_attachment() {
+                Attachment::Texture(texture) => {
+                    self.gl.framebuffer_texture_2d(
+                        Context::DRAW_FRAMEBUFFER,
+                        attachment_index,
+                        Context::TEXTURE_2D,
+                        texture,
+                        0,
+                    );
+                }
+            }
 
-            array.push(&attachment.into());
+            array.push(&attachment_index.into());
         }
 
         self.gl.draw_buffers(&array);

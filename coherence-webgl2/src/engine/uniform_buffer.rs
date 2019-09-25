@@ -2,7 +2,7 @@
 use log::{debug, info, warn};
 
 use crate::AlignedMemory;
-use crate::{ShaderBind, ShaderBindHandle};
+use crate::{AsBindTarget, BindTarget};
 use std::marker::PhantomData;
 use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer};
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
@@ -111,8 +111,8 @@ impl<T: ?Sized> Drop for UniformBuffer<T> {
     }
 }
 
-impl<T: ?Sized> ShaderBind for UniformBuffer<T> {
-    fn handle(&self) -> ShaderBindHandle {
-        ShaderBindHandle::UniformBuffer(self.handle.as_ref())
+impl<T: ?Sized> AsBindTarget for UniformBuffer<T> {
+    fn bind_target(&self) -> BindTarget {
+        BindTarget::UniformBuffer(self.handle.as_ref())
     }
 }

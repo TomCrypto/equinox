@@ -120,16 +120,7 @@ uniform sampler2D envmap_pix_tex;
 vec3 sample_envmap(vec3 direction) {
     vec2 uv = direction_to_equirectangular(direction, 0.0);
 
-    int x = int(uv.x * float(ENVMAP_W));
-    int y = int(uv.y * float(ENVMAP_H));
-
-    int i = y * ENVMAP_W + x;
-
-    int px = i % 32768;
-    int py = i / 32768;
-
-    // return texture(envmap_pix_tex, dir_to_envmap_uv(direction)).xyz;
-    return texelFetch(envmap_pix_tex, ivec2(px, py), 0).xyz;
+    return texture(envmap_pix_tex, uv).xyz;
 }
 
 // returns (U, V) of the sampled environment map

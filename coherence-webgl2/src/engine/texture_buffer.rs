@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::engine::{ShaderBind, ShaderBindHandle};
+use crate::engine::{AsBindTarget, BindTarget};
 use crate::AlignedMemory;
 use coherence_base::device::ToDevice;
 use js_sys::{Float32Array, Uint32Array};
@@ -220,8 +220,8 @@ impl<T: ?Sized> Drop for TextureBuffer<T> {
     }
 }
 
-impl<T: ?Sized> ShaderBind for TextureBuffer<T> {
-    fn handle(&self) -> ShaderBindHandle {
-        ShaderBindHandle::Texture(self.handle.as_ref())
+impl<T: ?Sized> AsBindTarget for TextureBuffer<T> {
+    fn bind_target(&self) -> BindTarget {
+        BindTarget::Texture(self.handle.as_ref())
     }
 }

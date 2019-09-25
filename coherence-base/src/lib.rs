@@ -4,9 +4,6 @@ use log::{debug, info, warn};
 use cgmath::prelude::*;
 use cgmath::Point3;
 
-/// Handy macro for pulling in and exporting the contents of another module.
-/// This is equivalent to privately declaring the module(s) passed, and
-/// exporting them with `pub use self::module::*;`.
 #[macro_export]
 macro_rules! export {
     [$( $module:ident ),*] => {

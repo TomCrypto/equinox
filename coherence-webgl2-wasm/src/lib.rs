@@ -166,13 +166,13 @@ impl WasmRunner {
         self.scene.instances.list[index].translation += Vector3::new(0.0, amount, 0.0);
     }*/
 
-    pub fn set_envmap(&mut self, data: &[f32], rows: usize, cols: usize) {
+    pub fn set_envmap(&mut self, data: &[f32], cols: usize, rows: usize) {
         self.scene.environment.multiplier = [1.0, 1.0, 1.0];
 
         self.scene.environment.map = Some(EnvironmentMap {
             pixels: data.to_vec(),
-            width: rows as u32,
-            height: cols as u32,
+            width: cols as u32,
+            height: rows as u32,
         });
     }
 

@@ -5,6 +5,21 @@ mod shaders {
     include!(concat!(env!("OUT_DIR"), "/glsl_shaders.rs"));
 }
 
+#[macro_export]
+macro_rules! export {
+    [$( $module:ident ),*] => {
+        $(
+            mod $module;
+            pub use self::$module::*;
+        )*
+    };
+}
+
+/// Types and definitions to model a scene to be ray-traced.
+pub mod render {
+    export![environment];
+}
+
 use coherence_base::device::*;
 use coherence_base::{model::RasterFilter, Dirty, Scene};
 use js_sys::Error;
@@ -13,79 +28,12 @@ use quasirandom::Qrng;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::mem::size_of;
-use web_sys::{WebGl2RenderingContext as Context, WebGlTexture};
+use web_sys::WebGl2RenderingContext as Context;
 use zerocopy::{AsBytes, FromBytes};
 
 mod engine;
 
 pub use engine::*;
-
-// TODO: need to add format here somehow
-pub struct RenderTexture {
-    gl: Context,
-    handle: Option<WebGlTexture>,
-    width: i32,
-    height: i32,
-}
-
-impl RenderTexture {
-    pub fn new(gl: Context) -> Self {
-        Self {
-            gl,
-            handle: None,
-            width: 0,
-            height: 0,
-        }
-    }
-
-    pub fn resize(&mut self, width: i32, height: i32) {
-        if !self.gl.is_texture(self.handle.as_ref()) {
-            self.handle = None;
-        }
-
-        if width != self.width || height != self.height || self.handle.is_none() {
-            self.gl.delete_texture(self.handle.as_ref());
-
-            self.handle = self.gl.create_texture();
-
-            self.gl
-                .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
-
-            self.gl
-                .tex_storage_2d(Context::TEXTURE_2D, 1, Context::RGBA32F, width, height);
-
-            self.gl.tex_parameteri(
-                Context::TEXTURE_2D,
-                Context::TEXTURE_MAG_FILTER,
-                Context::NEAREST as i32,
-            );
-            self.gl.tex_parameteri(
-                Context::TEXTURE_2D,
-                Context::TEXTURE_MIN_FILTER,
-                Context::NEAREST as i32,
-            );
-            self.gl.tex_parameteri(
-                Context::TEXTURE_2D,
-                Context::TEXTURE_WRAP_S,
-                Context::CLAMP_TO_EDGE as i32,
-            );
-            self.gl.tex_parameteri(
-                Context::TEXTURE_2D,
-                Context::TEXTURE_WRAP_T,
-                Context::CLAMP_TO_EDGE as i32,
-            );
-
-            self.width = width;
-            self.height = height;
-        }
-    }
-}
-
-impl ShaderBind for RenderTexture {
-    fn handle(&self) -> ShaderBindHandle {
-        ShaderBindHandle::Texture(self.handle.as_ref())
-    }
-}
 
 #[repr(align(64), C)]
 #[derive(FromBytes, AsBytes, Clone)]
@@ -145,12 +93,13 @@ pub struct Device {
     instance_buffer: UniformBuffer<[SceneInstanceNode]>,
 
     envmap_cdf_tex: TextureBuffer<[EnvironmentMapCdfData]>,
-    envmap_pix_tex: TextureBuffer<[EnvironmentMapPixelData]>,
+
+    envmap_texture: TextureImage<F32x4>,
 
     globals_buffer: UniformBuffer<GlobalData>,
     raster_buffer: UniformBuffer<RasterData>,
 
-    samples: RenderTexture,
+    samples: TextureImage<F32x4>,
     samples_fbo: Framebuffer,
 
     refine_query: Query,
@@ -205,11 +154,11 @@ impl Device {
             raster_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
             envmap_cdf_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
-            envmap_pix_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::F32x4),
+            envmap_texture: TextureImage::new(gl.clone()),
             samples_fbo: Framebuffer::new(gl.clone()),
             refine_query: Query::new(gl.clone()),
             render_query: Query::new(gl.clone()),
-            samples: RenderTexture::new(gl.clone()),
+            samples: TextureImage::new(gl.clone()),
             device_lost: true,
             state: DeviceState::new(),
         })
@@ -294,11 +243,13 @@ impl Device {
             // TODO: maybe avoid invalidating the shader if the define hasn't actually
             // changed... there is probably a nicer way to do this honestly
 
+            self.update_environment(environment);
+
             if let Some(map) = &environment.map {
                 self.program.frag_shader().set_define("HAS_ENVMAP", "1");
 
                 self.envmap_cdf_tex.write(&mut self.scratch, map);
-                self.envmap_pix_tex.write(&mut self.scratch, map);
+            // self.envmap_pix_tex.write(&mut self.scratch, map);
             } else {
                 self.program.frag_shader().set_define("HAS_ENVMAP", "0");
             }
@@ -308,7 +259,7 @@ impl Device {
             self.raster_buffer.write(&mut self.scratch, raster);
 
             self.samples
-                .resize(raster.width.get() as i32, raster.height.get() as i32);
+                .create(raster.width.get() as usize, raster.height.get() as usize);
 
             self.samples_fbo.invalidate(&[&self.samples]);
         });
@@ -335,7 +286,7 @@ impl Device {
         let refine_query = self.refine_query.query_time_elapsed();
 
         self.gl
-            .viewport(0, 0, self.samples.width, self.samples.height);
+            .viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
 
         let mut fbo = self.samples_fbo.bind_to_pipeline();
 
@@ -352,7 +303,7 @@ impl Device {
         shader.bind(&self.globals_buffer, "Globals");
         shader.bind(&self.raster_buffer, "Raster");
         shader.bind(&self.envmap_cdf_tex, "envmap_cdf_tex");
-        shader.bind(&self.envmap_pix_tex, "envmap_pix_tex");
+        shader.bind(&self.envmap_texture, "envmap_pix_tex");
 
         let weight = (self.state.frame as f32 - 1.0) / (self.state.frame as f32);
 
@@ -383,7 +334,7 @@ impl Device {
         let render_query = self.render_query.query_time_elapsed();
 
         self.gl
-            .viewport(0, 0, self.samples.width, self.samples.height);
+            .viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
 
         Framebuffer::bind_canvas_to_pipeline(&self.gl);
 

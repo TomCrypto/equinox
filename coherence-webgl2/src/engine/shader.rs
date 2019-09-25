@@ -292,20 +292,20 @@ pub struct ActiveShader<'a> {
     binds: &'a HashMap<&'static str, BindingPoint>,
 }
 
-pub enum ShaderBindHandle<'a> {
+pub enum BindTarget<'a> {
     UniformBuffer(Option<&'a WebGlBuffer>),
     Texture(Option<&'a WebGlTexture>),
 }
 
-pub trait ShaderBind {
-    fn handle(&self) -> ShaderBindHandle;
+pub trait AsBindTarget {
+    fn bind_target(&self) -> BindTarget;
 }
 
 impl ActiveShader<'_> {
-    pub fn bind(&self, target: &dyn ShaderBind, slot: &str) {
-        match target.handle() {
-            ShaderBindHandle::UniformBuffer(handle) => self.bind_uniform_buffer(handle, slot),
-            ShaderBindHandle::Texture(handle) => self.bind_texture(handle, slot),
+    pub fn bind(&self, target: &dyn AsBindTarget, slot: &str) {
+        match target.bind_target() {
+            BindTarget::UniformBuffer(handle) => self.bind_uniform_buffer(handle, slot),
+            BindTarget::Texture(handle) => self.bind_texture(handle, slot),
         }
     }
 
