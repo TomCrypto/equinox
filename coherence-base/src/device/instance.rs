@@ -41,7 +41,7 @@ impl SceneInstanceNode {
             min,
             max,
             packed1: skip_val as u32,
-            packed2: 0xffffffff,
+            packed2: 0xffff_ffff,
         }
     }
 

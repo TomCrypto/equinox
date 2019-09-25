@@ -127,7 +127,7 @@ impl<T: TextureFormat<Filterable = True, Compressed = True>> TextureImage<T> {
     // Compressed textures can never be rendered to by hardware, so they have to be
     // initialized with data; it doesn't make sense to create an uninitialized one.
 
-    pub fn upload_compressed(&mut self, rows: usize, cols: usize, data: &[T::Data]) {
+    pub fn upload_compressed(&mut self, _rows: usize, _cols: usize, _data: &[T::Data]) {
         unimplemented!("compressed textures are not implemented yet")
     }
 }

@@ -2,7 +2,7 @@
 use log::{debug, info, warn};
 
 use cgmath::prelude::*;
-use cgmath::{Point3, Quaternion, Vector3};
+use cgmath::{Point3, Vector3};
 use console_log;
 use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
@@ -89,11 +89,7 @@ impl WasmRunner {
     }
 
     pub fn set_camera_aperture(&mut self, radius: f32) {
-        self.scene.camera.aperture = Aperture::Ngon {
-            radius,
-            sides: 8,
-            rotation: 0.0,
-        };
+        self.scene.camera.aperture = Aperture::Circle { radius };
     }
 
     /*pub fn add_object(
@@ -198,7 +194,7 @@ impl WasmRunner {
         // for now, just add a sphere
         self.scene.objects.list.push(Geometry::Union {
             children: vec![
-                Box::new(Geometry::Translate {
+                Geometry::Translate {
                     translation: [
                         Parameter::Symbolic(1),
                         Parameter::Symbolic(2),
@@ -211,8 +207,8 @@ impl WasmRunner {
                             radius: Parameter::Constant(0.125),
                         }),
                     }),
-                }),
-                Box::new(Geometry::Translate {
+                },
+                Geometry::Translate {
                     translation: [
                         Parameter::Symbolic(5),
                         Parameter::Symbolic(6),
@@ -222,7 +218,7 @@ impl WasmRunner {
                         factor: Parameter::Symbolic(4),
                         f: Box::new(Geometry::UnitSphere),
                     }),
-                }),
+                },
             ],
         });
 

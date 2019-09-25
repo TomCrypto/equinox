@@ -131,13 +131,13 @@ impl Shader {
         &mut self.fragment
     }
 
-    pub fn bind_to_pipeline(&self) -> ActiveShader {
+    pub fn bind_to_pipeline(&self, callback: impl FnOnce(ActiveShader)) {
         self.gl.use_program(self.handle.as_ref());
 
-        ActiveShader {
+        callback(ActiveShader {
             gl: &self.gl,
             binds: &self.binds,
-        }
+        })
     }
 
     pub fn invalidate(&mut self) {

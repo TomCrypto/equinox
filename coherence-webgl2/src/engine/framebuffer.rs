@@ -27,6 +27,8 @@ impl Framebuffer {
             panic!("the WebGL2 extension `EXT_color_buffer_float' is unavailable");
         }
 
+        assert!(!attachments.is_empty());
+
         self.gl.delete_framebuffer(self.handle.as_ref());
 
         self.handle = self.gl.create_framebuffer();
@@ -57,41 +59,82 @@ impl Framebuffer {
         self.gl.draw_buffers(&array);
     }
 
-    pub fn bind_to_pipeline(&mut self) -> BoundFramebuffer {
+    pub fn draw(&self, options: DrawOptions) {
         self.gl
             .bind_framebuffer(Context::DRAW_FRAMEBUFFER, self.handle.as_ref());
 
-        BoundFramebuffer::new(self)
+        Self::perform_draw(&self.gl, options);
     }
 
-    pub fn bind_canvas_to_pipeline(gl: &Context) {
+    pub fn draw_to_canvas(gl: &Context, options: DrawOptions) {
         gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, None);
-    }
-}
 
-// TODO: some way to unify this with the canvas framebuffer...
-
-pub struct BoundFramebuffer<'a> {
-    framebuffer: &'a mut Framebuffer,
-}
-
-impl<'a> BoundFramebuffer<'a> {
-    fn new(framebuffer: &'a mut Framebuffer) -> Self {
-        Self { framebuffer }
+        Self::perform_draw(gl, options);
     }
 
-    pub fn clear(&mut self, attachment: i32, rgba: &[f32]) {
-        self.framebuffer
-            .gl
-            .clear_bufferfv_with_f32_array(Context::COLOR, attachment, rgba);
+    pub fn clear(&self, attachment: usize, color: [f32; 4]) {
+        self.gl
+            .bind_framebuffer(Context::DRAW_FRAMEBUFFER, self.handle.as_ref());
+
+        self.gl
+            .clear_bufferfv_with_f32_array(Context::COLOR, attachment as i32, &color);
     }
 
-    // TODO: APIs to set the blend state, set viewport/scissor, issue draw calls
-    // etc.
+    pub fn clear_canvas(gl: &Context, color: [f32; 4]) {
+        gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, None);
+
+        gl.clear_color(color[0], color[1], color[2], color[3]);
+
+        gl.clear(Context::COLOR_BUFFER_BIT);
+    }
+
+    fn perform_draw(gl: &Context, options: DrawOptions) {
+        gl.viewport(
+            options.viewport[0],
+            options.viewport[1],
+            options.viewport[2],
+            options.viewport[3],
+        );
+
+        if let Some(scissor) = options.scissor {
+            gl.enable(Context::SCISSOR_TEST);
+
+            gl.scissor(scissor[0], scissor[1], scissor[2], scissor[3]);
+        } else {
+            gl.disable(Context::SCISSOR_TEST);
+        }
+
+        if let Some(blend) = options.blend {
+            gl.enable(Context::BLEND);
+
+            match blend {
+                BlendMode::Accumulative { weight } => {
+                    gl.blend_equation(Context::FUNC_ADD);
+                    gl.blend_func(Context::CONSTANT_ALPHA, Context::ONE_MINUS_CONSTANT_ALPHA);
+                    gl.blend_color(0.0, 0.0, 0.0, 1.0 - weight);
+                }
+            }
+        } else {
+            gl.disable(Context::BLEND);
+        }
+
+        gl.bind_buffer(Context::ARRAY_BUFFER, None);
+        gl.draw_arrays(Context::TRIANGLES, 0, 3);
+    }
 }
 
 impl Drop for Framebuffer {
     fn drop(&mut self) {
         self.gl.delete_framebuffer(self.handle.as_ref());
     }
+}
+
+pub enum BlendMode {
+    Accumulative { weight: f32 },
+}
+
+pub struct DrawOptions {
+    pub viewport: [i32; 4],
+    pub scissor: Option<[i32; 4]>,
+    pub blend: Option<BlendMode>,
 }

@@ -283,38 +283,30 @@ impl Device {
             return None;
         }
 
-        let refine_query = self.refine_query.query_time_elapsed();
-
-        self.gl
-            .viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
-
-        let mut fbo = self.samples_fbo.bind_to_pipeline();
-
         // TODO: not happy with this, can we improve it
         self.state
             .update(&mut self.scratch, &mut self.globals_buffer);
 
-        let shader = self.program.bind_to_pipeline();
-
-        shader.bind(&self.camera_buffer, "Camera");
-        shader.bind(&self.geometry_buffer, "Geometry");
-        shader.bind(&self.material_buffer, "Material");
-        shader.bind(&self.instance_buffer, "Instance");
-        shader.bind(&self.globals_buffer, "Globals");
-        shader.bind(&self.raster_buffer, "Raster");
-        shader.bind(&self.envmap_cdf_tex, "envmap_cdf_tex");
-        shader.bind(&self.envmap_texture, "envmap_pix_tex");
+        self.program.bind_to_pipeline(|shader| {
+            shader.bind(&self.camera_buffer, "Camera");
+            shader.bind(&self.geometry_buffer, "Geometry");
+            shader.bind(&self.material_buffer, "Material");
+            shader.bind(&self.instance_buffer, "Instance");
+            shader.bind(&self.globals_buffer, "Globals");
+            shader.bind(&self.raster_buffer, "Raster");
+            shader.bind(&self.envmap_cdf_tex, "envmap_cdf_tex");
+            shader.bind(&self.envmap_texture, "envmap_pix_tex");
+        });
 
         let weight = (self.state.frame as f32 - 1.0) / (self.state.frame as f32);
 
-        self.gl.enable(Context::BLEND);
-        self.gl.blend_equation(Context::FUNC_ADD);
-        self.gl
-            .blend_func(Context::CONSTANT_ALPHA, Context::ONE_MINUS_CONSTANT_ALPHA);
-        self.gl.blend_color(0.0, 0.0, 0.0, 1.0 - weight);
+        let refine_query = self.refine_query.query_time_elapsed();
 
-        self.gl.bind_buffer(Context::ARRAY_BUFFER, None);
-        self.gl.draw_arrays(Context::TRIANGLES, 0, 3);
+        self.samples_fbo.draw(DrawOptions {
+            viewport: [0, 0, self.samples.cols() as i32, self.samples.rows() as i32],
+            scissor: None,
+            blend: Some(BlendMode::Accumulative { weight }),
+        });
 
         if !Query::is_supported(&self.gl) {
             return None; // no statistics
@@ -331,21 +323,20 @@ impl Device {
             return None;
         }
 
+        self.present_program.bind_to_pipeline(|shader| {
+            shader.bind(&self.samples, "samples");
+        });
+
         let render_query = self.render_query.query_time_elapsed();
 
-        self.gl
-            .viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
-
-        Framebuffer::bind_canvas_to_pipeline(&self.gl);
-
-        let shader = self.present_program.bind_to_pipeline();
-
-        shader.bind(&self.samples, "samples");
-
-        self.gl.disable(Context::BLEND);
-
-        self.gl.bind_buffer(Context::ARRAY_BUFFER, None);
-        self.gl.draw_arrays(Context::TRIANGLES, 0, 3);
+        Framebuffer::draw_to_canvas(
+            &self.gl,
+            DrawOptions {
+                viewport: [0, 0, self.samples.cols() as i32, self.samples.rows() as i32],
+                scissor: None,
+                blend: None,
+            },
+        );
 
         if !Query::is_supported(&self.gl) {
             return None; // no statistics
@@ -360,12 +351,6 @@ impl Device {
         if self.gl.is_context_lost() {
             return Ok(false);
         }
-
-        // Framebuffers are special in that they depend on existing WebGL resources, so
-        // we can't just recreate them on the fly. Just flag them for invalidation when
-        // the context is lost, and also whenever an attachment gets resized/recreated.
-
-        self.samples_fbo.invalidate(&[&self.samples]);
 
         // Unfortunately the isProgram call is extremely slow so we can't use it to
         // lazily check for context loss on the programs; manually invalidate them.
@@ -383,9 +368,7 @@ impl Device {
     }
 
     fn reset_refinement(&mut self) {
-        let mut fbo = self.samples_fbo.bind_to_pipeline();
-
-        fbo.clear(0, &[0.0, 0.0, 0.0, 0.0]);
+        self.samples_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
     }
 }
 

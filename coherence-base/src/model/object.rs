@@ -29,10 +29,10 @@ pub enum Geometry {
     UnitSphere,
     UnitCube,
     Union {
-        children: Vec<Box<Geometry>>,
+        children: Vec<Geometry>,
     },
     Intersection {
-        children: Vec<Box<Geometry>>,
+        children: Vec<Geometry>,
     },
     Subtraction {
         lhs: Box<Geometry>,
@@ -78,13 +78,13 @@ impl Geometry {
             // TODO: handle errors in a nicer way here??
             Self::Union { children } => Some(BoundingBox::union(
                 children
-                    .into_iter()
+                    .iter()
                     .map(|c| c.bounding_box(symbolic_values))
                     .collect::<Option<Vec<_>>>()?,
             )),
             Self::Intersection { children } => Some(BoundingBox::intersection(
                 children
-                    .into_iter()
+                    .iter()
                     .map(|c| c.bounding_box(symbolic_values))
                     .collect::<Option<Vec<_>>>()?,
             )),
@@ -94,7 +94,7 @@ impl Geometry {
                     lhs.bounding_box(symbolic_values)?,
                     rhs.bounding_box(symbolic_values)?,
                 ]
-                .into_iter()
+                .iter()
                 .copied(),
             )),
             Self::Scale { factor, f } => {
@@ -136,7 +136,7 @@ impl Geometry {
 
     fn symbolic_parameters_indices_recursive(&self, parameters: &mut Vec<usize>) {
         match self {
-            Self::UnitSphere | Self::UnitCube => return,
+            Self::UnitSphere | Self::UnitCube => {}
             Self::Union { children } | Self::Intersection { children } => children
                 .iter()
                 .for_each(|child| child.symbolic_parameters_indices_recursive(parameters)),
