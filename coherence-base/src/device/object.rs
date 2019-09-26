@@ -41,6 +41,7 @@ impl Geometry {
                 index,
                 r#"vec3 d = abs(x) - vec3(1.0); return length(max(d,0.0)) + min(max(d.x,max(d.y,d.z)),0.0);"#,
             ),
+            Self::Plane => emit_function(code, index, "return abs(x.y);"),
             Self::Union { children } => {
                 let name1 = children[0].as_glsl_function(code, index, parameter_index);
                 let name2 = children[1].as_glsl_function(code, index, parameter_index);

@@ -40,14 +40,14 @@ layout (std140) uniform Instance {
     BvhNode data[256];
 } instance_buffer;
 
-#define PREC 1e-5
+#define PREC (1e-4)
 
 #include <geometry.glsl>
 
 bool eval_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
     // TODO: possibly dynamically adjust precision based on initial distance?
 
-    while (range.x < range.y) {
+    while (range.x <= range.y) {
         float dist = sdf(geometry, instance, ray.org + range.x * ray.dir);
 
         if (dist < PREC) {
@@ -131,15 +131,7 @@ uint find_interval(sampler2D texture, int y, float u) {
     uint size = uint(textureSize(texture, 0).x);
     uint len = size;
 
-    int DEBUG = 0;
-
     while (len > 0U) {
-        DEBUG += 1;
-
-        if (DEBUG > 100) {
-            discard;
-        }
-
         uint _half = len >> 1U;
         uint middle = first + _half;
 
@@ -158,19 +150,13 @@ uint find_interval(sampler2D texture, int y, float u) {
 
 /*
 
-marginal CDF = [
-    0.0,
-    0.028975997,
-    0.63967484,
-    0.74944526,
-    0.83684194,
-    0.906162,
-    0.95527494,
-    0.9882174,
-    1.0,
-]
+For now hardcode the marginal CDF (we'll put it somewhere like a uniform buffer later on...)
+
+Store the conditional data as [[normalized CDF, actual function value]]
 
 */
+
+#if 0
 
 // returns (U, V) of the sampled environment map
 vec3 importance_sample_envmap(float u, float v, out float pdf) {
@@ -184,7 +170,7 @@ vec3 importance_sample_envmap(float u, float v, out float pdf) {
     // linearly interpolate between u_offset and u_offset + 1 based on position of u between cdf_at_offset and u_cdf_at_offset_next
     float dv = (u - v_cdf_at_offset) / (v_cdf_at_offset_next - v_cdf_at_offset);
 
-    pdf = (v_cdf_at_offset_next - v_cdf_at_offset);
+    pdf = texelFetch(envmap_marginal_cdf, ivec2(int(v_offset), 0), 0).y;
 
     /*float dv = v - v_cdf_at_offset;
 
@@ -211,35 +197,45 @@ vec3 importance_sample_envmap(float u, float v, out float pdf) {
 
     float du = (v - u_cdf_at_offset) / (u_cdf_at_offset_next - u_cdf_at_offset);
 
-    pdf *= (u_cdf_at_offset_next - u_cdf_at_offset);
+    pdf *= texelFetch(envmap_conditional_cdfs, ivec2(int(u_offset), v_offset), 0).y;
+
+    // pdf /= MARGINAL_INTEGRAL;
 
     // See V direction for PDF
 
     float sampled_u = (float(u_offset) + du) / float(textureSize(envmap_conditional_cdfs, 0).x - 1);
 
-    // float sampled_u = v;
-
-    return equirectangular_to_direction(vec2(fract(sampled_u + 0.5), sampled_v), 0.0);
+    return equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
 }
+
+float envmap_cdf_pdf(vec2 uv) {
+    ivec2 uv_int = ivec2(uv * vec2(textureSize(envmap_conditional_cdfs, 0).xy - ivec2(1)));
+
+    float cdf_value_at = texelFetch(envmap_conditional_cdfs, uv_int, 0).y;
+
+    int w = textureSize(envmap_conditional_cdfs, 0).x - 1;
+    int h = textureSize(envmap_conditional_cdfs, 0).y - 1;
+
+    return cdf_value_at / MARGINAL_INTEGRAL * float(w * h);
+}
+
+#endif
 
 
 // End envmap stuff
 
 // Begin camera stuff
 
-vec2 evaluate_circular_aperture_uv(uvec2 pixel_state) {
-    vec2 uv = low_discrepancy_2d(pixel_state);
+vec2 evaluate_circular_aperture_uv(inout random_t random) {
+    vec2 uv = rand_uniform_vec2(random);
 
     float a = uv.s * M_2PI;
 
     return sqrt(uv.t) * vec2(cos(a), sin(a));
 }
 
-vec2 evaluate_polygon_aperture_uv(uvec2 pixel_state) {
-    pixel_state += FRAME_RANDOM;
-    bitshuffle_mini(pixel_state);
-
-    vec2 uv = gen_vec2_uniform(pixel_state); // low_discrepancy_2d(pixel_state);
+vec2 evaluate_polygon_aperture_uv(inout random_t random) {
+    vec2 uv = rand_uniform_vec2(random); // low_discrepancy_2d(pixel_state);
 
     float corner = floor(uv.s * camera.aperture_settings.y);
 
@@ -257,10 +253,10 @@ vec2 evaluate_polygon_aperture_uv(uvec2 pixel_state) {
     return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
 }
 
-vec2 evaluate_aperture_uv(uvec2 pixel_state) {
+vec2 evaluate_aperture_uv(inout random_t random) {
     switch (int(camera.aperture_settings.x)) {
-        case 0: return evaluate_circular_aperture_uv(pixel_state);
-        case 1: return evaluate_polygon_aperture_uv(pixel_state);       
+        case 0: return evaluate_circular_aperture_uv(random);
+        case 1: return evaluate_polygon_aperture_uv(random);       
     }
 
     return vec2(0.0);
@@ -270,11 +266,11 @@ vec3 bilinear(vec4 p[4], vec2 uv) {
     return mix(mix(p[0].xyz, p[1].xyz, uv.x), mix(p[2].xyz, p[3].xyz, uv.x), uv.y);
 }
 
-void evaluate_primary_ray(uvec2 pixel_state, out vec3 pos, out vec3 dir) {
+void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
     vec2 raster_uv = (gl_FragCoord.xy + FILTER_DELTA) * raster.dimensions.w;
     raster_uv.x -= (raster.dimensions.x * raster.dimensions.w - 1.0) * 0.5;
 
-    vec3 origin = bilinear(camera.origin_plane, evaluate_aperture_uv(pixel_state) * 0.5 + 0.5);
+    vec3 origin = bilinear(camera.origin_plane, evaluate_aperture_uv(random) * 0.5 + 0.5);
 
     // TODO: this isn't quite right; this generates a flat focal plane but it should be curved
     // (to be equidistant to the lens)
@@ -289,112 +285,122 @@ void evaluate_primary_ray(uvec2 pixel_state, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-void main() {
-    uvec2 pixel_state = uvec2(gl_FragCoord.xy);
-    bitshuffle_full(pixel_state); // randomized
+#define BRDF_LAMBERTIAN_ALBEDO (material_buffer.data[inst].xyz)
+#define BRDF_MIRROR_REFLECTANCE (material_buffer.data[inst].xyz)
 
-    uvec2 frame_state = pixel_state + FRAME_RANDOM;
+vec3 brdf_mirror_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
+    return vec3(0.0);
+}
+
+vec3 brdf_mirror_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
+    pdf = 1.0;
+    wi = reflect(-wo, normal);
+
+    return BRDF_MIRROR_REFLECTANCE; // / abs(dot(wi, normal));
+}
+
+// TODO: assume cosine weighting or what?
+
+vec3 brdf_lambertian_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
+    return vec3(BRDF_LAMBERTIAN_ALBEDO / 1.0); // / pi
+}
+
+// the "BRDF" has no "PDF" by itself; only the sampling methodology does!
+
+vec3 brdf_lambertian_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
+    vec2 rng = rand_uniform_vec2(random);
+
+    float r = sqrt(rng.x);
+    float phi = M_2PI * rng.y;
+
+    vec3 outx = vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi));
+    wi = rotate(outx, normal);
+
+    pdf = 1.0;
+
+    return vec3(BRDF_LAMBERTIAN_ALBEDO);
+}
+
+vec3 brdf_eval(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo) {
+    switch (material) {
+        case 0U:
+            return brdf_lambertian_eval(inst, normal, wi, wo);
+        case 1U:
+            return brdf_mirror_eval(inst, normal, wi, wo);
+        default:
+            return vec3(0.0);
+    }
+}
+
+vec3 brdf_sample(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
+    switch (material) {
+        case 0U:
+            return brdf_lambertian_sample(inst, normal, wi, wo, pdf, random);
+        case 1U:
+            return brdf_mirror_sample(inst, normal, wi, wo, pdf, random);
+        default:
+            return vec3(0.0);
+    }
+}
+
+void main() {
+    random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
 
     ray_t ray;
-    evaluate_primary_ray(pixel_state, ray.org, ray.dir);
+    evaluate_primary_ray(random, ray.org, ray.dir);
 
-    vec3 accumulated = vec3(0.0);
-    vec3 factor = vec3(1.0);
+    vec3 radiance = vec3(0.0);
+    vec3 throughput = vec3(1.0);
 
     // many bounces (with russian roulette)
     for (int i = 0; i < 10; ++i) {
         traversal_t traversal = traverse_scene(ray);
 
         if (traversal_has_hit(traversal)) {
-            ray.org += ray.dir * traversal.range.y; // closest distance to hit
+            // NOTE: this - PREC is to account for when we land exactly on a surface with
+            // an SDF value of zero (e.g. axis-aligned planes). at this point the normal is
+            // not mathematically well-defined
+            // another solution to this might be to provide custom normal SDF implementations
+            // for those SDFs likely to be axis-aligned with an AABB of volume zero? or just
+            // generally flat, zero-volume SDFs where this issue would occur
+            // I think it cannot occur if the SDF has any volume at all
+
+            ray.org += ray.dir * (traversal.range.y - PREC); // closest distance to hit
 
             vec3 normal = sdf_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
 
             uint material = traversal.hit.y & 0xffffU;
-            uint offset = traversal.hit.y >> 16U;
+            uint inst = traversal.hit.y >> 16U;
 
-            switch (material) {
-                case 0U: {
-                    // diffuse
-                    // pick a random direction in the hemisphere and adjust factor
+            float pdf;
 
-                    vec2 rng = gen_vec2_uniform(frame_state);
-                    bitshuffle_mini(frame_state);
+            vec3 wo = -ray.dir;
+            vec3 wi;
 
-                    // importance sampling through cosine weighting
+            vec3 estimate = brdf_sample(material, inst, normal, wi, wo, pdf, random);
 
-                    float r = sqrt(rng.x);
-                    float phi = M_2PI * rng.y;
+            throughput *= estimate / pdf;
 
-                    vec3 a = vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi));
-
-                    // basis transform
-
-                    vec3 v = normal - vec3(0.0, 1.0, 0.0);
-                    ray.dir = a - 2.0 * v * (dot(a, v) / max(1e-5, dot(v, v)));
-
-
-                    factor *= material_buffer.data[offset + 0U].xyz;
-
-                    vec2 rng2 = gen_vec2_uniform(frame_state);
-                    bitshuffle_mini(frame_state);
-                    float pdf;
-                    vec3 dir_to_envmap = importance_sample_envmap(rng2.x, rng2.y, pdf);
-
-                    traversal_t traversal2 = traverse_scene(ray_t(ray.org, dir_to_envmap));
-
-                    if (!traversal_has_hit(traversal2)) {
-                        pdf /= (M_2PI * M_PI);
-
-                        accumulated += factor * sample_envmap(dir_to_envmap) * max(0.0, dot(dir_to_envmap, normal)) / pdf;
-                    }
-
-                    break;
-                }
-                case 1U: {
-                    // specular
-                    // reflect the ray off the normal and continue; assume perfect reflection so no change
-                    // in factor
-
-                    ray.dir = reflect(ray.dir, normal);
-                    factor *= 0.5;
-                    break;
-                }
-                case 2U: {
-                    // emissive
-                    // terminate the ray
-
-                    accumulated += factor * material_buffer.data[offset + 0U].xyz;
-                    factor = vec3(0.0);
-                    break;
-                }
-                default:
-                    return; // bug (TODO: do something coherent on these kinds of bugs)
-            }
-
-            // color = vec4(normal * 0.5 + 0.5, 1.0);
-            // return;
+            ray.dir = wi;
         } else {
-            // we've escaped; accumulate environment map and break out
+            // we've hit the environment map. We need to sample the environment map...
 
-            // accumulated += factor * sample_envmap(ray.dir) / (M_2PI * M_PI);
+            radiance += throughput * sample_envmap(ray.dir) * 1.0;
 
-            // we've escaped, break out
             break;
         }
 
         // russian roulette
 
-        vec2 rng = gen_vec2_uniform(frame_state);
-        bitshuffle_mini(frame_state);
-        float p = max(factor.x, max(factor.y, factor.z)); // dot(factor, vec3(1.0 / 3.0));
+        vec2 rng = rand_uniform_vec2(random);
+        float p = min(1.0, max(throughput.x, max(throughput.y, throughput.z)));
 
-        if (rng.x > p) {
-            break;
+        if (rng.x < p) {
+            throughput /= p;
         } else {
-            factor /= p;
+            break;
         }
     }
 
-    color = vec4(accumulated * 0.000001, 1.0);
+    color = vec4(radiance, 1.0);
 }

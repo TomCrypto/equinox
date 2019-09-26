@@ -270,11 +270,10 @@ pub trait TextureFormat {
     fn parse(cols: usize, rows: usize, levels: usize, data: &[Self::Data]) -> Vec<Object>;
 }
 
-// TODO: rename those to be consistent with OpenGL nomenclature
 pub struct RGBA32UI;
 pub struct RGBA32F;
-
 pub struct R32F;
+pub struct RG32F;
 
 impl TextureFormat for RGBA32UI {
     type Data = u32;
@@ -362,6 +361,40 @@ impl TextureFormat for R32F {
             let level_cols = (cols / (1 << level)).max(1);
             let level_rows = (rows / (1 << level)).max(1);
             let level_size = level_cols * level_rows;
+
+            assert!(data.len() >= level_size);
+
+            let (level_data, remaining) = data.split_at(level_size);
+
+            views.push((unsafe { Float32Array::view(level_data) }).into());
+
+            data = remaining;
+        }
+
+        assert!(data.is_empty());
+
+        views
+    }
+}
+
+impl TextureFormat for RG32F {
+    type Data = f32;
+
+    type Compressed = False;
+    type Filterable = True;
+    type Renderable = True;
+
+    const GL_INTERNAL_FORMAT: u32 = Context::RG32F;
+    const GL_FORMAT: u32 = Context::RG;
+    const GL_TYPE: u32 = Context::FLOAT;
+
+    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
+        let mut views = Vec::with_capacity(levels);
+
+        for level in 0..levels {
+            let level_cols = (cols / (1 << level)).max(1);
+            let level_rows = (rows / (1 << level)).max(1);
+            let level_size = level_cols * level_rows * 2;
 
             assert!(data.len() >= level_size);
 

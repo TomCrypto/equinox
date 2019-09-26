@@ -172,6 +172,67 @@ impl WasmRunner {
         });
     }
 
+    pub fn setup_test_scene(&mut self) {
+        self.scene.objects.list.push(Geometry::Plane);
+
+        self.scene.objects.list.push(Geometry::Translate {
+            f: Box::new(Geometry::UnitSphere),
+            translation: [
+                Parameter::Constant(0.0),
+                Parameter::Constant(1.0),
+                Parameter::Constant(0.0),
+            ],
+        });
+
+        self.scene.objects.list.push(Geometry::Union {
+            children: vec![
+                Geometry::Translate {
+                    f: Box::new(Geometry::Scale {
+                        f: Box::new(Geometry::UnitSphere),
+                        factor: Parameter::Constant(0.333),
+                    }),
+                    translation: [
+                        Parameter::Constant(2.0),
+                        Parameter::Constant(0.0),
+                        Parameter::Constant(0.2),
+                    ],
+                },
+                Geometry::Translate {
+                    f: Box::new(Geometry::Scale {
+                        f: Box::new(Geometry::UnitSphere),
+                        factor: Parameter::Constant(0.333),
+                    }),
+                    translation: [
+                        Parameter::Constant(2.0),
+                        Parameter::Constant(0.0),
+                        Parameter::Constant(-0.2),
+                    ],
+                },
+            ],
+        });
+
+        self.scene.instances.list.push(Instance {
+            geometry: 0,
+            material: 0,
+            geometry_values: vec![],
+            material_values: vec![0.9, 0.9, 0.9, 0.0],
+        });
+
+        self.scene.instances.list.push(Instance {
+            geometry: 1,
+            material: 1,
+            geometry_values: vec![],
+            material_values: vec![0.8, 0.8, 0.8, 0.0],
+        });
+
+        self.scene.instances.list.push(Instance {
+            geometry: 2,
+            material: 0,
+            geometry_values: vec![],
+            material_values: vec![0.1, 0.1, 0.9, 0.0],
+        });
+    }
+
     pub fn add_other_object(&mut self) -> usize {
         // elongated cube
 

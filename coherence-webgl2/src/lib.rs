@@ -94,8 +94,8 @@ pub struct Device {
 
     envmap_cdf_tex: TextureBuffer<[EnvironmentMapCdfData]>,
 
-    envmap_marginal_cdf: TextureImage<R32F>,
-    envmap_conditional_cdfs: TextureImage<R32F>,
+    envmap_marginal_cdf: TextureImage<RG32F>,
+    envmap_conditional_cdfs: TextureImage<RG32F>,
 
     envmap_texture: TextureImage<RGBA32F>,
 

@@ -61,10 +61,10 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
     ctx.restoreContext();
   });
 
-  let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap2.dat"))
+  let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap.dat"))
   runner.set_envmap(envmap_data, 4096, 2048)
 
-  runner.set_camera_position(0.5, 2, -5)
+  runner.set_camera_position(0.5, 4, -12)
 
   /*let [bvh, tri, position, normal] = await load_model_data('cat')
   let cat_object = runner.add_object(bvh, tri, position, normal, 1, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
@@ -78,14 +78,17 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
   //runner.add_instance(cornell_object, 0, 0, 0, 1, [white_mat, light, white_mat, white_mat, white_mat, green_mat, red_mat, blue_mat, yellow_mat])
   //runner.set_camera_position(338.34976, 698.74335, -1202.723)
 
-  let sphere = runner.add_object();
+  /*let sphere = runner.add_object();
   let other = runner.add_other_object();
 
   // s1 x1 y1 z1 s2 x2 y2 z2
 
   runner.add_instance(sphere, 0, [0.1, 0.0, 0.0, 0.0, 0.5, 0.0, -0.5, 0.0], [0.75, 0.25, 0.25, 0.0]);
   runner.add_instance(other, 0, [], [0.25, 0.75, 0.25, 0.0]);
-  runner.add_instance(sphere, 1, [1.0, 0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 2.0], []);
+  // runner.add_instance(sphere, 1, [1.0, 0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 2.0], []);
+  runner.add_instance(sphere, 0, [1.0, 0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 2.0], [0.25, 0.25, 0.75, 0.0]);*/
+
+  runner.setup_test_scene();
 
   document.getElementById("cat").addEventListener("click", () => {
     runner.add_instance(cat_object, 0, 0, 0, 1, [blue_mat])
@@ -165,6 +168,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
     let y = Math.cos(angleY);
 
     runner.set_camera_direction(x, y, z)
+    samples = 0
   })
 
   canvas.addEventListener("mousedown", _ => {
@@ -190,6 +194,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
   let updateEMA = new ExponentialMovingAverage(0.12)
   let renderEMA = new ExponentialMovingAverage(0.08)
   let refineEMA = new ExponentialMovingAverage(0.08)
+  let samples = 0
 
   const renderLoop = () => {
     let oldStart = start
@@ -205,6 +210,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
 
       if (pressed['q'] == true) {
         runner.set_camera_aperture(0.1)
+        samples = 0
       }
 
       if (pressed['w'] === true) {
@@ -225,6 +231,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
 
       if (dx != 0.0 || dy != 0.0) {
         runner.move_camera(-dx * 1, -dy * 1)
+        samples = 0
       }
 
       if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {
@@ -249,6 +256,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
       updateEMA.append(elapsed)
       for (let i = 0; i < refineCount; ++i) {
         runner.refine()
+        samples += 1
 
         let refineTime = runner.get_refine_frame_time()
 
@@ -273,6 +281,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
 
       document.getElementById("frame-info").innerText = ` [update: ${updateAvg}] ➜ [refine: ${refineAvg} × ${refineCount.toFixed(0).padStart(2, ' ')}] ➜ [render: ${renderAvg}]`
       document.getElementById("frame-rate").innerText = `${(1000 / seriesAverage(times)).toFixed(0)} fps`
+      document.getElementById("sample-count").innerText = `${samples} samples`
 
       window.requestAnimationFrame(renderLoop)
     } catch (e) {

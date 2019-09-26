@@ -48,6 +48,11 @@ canvas {
     border-right: 1px solid #777777;
 }
 
+.sample-count {
+    width: 120px;
+    border-right: 1px solid #777777;
+}
+
 .frame-time {
     width: 60px;
     border-right: 1px solid #777777;

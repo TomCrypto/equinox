@@ -58,3 +58,15 @@ vec3 equirectangular_to_direction(vec2 uv, float rotation) {
 vec2 direction_to_equirectangular(vec3 dir, float rotation) {
     return vec2((atan(dir.z, dir.x) - rotation) / M_2PI + 0.5, acos(dir.y) / M_PI);
 }
+
+// Picks an arbitrary rotation transforming the vector (0, 1, 0) into the provided
+// normal and transforms the a-vector by that rotation. This is equivalent to constructing an arbitrary orthonormal basis where n is the Y-axis and
+// transforming the given vector by it.
+
+vec3 rotate(vec3 a, vec3 n) {
+    float dir = (n.y > 0.0) ? 1.0 : -1.0; // not using sign() as it may return zero
+
+    n.y += dir;
+
+    return n * (dot(a, n) / n.y) - a * dir;
+}
