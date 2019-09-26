@@ -285,6 +285,26 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
+#define BRDF_PHONG_EXPONENT 512.0
+#define BRDF_PHONG_COLOR vec3(0.25, 0.75, 0.25)
+
+vec3 brdf_phong_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
+    return vec3(0.0); // not used yet
+}
+
+vec3 brdf_phong_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
+    vec2 rng = rand_uniform_vec2(random);
+
+    float phi = M_2PI * rng.x;
+    float theta = acos(pow(rng.y, 1.0 / (BRDF_PHONG_EXPONENT + 1.0)));
+
+    wi = rotate(to_spherical(phi, theta), reflect(-wo, normal));
+
+    pdf = 1.0;
+
+    return BRDF_PHONG_COLOR;
+}
+
 #define BRDF_LAMBERTIAN_ALBEDO (material_buffer.data[inst].xyz)
 #define BRDF_MIRROR_REFLECTANCE (material_buffer.data[inst].xyz)
 
@@ -313,8 +333,7 @@ vec3 brdf_lambertian_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out fl
     float r = sqrt(rng.x);
     float phi = M_2PI * rng.y;
 
-    vec3 outx = vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi));
-    wi = rotate(outx, normal);
+    wi = rotate(vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi)), normal);
 
     pdf = 1.0;
 
@@ -327,6 +346,8 @@ vec3 brdf_eval(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo) {
             return brdf_lambertian_eval(inst, normal, wi, wo);
         case 1U:
             return brdf_mirror_eval(inst, normal, wi, wo);
+        case 2U:
+            return brdf_phong_eval(inst, normal, wi, wo);
         default:
             return vec3(0.0);
     }
@@ -338,6 +359,8 @@ vec3 brdf_sample(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
             return brdf_lambertian_sample(inst, normal, wi, wo, pdf, random);
         case 1U:
             return brdf_mirror_sample(inst, normal, wi, wo, pdf, random);
+        case 2U:
+            return brdf_phong_sample(inst, normal, wi, wo, pdf, random);
         default:
             return vec3(0.0);
     }

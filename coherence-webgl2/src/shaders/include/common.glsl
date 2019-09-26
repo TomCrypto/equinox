@@ -39,7 +39,9 @@ bool ray_bbox(vec3 org, vec3 idir, inout vec2 range, vec3 bbmin, vec3 bbmax) {
     return range.x <= range.y;
 }
 
-vec3 _spherical_coordinates(float phi, float theta) {
+// Transforms the given (phi, theta) azimuth/elevation angles into a direction
+// vector with the north pole being (0, 1, 0). The vector will be unit length.
+vec3 to_spherical(float phi, float theta) {
     float sin_theta = sin(theta);
 
     return vec3(sin_theta * cos(phi), cos(theta), sin_theta * sin(phi));
@@ -49,7 +51,7 @@ vec3 _spherical_coordinates(float phi, float theta) {
 // an optional custom rotation. The V = 0.5 line corresponds to a direction
 // on the XZ plane, and (0.0, 0.5) will correspond to (1, 0, 0) by default.
 vec3 equirectangular_to_direction(vec2 uv, float rotation) {
-    return _spherical_coordinates(uv.x * M_2PI + rotation, uv.y * M_PI);
+    return to_spherical(uv.x * M_2PI + rotation, uv.y * M_PI);
 }
 
 // Transforms a unit vector into equirectangular coordinates with a custom
@@ -59,14 +61,11 @@ vec2 direction_to_equirectangular(vec3 dir, float rotation) {
     return vec2((atan(dir.z, dir.x) - rotation) / M_2PI + 0.5, acos(dir.y) / M_PI);
 }
 
-// Picks an arbitrary rotation transforming the vector (0, 1, 0) into the provided
-// normal and transforms the a-vector by that rotation. This is equivalent to constructing an arbitrary orthonormal basis where n is the Y-axis and
-// transforming the given vector by it.
-
+// Rotates an arbitrary vector "a" by an arbitrarily chosen rotation which
+// takes the (0, 1, 0) vector to the "n" vector which MUST be unit length.
 vec3 rotate(vec3 a, vec3 n) {
-    float dir = (n.y > 0.0) ? 1.0 : -1.0; // not using sign() as it may return zero
-
-    n.y += dir;
+    float dir = (n.y > 0.0) ? 1.0 : -1.0;
+    n.y += dir; // avoids extra register
 
     return n * (dot(a, n) / n.y) - a * dir;
 }
