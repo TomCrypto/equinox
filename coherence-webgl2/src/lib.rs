@@ -17,11 +17,10 @@ macro_rules! export {
 
 /// Types and definitions to model a scene to be ray-traced.
 pub mod render {
-    export![environment, object];
+    export![environment, object, raster, camera, instance];
 }
 
-use coherence_base::device::*;
-use coherence_base::{model::RasterFilter, Dirty, Scene};
+use coherence_base::{Dirty, RasterFilter, Scene, SceneInstanceNode};
 use js_sys::Error;
 use maplit::hashmap;
 use quasirandom::Qrng;
@@ -30,7 +29,7 @@ use rand_chacha::ChaCha20Rng;
 use render::*;
 use std::mem::size_of;
 use web_sys::WebGl2RenderingContext as Context;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 mod engine;
 
@@ -46,9 +45,6 @@ impl Default for Aligned {
     }
 }
 
-/// WebGL doesn't have buffer mapping so just allocate one big resident buffer
-/// for all our needs. this is shared everywhere and is just used as an
-/// intermediate buffer for large copy operations.
 #[derive(Default)]
 pub struct AlignedMemory {
     memory: Vec<Aligned>,
@@ -59,15 +55,21 @@ impl AlignedMemory {
         Self::default()
     }
 
-    pub fn allocate_bytes(&mut self, size: usize) -> &mut [u8] {
-        let blocks = (size + size_of::<Aligned>() - 1) / size_of::<Aligned>();
-        self.memory.resize_with(blocks, Aligned::default); // preallocate data
-
-        &mut self.memory.as_mut_slice().as_bytes_mut()[..size]
+    pub fn allocate<T: AsBytes + FromBytes>(&mut self, len: usize) -> &mut [T] {
+        LayoutVerified::new_slice(self.allocate_bytes(len * size_of::<T>()))
+            .unwrap()
+            .into_mut_slice()
     }
 
-    pub fn shrink_to_fit(&mut self) {
-        self.memory.shrink_to_fit();
+    pub fn allocate_one<T: AsBytes + FromBytes>(&mut self) -> &mut T {
+        &mut self.allocate(1)[0]
+    }
+
+    pub fn allocate_bytes(&mut self, len: usize) -> &mut [u8] {
+        let blocks = (len + size_of::<Aligned>() - 1) / size_of::<Aligned>();
+        self.memory.resize_with(blocks, Aligned::default); // round up length
+
+        &mut self.memory.as_mut_slice().as_bytes_mut()[..len]
     }
 }
 
@@ -82,7 +84,7 @@ pub struct RenderStatistics {
 }
 
 pub struct Device {
-    pub gl: Context,
+    pub gl: Context, // TODO: shouldn't be publicly exposed
 
     program: Shader,
     present_program: Shader,
@@ -92,8 +94,6 @@ pub struct Device {
     geometry_buffer: UniformBuffer<[GeometryParameter]>,
     material_buffer: UniformBuffer<[MaterialParameter]>,
     instance_buffer: UniformBuffer<[SceneInstanceNode]>,
-
-    envmap_cdf_tex: TextureBuffer<[EnvironmentMapCdfData]>,
 
     envmap_marginal_cdf: TextureImage<RG32F>,
     envmap_conditional_cdfs: TextureImage<RG32F>,
@@ -136,7 +136,6 @@ impl Device {
                     "Material" => BindingPoint::UniformBlock(8),
                     "Globals" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
-                    "envmap_cdf_tex" => BindingPoint::Texture(0),
                     "envmap_pix_tex" => BindingPoint::Texture(1),
                     "envmap_marginal_cdf" => BindingPoint::Texture(2),
                     "envmap_conditional_cdfs" => BindingPoint::Texture(3),
@@ -159,7 +158,6 @@ impl Device {
             instance_buffer: UniformBuffer::new_array(gl.clone(), 256),
             raster_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
-            envmap_cdf_tex: TextureBuffer::new(gl.clone(), TextureBufferFormat::RGBA32F),
             envmap_texture: TextureImage::new(gl.clone()),
             envmap_marginal_cdf: TextureImage::new(gl.clone()),
             envmap_conditional_cdfs: TextureImage::new(gl.clone()),
@@ -186,7 +184,7 @@ impl Device {
         let mut invalidated = false;
 
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
-            self.camera_buffer.write(&mut self.scratch, camera);
+            self.update_camera(camera);
         });
 
         invalidated |= Dirty::clean(&mut scene.objects, |objects| {
@@ -209,7 +207,9 @@ impl Device {
         let objects = &scene.objects;
 
         invalidated |= Dirty::clean(&mut scene.instances, |instances| {
-            let instances = InstancesWithObjects {
+            self.update_instances(&objects.list, instances);
+
+            /*let instances = InstancesWithObjects {
                 instances,
                 objects: &objects.list,
             };
@@ -221,7 +221,7 @@ impl Device {
                 .write_array(&mut self.scratch, &instances);
 
             self.material_buffer
-                .write_array(&mut self.scratch, &instances);
+                .write_array(&mut self.scratch, &instances);*/
         });
 
         invalidated |= Dirty::clean(&mut scene.materials, |materials| {
@@ -237,8 +237,6 @@ impl Device {
 
             if let Some(map) = &environment.map {
                 self.program.frag_shader().set_define("HAS_ENVMAP", "1");
-
-                self.envmap_cdf_tex.write(&mut self.scratch, map);
             // self.envmap_pix_tex.write(&mut self.scratch, map);
             } else {
                 self.program.frag_shader().set_define("HAS_ENVMAP", "0");
@@ -246,7 +244,7 @@ impl Device {
         });
 
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
-            self.raster_buffer.write(&mut self.scratch, raster);
+            self.update_raster(raster);
 
             self.samples
                 .create(raster.width.get() as usize, raster.height.get() as usize);
@@ -261,8 +259,6 @@ impl Device {
             self.state.reset(scene);
             self.reset_refinement();
         }
-
-        self.scratch.shrink_to_fit();
 
         Ok(invalidated)
     }
@@ -284,7 +280,6 @@ impl Device {
             shader.bind(&self.instance_buffer, "Instance");
             shader.bind(&self.globals_buffer, "Globals");
             shader.bind(&self.raster_buffer, "Raster");
-            shader.bind(&self.envmap_cdf_tex, "envmap_cdf_tex");
             shader.bind(&self.envmap_texture, "envmap_pix_tex");
             shader.bind(&self.envmap_marginal_cdf, "envmap_marginal_cdf");
             shader.bind(&self.envmap_conditional_cdfs, "envmap_conditional_cdfs");
@@ -404,13 +399,15 @@ impl DeviceState {
             y = 0.5;
         }
 
-        buffer.write_direct(scratch, |data| {
-            data.filter_delta[0] = 2.0 * self.filter.importance_sample(x) - 1.0;
-            data.filter_delta[1] = 2.0 * self.filter.importance_sample(y) - 1.0;
-            data.frame_state[0] = self.rng.next_u32();
-            data.frame_state[1] = self.rng.next_u32();
-            data.frame_state[2] = self.frame;
-        });
+        let data: &mut GlobalData = scratch.allocate_one();
+
+        data.filter_delta[0] = 2.0 * self.filter.importance_sample(x) - 1.0;
+        data.filter_delta[1] = 2.0 * self.filter.importance_sample(y) - 1.0;
+        data.frame_state[0] = self.rng.next_u32();
+        data.frame_state[1] = self.rng.next_u32();
+        data.frame_state[2] = self.frame;
+
+        buffer.write(&data);
 
         self.frame += 1;
 

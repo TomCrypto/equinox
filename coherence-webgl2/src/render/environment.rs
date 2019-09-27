@@ -2,7 +2,7 @@
 use log::{debug, info, warn};
 
 use crate::Device;
-use coherence_base::model::{Environment, EnvironmentMap};
+use coherence_base::Environment;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 // generates a NORMALIZED [[PDF, CDF], ...] array for the given discrete

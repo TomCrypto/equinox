@@ -6,6 +6,12 @@ description = "WebGL2 device implementation for the Coherence path tracer"
 edition = "2018"
 build = "build.rs"
 
+[dependencies.cgmath]
+version = "0.17"
+
+[dependencies.itertools]
+version = "0.8"
+
 [build-dependencies.lazy_static]
 version = "1.4"
 

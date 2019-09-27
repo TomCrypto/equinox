@@ -8,7 +8,7 @@ use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
 
-use coherence_base::{model::*, *};
+use coherence_base::*;
 use coherence_webgl2::*;
 
 #[wasm_bindgen]

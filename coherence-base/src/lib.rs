@@ -14,24 +14,7 @@ macro_rules! export {
     };
 }
 
-/// Types and definitions to model a scene to be ray-traced.
-pub mod model {
-    export![camera, raster, object, instance, material, environment];
-}
-
-/// Data formats and encoders to upload scene data to a device.
-pub mod device {
-    export![camera, raster, instance, material, environment];
-
-    pub trait ToDevice<T: ?Sized> {
-        /// Encodes this object's contents into device memory.
-        fn to_device(&self, memory: &mut T);
-
-        fn requested_count(&self) -> usize {
-            1 // for the non-array variants
-        }
-    }
-}
+export![camera, raster, object, instance, material, environment];
 
 /// Tracks mutable access to a value with a dirty flag.
 ///
@@ -102,12 +85,12 @@ impl<T> std::ops::DerefMut for Dirty<T> {
 /// taken when rendering a scene on multiple devices simultaneously.
 #[derive(Default)]
 pub struct Scene {
-    pub camera: Dirty<model::Camera>,
-    pub raster: Dirty<model::Raster>,
-    pub instances: Dirty<model::Instances>,
-    pub objects: Dirty<model::Objects>,
-    pub materials: Dirty<model::Materials>,
-    pub environment: Dirty<model::Environment>,
+    pub camera: Dirty<Camera>,
+    pub raster: Dirty<Raster>,
+    pub instances: Dirty<Instances>,
+    pub objects: Dirty<Objects>,
+    pub materials: Dirty<Materials>,
+    pub environment: Dirty<Environment>,
 }
 
 impl Scene {

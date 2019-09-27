@@ -1,4 +1,4 @@
-use coherence_base::model::{Geometry, Parameter};
+use coherence_base::{Geometry, Parameter};
 use std::fmt::Display;
 
 #[derive(Debug, Default)]

@@ -143,7 +143,6 @@ vec2 low_discrepancy_2d(uvec2 key) {
 
 // Begin envmap stuff
 
-uniform sampler2D envmap_cdf_tex;
 uniform sampler2D envmap_pix_tex;
 
 uniform sampler2D envmap_marginal_cdf;
