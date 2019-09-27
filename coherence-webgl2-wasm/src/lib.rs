@@ -182,7 +182,7 @@ impl WasmRunner {
             f: Box::new(Geometry::UnitSphere),
             translation: [
                 Parameter::Constant(0.0),
-                Parameter::Constant(1.0),
+                Parameter::Constant(1.01),
                 Parameter::Constant(0.0),
             ],
         });
