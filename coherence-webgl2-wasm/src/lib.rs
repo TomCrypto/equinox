@@ -239,8 +239,40 @@ impl WasmRunner {
             geometry: 2,
             material: 0,
             geometry_values: vec![],
-            material_values: vec![0.1, 0.1, 0.9, 0.0],
+            material_values: vec![0.75, 0.0, 0.0, 0.0],
         });
+    }
+
+    pub fn set_display_exposure(&mut self, exposure: f32) {
+        self.scene.display.exposure = exposure;
+    }
+
+    pub fn set_display_saturation(&mut self, saturation: f32) {
+        self.scene.display.saturation = saturation;
+    }
+
+    pub fn set_camera_response(&mut self, value: &str) {
+        if value == "none" {
+            self.scene.display.camera_response = None;
+        } else {
+            match value.parse::<u32>().unwrap() {
+                0 => self.scene.display.camera_response = Some(AGFA_AGFACOLOR_HDC_100_PLUS),
+                1 => self.scene.display.camera_response = Some(AGFA_ADVANTIX_100),
+                2 => self.scene.display.camera_response = Some(AGFA_AGFACOLOR_FUTURA_100),
+                3 => self.scene.display.camera_response = Some(AGFA_AGFACOLOR_FUTURA_II_100),
+                4 => self.scene.display.camera_response = Some(AGFA_AGFACHROME_CT_PRECISA_100),
+                5 => self.scene.display.camera_response = Some(AGFA_AGFACHROME_RSX2_050),
+                6 => self.scene.display.camera_response = Some(CANON_OPTURA_981111),
+                7 => self.scene.display.camera_response = Some(KODAK_DSCS_3151),
+                8 => self.scene.display.camera_response = Some(KODAK_EKTACHROME_64T),
+                9 => self.scene.display.camera_response = Some(KODAK_EKTACHROME_64),
+                10 => self.scene.display.camera_response = Some(KODAK_MAX_ZOOM_800),
+                11 => self.scene.display.camera_response = Some(KODAK_PORTRA_100T),
+                12 => self.scene.display.camera_response = Some(FUJIFILM_FCI),
+                13 => self.scene.display.camera_response = Some(AGFA_AGFACOLOR_VISTA_100),
+                _ => unreachable!(),
+            }
+        }
     }
 
     pub fn add_other_object(&mut self) -> usize {

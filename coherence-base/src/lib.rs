@@ -14,7 +14,15 @@ macro_rules! export {
     };
 }
 
-export![camera, raster, object, instance, material, environment];
+export![
+    camera,
+    raster,
+    object,
+    instance,
+    material,
+    environment,
+    display
+];
 
 /// Tracks mutable access to a value with a dirty flag.
 ///
@@ -91,6 +99,7 @@ pub struct Scene {
     pub objects: Dirty<Objects>,
     pub materials: Dirty<Materials>,
     pub environment: Dirty<Environment>,
+    pub display: Dirty<Display>,
 }
 
 impl Scene {
@@ -112,6 +121,7 @@ impl Scene {
         Dirty::dirty(&mut self.objects);
         Dirty::dirty(&mut self.materials);
         Dirty::dirty(&mut self.environment);
+        Dirty::dirty(&mut self.display);
     }
 }
 

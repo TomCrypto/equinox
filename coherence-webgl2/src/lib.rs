@@ -91,6 +91,8 @@ pub struct Device {
     material_buffer: UniformBuffer<[MaterialParameter]>,
     instance_buffer: UniformBuffer<[SceneInstanceNode]>,
 
+    display_buffer: UniformBuffer<DisplayData>,
+
     envmap_marginal_cdf: Texture<RG32F>,
     envmap_conditional_cdfs: Texture<RG32F>,
 
@@ -143,6 +145,7 @@ impl Device {
                 ShaderBuilder::new(shaders::PRESENT),
                 hashmap! {
                     "samples" => BindingPoint::Texture(0),
+                    "Display" => BindingPoint::UniformBlock(0),
                 },
             ),
             camera_buffer: UniformBuffer::new(gl.clone()),
@@ -153,6 +156,7 @@ impl Device {
             // context!
             instance_buffer: UniformBuffer::new_array(gl.clone(), 256),
             raster_buffer: UniformBuffer::new(gl.clone()),
+            display_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
             envmap_texture: Texture::new(gl.clone()),
             envmap_marginal_cdf: Texture::new(gl.clone()),
@@ -248,6 +252,13 @@ impl Device {
             self.samples_fbo.invalidate(&[&self.samples]);
         });
 
+        // These are post-processing settings that don't apply to the path-traced light
+        // transport simulation, so we don't need to invalidate the render buffer here.
+
+        Dirty::clean(&mut scene.display, |display| {
+            self.update_display(display);
+        });
+
         self.program.rebuild()?;
         self.present_program.rebuild()?;
 
@@ -308,6 +319,7 @@ impl Device {
 
         self.present_program.bind_to_pipeline(|shader| {
             shader.bind(&self.samples, "samples");
+            shader.bind(&self.display_buffer, "Display");
         });
 
         let render_query = self.render_query.query_time_elapsed();

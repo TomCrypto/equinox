@@ -73,7 +73,7 @@ canvas {
     flex-shrink: 1;
 }
 
-p {
+.render p {
     user-select: none;
     color: #ffffff;
     margin: 0;

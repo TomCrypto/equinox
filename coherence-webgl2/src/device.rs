@@ -1,1 +1,1 @@
-export![environment, object, raster, camera, instance];
+export![environment, object, raster, camera, instance, display];

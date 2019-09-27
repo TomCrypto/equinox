@@ -64,6 +64,9 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
   let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap.dat"))
   runner.set_envmap(envmap_data, 4096, 2048)
 
+  // let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap5.dat"))
+  // runner.set_envmap(envmap_data, 8192, 4096)
+
   runner.set_camera_position(0.5, 4, -12)
 
   /*let [bvh, tri, position, normal] = await load_model_data('cat')
@@ -135,6 +138,21 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
   let focalLength = document.getElementById("focal-length")
   focalLength.addEventListener("input", () => {
     runner.set_focal_length(focalLength.value / 1000)
+  })
+
+  let exposure = document.getElementById("exposure")
+  exposure.addEventListener("input", () => {
+    runner.set_display_exposure(exposure.value / 1000)
+  })
+
+  let saturation = document.getElementById("saturation")
+  saturation.addEventListener("input", () => {
+    runner.set_display_saturation(saturation.value / 10000)
+  })
+
+  let camera_response = document.getElementById("camera-response")
+  camera_response.addEventListener("change", () => {
+    runner.set_camera_response(camera_response.value)
   })
 
   let angleX = 4.758
