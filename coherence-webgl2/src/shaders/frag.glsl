@@ -319,7 +319,7 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-#define BRDF_PHONG_EXPONENT 256.0
+#define BRDF_PHONG_EXPONENT 3000.0
 #define BRDF_PHONG_COLOR vec3(0.25, 0.75, 0.25)
 
 vec3 brdf_phong_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
@@ -336,7 +336,7 @@ vec3 brdf_phong_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float p
 
     pdf = 1.0;
 
-    return BRDF_PHONG_COLOR;
+    return BRDF_PHONG_COLOR; // * (BRDF_PHONG_EXPONENT + 2.0) / (BRDF_PHONG_EXPONENT + 1.0) * max(0.0, dot(wi, normal));
 }
 
 #define BRDF_LAMBERTIAN_ALBEDO (material_buffer.data[inst].xyz)
