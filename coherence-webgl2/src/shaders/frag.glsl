@@ -434,8 +434,7 @@ void main() {
     vec3 radiance = vec3(0.0);
     vec3 throughput = vec3(1.0);
 
-    // many bounces (with russian roulette)
-    for (int i = 0; i < 20; ++i) {
+    for (uint bounce = 0U; bounce < 100U; ++bounce) {
         traversal_t traversal = traverse_scene(ray);
 
         if (traversal_has_hit(traversal)) {
