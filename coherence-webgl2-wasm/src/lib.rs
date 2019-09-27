@@ -174,8 +174,8 @@ impl WasmRunner {
 
     pub fn setup_test_scene(&mut self) {
         self.scene.objects.list.push(Geometry::Plane {
-            width: Parameter::Constant(1000.0),
-            length: Parameter::Constant(400.0),
+            width: Parameter::Constant(10.0),
+            length: Parameter::Constant(4.0),
         });
 
         self.scene.objects.list.push(Geometry::Translate {

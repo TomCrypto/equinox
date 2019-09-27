@@ -61,16 +61,6 @@ pub enum Geometry {
 }
 
 impl Geometry {
-    /// Returns a vector of all symbolic parameter indices in the order they are
-    /// encountered in the geometry tree. The resulting order is deterministic.
-    pub fn symbolic_parameter_indices(&self) -> Vec<usize> {
-        let mut parameters = vec![];
-
-        self.symbolic_parameters_indices_recursive(&mut parameters);
-
-        parameters
-    }
-
     /// Returns the estimated bounding box for an instance of this geometry, or
     /// `None` if a symbolic parameter was out of bounds of the provided array.
     pub fn bounding_box(&self, symbolic_values: &[f32]) -> Option<BoundingBox> {
@@ -143,57 +133,6 @@ impl Geometry {
                 max.z += radius;
 
                 Some(BoundingBox { min, max })
-            }
-        }
-    }
-
-    fn symbolic_parameters_indices_recursive(&self, parameters: &mut Vec<usize>) {
-        match self {
-            Self::UnitSphere | Self::UnitCube => {}
-            Self::Plane { width, length } => {
-                if let Parameter::Symbolic(index) = width {
-                    parameters.push(*index);
-                }
-
-                if let Parameter::Symbolic(index) = length {
-                    parameters.push(*index);
-                }
-            }
-            Self::Union { children } | Self::Intersection { children } => children
-                .iter()
-                .for_each(|child| child.symbolic_parameters_indices_recursive(parameters)),
-            Self::Subtraction { lhs, rhs } => {
-                lhs.symbolic_parameters_indices_recursive(parameters);
-                rhs.symbolic_parameters_indices_recursive(parameters);
-            }
-            Self::Scale { factor, f } => {
-                if let Parameter::Symbolic(index) = factor {
-                    parameters.push(*index);
-                }
-
-                f.symbolic_parameters_indices_recursive(parameters);
-            }
-            Self::Translate { translation, f } => {
-                if let Parameter::Symbolic(index) = translation[0] {
-                    parameters.push(index);
-                }
-
-                if let Parameter::Symbolic(index) = translation[1] {
-                    parameters.push(index);
-                }
-
-                if let Parameter::Symbolic(index) = translation[2] {
-                    parameters.push(index);
-                }
-
-                f.symbolic_parameters_indices_recursive(parameters);
-            }
-            Self::Round { f, radius } => {
-                if let Parameter::Symbolic(index) = radius {
-                    parameters.push(*index);
-                }
-
-                f.symbolic_parameters_indices_recursive(parameters);
             }
         }
     }

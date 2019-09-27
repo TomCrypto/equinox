@@ -67,8 +67,8 @@ impl GeometryGlslGenerator {
         format!("{}\n", code.join("\n"))
     }
 
-    // In the methods below, the parameters must be evaluated in the order used when
-    // renumbering the parameter array for upload to the device, even if not needed.
+    // In the methods below, the parameters must be evaluated in the same order used
+    // when renumbering the parameter array further below in `renumber_parameters`.
 
     fn distance_recursive(&mut self, geometry: &Geometry, index: &mut usize) -> DistanceFn {
         let code = match geometry {
@@ -244,6 +244,56 @@ impl GeometryGlslGenerator {
     fn generate_id(&mut self) -> u32 {
         self.next_function_id += 1;
         self.next_function_id
+    }
+}
+
+/// Returns a vector of all symbolic parameter indices in the order they are
+/// encountered in the geometry. The returned order is always deterministic.
+pub fn renumber_parameters(geometry: &Geometry) -> Vec<usize> {
+    let mut parameters = vec![];
+
+    renumber_parameters_recursive(geometry, &mut parameters);
+
+    parameters
+}
+
+fn add_parameter(parameters: &mut Vec<usize>, parameter: &Parameter) {
+    if let Parameter::Symbolic(index) = parameter {
+        parameters.push(*index);
+    }
+}
+
+fn renumber_parameters_recursive(geometry: &Geometry, parameters: &mut Vec<usize>) {
+    match geometry {
+        Geometry::UnitSphere | Geometry::UnitCube => {}
+        Geometry::Plane { width, length } => {
+            add_parameter(parameters, width);
+            add_parameter(parameters, length);
+        }
+        Geometry::Union { children } | Geometry::Intersection { children } => children
+            .iter()
+            .for_each(|child| renumber_parameters_recursive(child, parameters)),
+        Geometry::Subtraction { lhs, rhs } => {
+            renumber_parameters_recursive(lhs, parameters);
+            renumber_parameters_recursive(rhs, parameters);
+        }
+        Geometry::Scale { factor, f } => {
+            add_parameter(parameters, factor);
+
+            renumber_parameters_recursive(f, parameters);
+        }
+        Geometry::Translate { translation, f } => {
+            add_parameter(parameters, &translation[0]);
+            add_parameter(parameters, &translation[1]);
+            add_parameter(parameters, &translation[2]);
+
+            renumber_parameters_recursive(f, parameters);
+        }
+        Geometry::Round { f, radius } => {
+            add_parameter(parameters, radius);
+
+            renumber_parameters_recursive(f, parameters);
+        }
     }
 }
 

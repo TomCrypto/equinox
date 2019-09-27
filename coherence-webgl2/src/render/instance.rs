@@ -1,6 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
+use crate::render::renumber_parameters;
 use crate::Device;
 use coherence_base::{Geometry, HierarchyBuilder, InstanceInfo, Instances};
 use itertools::izip;
@@ -67,8 +68,7 @@ impl Device {
             self.scratch.allocate(geometry_parameter_count / 4);
 
         for instance in &instances.list {
-            // TODO: move symbolic_parameter_indices to the renderer
-            let indices = objects[instance.geometry].symbolic_parameter_indices();
+            let indices = renumber_parameters(&objects[instance.geometry]);
             let (region, remaining_data) = params.split_at_mut((indices.len() + 3) / 4);
 
             for (data, indices) in izip!(region, indices.chunks(4)) {
