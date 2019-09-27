@@ -1,0 +1,296 @@
+use coherence_base::model::{Geometry, Parameter};
+use std::fmt::Display;
+
+#[derive(Debug, Default)]
+pub struct GeometryGlslGenerator {
+    functions: Vec<String>,
+    next_function_id: u32,
+}
+
+impl GeometryGlslGenerator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_distance_function(&mut self, geometry: &Geometry) -> DistanceFn {
+        self.distance_recursive(geometry, &mut 0)
+    }
+
+    pub fn add_normal_function(&mut self, geometry: &Geometry) -> Option<NormalFn> {
+        self.normal_recursive(geometry, &mut 0)
+    }
+
+    /// Generates GLSL code for a list of geometries.
+    ///
+    /// When a normal function is not given, a gradient estimate implementation
+    /// will be inserted that should generate reasonable normals in most cases.
+    pub fn generate(self, geometries: &[(DistanceFn, Option<NormalFn>)]) -> String {
+        let mut code = vec![];
+
+        for function in self.functions {
+            code.push(function);
+        }
+
+        code.push("float geometry_distance(uint geometry, uint inst, vec3 p) {".to_owned());
+        code.push("  switch (geometry) {".to_owned());
+
+        for (index, (distance, _)) in geometries.iter().enumerate() {
+            code.push(format!("    case {}U:", index));
+            code.push(format!("      return {};", distance.call("p")));
+        }
+
+        code.push("    default:".to_owned());
+        code.push("      return 0.0;".to_owned());
+        code.push("  }".to_owned());
+        code.push("}".to_owned());
+
+        code.push("vec3 geometry_normal(uint geometry, uint inst, vec3 p) {".to_owned());
+        code.push("  switch (geometry) {".to_owned());
+
+        for (index, (distance, normal)) in geometries.iter().enumerate() {
+            code.push(format!("    case {}U:", index));
+
+            if let Some(normal) = normal {
+                code.push(format!("      return {};", normal.call("p")));
+            } else {
+                let estimate = Self::gradient_estimate(&distance);
+
+                code.push(format!("      return {};", estimate));
+            }
+        }
+
+        code.push("    default:".to_owned());
+        code.push("      return vec3(0.0);".to_owned());
+        code.push("  }".to_owned());
+        code.push("}".to_owned());
+
+        format!("{}\n", code.join("\n"))
+    }
+
+    // In the methods below, the parameters must be evaluated in the order used when
+    // renumbering the parameter array for upload to the device, even if not needed.
+
+    fn distance_recursive(&mut self, geometry: &Geometry, index: &mut usize) -> DistanceFn {
+        let code = match geometry {
+            Geometry::UnitSphere => "return length(p) - 1.0;".to_owned(),
+            Geometry::UnitCube => r#"
+                vec3 d = abs(p) - vec3(1.0);
+                return length(max(d,0.0)) + min(max(d.x,max(d.y,d.z)),0.0);
+            "#
+            .to_owned(),
+            Geometry::Plane { .. } => "return p.y;".to_owned(),
+            Geometry::Union { children } => self.nary_operator(children, index, "min"),
+            Geometry::Intersection { children } => self.nary_operator(children, index, "max"),
+            Geometry::Subtraction { lhs, rhs } => {
+                let lhs_function = self.distance_recursive(lhs, index);
+                let rhs_function = self.distance_recursive(rhs, index);
+
+                format!(
+                    "return max({}, -{}",
+                    lhs_function.call("p"),
+                    rhs_function.call("p")
+                )
+            }
+            Geometry::Scale { factor, f } => {
+                let factor = self.lookup_parameter(factor, index);
+
+                let function = self.distance_recursive(f, index);
+
+                format!(
+                    "float s = {}; return {} * s;",
+                    factor,
+                    function.call("p / s")
+                )
+            }
+            Geometry::Translate { translation, f } => {
+                let tx = self.lookup_parameter(&translation[0], index);
+                let ty = self.lookup_parameter(&translation[1], index);
+                let tz = self.lookup_parameter(&translation[2], index);
+
+                let translation = format!("vec3({}, {}, {})", tx, ty, tz);
+
+                let function = self.distance_recursive(f, index);
+
+                format!("return {};", function.call(format!("p - {}", translation)))
+            }
+            Geometry::Round { radius, f } => {
+                let radius = self.lookup_parameter(radius, index);
+
+                let function = self.distance_recursive(f, index);
+
+                format!("return {} - {};", function.call("p"), radius)
+            }
+        };
+
+        self.register_distance_function(code.trim())
+    }
+
+    fn normal_recursive(&mut self, geometry: &Geometry, index: &mut usize) -> Option<NormalFn> {
+        let code = match geometry {
+            Geometry::UnitSphere => Some("return normalize(p);".to_owned()),
+            Geometry::Plane { .. } => Some("return vec3(0.0, 1.0, 0.0);".to_owned()),
+            Geometry::Translate { translation, f } => {
+                let tx = self.lookup_parameter(&translation[0], index);
+                let ty = self.lookup_parameter(&translation[1], index);
+                let tz = self.lookup_parameter(&translation[2], index);
+
+                let translation = format!("vec3({}, {}, {})", tx, ty, tz);
+
+                let function = self.normal_recursive(f, index)?;
+
+                Some(format!(
+                    "return {};",
+                    function.call(format!("p - {}", translation))
+                ))
+            }
+            Geometry::Scale { factor, f } => {
+                let _ = self.lookup_parameter(factor, index);
+
+                return self.normal_recursive(f, index);
+            }
+            _ => None,
+        };
+
+        Some(self.register_normal_function(code?))
+    }
+
+    fn nary_operator(&mut self, children: &[Geometry], index: &mut usize, op: &str) -> String {
+        assert!(!children.is_empty());
+
+        if children.len() == 1 {
+            let function = self.distance_recursive(&children[0], index);
+
+            return format!("return {};", function.call("p"));
+        }
+
+        let mut code = String::new();
+
+        for (i, child) in children.iter().enumerate() {
+            let function = self.distance_recursive(child, index);
+
+            if i != children.len() - 1 {
+                code += &format!("{}({}, ", op, function.call("p"));
+            } else {
+                code += &format!("{}", function.call("p"));
+            }
+        }
+
+        for _ in 0..children.len() - 1 {
+            code += ")";
+        }
+
+        format!("return {};", code)
+    }
+
+    // TODO: could make the "geometry_buffer" string a parameter possibly
+
+    fn lookup_parameter(&self, parameter: &Parameter, index: &mut usize) -> String {
+        match parameter {
+            Parameter::Constant(value) => format!("{:+e}", value),
+            Parameter::Symbolic(_) => self.lookup_symbolic_parameter(index),
+        }
+    }
+
+    fn lookup_symbolic_parameter(&self, index: &mut usize) -> String {
+        let result = match *index % 4 {
+            0 => format!("geometry_buffer.data[inst + {}U].x", *index / 4),
+            1 => format!("geometry_buffer.data[inst + {}U].y", *index / 4),
+            2 => format!("geometry_buffer.data[inst + {}U].z", *index / 4),
+            _ => format!("geometry_buffer.data[inst + {}U].w", *index / 4),
+        };
+
+        *index += 1;
+
+        result
+    }
+
+    fn gradient_estimate(distance: &DistanceFn) -> String {
+        let x1 = distance.call("vec3(p.x + PREC, p.y, p.z)");
+        let y1 = distance.call("vec3(p.x, p.y + PREC, p.z)");
+        let z1 = distance.call("vec3(p.x, p.y, p.z + PREC)");
+        let x2 = distance.call("vec3(p.x - PREC, p.y, p.z)");
+        let y2 = distance.call("vec3(p.x, p.y - PREC, p.z)");
+        let z2 = distance.call("vec3(p.x, p.y, p.z - PREC)");
+
+        let dx = format!("{} - {}", x1, x2);
+        let dy = format!("{} - {}", y1, y2);
+        let dz = format!("{} - {}", z1, z2);
+
+        format!("normalize(vec3({}, {}, {}))", dx, dy, dz)
+    }
+
+    fn register_distance_function(&mut self, body: impl Display) -> DistanceFn {
+        let function = DistanceFn {
+            id: self.generate_id(),
+            body: body.to_string(),
+        };
+
+        self.functions.push(function.emit());
+
+        function
+    }
+
+    fn register_normal_function(&mut self, body: impl Display) -> NormalFn {
+        let function = NormalFn {
+            id: self.generate_id(),
+            body: body.to_string(),
+        };
+
+        self.functions.push(function.emit());
+
+        function
+    }
+
+    fn generate_id(&mut self) -> u32 {
+        self.next_function_id += 1;
+        self.next_function_id
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct DistanceFn {
+    id: u32,
+    body: String,
+}
+
+impl DistanceFn {
+    pub fn name(&self) -> String {
+        format!("geometry_distance_{}", self.id)
+    }
+
+    pub fn call(&self, point: impl Display) -> String {
+        format!("{}(inst, {})", self.name(), point)
+    }
+
+    pub fn emit(&self) -> String {
+        format!(
+            "float {}(uint inst, vec3 p) {{ {} }}",
+            self.name(),
+            self.body
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NormalFn {
+    id: u32,
+    body: String,
+}
+
+impl NormalFn {
+    pub fn name(&self) -> String {
+        format!("geometry_normal_{}", self.id)
+    }
+
+    pub fn call(&self, point: impl Display) -> String {
+        format!("{}(inst, {})", self.name(), point)
+    }
+
+    pub fn emit(&self) -> String {
+        format!(
+            "vec3 {}(uint inst, vec3 p) {{\n{}\n}}",
+            self.name(),
+            self.body
+        )
+    }
+}

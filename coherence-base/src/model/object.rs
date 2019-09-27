@@ -28,7 +28,10 @@ impl Parameter {
 pub enum Geometry {
     UnitSphere,
     UnitCube,
-    Plane,
+    Plane {
+        width: Parameter,
+        length: Parameter,
+    },
     Union {
         children: Vec<Geometry>,
     },
@@ -76,10 +79,15 @@ impl Geometry {
                 min: Point3::new(-1.0, -1.0, -1.0),
                 max: Point3::new(1.0, 1.0, 1.0),
             }),
-            Self::Plane => Some(BoundingBox {
-                min: Point3::new(-5.0, 0.0, -5.0),
-                max: Point3::new(5.0, 0.0, 5.0),
-            }),
+            Self::Plane { width, length } => {
+                let width = width.value(symbolic_values)?;
+                let length = length.value(symbolic_values)?;
+
+                Some(BoundingBox {
+                    min: Point3::new(-width, 0.0, -length),
+                    max: Point3::new(width, 0.0, length),
+                })
+            }
             // TODO: handle errors in a nicer way here??
             Self::Union { children } => Some(BoundingBox::union(
                 children
@@ -142,7 +150,15 @@ impl Geometry {
     fn symbolic_parameters_indices_recursive(&self, parameters: &mut Vec<usize>) {
         match self {
             Self::UnitSphere | Self::UnitCube => {}
-            Self::Plane => {}
+            Self::Plane { width, length } => {
+                if let Parameter::Symbolic(index) = width {
+                    parameters.push(*index);
+                }
+
+                if let Parameter::Symbolic(index) = length {
+                    parameters.push(*index);
+                }
+            }
             Self::Union { children } | Self::Intersection { children } => children
                 .iter()
                 .for_each(|child| child.symbolic_parameters_indices_recursive(parameters)),

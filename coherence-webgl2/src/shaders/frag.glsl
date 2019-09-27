@@ -42,13 +42,17 @@ layout (std140) uniform Instance {
 
 #define PREC (1e-4)
 
-#include <geometry.glsl>
+float geometry_distance(uint geometry, uint inst, vec3 p);
+
+vec3 geometry_normal(uint geometry, uint inst, vec3 p);
+
+#include <geometry-user.glsl>
 
 bool eval_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
     // TODO: possibly dynamically adjust precision based on initial distance?
 
     while (range.x <= range.y) {
-        float dist = sdf(geometry, instance, ray.org + range.x * ray.dir);
+        float dist = geometry_distance(geometry, instance, ray.org + range.x * ray.dir);
 
         if (dist < PREC) {
             return true;
@@ -315,7 +319,7 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-#define BRDF_PHONG_EXPONENT 512.0
+#define BRDF_PHONG_EXPONENT 256.0
 #define BRDF_PHONG_COLOR vec3(0.25, 0.75, 0.25)
 
 vec3 brdf_phong_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
@@ -410,17 +414,9 @@ void main() {
         traversal_t traversal = traverse_scene(ray);
 
         if (traversal_has_hit(traversal)) {
-            // NOTE: this - PREC is to account for when we land exactly on a surface with
-            // an SDF value of zero (e.g. axis-aligned planes). at this point the normal is
-            // not mathematically well-defined
-            // another solution to this might be to provide custom normal SDF implementations
-            // for those SDFs likely to be axis-aligned with an AABB of volume zero? or just
-            // generally flat, zero-volume SDFs where this issue would occur
-            // I think it cannot occur if the SDF has any volume at all
+            ray.org += ray.dir * traversal.range.y;
 
-            ray.org += ray.dir * (traversal.range.y - PREC);
-
-            vec3 normal = sdf_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
+            vec3 normal = geometry_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
 
             uint material = traversal.hit.y & 0xffffU;
             uint inst = traversal.hit.y >> 16U;

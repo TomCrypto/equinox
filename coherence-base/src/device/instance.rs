@@ -10,13 +10,10 @@ use zerocopy::{AsBytes, FromBytes};
 #[derive(AsBytes, FromBytes, Debug, Default)]
 pub struct SceneInstanceNode {
     min: [f32; 3],
-    packed1: u32, // "skip" pointer + "parameter offset" << 16
+    word1: u32, // "skip" pointer + "parameter offset" << 16
     max: [f32; 3],
-    packed2: u32, // geometry ID + material ID << 16  == 0 if it's not a leaf
+    word2: u32, // geometry ID + material ID << 16  == 0 if it's not a leaf
 }
-
-// TODO: check bits 15 are never used for any u16 here because we rely on some
-// assumptions
 
 impl SceneInstanceNode {
     pub fn make_leaf(
@@ -28,20 +25,25 @@ impl SceneInstanceNode {
         mat_data: u16,
         is_last: bool,
     ) -> Self {
+        assert!(geometry < 0x8000);
+        assert!(geo_data < 0x8000);
+        assert!(material < 0x8000);
+        assert!(mat_data < 0x8000);
+
         Self {
             min,
             max,
-            packed1: Self::pack_u32(geo_data, geometry) | Self::is_last_bit(is_last),
-            packed2: Self::pack_u32(mat_data, material),
+            word1: Self::pack_u32(geo_data, geometry) | Self::is_last_bit(is_last),
+            word2: Self::pack_u32(mat_data, material),
         }
     }
 
-    pub fn make_node(min: [f32; 3], max: [f32; 3], skip_val: u16) -> Self {
+    pub fn make_node(min: [f32; 3], max: [f32; 3], skip_val: u32) -> Self {
         Self {
             min,
             max,
-            packed1: skip_val as u32,
-            packed2: 0xffff_ffff,
+            word1: skip_val,
+            word2: 0xffff_ffff,
         }
     }
 
@@ -178,12 +180,12 @@ impl<'a> HierarchyBuilder<'a> {
         let lhs_offset = self.build_recursive(offset, lhs);
         let rhs_offset = self.build_recursive(lhs_offset, rhs);
 
-        // for nodes, packed2 is always zero and packed1 just contains the skip
+        // for nodes, word2 is always zero and word1 just contains the skip
 
         self.nodes[curr] = SceneInstanceNode::make_node(
             bbox.min.into(),
             bbox.max.into(),
-            (rhs_offset as u16) % (self.nodes.len() as u16),
+            (rhs_offset as u32) % (self.nodes.len() as u32),
         );
 
         rhs_offset

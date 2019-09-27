@@ -17,7 +17,7 @@ macro_rules! export {
 
 /// Types and definitions to model a scene to be ray-traced.
 pub mod render {
-    export![environment];
+    export![environment, object];
 }
 
 use coherence_base::device::*;
@@ -27,6 +27,7 @@ use maplit::hashmap;
 use quasirandom::Qrng;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
+use render::*;
 use std::mem::size_of;
 use web_sys::WebGl2RenderingContext as Context;
 use zerocopy::{AsBytes, FromBytes};
@@ -189,38 +190,20 @@ impl Device {
         });
 
         invalidated |= Dirty::clean(&mut scene.objects, |objects| {
-            // TODO: generate this elsewhere
+            let mut generator = GeometryGlslGenerator::new();
 
-            let mut code = String::from("float sdf(uint geometry, uint instance, vec3 x) {");
-            let mut code_normal =
-                String::from("vec3 sdf_normal(uint geometry, uint instance, vec3 x) {");
-            let mut functions = String::new();
-            let mut code_index = 0;
-            let mut parameter_index = 0;
+            let mut geometries = vec![];
 
-            code += "switch (geometry) {";
-            code_normal += "switch (geometry) {";
-
-            for (index, geometry) in objects.list.iter().enumerate() {
-                let name = geometry.as_glsl_function(
-                    &mut functions,
-                    &mut code_index,
-                    &mut parameter_index,
-                );
-
-                code += &format!("case {}U: return {}(x, instance);", index, name);
-                code_normal += &format!("case {}U: return normalize(vec3({}(vec3(x.x + PREC, x.y, x.z), instance) - {}(vec3(x.x - PREC, x.y, x.z), instance), {}(vec3(x.x, x.y + PREC, x.z), instance) - {}(vec3(x.x, x.y - PREC, x.z), instance), {}(vec3(x.x, x.y, x.z + PREC), instance) - {}(vec3(x.x, x.y, x.z - PREC), instance)));", index, name, name, name, name, name, name);
+            for geometry in &objects.list {
+                geometries.push((
+                    generator.add_distance_function(geometry),
+                    generator.add_normal_function(geometry),
+                ));
             }
-
-            code += "} return 1.0 / 0.0; }";
-            code_normal += "} return vec3(0.0); }";
-
-            info!("{}", functions);
-            info!("{}{}", code, code_normal);
 
             self.program
                 .frag_shader()
-                .set_header("geometry.glsl", functions + &code + &code_normal);
+                .set_header("geometry-user.glsl", generator.generate(&geometries));
         });
 
         let objects = &scene.objects;

@@ -21,7 +21,7 @@ pub mod model {
 
 /// Data formats and encoders to upload scene data to a device.
 pub mod device {
-    export![camera, raster, object, instance, material, environment];
+    export![camera, raster, instance, material, environment];
 
     pub trait ToDevice<T: ?Sized> {
         /// Encodes this object's contents into device memory.
