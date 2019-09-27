@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::render::renumber_parameters;
+use crate::renumber_parameters;
 use crate::Device;
 use coherence_base::{Geometry, HierarchyBuilder, InstanceInfo, Instances};
 use itertools::izip;

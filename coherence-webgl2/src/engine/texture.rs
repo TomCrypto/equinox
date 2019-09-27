@@ -20,7 +20,7 @@ impl Boolean for False {
     const VALUE: bool = false;
 }
 
-pub struct TextureImage<T> {
+pub struct Texture<T> {
     gl: Context,
 
     handle: Option<WebGlTexture>,
@@ -28,7 +28,7 @@ pub struct TextureImage<T> {
     format: PhantomData<T>,
 }
 
-impl<T> TextureImage<T> {
+impl<T> Texture<T> {
     pub fn new(gl: Context) -> Self {
         Self {
             gl,
@@ -73,7 +73,7 @@ impl<T> TextureImage<T> {
     }
 }
 
-impl<T: TextureFormat> TextureImage<T> {
+impl<T: TextureFormat> Texture<T> {
     fn mag_filter_for_format(&self) -> i32 {
         if T::Filterable::VALUE {
             Context::LINEAR as i32
@@ -123,7 +123,7 @@ impl<T: TextureFormat> TextureImage<T> {
     }
 }
 
-impl<T: TextureFormat<Filterable = True, Compressed = True>> TextureImage<T> {
+impl<T: TextureFormat<Filterable = True, Compressed = True>> Texture<T> {
     // Compressed textures can never be rendered to by hardware, so they have to be
     // initialized with data; it doesn't make sense to create an uninitialized one.
 
@@ -132,7 +132,7 @@ impl<T: TextureFormat<Filterable = True, Compressed = True>> TextureImage<T> {
     }
 }
 
-impl<T: TextureFormat<Filterable = True, Compressed = False>> TextureImage<T> {
+impl<T: TextureFormat<Filterable = True, Compressed = False>> Texture<T> {
     pub fn create_mipped(&mut self, cols: usize, rows: usize) {
         let mip_levels = Self::mip_levels(cols, rows);
 
@@ -191,7 +191,7 @@ impl<T: TextureFormat<Filterable = True, Compressed = False>> TextureImage<T> {
     }
 }
 
-impl<T: TextureFormat<Compressed = False>> TextureImage<T> {
+impl<T: TextureFormat<Compressed = False>> Texture<T> {
     pub fn create(&mut self, cols: usize, rows: usize) {
         if self.create_texture(cols, rows, 1) {
             return; // texture already created
@@ -237,19 +237,19 @@ impl<T: TextureFormat<Compressed = False>> TextureImage<T> {
     }
 }
 
-impl<'a, T: TextureFormat<Renderable = True>> AsAttachment for TextureImage<T> {
+impl<'a, T: TextureFormat<Renderable = True>> AsAttachment for Texture<T> {
     fn as_attachment(&self) -> Attachment {
         Attachment::Texture(self.handle.as_ref())
     }
 }
 
-impl<T: TextureFormat> AsBindTarget for TextureImage<T> {
+impl<T: TextureFormat> AsBindTarget for Texture<T> {
     fn bind_target(&self) -> BindTarget {
         BindTarget::Texture(self.handle.as_ref())
     }
 }
 
-impl<T> Drop for TextureImage<T> {
+impl<T> Drop for Texture<T> {
     fn drop(&mut self) {
         self.gl.delete_texture(self.handle.as_ref());
     }

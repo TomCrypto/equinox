@@ -15,24 +15,20 @@ macro_rules! export {
     };
 }
 
-/// Types and definitions to model a scene to be ray-traced.
-pub mod render {
-    export![environment, object, raster, camera, instance];
-}
-
 use coherence_base::{Dirty, RasterFilter, Scene, SceneInstanceNode};
 use js_sys::Error;
 use maplit::hashmap;
 use quasirandom::Qrng;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-use render::*;
 use std::mem::size_of;
 use web_sys::WebGl2RenderingContext as Context;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
+mod device;
 mod engine;
 
+pub use device::*;
 pub use engine::*;
 
 #[repr(align(64), C)]
@@ -95,15 +91,15 @@ pub struct Device {
     material_buffer: UniformBuffer<[MaterialParameter]>,
     instance_buffer: UniformBuffer<[SceneInstanceNode]>,
 
-    envmap_marginal_cdf: TextureImage<RG32F>,
-    envmap_conditional_cdfs: TextureImage<RG32F>,
+    envmap_marginal_cdf: Texture<RG32F>,
+    envmap_conditional_cdfs: Texture<RG32F>,
 
-    envmap_texture: TextureImage<RGBA32F>,
+    envmap_texture: Texture<RGBA32F>,
 
     globals_buffer: UniformBuffer<GlobalData>,
     raster_buffer: UniformBuffer<RasterData>,
 
-    samples: TextureImage<RGBA32F>,
+    samples: Texture<RGBA32F>,
     samples_fbo: Framebuffer,
 
     refine_query: Query,
@@ -158,13 +154,13 @@ impl Device {
             instance_buffer: UniformBuffer::new_array(gl.clone(), 256),
             raster_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
-            envmap_texture: TextureImage::new(gl.clone()),
-            envmap_marginal_cdf: TextureImage::new(gl.clone()),
-            envmap_conditional_cdfs: TextureImage::new(gl.clone()),
+            envmap_texture: Texture::new(gl.clone()),
+            envmap_marginal_cdf: Texture::new(gl.clone()),
+            envmap_conditional_cdfs: Texture::new(gl.clone()),
             samples_fbo: Framebuffer::new(gl.clone()),
             refine_query: Query::new(gl.clone()),
             render_query: Query::new(gl.clone()),
-            samples: TextureImage::new(gl.clone()),
+            samples: Texture::new(gl.clone()),
             device_lost: true,
             state: DeviceState::new(),
         })

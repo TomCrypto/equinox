@@ -171,7 +171,7 @@ impl GeometryGlslGenerator {
             if i != children.len() - 1 {
                 code += &format!("{}({}, ", op, function.call("p"));
             } else {
-                code += &format!("{}", function.call("p"));
+                code += &function.call("p");
             }
         }
 
