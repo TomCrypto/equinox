@@ -228,11 +228,18 @@ impl WasmRunner {
             material_values: vec![0.8, 0.8, 0.8, 0.0],
         });*/
 
-        self.scene.instances.list.push(Instance {
+        /*self.scene.instances.list.push(Instance {
             geometry: 1,
             material: 2,
             geometry_values: vec![],
             material_values: vec![],
+        });*/
+
+        self.scene.instances.list.push(Instance {
+            geometry: 1,
+            material: 3,
+            geometry_values: vec![],
+            material_values: vec![0.8, 0.8, 0.8, 1.55],
         });
 
         self.scene.instances.list.push(Instance {

@@ -52,7 +52,9 @@ bool eval_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
     // TODO: possibly dynamically adjust precision based on initial distance?
 
     while (range.x <= range.y) {
-        float dist = geometry_distance(geometry, instance, ray.org + range.x * ray.dir);
+        // need to take the absolute value here in case we're on the inside of a distance field
+        // I'm not sure if this is always valid?
+        float dist = abs(geometry_distance(geometry, instance, ray.org + range.x * ray.dir));
 
         if (dist < PREC) {
             return true;
@@ -338,6 +340,26 @@ vec3 brdf_phong_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float p
     return BRDF_PHONG_COLOR; // * (BRDF_PHONG_EXPONENT + 2.0) / (BRDF_PHONG_EXPONENT + 1.0) * max(0.0, dot(wi, normal));
 }
 
+vec3 brdf_refractive_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
+    return vec3(0.0);
+}
+
+#define BRDF_REFRACTIVE_TRANSMITTANCE vec3(0.85, 0.85, 0.85) // (material_buffer.data[inst].xyz)
+#define BRDF_REFRACTIVE_IOR  1.55 // (material_buffer.data[inst].w)
+
+vec3 brdf_refractive_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
+    pdf = 1.0;
+
+    if (dot(wo, normal) >= 0.0) {
+        wi = refract(-wo, normal, 1.0 / BRDF_REFRACTIVE_IOR);
+    } else {
+        wi = refract(-wo, -normal, BRDF_REFRACTIVE_IOR);
+    }
+
+    return BRDF_REFRACTIVE_TRANSMITTANCE; // / abs(dot(wi, normal));
+}
+
+
 #define BRDF_LAMBERTIAN_ALBEDO (material_buffer.data[inst].xyz)
 #define BRDF_MIRROR_REFLECTANCE (material_buffer.data[inst].xyz)
 
@@ -381,6 +403,8 @@ vec3 brdf_eval(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo) {
             return brdf_mirror_eval(inst, normal, wi, wo);
         case 2U:
             return brdf_phong_eval(inst, normal, wi, wo);
+        case 3U:
+            return brdf_refractive_eval(inst, normal, wi, wo);
         default:
             return vec3(0.0);
     }
@@ -394,6 +418,8 @@ vec3 brdf_sample(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
             return brdf_mirror_sample(inst, normal, wi, wo, pdf, random);
         case 2U:
             return brdf_phong_sample(inst, normal, wi, wo, pdf, random);
+        case 3U:
+            return brdf_refractive_sample(inst, normal, wi, wo, pdf, random);
         default:
             return vec3(0.0);
     }
@@ -409,7 +435,7 @@ void main() {
     vec3 throughput = vec3(1.0);
 
     // many bounces (with russian roulette)
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 20; ++i) {
         traversal_t traversal = traverse_scene(ray);
 
         if (traversal_has_hit(traversal)) {
