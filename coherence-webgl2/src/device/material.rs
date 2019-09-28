@@ -24,7 +24,7 @@ pub fn material_parameter_block_count(material: &Material) -> usize {
         Material::Lambertian { .. } => 1,
         Material::IdealReflection { .. } => 1,
         Material::IdealRefraction { .. } => 1,
-        Material::Phong { .. } => 2,
+        Material::Phong { .. } => 1,
     }
 }
 
@@ -49,16 +49,11 @@ fn write_material_parameters(material: &Material, parameters: &mut [MaterialPara
             parameters[0].0[2] = transmittance[2];
             parameters[0].0[3] = *refractive_index;
         }
-        Material::Phong {
-            albedo,
-            shininess,
-            kd,
-        } => {
+        Material::Phong { albedo, shininess } => {
             parameters[0].0[0] = albedo[0];
             parameters[0].0[1] = albedo[1];
             parameters[0].0[2] = albedo[2];
-            parameters[0].0[3] = *kd;
-            parameters[1].0[0] = *shininess;
+            parameters[0].0[3] = *shininess;
         }
     }
 }

@@ -226,7 +226,6 @@ impl WasmRunner {
         self.scene.materials.list.push(Material::Phong {
             albedo: [0.8, 0.8, 0.8],
             shininess: 4096.0,
-            kd: 0.3,
         });
 
         self.scene.instances.list.push(Instance {

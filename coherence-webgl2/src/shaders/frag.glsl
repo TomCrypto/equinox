@@ -320,8 +320,7 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-// TODO: add support for kd?
-#define BRDF_PHONG_EXPONENT (material_buffer.data[inst + 1U].x)
+#define BRDF_PHONG_EXPONENT (material_buffer.data[inst + 0U].w)
 #define BRDF_PHONG_COLOR (material_buffer.data[inst + 0U].xyz)
 
 vec3 brdf_phong_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {

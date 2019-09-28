@@ -12,6 +12,7 @@ pub struct Display {
     pub camera_response: Option<CameraResponse>,
 }
 
+#[allow(clippy::all)]
 pub const AGFA_AGFACOLOR_HDC_100_PLUS: CameraResponse = [
     [
         0.007018532916957466,
@@ -30,6 +31,7 @@ pub const AGFA_AGFACOLOR_HDC_100_PLUS: CameraResponse = [
     [-744.4730677446942, -692.3192076668313, -744.4730677446942],
 ];
 
+#[allow(clippy::all)]
 pub const AGFA_ADVANTIX_100: CameraResponse = [
     [0.0117059874, 0.009161136924137961, 0.006131209509685431],
     [6.0964549901, 5.45759147128599, 4.520383043085695],
@@ -44,6 +46,7 @@ pub const AGFA_ADVANTIX_100: CameraResponse = [
     [-1047.0286823081, -893.2068423752977, -634.815916929171],
 ];
 
+#[allow(clippy::all)]
 pub const AGFA_AGFACOLOR_FUTURA_100: CameraResponse = [
     [
         0.020035316087644545,
@@ -66,6 +69,7 @@ pub const AGFA_AGFACOLOR_FUTURA_100: CameraResponse = [
     [-1986.4468100290444, -1828.6714577513474, -1204.723838335825],
 ];
 
+#[allow(clippy::all)]
 pub const AGFA_AGFACOLOR_FUTURA_II_100: CameraResponse = [
     [
         0.008123195824466344,
@@ -88,6 +92,7 @@ pub const AGFA_AGFACOLOR_FUTURA_II_100: CameraResponse = [
     [-985.1870358177281, -787.8874739481588, -216.08905911059182],
 ];
 
+#[allow(clippy::all)]
 pub const AGFA_AGFACHROME_CT_PRECISA_100: CameraResponse = [
     [
         -0.002987119555079158,
@@ -110,6 +115,7 @@ pub const AGFA_AGFACHROME_CT_PRECISA_100: CameraResponse = [
     [1207.7051146168385, 0.0, 885.2221417413882],
 ];
 
+#[allow(clippy::all)]
 pub const AGFA_AGFACHROME_RSX2_050: CameraResponse = [
     [
         -0.007066272947757231,
@@ -128,6 +134,7 @@ pub const AGFA_AGFACHROME_RSX2_050: CameraResponse = [
     [1078.860477403592, 0.0, 797.8613572851588],
 ];
 
+#[allow(clippy::all)]
 pub const CANON_OPTURA_981111: CameraResponse = [
     [
         -0.0006896197584271259,
@@ -158,6 +165,7 @@ pub const CANON_OPTURA_981111: CameraResponse = [
     [2585.022188203127, 2585.022188203127, 2585.022188203127],
 ];
 
+#[allow(clippy::all)]
 pub const KODAK_DSCS_3151: CameraResponse = [
     [
         -0.002484709017264911,
@@ -176,6 +184,7 @@ pub const KODAK_DSCS_3151: CameraResponse = [
     [0.0, 0.0, 0.0],
 ];
 
+#[allow(clippy::all)]
 pub const KODAK_EKTACHROME_64T: CameraResponse = [
     [
         0.006622672934392633,
@@ -198,6 +207,7 @@ pub const KODAK_EKTACHROME_64T: CameraResponse = [
     [1615.8580731225866, 0.0, -1398.3654751354359],
 ];
 
+#[allow(clippy::all)]
 pub const KODAK_EKTACHROME_64: CameraResponse = [
     [
         0.002205127978427317,
@@ -216,6 +226,7 @@ pub const KODAK_EKTACHROME_64: CameraResponse = [
     [-1218.6583466520678, -1165.3585813420723, -361.9967896498058],
 ];
 
+#[allow(clippy::all)]
 pub const KODAK_MAX_ZOOM_800: CameraResponse = [
     [
         0.009340504607283685,
@@ -234,6 +245,7 @@ pub const KODAK_MAX_ZOOM_800: CameraResponse = [
     [-799.9631986815324, -728.3397449075763, -417.37022642790237],
 ];
 
+#[allow(clippy::all)]
 pub const KODAK_PORTRA_100T: CameraResponse = [
     [
         0.008951044228247938,
@@ -256,6 +268,7 @@ pub const KODAK_PORTRA_100T: CameraResponse = [
     [-807.2438339295642, -598.7487032159387, -463.0729347382043],
 ];
 
+#[allow(clippy::all)]
 pub const FUJIFILM_FCI: CameraResponse = [
     [
         0.0019708668454301564,
@@ -274,6 +287,7 @@ pub const FUJIFILM_FCI: CameraResponse = [
     [-414.2954917760788, -546.8216107150558, -468.028814170636],
 ];
 
+#[allow(clippy::all)]
 pub const AGFA_AGFACOLOR_VISTA_100: CameraResponse = [
     [
         0.00817580813891173,

@@ -20,10 +20,10 @@ impl Device {
         data.saturation = display.saturation.max(0.0).min(1.0);
 
         if let Some(camera_response) = display.camera_response {
-            for i in 0..11 {
-                data.camera_response[i][0] = camera_response[i][0];
-                data.camera_response[i][1] = camera_response[i][1];
-                data.camera_response[i][2] = camera_response[i][2];
+            for (index, camera_response) in camera_response.iter().enumerate() {
+                data.camera_response[index][0] = camera_response[0];
+                data.camera_response[index][1] = camera_response[1];
+                data.camera_response[index][2] = camera_response[2];
             }
 
             data.has_camera_response = 1;

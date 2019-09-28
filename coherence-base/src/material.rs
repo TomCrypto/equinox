@@ -18,6 +18,5 @@ pub enum Material {
     Phong {
         albedo: [f32; 3],
         shininess: f32,
-        kd: f32,
     },
 }
