@@ -61,7 +61,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
     ctx.restoreContext();
   });
 
-  let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap.dat"))
+  let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap2.dat"))
   runner.set_envmap(envmap_data, 4096, 2048)
 
   // let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap5.dat"))
