@@ -320,8 +320,9 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-#define BRDF_PHONG_EXPONENT 3000.0
-#define BRDF_PHONG_COLOR vec3(0.25, 0.75, 0.25)
+// TODO: add support for kd?
+#define BRDF_PHONG_EXPONENT (material_buffer.data[inst + 1U].x)
+#define BRDF_PHONG_COLOR (material_buffer.data[inst + 0U].xyz)
 
 vec3 brdf_phong_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
     return vec3(0.0); // not used yet
@@ -344,8 +345,8 @@ vec3 brdf_refractive_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
     return vec3(0.0);
 }
 
-#define BRDF_REFRACTIVE_TRANSMITTANCE vec3(0.85, 0.85, 0.85) // (material_buffer.data[inst].xyz)
-#define BRDF_REFRACTIVE_IOR  1.55 // (material_buffer.data[inst].w)
+#define BRDF_REFRACTIVE_TRANSMITTANCE (material_buffer.data[inst + 0U].xyz)
+#define BRDF_REFRACTIVE_IOR  (material_buffer.data[inst + 0U].w)
 
 vec3 brdf_refractive_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
     pdf = 1.0;
@@ -356,12 +357,12 @@ vec3 brdf_refractive_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out fl
         wi = refract(-wo, -normal, BRDF_REFRACTIVE_IOR);
     }
 
-    return BRDF_REFRACTIVE_TRANSMITTANCE; // / abs(dot(wi, normal));
+    return BRDF_REFRACTIVE_TRANSMITTANCE;
 }
 
 
-#define BRDF_LAMBERTIAN_ALBEDO (material_buffer.data[inst].xyz)
-#define BRDF_MIRROR_REFLECTANCE (material_buffer.data[inst].xyz)
+#define BRDF_LAMBERTIAN_ALBEDO (material_buffer.data[inst + 0U].xyz)
+#define BRDF_MIRROR_REFLECTANCE (material_buffer.data[inst + 0U].xyz)
 
 vec3 brdf_mirror_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
     return vec3(0.0);
@@ -371,7 +372,7 @@ vec3 brdf_mirror_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float 
     pdf = 1.0;
     wi = reflect(-wo, normal);
 
-    return BRDF_MIRROR_REFLECTANCE; // / abs(dot(wi, normal));
+    return BRDF_MIRROR_REFLECTANCE;
 }
 
 // TODO: assume cosine weighting or what?

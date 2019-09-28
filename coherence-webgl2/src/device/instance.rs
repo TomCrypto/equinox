@@ -3,45 +3,52 @@ use log::{debug, info, warn};
 
 use crate::renumber_parameters;
 use crate::Device;
-use coherence_base::{Geometry, HierarchyBuilder, InstanceInfo, Instances};
+use crate::{material_index, material_parameter_block_count};
+use coherence_base::{Geometry, HierarchyBuilder, InstanceInfo, Instances, Material};
 use itertools::izip;
 use zerocopy::{AsBytes, FromBytes};
 
-#[repr(transparent)]
-#[derive(AsBytes, FromBytes, Copy, Clone)]
-pub struct MaterialIndex([u32; 4]);
-
 impl Device {
-    pub(crate) fn update_instances(&mut self, objects: &[Geometry], instances: &Instances) {
+    pub(crate) fn update_instances(
+        &mut self,
+        geometries: &[Geometry],
+        materials: &[Material],
+        instances: &Instances,
+    ) {
         // update the instance BVH
+
+        let mut material_starts = vec![];
+        let mut count = 0;
+
+        for material in materials {
+            material_starts.push(count);
+
+            count += material_parameter_block_count(material) as u16;
+        }
 
         let mut instance_info = Vec::with_capacity(instances.list.len());
         let mut geometry_start = 0;
-        let mut material_start = 0;
 
         for instance in &instances.list {
-            let object = &objects[instance.geometry];
+            let geometry = &geometries[instance.geometry];
+            let material = &materials[instance.material];
 
             // TODO: handle errors gracefully here somehow? it would indicate bad data
-            let bbox = object.bounding_box(&instance.geometry_values).unwrap();
+            let bbox = geometry.bounding_box(&instance.geometry_values).unwrap();
 
             instance_info.push(InstanceInfo {
                 bbox,
                 surface_area: 1.0, // obtain from the geometry somehow (at least an approximation)
                 geometry: instance.geometry as u16,
-                material: instance.material as u16,
+                material: material_index(material),
                 geo_inst: geometry_start,
-                mat_inst: material_start / 4,
+                mat_inst: material_starts[instance.material],
             });
 
             // need to divide all starts by 4 because we use vec4 buffers...
             // (note: this is an implementation detail)
 
-            // in this case we KNOW there are only that many, so we don't really need to do
-            // renumbering here; we just take the total number of values and go with that
-
             geometry_start += (instance.geometry_values.len() as u16) / 4;
-            material_start += instance.material_values.len() as u16;
         }
 
         let node_count = HierarchyBuilder::node_count_for_leaves(instances.list.len());
@@ -68,7 +75,7 @@ impl Device {
             self.scratch.allocate(geometry_parameter_count / 4);
 
         for instance in &instances.list {
-            let indices = renumber_parameters(&objects[instance.geometry]);
+            let indices = renumber_parameters(&geometries[instance.geometry]);
             let (region, remaining_data) = params.split_at_mut((indices.len() + 3) / 4);
 
             for (data, indices) in izip!(region, indices.chunks(4)) {
@@ -85,35 +92,9 @@ impl Device {
         }
 
         self.geometry_buffer.write_array(&params);
-
-        // update the material data
-
-        let material_parameter_count: usize = instances
-            .list
-            .iter()
-            .map(|inst| inst.material_values.len())
-            .sum();
-
-        let material_params = self.scratch.allocate(material_parameter_count);
-
-        let mut index = 0;
-
-        for instance in &instances.list {
-            for &value in &instance.material_values {
-                material_params[index] = MaterialParameter(value);
-
-                index += 1;
-            }
-        }
-
-        self.material_buffer.write_array(&material_params);
     }
 }
 
 #[repr(align(16), C)]
 #[derive(AsBytes, FromBytes)]
 pub struct GeometryParameter([f32; 4]);
-
-#[repr(transparent)]
-#[derive(AsBytes, FromBytes)]
-pub struct MaterialParameter(f32);

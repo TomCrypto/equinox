@@ -20,7 +20,6 @@ pub struct Instance {
     pub material: usize,
 
     pub geometry_values: Vec<f32>,
-    pub material_values: Vec<f32>,
 }
 
 #[repr(align(32), C)]

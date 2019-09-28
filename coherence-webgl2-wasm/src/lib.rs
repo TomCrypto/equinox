@@ -106,7 +106,7 @@ impl WasmRunner {
         bmaxy: f32,
         bmaxz: f32,
     ) -> usize {
-        self.scene.objects.list.push(Object {
+        self.scene.geometries.list.push(Object {
             hierarchy: bvh.to_vec(),
             triangles: tri.to_vec(),
             positions: positions.to_vec(),
@@ -118,7 +118,7 @@ impl WasmRunner {
             },
         });
 
-        self.scene.objects.list.len() - 1
+        self.scene.geometries.list.len() - 1
     }
 
     pub fn add_material(&mut self, kind: u32, r: f32, g: f32, b: f32) -> usize {
@@ -173,12 +173,12 @@ impl WasmRunner {
     }
 
     pub fn setup_test_scene(&mut self) {
-        self.scene.objects.list.push(Geometry::Plane {
+        self.scene.geometries.list.push(Geometry::Plane {
             width: Parameter::Constant(10.0),
             length: Parameter::Constant(4.0),
         });
 
-        self.scene.objects.list.push(Geometry::Translate {
+        self.scene.geometries.list.push(Geometry::Translate {
             f: Box::new(Geometry::UnitSphere),
             translation: [
                 Parameter::Constant(0.0),
@@ -187,7 +187,7 @@ impl WasmRunner {
             ],
         });
 
-        self.scene.objects.list.push(Geometry::Union {
+        self.scene.geometries.list.push(Geometry::Union {
             children: vec![
                 Geometry::Translate {
                     f: Box::new(Geometry::Scale {
@@ -214,11 +214,25 @@ impl WasmRunner {
             ],
         });
 
+        // white lambertian
+        self.scene.materials.list.push(Material::Lambertian {
+            albedo: [0.9, 0.9, 0.9],
+        });
+
+        self.scene.materials.list.push(Material::Lambertian {
+            albedo: [0.25, 0.25, 0.75],
+        });
+
+        self.scene.materials.list.push(Material::Phong {
+            albedo: [0.8, 0.8, 0.8],
+            shininess: 4096.0,
+            kd: 0.3,
+        });
+
         self.scene.instances.list.push(Instance {
             geometry: 0,
             material: 0,
             geometry_values: vec![],
-            material_values: vec![0.9, 0.9, 0.9, 0.0],
         });
 
         /*self.scene.instances.list.push(Instance {
@@ -228,25 +242,23 @@ impl WasmRunner {
             material_values: vec![0.8, 0.8, 0.8, 0.0],
         });*/
 
-        /*self.scene.instances.list.push(Instance {
+        self.scene.instances.list.push(Instance {
             geometry: 1,
             material: 2,
             geometry_values: vec![],
-            material_values: vec![],
-        });*/
+        });
 
-        self.scene.instances.list.push(Instance {
+        /*self.scene.instances.list.push(Instance {
             geometry: 1,
             material: 3,
             geometry_values: vec![],
             material_values: vec![0.8, 0.8, 0.8, 1.55],
-        });
+        });*/
 
         self.scene.instances.list.push(Instance {
             geometry: 2,
-            material: 0,
+            material: 1,
             geometry_values: vec![],
-            material_values: vec![0.75, 0.0, 0.0, 0.0],
         });
     }
 
@@ -285,7 +297,7 @@ impl WasmRunner {
     pub fn add_other_object(&mut self) -> usize {
         // elongated cube
 
-        self.scene.objects.list.push(Geometry::Translate {
+        self.scene.geometries.list.push(Geometry::Translate {
             translation: [
                 Parameter::Constant(1.5),
                 Parameter::Constant(0.0),
@@ -297,12 +309,12 @@ impl WasmRunner {
             }),
         });
 
-        self.scene.objects.list.len() - 1
+        self.scene.geometries.list.len() - 1
     }
 
     pub fn add_object(&mut self) -> usize {
         // for now, just add a sphere
-        self.scene.objects.list.push(Geometry::Union {
+        self.scene.geometries.list.push(Geometry::Union {
             children: vec![
                 Geometry::Translate {
                     translation: [
@@ -332,22 +344,7 @@ impl WasmRunner {
             ],
         });
 
-        self.scene.objects.list.len() - 1
-    }
-
-    pub fn add_instance(
-        &mut self,
-        geometry: usize,
-        material: usize,
-        parameters: &[f32],
-        materials: &[f32],
-    ) {
-        self.scene.instances.list.push(Instance {
-            geometry,
-            material,
-            geometry_values: parameters.to_vec(),
-            material_values: materials.to_vec(),
-        });
+        self.scene.geometries.list.len() - 1
     }
 
     pub fn set_dimensions(&mut self, width: u32, height: u32) {

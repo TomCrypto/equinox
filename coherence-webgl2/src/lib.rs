@@ -187,46 +187,33 @@ impl Device {
             self.update_camera(camera);
         });
 
-        invalidated |= Dirty::clean(&mut scene.objects, |objects| {
+        invalidated |= Dirty::clean(&mut scene.geometries, |geometries| {
             let mut generator = GeometryGlslGenerator::new();
 
-            let mut geometries = vec![];
+            let mut geometry_functions = vec![];
 
-            for geometry in &objects.list {
-                geometries.push((
+            for geometry in &geometries.list {
+                geometry_functions.push((
                     generator.add_distance_function(geometry),
                     generator.add_normal_function(geometry),
                 ));
             }
 
-            self.program
-                .frag_shader()
-                .set_header("geometry-user.glsl", generator.generate(&geometries));
+            self.program.frag_shader().set_header(
+                "geometry-user.glsl",
+                generator.generate(&geometry_functions),
+            );
         });
 
-        let objects = &scene.objects;
+        let geometry_list = &scene.geometries.list;
+        let material_list = &scene.materials.list;
 
         invalidated |= Dirty::clean(&mut scene.instances, |instances| {
-            self.update_instances(&objects.list, instances);
-
-            /*let instances = InstancesWithObjects {
-                instances,
-                objects: &objects.list,
-            };
-
-            self.instance_buffer
-                .write_array(&mut self.scratch, &instances);
-
-            self.geometry_buffer
-                .write_array(&mut self.scratch, &instances);
-
-            self.material_buffer
-                .write_array(&mut self.scratch, &instances);*/
+            self.update_instances(&geometry_list, &material_list, instances);
         });
 
         invalidated |= Dirty::clean(&mut scene.materials, |materials| {
-            /*self.material_buffer
-            .write_array(&mut self.scratch, materials);*/
+            self.update_materials(materials);
         });
 
         invalidated |= Dirty::clean(&mut scene.environment, |environment| {

@@ -17,7 +17,7 @@ macro_rules! export {
 export![
     camera,
     raster,
-    object,
+    geometry,
     instance,
     material,
     environment,
@@ -96,7 +96,7 @@ pub struct Scene {
     pub camera: Dirty<Camera>,
     pub raster: Dirty<Raster>,
     pub instances: Dirty<Instances>,
-    pub objects: Dirty<Objects>,
+    pub geometries: Dirty<Geometries>,
     pub materials: Dirty<Materials>,
     pub environment: Dirty<Environment>,
     pub display: Dirty<Display>,
@@ -118,7 +118,7 @@ impl Scene {
         Dirty::dirty(&mut self.camera);
         Dirty::dirty(&mut self.raster);
         Dirty::dirty(&mut self.instances);
-        Dirty::dirty(&mut self.objects);
+        Dirty::dirty(&mut self.geometries);
         Dirty::dirty(&mut self.materials);
         Dirty::dirty(&mut self.environment);
         Dirty::dirty(&mut self.display);

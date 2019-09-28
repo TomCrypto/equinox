@@ -1,1 +1,9 @@
-export![environment, object, raster, camera, instance, display];
+export![
+    environment,
+    geometry,
+    raster,
+    camera,
+    instance,
+    display,
+    material
+];

@@ -2,7 +2,7 @@ use crate::BoundingBox;
 use cgmath::Point3;
 
 #[derive(Default)]
-pub struct Objects {
+pub struct Geometries {
     pub list: Vec<Geometry>,
 }
 
