@@ -1,6 +1,7 @@
 #include <common.glsl>
 #include <random.glsl>
-// #include <object.glsl>
+
+#include <material.glsl>
 
 out vec4 color;
 
@@ -26,10 +27,6 @@ layout (std140) uniform Raster {
 layout (std140) uniform Geometry {
     vec4 data[64];
 } geometry_buffer;
-
-layout (std140) uniform Material {
-    vec4 data[64];
-} material_buffer;
 
 struct BvhNode {
     vec4 data1;
@@ -320,110 +317,9 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-#define BRDF_PHONG_EXPONENT (material_buffer.data[inst + 0U].w)
-#define BRDF_PHONG_COLOR (material_buffer.data[inst + 0U].xyz)
-
-vec3 brdf_phong_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
-    return vec3(0.0); // not used yet
-}
-
-vec3 brdf_phong_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
-    vec2 rng = rand_uniform_vec2(random);
-
-    float phi = M_2PI * rng.x;
-    float theta = acos(pow(rng.y, 1.0 / (BRDF_PHONG_EXPONENT + 1.0)));
-
-    wi = rotate(to_spherical(phi, theta), reflect(-wo, normal));
-
-    pdf = 1.0;
-
-    return BRDF_PHONG_COLOR; // * (BRDF_PHONG_EXPONENT + 2.0) / (BRDF_PHONG_EXPONENT + 1.0) * max(0.0, dot(wi, normal));
-}
-
-vec3 brdf_refractive_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
-    return vec3(0.0);
-}
-
-#define BRDF_REFRACTIVE_TRANSMITTANCE (material_buffer.data[inst + 0U].xyz)
-#define BRDF_REFRACTIVE_IOR  (material_buffer.data[inst + 0U].w)
-
-vec3 brdf_refractive_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
-    pdf = 1.0;
-
-    if (dot(wo, normal) >= 0.0) {
-        wi = refract(-wo, normal, 1.0 / BRDF_REFRACTIVE_IOR);
-    } else {
-        wi = refract(-wo, -normal, BRDF_REFRACTIVE_IOR);
-    }
-
-    return BRDF_REFRACTIVE_TRANSMITTANCE;
-}
 
 
-#define BRDF_LAMBERTIAN_ALBEDO (material_buffer.data[inst + 0U].xyz)
-#define BRDF_MIRROR_REFLECTANCE (material_buffer.data[inst + 0U].xyz)
 
-vec3 brdf_mirror_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
-    return vec3(0.0);
-}
-
-vec3 brdf_mirror_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
-    pdf = 1.0;
-    wi = reflect(-wo, normal);
-
-    return BRDF_MIRROR_REFLECTANCE;
-}
-
-// TODO: assume cosine weighting or what?
-
-vec3 brdf_lambertian_eval(uint inst, vec3 normal, vec3 wi, vec3 wo) {
-    return vec3(BRDF_LAMBERTIAN_ALBEDO / 1.0); // / pi
-}
-
-// the "BRDF" has no "PDF" by itself; only the sampling methodology does!
-
-vec3 brdf_lambertian_sample(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
-    vec2 rng = rand_uniform_vec2(random);
-
-    float r = sqrt(rng.x);
-    float phi = M_2PI * rng.y;
-
-    wi = rotate(vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi)), normal);
-
-    pdf = 1.0;
-
-    return vec3(BRDF_LAMBERTIAN_ALBEDO);
-}
-
-vec3 brdf_eval(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo) {
-    switch (material) {
-        case 0U:
-            return brdf_lambertian_eval(inst, normal, wi, wo);
-        case 1U:
-            return brdf_mirror_eval(inst, normal, wi, wo);
-        case 2U:
-            return brdf_phong_eval(inst, normal, wi, wo);
-        case 3U:
-            return brdf_refractive_eval(inst, normal, wi, wo);
-        default:
-            return vec3(0.0);
-    }
-}
-
-vec3 brdf_sample(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
-    switch (material) {
-        case 0U:
-            return brdf_lambertian_sample(inst, normal, wi, wo, pdf, random);
-        case 1U:
-            return brdf_mirror_sample(inst, normal, wi, wo, pdf, random);
-        case 2U:
-            return brdf_phong_sample(inst, normal, wi, wo, pdf, random);
-        case 3U:
-            return brdf_refractive_sample(inst, normal, wi, wo, pdf, random);
-        default:
-            return vec3(0.0);
-    }
-}
 
 void main() {
     random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
@@ -450,7 +346,7 @@ void main() {
             vec3 wo = -ray.dir;
             vec3 wi;
 
-            vec3 estimate = brdf_sample(material, inst, normal, wi, wo, pdf, random);
+            vec3 estimate = mat_sample_brdf(material, inst, normal, wi, wo, pdf, random);
 
             throughput *= estimate / pdf;
 
