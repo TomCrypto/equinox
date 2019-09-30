@@ -162,6 +162,14 @@ impl WasmRunner {
         self.scene.instances.list[index].translation += Vector3::new(0.0, amount, 0.0);
     }*/
 
+    pub fn set_aperture_data(&mut self, r: &[f32], g: &[f32], b: &[f32], width: u32, height: u32) {
+        self.scene.camera.aperture_width = width;
+        self.scene.camera.aperture_height = height;
+        self.scene.camera.aperture_r_spectrum = r.to_vec();
+        self.scene.camera.aperture_g_spectrum = g.to_vec();
+        self.scene.camera.aperture_b_spectrum = b.to_vec();
+    }
+
     pub fn set_envmap(&mut self, data: &[f32], cols: usize, rows: usize) {
         self.scene.environment.multiplier = [1.0, 1.0, 1.0];
 

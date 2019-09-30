@@ -61,7 +61,12 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
     ctx.restoreContext();
   });
 
-  let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap6.dat"))
+  let aperture_r = new Float32Array(await fetch_bytes("pkg/r_spectrum.dat"))
+  let aperture_g = new Float32Array(await fetch_bytes("pkg/g_spectrum.dat"))
+  let aperture_b = new Float32Array(await fetch_bytes("pkg/b_spectrum.dat"))
+  runner.set_aperture_data(aperture_r, aperture_g, aperture_b, 2048, 1024)
+
+  let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap2.dat"))
   runner.set_envmap(envmap_data, 4096, 2048)
 
   // let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap5.dat"))

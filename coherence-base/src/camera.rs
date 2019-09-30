@@ -47,4 +47,10 @@ pub struct Camera {
 
     #[default(0.024)]
     pub film_height: f32,
+
+    pub aperture_r_spectrum: Vec<f32>,
+    pub aperture_g_spectrum: Vec<f32>,
+    pub aperture_b_spectrum: Vec<f32>,
+    pub aperture_width: u32,
+    pub aperture_height: u32,
 }

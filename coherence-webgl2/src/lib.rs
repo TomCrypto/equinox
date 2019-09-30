@@ -85,6 +85,15 @@ pub struct Device {
     program: Shader,
     present_program: Shader,
 
+    copy_from_spectrum_shader: Shader,
+    copy_into_spectrum_shader: Shader,
+    fft_shader: Shader,
+    pointwise_multiply_shader: Shader,
+    draw_aperture_shader: Shader,
+    direct_copy_shader: Shader,
+
+    fft_buffer: UniformBuffer<FFTData>,
+
     camera_buffer: UniformBuffer<CameraData>,
 
     geometry_buffer: UniformBuffer<[GeometryParameter]>,
@@ -104,6 +113,31 @@ pub struct Device {
     samples: Texture<RGBA32F>,
     samples_fbo: Framebuffer,
 
+    // Complex-valued spectrums for each render channel
+    rspectrum_temp1: Texture<RG32F>,
+    gspectrum_temp1: Texture<RG32F>,
+    bspectrum_temp1: Texture<RG32F>,
+    rspectrum_temp2: Texture<RG32F>,
+    gspectrum_temp2: Texture<RG32F>,
+    bspectrum_temp2: Texture<RG32F>,
+
+    conv_source: Texture<RGBA32F>,
+    conv_fbo: Framebuffer,
+
+    aperture_source: Texture<RG32F>,
+    r_aperture_spectrum: Texture<RG32F>,
+    g_aperture_spectrum: Texture<RG32F>,
+    b_aperture_spectrum: Texture<RG32F>,
+
+    // Final convolved render output (real-valued)
+    render: Texture<RGBA32F>,
+
+    spectrum_temp1_fbo: Framebuffer,
+    spectrum_temp2_fbo: Framebuffer,
+    render_fbo: Framebuffer,
+    aperture_fbo: Framebuffer,
+    aperture_source_fbo: Framebuffer,
+
     refine_query: Query,
     render_query: Query,
 
@@ -117,12 +151,67 @@ pub struct Device {
 impl Device {
     /// Creates a new device using a WebGL2 context.
     pub fn new(gl: &Context) -> Result<Self, Error> {
-        // hashmap! { "TBUF_WIDTH" => format!("{}", pixels_per_texture_buffer_row(&gl))
-        // }
-
         Ok(Self {
             scratch: AlignedMemory::new(),
             gl: gl.clone(),
+            direct_copy_shader: Shader::new(
+                gl.clone(),
+                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::DIRECT_COPY),
+                hashmap! {
+                    "source" => BindingPoint::Texture(0),
+                },
+            ),
+            draw_aperture_shader: Shader::new(
+                gl.clone(),
+                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::DRAW_APERTURE),
+                hashmap! {},
+            ),
+            fft_shader: Shader::new(
+                gl.clone(),
+                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::FFT),
+                hashmap! {
+                    "r_spectrum_input" => BindingPoint::Texture(0),
+                    "g_spectrum_input" => BindingPoint::Texture(1),
+                    "b_spectrum_input" => BindingPoint::Texture(2),
+                    "FFT" => BindingPoint::UniformBlock(0),
+                },
+            ),
+            pointwise_multiply_shader: Shader::new(
+                gl.clone(),
+                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::POINTWISE_MULTIPLY),
+                hashmap! {
+                    "r_spectrum_input" => BindingPoint::Texture(0),
+                    "g_spectrum_input" => BindingPoint::Texture(1),
+                    "b_spectrum_input" => BindingPoint::Texture(2),
+                    "r_aperture_input" => BindingPoint::Texture(3),
+                    "g_aperture_input" => BindingPoint::Texture(4),
+                    "b_aperture_input" => BindingPoint::Texture(5),
+                },
+            ),
+            copy_from_spectrum_shader: Shader::new(
+                gl.clone(),
+                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::COPY_FROM_SPECTRUM),
+                hashmap! {
+                    "r_spectrum" => BindingPoint::Texture(0),
+                    "g_spectrum" => BindingPoint::Texture(1),
+                    "b_spectrum" => BindingPoint::Texture(2),
+                    "add" => BindingPoint::Texture(3),
+                    "subtract" => BindingPoint::Texture(4),
+                },
+            ),
+            copy_into_spectrum_shader: Shader::new(
+                gl.clone(),
+                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::COPY_INTO_SPECTRUM),
+                hashmap! {
+                    "source" => BindingPoint::Texture(0),
+                },
+            ),
             program: Shader::new(
                 gl.clone(),
                 ShaderBuilder::new(shaders::VERT),
@@ -155,6 +244,7 @@ impl Device {
             //  -> #define them in the shader from some shared value obtained from the WebGL
             // context!
             instance_buffer: UniformBuffer::new_array(gl.clone(), 256),
+            fft_buffer: UniformBuffer::new(gl.clone()),
             raster_buffer: UniformBuffer::new(gl.clone()),
             display_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
@@ -162,6 +252,24 @@ impl Device {
             envmap_marginal_cdf: Texture::new(gl.clone()),
             envmap_conditional_cdfs: Texture::new(gl.clone()),
             samples_fbo: Framebuffer::new(gl.clone()),
+            rspectrum_temp1: Texture::new(gl.clone()),
+            gspectrum_temp1: Texture::new(gl.clone()),
+            bspectrum_temp1: Texture::new(gl.clone()),
+            rspectrum_temp2: Texture::new(gl.clone()),
+            gspectrum_temp2: Texture::new(gl.clone()),
+            bspectrum_temp2: Texture::new(gl.clone()),
+            aperture_source: Texture::new(gl.clone()),
+            r_aperture_spectrum: Texture::new(gl.clone()),
+            g_aperture_spectrum: Texture::new(gl.clone()),
+            b_aperture_spectrum: Texture::new(gl.clone()),
+            render: Texture::new(gl.clone()),
+            render_fbo: Framebuffer::new(gl.clone()),
+            aperture_fbo: Framebuffer::new(gl.clone()),
+            aperture_source_fbo: Framebuffer::new(gl.clone()),
+            spectrum_temp1_fbo: Framebuffer::new(gl.clone()),
+            spectrum_temp2_fbo: Framebuffer::new(gl.clone()),
+            conv_source: Texture::new(gl.clone()),
+            conv_fbo: Framebuffer::new(gl.clone()),
             refine_query: Query::new(gl.clone()),
             render_query: Query::new(gl.clone()),
             samples: Texture::new(gl.clone()),
@@ -185,6 +293,24 @@ impl Device {
 
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
             self.update_camera(camera);
+
+            self.r_aperture_spectrum.upload(
+                camera.aperture_width as usize,
+                camera.aperture_height as usize,
+                &camera.aperture_r_spectrum,
+            );
+
+            self.g_aperture_spectrum.upload(
+                camera.aperture_width as usize,
+                camera.aperture_height as usize,
+                &camera.aperture_g_spectrum,
+            );
+
+            self.b_aperture_spectrum.upload(
+                camera.aperture_width as usize,
+                camera.aperture_height as usize,
+                &camera.aperture_b_spectrum,
+            );
         });
 
         invalidated |= Dirty::clean(&mut scene.geometries, |geometries| {
@@ -236,7 +362,57 @@ impl Device {
             self.samples
                 .create(raster.width.get() as usize, raster.height.get() as usize);
 
+            self.render
+                .create(raster.width.get() as usize, raster.height.get() as usize);
+
+            self.rspectrum_temp1.create(2048, 1024);
+            self.gspectrum_temp1.create(2048, 1024);
+            self.bspectrum_temp1.create(2048, 1024);
+
+            self.rspectrum_temp2.create(2048, 1024);
+            self.gspectrum_temp2.create(2048, 1024);
+            self.bspectrum_temp2.create(2048, 1024);
+
+            self.aperture_source.create(2048, 1024);
+            self.r_aperture_spectrum.create(2048, 1024);
+            self.g_aperture_spectrum.create(2048, 1024);
+            self.b_aperture_spectrum.create(2048, 1024);
+
+            self.conv_source.create(2048, 1024);
+
             self.samples_fbo.invalidate(&[&self.samples]);
+            self.conv_fbo.invalidate(&[&self.conv_source]);
+
+            self.aperture_source_fbo
+                .invalidate((&[&self.aperture_source]));
+
+            self.render_fbo.invalidate(&[&self.render]);
+            self.aperture_fbo.invalidate(&[
+                &self.r_aperture_spectrum,
+                &self.g_aperture_spectrum,
+                &self.b_aperture_spectrum,
+            ]);
+
+            self.spectrum_temp1_fbo.invalidate(&[
+                &self.rspectrum_temp1,
+                &self.gspectrum_temp1,
+                &self.bspectrum_temp1,
+            ]);
+
+            self.spectrum_temp2_fbo.invalidate(&[
+                &self.rspectrum_temp2,
+                &self.gspectrum_temp2,
+                &self.bspectrum_temp2,
+            ]);
+
+            // TODO: invalidate spectrum FBOs, resize etc...
+            // for now let's just always do a 2048x1024 FFT
+            // we'll simply resize the input render to always be < 1024 during
+            // the spectrum construction phase
+            // then the aperture will be < 1024 as well
+            // then the final result will simply be composited directly on top
+            // of the original data, stretched out with linear
+            // filtering to provide extra detail cheaply...
         });
 
         // These are post-processing settings that don't apply to the path-traced light
@@ -248,6 +424,13 @@ impl Device {
 
         self.program.rebuild()?;
         self.present_program.rebuild()?;
+
+        self.copy_from_spectrum_shader.rebuild()?;
+        self.copy_into_spectrum_shader.rebuild()?;
+        self.fft_shader.rebuild()?;
+        self.draw_aperture_shader.rebuild()?;
+        self.pointwise_multiply_shader.rebuild()?;
+        self.direct_copy_shader.rebuild()?;
 
         if invalidated {
             self.state.reset(scene);
@@ -304,8 +487,10 @@ impl Device {
             return None;
         }
 
+        self.render_lens_flare();
+
         self.present_program.bind_to_pipeline(|shader| {
-            shader.bind(&self.samples, "samples");
+            shader.bind(&self.render, "samples");
             shader.bind(&self.display_buffer, "Display");
         });
 
@@ -339,6 +524,12 @@ impl Device {
 
         self.program.invalidate();
         self.present_program.invalidate();
+        self.copy_into_spectrum_shader.invalidate();
+        self.copy_from_spectrum_shader.invalidate();
+        self.fft_shader.invalidate();
+        self.draw_aperture_shader.invalidate();
+        self.pointwise_multiply_shader.invalidate();
+        self.direct_copy_shader.invalidate();
 
         self.refine_query.reset();
         self.render_query.reset();

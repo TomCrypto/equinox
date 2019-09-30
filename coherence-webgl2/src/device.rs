@@ -5,5 +5,6 @@ export![
     camera,
     instance,
     display,
-    material
+    material,
+    lens_flare
 ];
