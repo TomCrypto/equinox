@@ -7,6 +7,8 @@ import('../pkg/equinox').catch(console.error).then(async gl => {
     throw "fail"
   }
 
+  gl.initialize_logging()
+
   const canvas = document.getElementsByTagName("canvas")[0]
 
   let moving = false

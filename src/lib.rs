@@ -573,12 +573,15 @@ pub struct WasmRunner {
 }
 
 #[wasm_bindgen]
+pub fn initialize_logging() {
+    console_error_panic_hook::set_once();
+    console_log::init().unwrap();
+}
+
+#[wasm_bindgen]
 impl WasmRunner {
     #[wasm_bindgen(constructor)]
     pub fn new(context: &WebGl2RenderingContext) -> Result<WasmRunner, JsValue> {
-        console_log::init().unwrap();
-        console_error_panic_hook::set_once();
-
         Ok(Self {
             device: Device::new(context)?,
             scene: Scene::new(),
