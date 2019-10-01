@@ -1,5 +1,3 @@
-in vec2 screen_coords;
-
 out vec4 target;
 
 uniform sampler2D r_spectrum;
@@ -24,10 +22,9 @@ void main() {
 
     vec2 coords = offset + vec2(tx, ty) * range;
     
-    // TODO: would be better to always do a complex -> real IFFT for the output so there's no length here
-    float r = length(texture(r_spectrum, coords).rg) / (1024.0 * 2048.0);
-    float g = length(texture(g_spectrum, coords).rg) / (1024.0 * 2048.0);
-    float b = length(texture(b_spectrum, coords).rg) / (1024.0 * 2048.0);
+    float r = texture(r_spectrum, coords).r / (1024.0 * 2048.0);
+    float g = texture(g_spectrum, coords).r / (1024.0 * 2048.0);
+    float b = texture(b_spectrum, coords).r / (1024.0 * 2048.0);
 
     // first sample the addition texture as-is
     vec3 add_data = texture(add, (gl_FragCoord.xy - vec2(0.5)) / vec2(WIDTH, HEIGHT)).rgb;

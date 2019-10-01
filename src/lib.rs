@@ -108,7 +108,7 @@ impl Device {
             gl: gl.clone(),
             direct_copy_shader: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::VS_FULLSCREEN),
                 ShaderBuilder::new(shaders::DIRECT_COPY),
                 hashmap! {
                     "source" => BindingPoint::Texture(0),
@@ -116,13 +116,13 @@ impl Device {
             ),
             draw_aperture_shader: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::VS_FULLSCREEN),
                 ShaderBuilder::new(shaders::DRAW_APERTURE),
                 hashmap! {},
             ),
             fft_shader: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::VS_FULLSCREEN),
                 ShaderBuilder::new(shaders::FFT),
                 hashmap! {
                     "r_spectrum_input" => BindingPoint::Texture(0),
@@ -133,7 +133,7 @@ impl Device {
             ),
             pointwise_multiply_shader: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::VS_FULLSCREEN),
                 ShaderBuilder::new(shaders::POINTWISE_MULTIPLY),
                 hashmap! {
                     "r_spectrum_input" => BindingPoint::Texture(0),
@@ -146,7 +146,7 @@ impl Device {
             ),
             copy_from_spectrum_shader: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::VS_FULLSCREEN),
                 ShaderBuilder::new(shaders::COPY_FROM_SPECTRUM),
                 hashmap! {
                     "r_spectrum" => BindingPoint::Texture(0),
@@ -158,7 +158,7 @@ impl Device {
             ),
             copy_into_spectrum_shader: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::VS_FULLSCREEN),
                 ShaderBuilder::new(shaders::COPY_INTO_SPECTRUM),
                 hashmap! {
                     "source" => BindingPoint::Texture(0),
@@ -166,7 +166,7 @@ impl Device {
             ),
             program: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::VS_FULLSCREEN),
                 ShaderBuilder::new(shaders::FRAG),
                 hashmap! {
                     "Camera" => BindingPoint::UniformBlock(0),
@@ -182,7 +182,7 @@ impl Device {
             ),
             present_program: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VERT),
+                ShaderBuilder::new(shaders::VS_FULLSCREEN),
                 ShaderBuilder::new(shaders::PRESENT),
                 hashmap! {
                     "samples" => BindingPoint::Texture(0),

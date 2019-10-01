@@ -8,9 +8,9 @@ uniform sampler2D r_spectrum_input;
 uniform sampler2D g_spectrum_input;
 uniform sampler2D b_spectrum_input;
 
-layout(location = 0) out vec4 r_spectrum_output;
-layout(location = 1) out vec4 g_spectrum_output;
-layout(location = 2) out vec4 b_spectrum_output;
+layout(location = 0) out vec2 r_spectrum_output;
+layout(location = 1) out vec2 g_spectrum_output;
+layout(location = 2) out vec2 b_spectrum_output;
 
 layout (std140) uniform FFT {
     int transformSize;
@@ -54,7 +54,7 @@ void main(void){
     float twiddleArgument1D = -fft.direction * M_2PI * (float(index % fft.subtransformSize) / float(fft.subtransformSize));
     vec2 twiddle1D = vec2(cos(twiddleArgument1D), sin(twiddleArgument1D));
 
-    r_spectrum_output = vec4(r_even + multiplyComplex(twiddle1D, r_odd), 0.0, 0.0);
-    g_spectrum_output = vec4(g_even + multiplyComplex(twiddle1D, g_odd), 0.0, 0.0);
-    b_spectrum_output = vec4(b_even + multiplyComplex(twiddle1D, b_odd), 0.0, 0.0);
+    r_spectrum_output = r_even + multiplyComplex(twiddle1D, r_odd);
+    g_spectrum_output = g_even + multiplyComplex(twiddle1D, g_odd);
+    b_spectrum_output = b_even + multiplyComplex(twiddle1D, b_odd);
 }

@@ -1,9 +1,6 @@
-in vec2 screen_coords;
-
-// TODO: vec2?
-layout(location = 0) out vec4 r_spectrum;
-layout(location = 1) out vec4 g_spectrum;
-layout(location = 2) out vec4 b_spectrum;
+layout(location = 0) out vec2 r_spectrum;
+layout(location = 1) out vec2 g_spectrum;
+layout(location = 2) out vec2 b_spectrum;
 
 #define WIDTH 1380.0
 #define HEIGHT 1008.0
@@ -16,7 +13,7 @@ void main() {
 
     vec3 data = texture(source, vec2(tx, ty)).rgb;
 
-    r_spectrum = vec4(vec2(data.r, 0.0), 0.0, 0.0);
-    g_spectrum = vec4(vec2(data.g, 0.0), 0.0, 0.0);
-    b_spectrum = vec4(vec2(data.b, 0.0), 0.0, 0.0);
+    r_spectrum = vec2(data.r, 0.0);
+    g_spectrum = vec2(data.g, 0.0);
+    b_spectrum = vec2(data.b, 0.0);
 }
