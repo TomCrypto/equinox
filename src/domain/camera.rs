@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Aperture {
     #[default]
     Point,

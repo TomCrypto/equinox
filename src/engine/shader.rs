@@ -289,11 +289,13 @@ impl Shader {
     }
 }
 
+#[derive(Debug)]
 pub struct ActiveShader<'a> {
     gl: &'a Context,
     binds: &'a HashMap<&'static str, BindingPoint>,
 }
 
+#[derive(Debug)]
 pub enum BindTarget<'a> {
     UniformBuffer(Option<&'a WebGlBuffer>),
     Texture(Option<&'a WebGlTexture>),

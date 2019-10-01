@@ -77,8 +77,6 @@ impl Device {
             start += count;
         }
 
-        info!("MATERIAL PARAMS = {:?}", parameters);
-
         self.material_buffer.write_array(&parameters);
     }
 }

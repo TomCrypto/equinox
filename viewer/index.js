@@ -14,7 +14,7 @@ import('../pkg/equinox').catch(console.error).then(async gl => {
   canvas.width = canvas.clientWidth
   canvas.height = canvas.clientHeight
 
-  const runner = new gl.WasmRunner(canvas.getContext("webgl2", {
+  runner = new gl.WasmRunner(canvas.getContext("webgl2", {
     alpha: false,
     antialias: false,
     depth: false,

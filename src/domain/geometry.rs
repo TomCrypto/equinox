@@ -9,23 +9,25 @@ pub struct Geometries {
 
 /// Parameter
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Parameter {
     /// Fixed value across all instances.
-    Constant(f32),
+    Constant { value: f32 },
     /// Reference into a parameter array.
-    Symbolic(usize),
+    Symbolic { index: usize },
 }
 
 impl Parameter {
     pub fn value(&self, symbolic_values: &[f32]) -> Option<f32> {
         match self {
-            Self::Constant(value) => Some(*value),
-            Self::Symbolic(index) => symbolic_values.get(*index).copied(),
+            Self::Constant { value } => Some(*value),
+            Self::Symbolic { index } => symbolic_values.get(*index).copied(),
         }
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Geometry {
     UnitSphere,
     UnitCube,

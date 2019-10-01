@@ -186,8 +186,8 @@ impl GeometryGlslGenerator {
 
     fn lookup_parameter(&self, parameter: &Parameter, index: &mut usize) -> String {
         match parameter {
-            Parameter::Constant(value) => format!("{:+e}", value),
-            Parameter::Symbolic(_) => self.lookup_symbolic_parameter(index),
+            Parameter::Constant { value } => format!("{:+e}", value),
+            Parameter::Symbolic { .. } => self.lookup_symbolic_parameter(index),
         }
     }
 
@@ -258,7 +258,7 @@ pub fn renumber_parameters(geometry: &Geometry) -> Vec<usize> {
 }
 
 fn add_parameter(parameters: &mut Vec<usize>, parameter: &Parameter) {
-    if let Parameter::Symbolic(index) = parameter {
+    if let Parameter::Symbolic { index } = parameter {
         parameters.push(*index);
     }
 }

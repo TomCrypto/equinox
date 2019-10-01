@@ -6,6 +6,7 @@ pub struct Materials {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Material {
     Lambertian {
         albedo: [f32; 3],

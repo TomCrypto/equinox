@@ -22,8 +22,6 @@ use rand_chacha::ChaCha20Rng;
 use web_sys::WebGl2RenderingContext as Context;
 use zerocopy::{AsBytes, FromBytes};
 
-export![device, domain, engine];
-
 #[derive(Clone, Copy, Debug)]
 pub struct RefineStatistics {
     pub frame_time_us: f32,
@@ -548,8 +546,6 @@ impl DeviceState {
         buffer.write(&data);
 
         self.frame += 1;
-
-        // info!("frame = {}", self.frame);
     }
 }
 
@@ -562,6 +558,7 @@ struct GlobalData {
 
 use cgmath::prelude::*;
 use cgmath::{Point3, Vector3};
+use serde::{de::DeserializeOwned, Serialize};
 use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
@@ -590,12 +587,38 @@ impl WasmRunner {
         })
     }
 
+    pub fn scene_json(&self) -> Result<JsValue, JsValue> {
+        Self::to_json(&self.scene)
+    }
+
+    pub fn set_camera_from_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
+        self.scene.camera = Self::from_json(json)?;
+
+        Ok(())
+    }
+
+    pub fn set_materials_from_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
+        self.scene.materials = Self::from_json(json)?;
+
+        Ok(())
+    }
+
     pub fn context_lost(&mut self) {
         self.device.context_lost();
     }
 
     pub fn context(&self) -> WebGl2RenderingContext {
         self.device.gl.clone()
+    }
+
+    fn to_json<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
+        Ok(JsValue::from_serde(value).map_err(|err| Error::new(&err.to_string()))?)
+    }
+
+    fn from_json<T: DeserializeOwned>(json: &JsValue) -> Result<T, JsValue> {
+        Ok(json
+            .into_serde()
+            .map_err(|err| Error::new(&err.to_string()))?)
     }
 
     // functions to do stuff... e.g. "rotate camera", "zoom in", "switch
@@ -667,16 +690,16 @@ impl WasmRunner {
 
     pub fn setup_test_scene(&mut self) {
         self.scene.geometries.list.push(Geometry::Plane {
-            width: Parameter::Constant(10.0),
-            length: Parameter::Constant(4.0),
+            width: Parameter::Constant { value: 10.0 },
+            length: Parameter::Constant { value: 4.0 },
         });
 
         self.scene.geometries.list.push(Geometry::Translate {
             f: Box::new(Geometry::UnitSphere),
             translation: [
-                Parameter::Constant(0.0),
-                Parameter::Constant(1.01),
-                Parameter::Constant(0.0),
+                Parameter::Constant { value: 0.0 },
+                Parameter::Constant { value: 1.01 },
+                Parameter::Constant { value: 0.0 },
             ],
         });
 
@@ -685,23 +708,23 @@ impl WasmRunner {
                 Geometry::Translate {
                     f: Box::new(Geometry::Scale {
                         f: Box::new(Geometry::UnitSphere),
-                        factor: Parameter::Constant(0.333),
+                        factor: Parameter::Constant { value: 0.333 },
                     }),
                     translation: [
-                        Parameter::Constant(2.0),
-                        Parameter::Constant(0.0),
-                        Parameter::Constant(0.2),
+                        Parameter::Constant { value: 2.0 },
+                        Parameter::Constant { value: 0.0 },
+                        Parameter::Constant { value: 0.2 },
                     ],
                 },
                 Geometry::Translate {
                     f: Box::new(Geometry::Scale {
                         f: Box::new(Geometry::UnitSphere),
-                        factor: Parameter::Constant(0.333),
+                        factor: Parameter::Constant { value: 0.333 },
                     }),
                     translation: [
-                        Parameter::Constant(2.0),
-                        Parameter::Constant(0.0),
-                        Parameter::Constant(-0.2),
+                        Parameter::Constant { value: 2.0 },
+                        Parameter::Constant { value: 0.0 },
+                        Parameter::Constant { value: -0.2 },
                     ],
                 },
             ],
@@ -791,12 +814,12 @@ impl WasmRunner {
 
         self.scene.geometries.list.push(Geometry::Translate {
             translation: [
-                Parameter::Constant(1.5),
-                Parameter::Constant(0.0),
-                Parameter::Constant(0.0),
+                Parameter::Constant { value: 1.5 },
+                Parameter::Constant { value: 0.0 },
+                Parameter::Constant { value: 0.0 },
             ],
             f: Box::new(Geometry::Scale {
-                factor: Parameter::Constant(0.5),
+                factor: Parameter::Constant { value: 0.5 },
                 f: Box::new(Geometry::UnitCube),
             }),
         });
@@ -810,26 +833,26 @@ impl WasmRunner {
             children: vec![
                 Geometry::Translate {
                     translation: [
-                        Parameter::Symbolic(1),
-                        Parameter::Symbolic(2),
-                        Parameter::Symbolic(3),
+                        Parameter::Symbolic { index: 1 },
+                        Parameter::Symbolic { index: 2 },
+                        Parameter::Symbolic { index: 3 },
                     ],
                     f: Box::new(Geometry::Scale {
-                        factor: Parameter::Symbolic(0),
+                        factor: Parameter::Symbolic { index: 0 },
                         f: Box::new(Geometry::Round {
                             f: Box::new(Geometry::UnitCube),
-                            radius: Parameter::Constant(0.125),
+                            radius: Parameter::Constant { value: 0.125 },
                         }),
                     }),
                 },
                 Geometry::Translate {
                     translation: [
-                        Parameter::Symbolic(5),
-                        Parameter::Symbolic(6),
-                        Parameter::Symbolic(7),
+                        Parameter::Symbolic { index: 5 },
+                        Parameter::Symbolic { index: 6 },
+                        Parameter::Symbolic { index: 7 },
                     ],
                     f: Box::new(Geometry::Scale {
-                        factor: Parameter::Symbolic(4),
+                        factor: Parameter::Symbolic { index: 4 },
                         f: Box::new(Geometry::UnitSphere),
                     }),
                 },
@@ -861,3 +884,5 @@ impl WasmRunner {
         self.scene.instances.list.remove(index);
     }
 }
+
+export![device, domain, engine];

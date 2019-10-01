@@ -3,6 +3,7 @@ use smart_default::SmartDefault;
 use std::num::NonZeroU32;
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(tag = "type", rename_all = "kebab-case")]
 pub enum RasterFilter {
     #[default]
     BlackmanHarris,
