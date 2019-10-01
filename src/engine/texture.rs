@@ -2,7 +2,7 @@
 use log::{debug, info, warn};
 
 use crate::engine::{AsAttachment, AsBindTarget, Attachment, BindTarget};
-use js_sys::{Float32Array, Object, Uint32Array};
+use js_sys::Object;
 use std::marker::PhantomData;
 use web_sys::{WebGl2RenderingContext as Context, WebGlTexture};
 
@@ -267,7 +267,6 @@ pub trait TextureFormat {
     const GL_FORMAT: u32;
     const GL_TYPE: u32;
 
-    /// Parses all levels of a sized texture from a linearly packed data array.
     fn parse(cols: usize, rows: usize, levels: usize, data: &[Self::Data]) -> Vec<Object>;
 }
 
@@ -303,7 +302,7 @@ impl TextureFormat for RGBA32UI {
 
             let (level_data, remaining) = data.split_at(level_size);
 
-            views.push((unsafe { Uint32Array::view(level_data) }).into());
+            views.push(unsafe_helpers::u32_slice_to_float32_array(level_data).into());
 
             data = remaining;
         }
@@ -337,7 +336,7 @@ impl TextureFormat for RGBA32F {
 
             let (level_data, remaining) = data.split_at(level_size);
 
-            views.push((unsafe { Float32Array::view(level_data) }).into());
+            views.push(unsafe_helpers::f32_slice_to_float32_array(level_data).into());
 
             data = remaining;
         }
@@ -371,7 +370,7 @@ impl TextureFormat for R32F {
 
             let (level_data, remaining) = data.split_at(level_size);
 
-            views.push((unsafe { Float32Array::view(level_data) }).into());
+            views.push(unsafe_helpers::f32_slice_to_float32_array(level_data).into());
 
             data = remaining;
         }
@@ -405,7 +404,7 @@ impl TextureFormat for RG32F {
 
             let (level_data, remaining) = data.split_at(level_size);
 
-            views.push((unsafe { Float32Array::view(level_data) }).into());
+            views.push(unsafe_helpers::f32_slice_to_float32_array(level_data).into());
 
             data = remaining;
         }
@@ -413,5 +412,22 @@ impl TextureFormat for RG32F {
         assert!(data.is_empty());
 
         views
+    }
+}
+
+// SAFETY: the objects returned by these methods are immediately fed into WebGL
+// APIs to upload some data to a WebGL resource and are not held onto. There is
+// no reallocation happening in between, so the `view` requirements are upheld.
+
+#[allow(unsafe_code)]
+mod unsafe_helpers {
+    use js_sys::{Float32Array, Uint32Array};
+
+    pub fn f32_slice_to_float32_array(slice: &[f32]) -> Float32Array {
+        unsafe { Float32Array::view(slice) }
+    }
+
+    pub fn u32_slice_to_float32_array(slice: &[u32]) -> Uint32Array {
+        unsafe { Uint32Array::view(slice) }
     }
 }

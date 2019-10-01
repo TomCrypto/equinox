@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// For pragmatic reasons, the scene structure maintains dirty flags relative to
 /// a particular device instance's internal state. As a consequence care must be
-/// taken when rendering a scene on multiple devices simultaneously.
+/// taken when using the same scene instance on multiple devices simultaneously.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Scene {
     pub camera: Dirty<Camera>,
@@ -19,17 +19,10 @@ pub struct Scene {
 }
 
 impl Scene {
-    /// Creates a new empty scene with a default configuration.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Marks all of this scene as dirty, forcing a complete device update.
+    /// Marks the entire contents of this scene as dirty.
     ///
-    /// This is normally only used internally by devices to respond to events
-    /// such as device loss. However because the dirty flags stored by scenes
-    /// are associated with a device's current state, you should call this if
-    /// a scene is "moved" from one device to another (not recommended).
+    /// This method will force a complete device update the next time that a
+    /// device is updated using this scene, and so should be used sparingly.
     pub fn dirty_all_fields(&mut self) {
         Dirty::dirty(&mut self.camera);
         Dirty::dirty(&mut self.raster);

@@ -1,3 +1,5 @@
+#![deny(unsafe_code)]
+
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
@@ -584,7 +586,7 @@ impl WasmRunner {
     pub fn new(context: &WebGl2RenderingContext) -> Result<WasmRunner, JsValue> {
         Ok(Self {
             device: Device::new(context)?,
-            scene: Scene::new(),
+            scene: Scene::default(),
             render_stats: None,
             refine_stats: None,
         })
