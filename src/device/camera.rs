@@ -6,7 +6,7 @@ use itertools::iproduct;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]
-#[derive(Default, AsBytes, FromBytes)]
+#[derive(Debug, Default, AsBytes, FromBytes)]
 pub struct CameraData {
     origin_plane: [[f32; 4]; 4],
     target_plane: [[f32; 4]; 4],

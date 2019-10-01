@@ -3,6 +3,7 @@ use log::{debug, info, warn};
 
 use web_sys::{ExtDisjointTimerQuery, WebGl2RenderingContext as Context, WebGlQuery};
 
+#[derive(Debug)]
 pub struct Query {
     gl: Context,
     handle: Option<WebGlQuery>,

@@ -20,6 +20,7 @@ impl Boolean for False {
     const VALUE: bool = false;
 }
 
+#[derive(Debug)]
 pub struct Texture<T> {
     gl: Context,
 
@@ -270,9 +271,13 @@ pub trait TextureFormat {
     fn parse(cols: usize, rows: usize, levels: usize, data: &[Self::Data]) -> Vec<Object>;
 }
 
+#[derive(Debug)]
 pub struct RGBA32UI;
+#[derive(Debug)]
 pub struct RGBA32F;
+#[derive(Debug)]
 pub struct R32F;
+#[derive(Debug)]
 pub struct RG32F;
 
 impl TextureFormat for RGBA32UI {

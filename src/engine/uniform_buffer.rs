@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer};
 use zerocopy::{AsBytes, FromBytes};
 
+#[derive(Debug)]
 pub struct UniformBuffer<T: ?Sized> {
     gl: Context,
     handle: Option<WebGlBuffer>,

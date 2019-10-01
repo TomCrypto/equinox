@@ -8,6 +8,7 @@ use web_sys::{
     WebGl2RenderingContext as Context, WebGlBuffer, WebGlProgram, WebGlShader, WebGlTexture,
 };
 
+#[derive(Debug)]
 pub struct ShaderBuilder {
     headers: HashMap<&'static str, String>,
     defines: HashMap<&'static str, String>,
@@ -83,12 +84,13 @@ impl ShaderBuilder {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum BindingPoint {
     Texture(u32),
     UniformBlock(u32),
 }
 
+#[derive(Debug)]
 pub struct Shader {
     gl: Context,
     invalidated: bool,

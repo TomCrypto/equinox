@@ -6,9 +6,6 @@ description = "WebGL2 real-time path tracer"
 edition = "2018"
 build = "build.rs"
 
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies.cgmath]
 version = "0.17"
 features = ["serde"]
@@ -81,3 +78,9 @@ features = [
 
 [dependencies.zerocopy]
 version = "0.2"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true

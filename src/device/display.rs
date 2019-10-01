@@ -3,7 +3,7 @@ use crate::Display;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]
-#[derive(AsBytes, FromBytes)]
+#[derive(Debug, AsBytes, FromBytes)]
 pub struct DisplayData {
     exposure: f32,
     saturation: f32,

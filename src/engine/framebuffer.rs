@@ -4,6 +4,7 @@ use log::{debug, info, warn};
 use js_sys::Array;
 use web_sys::{WebGl2RenderingContext as Context, WebGlFramebuffer, WebGlTexture};
 
+#[derive(Debug)]
 pub enum Attachment<'a> {
     Texture(Option<&'a WebGlTexture>),
 }
@@ -12,6 +13,7 @@ pub trait AsAttachment {
     fn as_attachment(&self) -> Attachment;
 }
 
+#[derive(Debug)]
 pub struct Framebuffer {
     gl: Context,
     handle: Option<WebGlFramebuffer>,

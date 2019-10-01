@@ -7,7 +7,7 @@ use crate::DrawOptions;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromBytes, Debug)]
 pub struct FFTData {
     pub transform_size: i32,
     pub subtransform_size: i32,

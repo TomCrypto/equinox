@@ -3,7 +3,7 @@ use crate::Raster;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromBytes, Debug)]
 pub struct RasterData {
     width: f32,
     height: f32,

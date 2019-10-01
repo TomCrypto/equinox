@@ -96,5 +96,5 @@ impl Device {
 }
 
 #[repr(align(16), C)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromBytes, Debug)]
 pub struct GeometryParameter([f32; 4]);

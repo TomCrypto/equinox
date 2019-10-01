@@ -34,6 +34,7 @@ pub struct RenderStatistics {
     pub frame_time_us: f32,
 }
 
+#[derive(Debug)]
 pub struct Device {
     pub gl: Context, // TODO: shouldn't be publicly exposed
 
@@ -495,6 +496,7 @@ impl Device {
     }
 }
 
+#[derive(Debug)]
 struct DeviceState {
     rng: ChaCha20Rng,
     filter_rng: Qrng,
@@ -552,7 +554,7 @@ impl DeviceState {
 }
 
 #[repr(C)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromBytes, Debug)]
 struct GlobalData {
     filter_delta: [f32; 4],
     frame_state: [u32; 4],
