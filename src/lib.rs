@@ -270,7 +270,7 @@ impl Device {
 
             let mut geometry_functions = vec![];
 
-            for geometry in &geometries.list {
+            for geometry in geometries {
                 geometry_functions.push((
                     generator.add_distance_function(geometry),
                     generator.add_normal_function(geometry),
@@ -283,11 +283,11 @@ impl Device {
             );
         });
 
-        let geometry_list = &scene.geometries.list;
-        let material_list = &scene.materials.list;
+        let geometry_list = &scene.geometries;
+        let material_list = &scene.materials;
 
         invalidated |= Dirty::clean(&mut scene.instances, |instances| {
-            self.update_instances(&geometry_list, &material_list, instances);
+            self.update_instances(geometry_list, material_list, instances);
         });
 
         invalidated |= Dirty::clean(&mut scene.materials, |materials| {
@@ -589,7 +589,7 @@ impl WasmRunner {
     }
 
     pub fn scene_json(&self) -> Result<JsValue, JsValue> {
-        Self::to_json(&self.scene)
+        Self::as_json(&self.scene)
     }
 
     pub fn set_camera_from_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
@@ -612,7 +612,7 @@ impl WasmRunner {
         self.device.gl.clone()
     }
 
-    fn to_json<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
+    fn as_json<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
         Ok(JsValue::from_serde(value).map_err(|err| Error::new(&err.to_string()))?)
     }
 
@@ -686,12 +686,12 @@ impl WasmRunner {
     }
 
     pub fn setup_test_scene(&mut self) {
-        self.scene.geometries.list.push(Geometry::Plane {
+        self.scene.geometries.push(Geometry::Plane {
             width: Parameter::Constant { value: 10.0 },
             length: Parameter::Constant { value: 4.0 },
         });
 
-        self.scene.geometries.list.push(Geometry::Translate {
+        self.scene.geometries.push(Geometry::Translate {
             f: Box::new(Geometry::UnitSphere),
             translation: [
                 Parameter::Constant { value: 0.0 },
@@ -700,7 +700,7 @@ impl WasmRunner {
             ],
         });
 
-        self.scene.geometries.list.push(Geometry::Union {
+        self.scene.geometries.push(Geometry::Union {
             children: vec![
                 Geometry::Translate {
                     f: Box::new(Geometry::Scale {
@@ -728,46 +728,46 @@ impl WasmRunner {
         });
 
         // white lambertian
-        self.scene.materials.list.push(Material::Lambertian {
+        self.scene.materials.push(Material::Lambertian {
             albedo: [0.9, 0.9, 0.9],
         });
 
-        self.scene.materials.list.push(Material::Lambertian {
+        self.scene.materials.push(Material::Lambertian {
             albedo: [0.25, 0.25, 0.75],
         });
 
-        self.scene.materials.list.push(Material::Phong {
+        self.scene.materials.push(Material::Phong {
             albedo: [0.9, 0.9, 0.9],
             shininess: 1024.0,
         });
 
-        /*self.scene.instances.list.push(Instance {
+        /*self.scene.instances.push(Instance {
             geometry: 0,
             material: 0,
             geometry_values: vec![],
         });*/
 
-        /*self.scene.instances.list.push(Instance {
+        /*self.scene.instances.push(Instance {
             geometry: 1,
             material: 1,
             geometry_values: vec![],
             material_values: vec![0.8, 0.8, 0.8, 0.0],
         });*/
 
-        self.scene.instances.list.push(Instance {
+        self.scene.instances.push(Instance {
             geometry: 1,
             material: 2,
             geometry_values: vec![],
         });
 
-        /*self.scene.instances.list.push(Instance {
+        /*self.scene.instances.push(Instance {
             geometry: 1,
             material: 3,
             geometry_values: vec![],
             material_values: vec![0.8, 0.8, 0.8, 1.55],
         });*/
 
-        /*self.scene.instances.list.push(Instance {
+        /*self.scene.instances.push(Instance {
             geometry: 2,
             material: 1,
             geometry_values: vec![],
@@ -806,59 +806,6 @@ impl WasmRunner {
         }
     }
 
-    pub fn add_other_object(&mut self) -> usize {
-        // elongated cube
-
-        self.scene.geometries.list.push(Geometry::Translate {
-            translation: [
-                Parameter::Constant { value: 1.5 },
-                Parameter::Constant { value: 0.0 },
-                Parameter::Constant { value: 0.0 },
-            ],
-            f: Box::new(Geometry::Scale {
-                factor: Parameter::Constant { value: 0.5 },
-                f: Box::new(Geometry::UnitCube),
-            }),
-        });
-
-        self.scene.geometries.list.len() - 1
-    }
-
-    pub fn add_object(&mut self) -> usize {
-        // for now, just add a sphere
-        self.scene.geometries.list.push(Geometry::Union {
-            children: vec![
-                Geometry::Translate {
-                    translation: [
-                        Parameter::Symbolic { index: 1 },
-                        Parameter::Symbolic { index: 2 },
-                        Parameter::Symbolic { index: 3 },
-                    ],
-                    f: Box::new(Geometry::Scale {
-                        factor: Parameter::Symbolic { index: 0 },
-                        f: Box::new(Geometry::Round {
-                            f: Box::new(Geometry::UnitCube),
-                            radius: Parameter::Constant { value: 0.125 },
-                        }),
-                    }),
-                },
-                Geometry::Translate {
-                    translation: [
-                        Parameter::Symbolic { index: 5 },
-                        Parameter::Symbolic { index: 6 },
-                        Parameter::Symbolic { index: 7 },
-                    ],
-                    f: Box::new(Geometry::Scale {
-                        factor: Parameter::Symbolic { index: 4 },
-                        f: Box::new(Geometry::UnitSphere),
-                    }),
-                },
-            ],
-        });
-
-        self.scene.geometries.list.len() - 1
-    }
-
     pub fn set_dimensions(&mut self, width: u32, height: u32) {
         self.scene.raster.width = NonZeroU32::new(width).unwrap();
         self.scene.raster.height = NonZeroU32::new(height).unwrap();
@@ -874,11 +821,11 @@ impl WasmRunner {
     }
 
     pub fn instance_count(&mut self) -> usize {
-        self.scene.instances.list.len()
+        self.scene.instances.len()
     }
 
     pub fn remove_instance(&mut self, index: usize) {
-        self.scene.instances.list.remove(index);
+        self.scene.instances.remove(index);
     }
 }
 

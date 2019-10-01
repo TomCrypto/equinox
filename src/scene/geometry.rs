@@ -2,11 +2,6 @@ use crate::BoundingBox;
 use cgmath::Point3;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct Geometries {
-    pub list: Vec<Geometry>,
-}
-
 /// Parameter
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]

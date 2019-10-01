@@ -2,7 +2,7 @@
 use log::{debug, info, warn};
 
 use crate::Device;
-use crate::{Material, Materials};
+use crate::Material;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
@@ -59,17 +59,17 @@ fn write_material_parameters(material: &Material, parameters: &mut [MaterialPara
 }
 
 impl Device {
-    pub(crate) fn update_materials(&mut self, materials: &Materials) {
+    pub(crate) fn update_materials(&mut self, materials: &[Material]) {
         let mut block_count = 0;
 
-        for material in &materials.list {
+        for material in materials {
             block_count += material_parameter_block_count(material);
         }
 
         let parameters: &mut [MaterialParameter] = self.allocator.allocate(block_count);
         let mut start = 0;
 
-        for material in &materials.list {
+        for material in materials {
             let count = material_parameter_block_count(material);
 
             write_material_parameters(material, &mut parameters[start..start + count]);

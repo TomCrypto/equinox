@@ -68,28 +68,6 @@ import('../pkg/equinox').catch(console.error).then(async gl => {
 
   runner.set_camera_position(0.5, 4, -12)
 
-  /*let [bvh, tri, position, normal] = await load_model_data('cat')
-  let cat_object = runner.add_object(bvh, tri, position, normal, 1, -484.04044, 7.148789, -72.22099, 277.95947, 338.37366, 72.22315)
-  let [bvh2, tri2, position2, normal2] = await load_model_data('buddha')
-  let buddha_object = runner.add_object(bvh2, tri2, position2, normal2, 1, -0.188615, -0.445945, -0.224346, 0.222054, 0.554055, 0.186807)
-  let [bvh3, tri3, position3, normal3] = await load_model_data('cornell')
-  let cornell_object = runner.add_object(bvh3, tri3, position3, normal3, 9, 0, 0, 0, 556.0, 548.8, 559.2)
-  let [bvh4, tri4, position4, normal4] = await load_model_data('sphere')
-  let sphere_object = runner.add_object(bvh4, tri4, position4, normal4, 1, -19.74, -19.74, -19.74, 19.74, 19.74, 19.74)*/
-
-  //runner.add_instance(cornell_object, 0, 0, 0, 1, [white_mat, light, white_mat, white_mat, white_mat, green_mat, red_mat, blue_mat, yellow_mat])
-  //runner.set_camera_position(338.34976, 698.74335, -1202.723)
-
-  /*let sphere = runner.add_object();
-  let other = runner.add_other_object();
-
-  // s1 x1 y1 z1 s2 x2 y2 z2
-
-  runner.add_instance(sphere, 0, [0.1, 0.0, 0.0, 0.0, 0.5, 0.0, -0.5, 0.0], [0.75, 0.25, 0.25, 0.0]);
-  runner.add_instance(other, 0, [], [0.25, 0.75, 0.25, 0.0]);
-  // runner.add_instance(sphere, 1, [1.0, 0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 2.0], []);
-  runner.add_instance(sphere, 0, [1.0, 0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 2.0], [0.25, 0.25, 0.75, 0.0]);*/
-
   runner.setup_test_scene();
 
   document.getElementById("cat").addEventListener("click", () => {

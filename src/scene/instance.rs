@@ -5,11 +5,6 @@ use crate::BoundingBox;
 use serde::{Deserialize, Serialize};
 use zerocopy::{AsBytes, FromBytes};
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct Instances {
-    pub list: Vec<Instance>,
-}
-
 // transforms are baked into the SDF nature of the geometry, so it's unnecessary
 // to include it here. all we need here is a reference to the geometry, and a
 // reference to the material

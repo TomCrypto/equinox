@@ -4,7 +4,7 @@ use log::{debug, info, warn};
 use crate::renumber_parameters;
 use crate::Device;
 use crate::{material_index, material_parameter_block_count};
-use crate::{Geometry, HierarchyBuilder, InstanceInfo, Instances, Material};
+use crate::{Geometry, HierarchyBuilder, Instance, InstanceInfo, Material};
 use itertools::izip;
 use zerocopy::{AsBytes, FromBytes};
 
@@ -13,7 +13,7 @@ impl Device {
         &mut self,
         geometries: &[Geometry],
         materials: &[Material],
-        instances: &Instances,
+        instances: &[Instance],
     ) {
         // update the instance BVH
 
@@ -26,10 +26,10 @@ impl Device {
             count += material_parameter_block_count(material) as u16;
         }
 
-        let mut instance_info = Vec::with_capacity(instances.list.len());
+        let mut instance_info = Vec::with_capacity(instances.len());
         let mut geometry_start = 0;
 
-        for instance in &instances.list {
+        for instance in instances {
             let geometry = &geometries[instance.geometry];
             let material = &materials[instance.material];
 
@@ -51,7 +51,7 @@ impl Device {
             geometry_start += (instance.geometry_values.len() as u16) / 4;
         }
 
-        let node_count = HierarchyBuilder::node_count_for_leaves(instances.list.len());
+        let node_count = HierarchyBuilder::node_count_for_leaves(instances.len());
 
         let mut nodes = self.allocator.allocate(node_count);
 
@@ -66,7 +66,6 @@ impl Device {
         // individual vec4 elements. Out-of-bounds parameter indices are checked here.
 
         let geometry_parameter_count: usize = instances
-            .list
             .iter()
             .map(|inst| inst.geometry_values.len())
             .sum();
@@ -74,7 +73,7 @@ impl Device {
         let mut params: &mut [GeometryParameter] =
             self.allocator.allocate(geometry_parameter_count / 4);
 
-        for instance in &instances.list {
+        for instance in instances {
             let indices = renumber_parameters(&geometries[instance.geometry]);
             let (region, remaining_data) = params.split_at_mut((indices.len() + 3) / 4);
 

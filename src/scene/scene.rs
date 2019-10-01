@@ -1,4 +1,4 @@
-use crate::{Camera, Dirty, Display, Environment, Geometries, Instances, Materials, Raster};
+use crate::{Camera, Dirty, Display, Environment, Geometry, Instance, Material, Raster};
 
 use serde::{Deserialize, Serialize};
 
@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 pub struct Scene {
     pub camera: Dirty<Camera>,
     pub raster: Dirty<Raster>,
-    pub instances: Dirty<Instances>,
-    pub geometries: Dirty<Geometries>,
-    pub materials: Dirty<Materials>,
+    pub instances: Dirty<Vec<Instance>>,
+    pub geometries: Dirty<Vec<Geometry>>,
+    pub materials: Dirty<Vec<Material>>,
     pub environment: Dirty<Environment>,
     pub display: Dirty<Display>,
 }
