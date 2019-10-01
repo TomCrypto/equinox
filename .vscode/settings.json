@@ -15,6 +15,7 @@
     ".vscode": true,
     "Cargo.lock": true,
     "target": true,
+    "pkg": "true",
   },
 
   "files.insertFinalNewline": true,

@@ -1,6 +1,7 @@
 /target
 **/*.rs.bk
 /Cargo.lock
-/node_modules
+node_modules
+assets
 /pkg
 /.vscode/tasks.json

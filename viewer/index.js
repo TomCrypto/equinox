@@ -2,16 +2,7 @@ async function fetch_bytes(url) {
   return (await fetch(new Request(url))).arrayBuffer();
 }
 
-async function load_model_data(name) {
-  hierarchy_data = new Uint8Array(await fetch_bytes(`pkg/${name}.hierarchy.bin`))
-  triangle_data = new Uint8Array(await fetch_bytes(`pkg/${name}.triangle.bin`))
-  position_data = new Uint8Array(await fetch_bytes(`pkg/${name}.position.bin`))
-  normal_data = new Uint8Array(await fetch_bytes(`pkg/${name}.mapping.bin`))
-
-  return [hierarchy_data, triangle_data, position_data, normal_data]
-}
-
-import('./pkg/equinox').catch(console.error).then(async gl => {
+import('../pkg/equinox').catch(console.error).then(async gl => {
   if (!gl) {
     throw "fail"
   }
@@ -61,15 +52,15 @@ import('./pkg/equinox').catch(console.error).then(async gl => {
     ctx.restoreContext();
   });
 
-  let aperture_r = new Float32Array(await fetch_bytes("pkg/r_spectrum.dat"))
-  let aperture_g = new Float32Array(await fetch_bytes("pkg/g_spectrum.dat"))
-  let aperture_b = new Float32Array(await fetch_bytes("pkg/b_spectrum.dat"))
+  let aperture_r = new Float32Array(await fetch_bytes("assets/r_spectrum.dat"))
+  let aperture_g = new Float32Array(await fetch_bytes("assets/g_spectrum.dat"))
+  let aperture_b = new Float32Array(await fetch_bytes("assets/b_spectrum.dat"))
   runner.set_aperture_data(aperture_r, aperture_g, aperture_b, 2048, 1024)
 
-  let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap2.dat"))
+  let envmap_data = new Float32Array(await fetch_bytes("assets/envmap2.dat"))
   runner.set_envmap(envmap_data, 4096, 2048)
 
-  // let envmap_data = new Float32Array(await fetch_bytes("pkg/envmap5.dat"))
+  // let envmap_data = new Float32Array(await fetch_bytes("assets/envmap5.dat"))
   // runner.set_envmap(envmap_data, 8192, 4096)
 
   runner.set_camera_position(0.5, 4, -12)
