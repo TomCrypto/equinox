@@ -1,13 +1,14 @@
 use crate::BoundingBox;
 use cgmath::Point3;
+use serde::{Deserialize, Serialize};
 
-#[derive(Default)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Geometries {
     pub list: Vec<Geometry>,
 }
 
 /// Parameter
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub enum Parameter {
     /// Fixed value across all instances.
     Constant(f32),
@@ -24,7 +25,7 @@ impl Parameter {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Geometry {
     UnitSphere,
     UnitCube,

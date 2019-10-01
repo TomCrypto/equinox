@@ -1,9 +1,11 @@
-#[derive(Debug, Default)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Materials {
     pub list: Vec<Material>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub enum Material {
     Lambertian {
         albedo: [f32; 3],

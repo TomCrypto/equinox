@@ -2,7 +2,7 @@
 use log::{debug, info, warn};
 
 use crate::Device;
-use coherence_base::{Material, Materials};
+use crate::{Material, Materials};
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]

@@ -1,7 +1,8 @@
+use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 use std::num::NonZeroU32;
 
-#[derive(Copy, Clone, SmartDefault)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, SmartDefault)]
 pub enum RasterFilter {
     #[default]
     BlackmanHarris,
@@ -54,7 +55,7 @@ impl RasterFilter {
     }
 }
 
-#[derive(SmartDefault)]
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 pub struct Raster {
     #[default(NonZeroU32::new(256).unwrap())]
     pub width: NonZeroU32,

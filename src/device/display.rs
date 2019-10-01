@@ -1,5 +1,5 @@
 use crate::Device;
-use coherence_base::Display;
+use crate::Display;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]

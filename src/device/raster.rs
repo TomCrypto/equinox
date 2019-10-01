@@ -1,5 +1,5 @@
 use crate::Device;
-use coherence_base::Raster;
+use crate::Raster;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]

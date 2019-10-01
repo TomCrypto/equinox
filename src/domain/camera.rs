@@ -1,7 +1,9 @@
+use crate::Alias;
 use cgmath::{Point3, Vector3};
+use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
-#[derive(Clone, Copy, SmartDefault)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, SmartDefault)]
 pub enum Aperture {
     #[default]
     Point,
@@ -25,7 +27,7 @@ impl Aperture {
     }
 }
 
-#[derive(SmartDefault)]
+#[derive(Clone, Debug, Deserialize, SmartDefault, Serialize)]
 pub struct Camera {
     #[default(Point3::new(0.0, 0.0, 0.0))]
     pub position: Point3<f32>,
@@ -48,9 +50,9 @@ pub struct Camera {
     #[default(0.024)]
     pub film_height: f32,
 
-    pub aperture_r_spectrum: Vec<f32>,
-    pub aperture_g_spectrum: Vec<f32>,
-    pub aperture_b_spectrum: Vec<f32>,
+    pub aperture_r_spectrum: Alias<Vec<f32>>,
+    pub aperture_g_spectrum: Alias<Vec<f32>>,
+    pub aperture_b_spectrum: Alias<Vec<f32>>,
     pub aperture_width: u32,
     pub aperture_height: u32,
 }

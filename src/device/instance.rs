@@ -4,7 +4,7 @@ use log::{debug, info, warn};
 use crate::renumber_parameters;
 use crate::Device;
 use crate::{material_index, material_parameter_block_count};
-use coherence_base::{Geometry, HierarchyBuilder, InstanceInfo, Instances, Material};
+use crate::{Geometry, HierarchyBuilder, InstanceInfo, Instances, Material};
 use itertools::izip;
 use zerocopy::{AsBytes, FromBytes};
 

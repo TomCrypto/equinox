@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
 pub type CameraResponse = [[f32; 3]; 11];
 
-#[derive(Debug, SmartDefault)]
+#[derive(Debug, Deserialize, SmartDefault, Serialize)]
 pub struct Display {
     #[default(0.0)]
     pub exposure: f32,

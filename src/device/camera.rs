@@ -1,7 +1,7 @@
 use crate::Device;
+use crate::{Aperture, Camera};
 use cgmath::prelude::*;
 use cgmath::Point3;
-use coherence_base::{Aperture, Camera};
 use itertools::iproduct;
 use zerocopy::{AsBytes, FromBytes};
 

@@ -2,9 +2,10 @@
 use log::{debug, info, warn};
 
 use crate::BoundingBox;
+use serde::{Deserialize, Serialize};
 use zerocopy::{AsBytes, FromBytes};
 
-#[derive(Default)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Instances {
     pub list: Vec<Instance>,
 }
@@ -15,6 +16,7 @@ pub struct Instances {
 
 // what about multiple materials? don't bother for now
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Instance {
     pub geometry: usize,
     pub material: usize,

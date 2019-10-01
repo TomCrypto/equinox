@@ -11,7 +11,7 @@ async function load_model_data(name) {
   return [hierarchy_data, triangle_data, position_data, normal_data]
 }
 
-import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
+import('./pkg/equinox').catch(console.error).then(async gl => {
   if (!gl) {
     throw "fail"
   }
@@ -253,7 +253,7 @@ import('./pkg/coherence_webgl2_wasm').catch(console.error).then(async gl => {
       }
 
       if (dx != 0.0 || dy != 0.0) {
-        runner.move_camera(-dx * 1, -dy * 1)
+        runner.move_camera(-dx * 10, -dy * 10)
         samples = 0
       }
 

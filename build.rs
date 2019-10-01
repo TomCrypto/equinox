@@ -48,7 +48,8 @@ fn preprocess(
             }
 
             // If we don't find the file, simply leave the #include in there to be populated
-            // dynamically by the renderer, but always insert the file/line marker comments.
+            // dynamically by the renderer. The file/line marker comments are still added in
+            // which allows compilation errors inside dynamic includes to still be reported.
 
             let result = read_to_string(&relative_path.join(includes_path.join(&header)));
 

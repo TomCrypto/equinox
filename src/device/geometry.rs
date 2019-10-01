@@ -1,4 +1,4 @@
-use coherence_base::{Geometry, Parameter};
+use crate::{Geometry, Parameter};
 use std::fmt::Display;
 
 #[derive(Debug, Default)]
