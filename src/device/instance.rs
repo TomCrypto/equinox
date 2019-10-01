@@ -53,7 +53,7 @@ impl Device {
 
         let node_count = HierarchyBuilder::node_count_for_leaves(instances.list.len());
 
-        let mut nodes = self.scratch.allocate(node_count);
+        let mut nodes = self.allocator.allocate(node_count);
 
         HierarchyBuilder::new(&mut nodes).build(&mut instance_info);
 
@@ -72,7 +72,7 @@ impl Device {
             .sum();
 
         let mut params: &mut [GeometryParameter] =
-            self.scratch.allocate(geometry_parameter_count / 4);
+            self.allocator.allocate(geometry_parameter_count / 4);
 
         for instance in &instances.list {
             let indices = renumber_parameters(&geometries[instance.geometry]);

@@ -66,7 +66,7 @@ impl Device {
             block_count += material_parameter_block_count(material);
         }
 
-        let parameters: &mut [MaterialParameter] = self.scratch.allocate(block_count);
+        let parameters: &mut [MaterialParameter] = self.allocator.allocate(block_count);
         let mut start = 0;
 
         for material in &materials.list {

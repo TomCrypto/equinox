@@ -15,7 +15,7 @@ pub struct CameraData {
 
 impl Device {
     pub(crate) fn update_camera(&mut self, camera: &Camera) {
-        let data: &mut CameraData = self.scratch.allocate_one();
+        let data: &mut CameraData = self.allocator.allocate_one();
 
         let fov_tan = camera.film_height / (2.0 * camera.focal_length);
 

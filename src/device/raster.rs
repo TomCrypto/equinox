@@ -13,7 +13,7 @@ pub struct RasterData {
 
 impl Device {
     pub(crate) fn update_raster(&mut self, raster: &Raster) {
-        let data: &mut RasterData = self.scratch.allocate_one();
+        let data: &mut RasterData = self.allocator.allocate_one();
 
         data.width = raster.width.get() as f32;
         data.height = raster.height.get() as f32;

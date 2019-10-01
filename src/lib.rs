@@ -19,49 +19,10 @@ use maplit::hashmap;
 use quasirandom::Qrng;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-use std::mem::size_of;
 use web_sys::WebGl2RenderingContext as Context;
-use zerocopy::{AsBytes, FromBytes, LayoutVerified};
+use zerocopy::{AsBytes, FromBytes};
 
 export![device, domain, engine];
-
-#[repr(align(64), C)]
-#[derive(FromBytes, AsBytes, Clone)]
-struct Aligned([u8; 64]);
-
-impl Default for Aligned {
-    fn default() -> Self {
-        Self([0; 64])
-    }
-}
-
-#[derive(Default)]
-pub struct AlignedMemory {
-    memory: Vec<Aligned>,
-}
-
-impl AlignedMemory {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn allocate<T: AsBytes + FromBytes>(&mut self, len: usize) -> &mut [T] {
-        LayoutVerified::new_slice(self.allocate_bytes(len * size_of::<T>()))
-            .unwrap()
-            .into_mut_slice()
-    }
-
-    pub fn allocate_one<T: AsBytes + FromBytes>(&mut self) -> &mut T {
-        &mut self.allocate(1)[0]
-    }
-
-    pub fn allocate_bytes(&mut self, len: usize) -> &mut [u8] {
-        let blocks = (len + size_of::<Aligned>() - 1) / size_of::<Aligned>();
-        self.memory.resize_with(blocks, Aligned::default); // round up length
-
-        &mut self.memory.as_mut_slice().as_bytes_mut()[..len]
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct RefineStatistics {
@@ -135,7 +96,7 @@ pub struct Device {
     refine_query: Query,
     render_query: Query,
 
-    scratch: AlignedMemory,
+    allocator: Allocator,
 
     device_lost: bool,
 
@@ -146,7 +107,7 @@ impl Device {
     /// Creates a new device using a WebGL2 context.
     pub fn new(gl: &Context) -> Result<Self, Error> {
         Ok(Self {
-            scratch: AlignedMemory::new(),
+            allocator: Allocator::new(),
             gl: gl.clone(),
             direct_copy_shader: Shader::new(
                 gl.clone(),
@@ -341,13 +302,6 @@ impl Device {
             // changed... there is probably a nicer way to do this honestly
 
             self.update_environment(environment);
-
-            if let Some(map) = &environment.map {
-                self.program.frag_shader().set_define("HAS_ENVMAP", "1");
-            // self.envmap_pix_tex.write(&mut self.scratch, map);
-            } else {
-                self.program.frag_shader().set_define("HAS_ENVMAP", "0");
-            }
         });
 
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
@@ -431,6 +385,8 @@ impl Device {
             self.reset_refinement();
         }
 
+        self.allocator.shrink_to_watermark();
+
         Ok(invalidated)
     }
 
@@ -442,7 +398,7 @@ impl Device {
 
         // TODO: not happy with this, can we improve it
         self.state
-            .update(&mut self.scratch, &mut self.globals_buffer);
+            .update(&mut self.allocator, &mut self.globals_buffer);
 
         self.program.bind_to_pipeline(|shader| {
             shader.bind(&self.camera_buffer, "Camera");
@@ -570,7 +526,7 @@ impl DeviceState {
         self.filter = scene.raster.filter;
     }
 
-    pub fn update(&mut self, scratch: &mut AlignedMemory, buffer: &mut UniformBuffer<GlobalData>) {
+    pub fn update(&mut self, allocator: &mut Allocator, buffer: &mut UniformBuffer<GlobalData>) {
         // we don't want the first (0, 0) sample from the sequence
         let (mut x, mut y) = self.filter_rng.next::<(f32, f32)>();
 
@@ -579,7 +535,7 @@ impl DeviceState {
             y = 0.5;
         }
 
-        let data: &mut GlobalData = scratch.allocate_one();
+        let data: &mut GlobalData = allocator.allocate_one();
 
         data.filter_delta[0] = 2.0 * self.filter.importance_sample(x) - 1.0;
         data.filter_delta[1] = 2.0 * self.filter.importance_sample(y) - 1.0;

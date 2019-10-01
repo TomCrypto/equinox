@@ -14,7 +14,7 @@ pub struct DisplayData {
 
 impl Device {
     pub(crate) fn update_display(&mut self, display: &Display) {
-        let data: &mut DisplayData = self.scratch.allocate_one();
+        let data: &mut DisplayData = self.allocator.allocate_one();
 
         data.exposure = (2.0f32).powf(display.exposure);
         data.saturation = display.saturation.max(0.0).min(1.0);

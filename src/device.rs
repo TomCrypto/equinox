@@ -6,5 +6,6 @@ export![
     instance,
     display,
     material,
-    lens_flare
+    lens_flare,
+    allocator
 ];
