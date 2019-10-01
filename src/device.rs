@@ -1,11 +1,11 @@
 export![
+    allocator,
+    camera,
+    display,
     environment,
     geometry,
-    raster,
-    camera,
     instance,
-    display,
-    material,
     lens_flare,
-    allocator
+    material,
+    raster,
 ];

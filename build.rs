@@ -121,7 +121,14 @@ fn preprocess_shaders(dir: &str, ext: &str, include_path: &str) -> Result<()> {
 
             write!(
                 generated_file,
-                "\npub const {}: &str = include_str!(\"{}\");\n",
+                "\n/// GLSL source for the `{}` shader file.\n",
+                path.display(),
+            )
+            .unwrap();
+
+            write!(
+                generated_file,
+                "pub const {}: &str = include_str!(\"{}\");\n",
                 name,
                 path.display(),
             )

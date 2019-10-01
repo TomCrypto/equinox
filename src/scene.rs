@@ -1,7 +1,3 @@
-mod scene;
-
-pub use scene::Scene;
-
 export![
     alias,
     bounding_box,
@@ -12,5 +8,6 @@ export![
     geometry,
     instance,
     material,
-    raster
+    raster,
+    scene,
 ];

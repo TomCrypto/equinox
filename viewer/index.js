@@ -59,11 +59,12 @@ import('../pkg/equinox').catch(console.error).then(async gl => {
   let aperture_b = new Float32Array(await fetch_bytes("assets/b_spectrum.dat"))
   runner.set_aperture_data(aperture_r, aperture_g, aperture_b, 2048, 1024)
 
-  let envmap_data = new Float32Array(await fetch_bytes("assets/envmap2.dat"))
-  runner.set_envmap(envmap_data, 4096, 2048)
+  //let envmap_data = new Float32Array(await fetch_bytes("assets/envmap2.dat"))
+  //runner.set_envmap(envmap_data, 4096, 2048)
 
-  // let envmap_data = new Float32Array(await fetch_bytes("assets/envmap5.dat"))
-  // runner.set_envmap(envmap_data, 8192, 4096)
+  // 5 or 7
+  let envmap_data = new Float32Array(await fetch_bytes("assets/envmap7.dat"))
+  runner.set_envmap(envmap_data, 8192, 4096)
 
   runner.set_camera_position(0.5, 4, -12)
 

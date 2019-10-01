@@ -3,12 +3,8 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-mod shaders {
-    include!(concat!(env!("OUT_DIR"), "/glsl_shaders.rs"));
-}
-
 macro_rules! export {
-    [$( $module:ident ),*] => {
+    [$( $module:ident ),* $(,)*] => {
         $(
             mod $module;
             pub use self::$module::*;
@@ -626,10 +622,6 @@ impl WasmRunner {
             .map_err(|err| Error::new(&err.to_string()))?)
     }
 
-    // functions to do stuff... e.g. "rotate camera", "zoom in", "switch
-    // perspective", "change material", etc... these are all "actions"
-    // propagated to the scene
-
     pub fn update(&mut self) -> Result<bool, JsValue> {
         Ok(self.device.update(&mut self.scene)?)
     }
@@ -890,4 +882,9 @@ impl WasmRunner {
     }
 }
 
-export![device, domain, engine];
+export![device, engine, scene];
+
+/// GLSL shaders.
+pub mod shaders {
+    include!(concat!(env!("OUT_DIR"), "/glsl_shaders.rs"));
+}
