@@ -28,6 +28,52 @@ impl Query {
         }
     }
 
+    pub fn start_query(&mut self) {
+        if let Some(handle) = &self.handle {
+            if !self.busy {
+                self.gl
+                    .begin_query(ExtDisjointTimerQuery::TIME_ELAPSED_EXT, handle);
+
+                self.busy = true;
+            }
+        }
+    }
+
+    pub fn end_query(&mut self) -> Option<f32> {
+        if self.busy {
+            self.gl.end_query(ExtDisjointTimerQuery::TIME_ELAPSED_EXT);
+        }
+
+        if let Some(handle) = &self.handle {
+            let available = self
+                .gl
+                .get_query_parameter(handle, Context::QUERY_RESULT_AVAILABLE)
+                .as_bool()
+                .unwrap_or_default();
+
+            let disjoint = self
+                .gl
+                .get_parameter(ExtDisjointTimerQuery::GPU_DISJOINT_EXT)
+                .unwrap()
+                .as_bool()
+                .unwrap_or_default();
+
+            if available && !disjoint {
+                let elapsed = self
+                    .gl
+                    .get_query_parameter(handle, Context::QUERY_RESULT)
+                    .as_f64()
+                    .unwrap();
+
+                self.busy = false;
+
+                return Some(elapsed as f32);
+            }
+        }
+
+        None
+    }
+
     pub fn query_time_elapsed(&mut self) -> QueryScope {
         QueryScope::begin(self)
     }

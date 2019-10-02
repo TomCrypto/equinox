@@ -1,9 +1,5 @@
 #include <common.glsl>
 
-vec2 multiplyComplex (vec2 a, vec2 b) {
-    return vec2(a[0] * b[0] - a[1] * b[1], a[1] * b[0] + a[0] * b[1]);
-}
-
 uniform sampler2D r_spectrum_input;
 uniform sampler2D g_spectrum_input;
 uniform sampler2D b_spectrum_input;
@@ -54,7 +50,7 @@ void main(void){
     float twiddleArgument1D = -fft.direction * M_2PI * (float(index % fft.subtransformSize) / float(fft.subtransformSize));
     vec2 twiddle1D = vec2(cos(twiddleArgument1D), sin(twiddleArgument1D));
 
-    r_spectrum_output = r_even + multiplyComplex(twiddle1D, r_odd);
-    g_spectrum_output = g_even + multiplyComplex(twiddle1D, g_odd);
-    b_spectrum_output = b_even + multiplyComplex(twiddle1D, b_odd);
+    r_spectrum_output = r_even + complex_mul(twiddle1D, r_odd);
+    g_spectrum_output = g_even + complex_mul(twiddle1D, g_odd);
+    b_spectrum_output = b_even + complex_mul(twiddle1D, b_odd);
 }

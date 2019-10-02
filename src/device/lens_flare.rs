@@ -3,6 +3,8 @@ use log::{debug, info, warn};
 
 use crate::Device;
 use crate::DrawOptions;
+use crate::Framebuffer;
+use crate::{Texture, RG32F};
 
 use zerocopy::{AsBytes, FromBytes};
 
@@ -18,562 +20,227 @@ pub struct FFTData {
 // TODO: possible speed-ups:
 //  - larger radix to reduce number of iterations
 //  - complex-to-real/real-to-complex FFT speedups
+//  - reducing number of state switches...
 
 impl Device {
-    fn prepare_aperture(&mut self) {
-        self.spectrum_temp2_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
-        self.spectrum_temp2_fbo.clear(1, [0.0, 0.0, 0.0, 0.0]);
-        self.spectrum_temp2_fbo.clear(2, [0.0, 0.0, 0.0, 0.0]);
+    pub(crate) fn render_lens_flare(&mut self) {
+        let mut location = self.load_path_traced_render_into_convolution_buffers();
+        self.perform_forward_fft(&mut location);
+        self.perform_pointwise_multiplication(&mut location);
+        self.perform_inverse_fft(&mut location);
+        self.load_convolved_render_from_convolution_buffers(&mut location);
+    }
 
-        self.spectrum_temp1_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
-        self.spectrum_temp1_fbo.clear(1, [0.0, 0.0, 0.0, 0.0]);
-        self.spectrum_temp1_fbo.clear(2, [0.0, 0.0, 0.0, 0.0]);
+    // TODO: in the future, pack the real data into a half-size complex FFT and do
+    // the convolution using that, to get hopefully a 2x speed boost?
+    // TODO: see if we can just compute the FFT of the non-padded data and then
+    // "stretch" it as-if it had been zero-padded? not sure if possible
 
-        // 1. create the source data...
-
-        self.draw_aperture_shader.bind_to_pipeline(|_| {});
-
-        self.aperture_source_fbo.draw(DrawOptions {
-            viewport: [0, 0, 2048, 1024],
-            scissor: None,
-            blend: None,
-        });
-
-        // 2. take its FFT to get the spectrum...
-
-        self.copy_into_spectrum_shader.bind_to_pipeline(|shader| {
-            shader.bind(&self.aperture_source, "source");
+    fn load_path_traced_render_into_convolution_buffers(&mut self) -> DataLocation {
+        self.load_convolution_buffers.bind_to_pipeline(|shader| {
+            shader.bind(&self.samples, "image");
         });
 
         self.spectrum_temp1_fbo.draw(DrawOptions {
-            viewport: [0, 0, 1024, 512],
+            viewport: [0, 0, 2048, 1024], // TODO: get this data from a central place
             scissor: None,
             blend: None,
         });
 
-        let mut current_input = true; // FALSE = temp2, TRUE = temp1
+        DataLocation::Temp1
+    }
 
-        let transform_size = 2048;
-        let row_iterations = 11; // log2(2048)
-
-        for i in 0..row_iterations {
-            let subtransform_size = 2i32.pow(i + 1);
-
-            self.fft_buffer.write(&FFTData {
-                direction: 1.0,
-                horizontal: 1.0,
-                transform_size,
-                subtransform_size,
-            });
-
-            if current_input {
-                // render into TEMP2 from TEMP1
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp1, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp1, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp1, "b_spectrum_input");
-                });
-
-                self.spectrum_temp2_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            } else {
-                // render into TEMP1 from TEMP2
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp2, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp2, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp2, "b_spectrum_input");
-                });
-
-                self.spectrum_temp1_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            }
-
-            current_input = !current_input;
-        }
-
-        // STEP 3: perform the per-column FFT
-
-        let transform_size = 1024;
-        let row_iterations = 10; // log2(1024)
-
-        for i in 0..row_iterations {
-            let subtransform_size = 2i32.pow(i + 1);
-
-            self.fft_buffer.write(&FFTData {
-                direction: 1.0,
-                horizontal: 0.0,
-                transform_size,
-                subtransform_size,
-            });
-
-            if current_input {
-                // render into TEMP2 from TEMP1
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp1, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp1, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp1, "b_spectrum_input");
-                });
-
-                self.spectrum_temp2_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            } else {
-                // render into TEMP1 from TEMP2
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp2, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp2, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp2, "b_spectrum_input");
-                });
-
-                self.spectrum_temp1_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            }
-
-            current_input = !current_input;
-        }
-
-        let transform_size = 2048;
-        let row_iterations = 11; // log2(2048)
-
-        for i in 0..row_iterations {
-            let subtransform_size = 2i32.pow(i + 1);
-
-            self.fft_buffer.write(&FFTData {
-                direction: -1.0,
-                horizontal: 1.0,
-                transform_size,
-                subtransform_size,
-            });
-
-            if current_input {
-                // render into TEMP2 from TEMP1
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp1, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp1, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp1, "b_spectrum_input");
-                });
-
-                self.spectrum_temp2_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            } else {
-                // render into TEMP1 from TEMP2
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp2, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp2, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp2, "b_spectrum_input");
-                });
-
-                self.spectrum_temp1_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            }
-
-            current_input = !current_input;
-        }
-
-        // STEP 6: perform per-column IFFT
-
-        let transform_size = 1024;
-        let row_iterations = 10; // log2(1024)
-
-        for i in 0..row_iterations {
-            let subtransform_size = 2i32.pow(i + 1);
-
-            self.fft_buffer.write(&FFTData {
-                direction: -1.0,
-                horizontal: 0.0,
-                transform_size,
-                subtransform_size,
-            });
-
-            if current_input {
-                // render into TEMP2 from TEMP1
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp1, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp1, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp1, "b_spectrum_input");
-                });
-
-                if i == row_iterations - 1 {
-                    self.aperture_fbo.draw(DrawOptions {
-                        viewport: [0, 0, 2048, 1024],
-                        scissor: None,
-                        blend: None,
-                    });
-                } else {
-                    self.spectrum_temp2_fbo.draw(DrawOptions {
-                        viewport: [0, 0, 2048, 1024],
-                        scissor: None,
-                        blend: None,
-                    });
-                }
-            } else {
-                // render into TEMP1 from TEMP2
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp2, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp2, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp2, "b_spectrum_input");
-                });
-
-                if i == row_iterations - 1 {
-                    self.aperture_fbo.draw(DrawOptions {
-                        viewport: [0, 0, 2048, 1024],
-                        scissor: None,
-                        blend: None,
-                    });
-                } else {
-                    self.spectrum_temp1_fbo.draw(DrawOptions {
-                        viewport: [0, 0, 2048, 1024],
-                        scissor: None,
-                        blend: None,
-                    });
-                }
-            }
-
-            current_input = !current_input;
+    fn source_r_buffer(&self, location: DataLocation) -> &Texture<RG32F> {
+        match location {
+            DataLocation::Temp1 => &self.rspectrum_temp1,
+            DataLocation::Temp2 => &self.rspectrum_temp2,
         }
     }
 
-    pub(crate) fn render_lens_flare(&mut self) {
-        // self.prepare_aperture();
+    fn source_g_buffer(&self, location: DataLocation) -> &Texture<RG32F> {
+        match location {
+            DataLocation::Temp1 => &self.gspectrum_temp1,
+            DataLocation::Temp2 => &self.gspectrum_temp2,
+        }
+    }
 
-        // STEP 1: copy the data for each channel of the samples buffer into
-        // temp buffers R1, G1, B1 (these are complex RG32F textures),
-        // zero-padded accordingly
+    fn source_b_buffer(&self, location: DataLocation) -> &Texture<RG32F> {
+        match location {
+            DataLocation::Temp1 => &self.bspectrum_temp1,
+            DataLocation::Temp2 => &self.bspectrum_temp2,
+        }
+    }
 
-        /*
+    fn target_framebuffer(&self, location: DataLocation) -> &Framebuffer {
+        match location {
+            DataLocation::Temp1 => &self.spectrum_temp2_fbo,
+            DataLocation::Temp2 => &self.spectrum_temp1_fbo,
+        }
+    }
 
-        Resizing logic: the spectrum buffers are defined to be 2048x1024
+    // TODO: might be a way to speed things up here by avoiding unnecessary
+    // useProgram (which I suspect might not be the fastest operation out there)
 
-        we need to copy the source image into the lower 1024x512 pixels of this
+    fn perform_forward_fft(&mut self, location: &mut DataLocation) {
+        // per-row pass, transform size will be row size
 
-        */
+        let (mut s, mut m) = (1, 2);
 
-        self.spectrum_temp2_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
-        self.spectrum_temp2_fbo.clear(1, [0.0, 0.0, 0.0, 0.0]);
-        self.spectrum_temp2_fbo.clear(2, [0.0, 0.0, 0.0, 0.0]);
-
-        self.spectrum_temp1_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
-        self.spectrum_temp1_fbo.clear(1, [0.0, 0.0, 0.0, 0.0]);
-        self.spectrum_temp1_fbo.clear(2, [0.0, 0.0, 0.0, 0.0]);
-
-        self.direct_copy_shader.bind_to_pipeline(|shader| {
-            shader.bind(&self.samples, "source");
-        });
-
-        self.conv_fbo.draw(DrawOptions {
-            viewport: [0, 0, 1024, 512],
-            scissor: Some([0, 0, 1024, 512]),
-            blend: None,
-        });
-
-        self.copy_into_spectrum_shader.bind_to_pipeline(|shader| {
-            shader.bind(&self.samples, "source");
-        });
-
-        self.spectrum_temp1_fbo.draw(DrawOptions {
-            viewport: [0, 0, 1024, 512],
-            scissor: Some([0, 0, 1024, 512]),
-            blend: None,
-        });
-
-        let mut current_input = true; // FALSE = temp2, TRUE = temp1
-
-        // STEP 2: perform the per-row FFT concurrently for all three buffers,
-        // ping-ponging between temp1 and temp2
-
-        let transform_size = 2048;
-        let row_iterations = 11; // log2(2048)
-
-        for i in 0..row_iterations {
-            let subtransform_size = 2i32.pow(i + 1);
-
+        while m <= 2048 {
             self.fft_buffer.write(&FFTData {
                 direction: 1.0,
                 horizontal: 1.0,
-                transform_size,
-                subtransform_size,
+                transform_size: 2048,
+                subtransform_size: m,
             });
 
-            if current_input {
-                // render into TEMP2 from TEMP1
+            self.fft_shader.bind_to_pipeline(|shader| {
+                shader.bind(&self.fft_buffer, "FFT");
 
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp1, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp1, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp1, "b_spectrum_input");
-                });
+                shader.bind(self.source_r_buffer(*location), "r_spectrum_input");
+                shader.bind(self.source_g_buffer(*location), "g_spectrum_input");
+                shader.bind(self.source_b_buffer(*location), "b_spectrum_input");
+            });
 
-                self.spectrum_temp2_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            } else {
-                // render into TEMP1 from TEMP2
+            self.target_framebuffer(*location).draw(DrawOptions {
+                viewport: [0, 0, 2048, 1024],
+                scissor: None,
+                blend: None,
+            });
 
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp2, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp2, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp2, "b_spectrum_input");
-                });
+            location.swap();
 
-                self.spectrum_temp1_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            }
-
-            current_input = !current_input;
+            s += 1;
+            m *= 2;
         }
 
-        // STEP 3: perform the per-column FFT
+        // per-column pass, transform size will be column size
 
-        let transform_size = 1024;
-        let row_iterations = 10; // log2(1024)
+        let (mut s, mut m) = (1, 2);
 
-        for i in 0..row_iterations {
-            let subtransform_size = 2i32.pow(i + 1);
-
+        while m <= 1024 {
             self.fft_buffer.write(&FFTData {
                 direction: 1.0,
                 horizontal: 0.0,
-                transform_size,
-                subtransform_size,
+                transform_size: 1024,
+                subtransform_size: m,
             });
 
-            if current_input {
-                // render into TEMP2 from TEMP1
+            self.fft_shader.bind_to_pipeline(|shader| {
+                shader.bind(&self.fft_buffer, "FFT");
 
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp1, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp1, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp1, "b_spectrum_input");
-                });
+                shader.bind(self.source_r_buffer(*location), "r_spectrum_input");
+                shader.bind(self.source_g_buffer(*location), "g_spectrum_input");
+                shader.bind(self.source_b_buffer(*location), "b_spectrum_input");
+            });
 
-                self.spectrum_temp2_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            } else {
-                // render into TEMP1 from TEMP2
+            self.target_framebuffer(*location).draw(DrawOptions {
+                viewport: [0, 0, 2048, 1024],
+                scissor: None,
+                blend: None,
+            });
 
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp2, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp2, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp2, "b_spectrum_input");
-                });
+            location.swap();
 
-                self.spectrum_temp1_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            }
+            s += 1;
+            m *= 2;
+        }
+    }
 
-            current_input = !current_input;
+    fn perform_inverse_fft(&mut self, location: &mut DataLocation) {
+        // per-row pass, transform size will be row size
+
+        let (mut s, mut m) = (1, 2);
+
+        while m <= 2048 {
+            self.fft_buffer.write(&FFTData {
+                direction: -1.0,
+                horizontal: 1.0,
+                transform_size: 2048,
+                subtransform_size: m,
+            });
+
+            self.fft_shader.bind_to_pipeline(|shader| {
+                shader.bind(&self.fft_buffer, "FFT");
+
+                shader.bind(self.source_r_buffer(*location), "r_spectrum_input");
+                shader.bind(self.source_g_buffer(*location), "g_spectrum_input");
+                shader.bind(self.source_b_buffer(*location), "b_spectrum_input");
+            });
+
+            self.target_framebuffer(*location).draw(DrawOptions {
+                viewport: [0, 0, 2048, 1024],
+                scissor: None,
+                blend: None,
+            });
+
+            location.swap();
+
+            s += 1;
+            m *= 2;
         }
 
-        // STEP 4: point-wise multiply with the aperture FFT (it too has three
-        // channels)
+        // per-column pass, transform size will be column size
 
+        let (mut s, mut m) = (1, 2);
+
+        while m <= 1024 {
+            self.fft_buffer.write(&FFTData {
+                direction: -1.0,
+                horizontal: 0.0,
+                transform_size: 1024,
+                subtransform_size: m,
+            });
+
+            self.fft_shader.bind_to_pipeline(|shader| {
+                shader.bind(&self.fft_buffer, "FFT");
+
+                shader.bind(self.source_r_buffer(*location), "r_spectrum_input");
+                shader.bind(self.source_g_buffer(*location), "g_spectrum_input");
+                shader.bind(self.source_b_buffer(*location), "b_spectrum_input");
+            });
+
+            self.target_framebuffer(*location).draw(DrawOptions {
+                viewport: [0, 0, 2048, 1024],
+                scissor: None,
+                blend: None,
+            });
+
+            location.swap();
+
+            s += 1;
+            m *= 2;
+        }
+    }
+
+    fn perform_pointwise_multiplication(&mut self, location: &mut DataLocation) {
         self.pointwise_multiply_shader.bind_to_pipeline(|shader| {
-            if current_input {
-                shader.bind(&self.rspectrum_temp1, "r_spectrum_input");
-                shader.bind(&self.gspectrum_temp1, "g_spectrum_input");
-                shader.bind(&self.bspectrum_temp1, "b_spectrum_input");
-            } else {
-                shader.bind(&self.rspectrum_temp2, "r_spectrum_input");
-                shader.bind(&self.gspectrum_temp2, "g_spectrum_input");
-                shader.bind(&self.bspectrum_temp2, "b_spectrum_input");
-            }
+            shader.bind(self.source_r_buffer(*location), "r_spectrum_input");
+            shader.bind(self.source_g_buffer(*location), "g_spectrum_input");
+            shader.bind(self.source_b_buffer(*location), "b_spectrum_input");
 
             shader.bind(&self.r_aperture_spectrum, "r_aperture_input");
             shader.bind(&self.g_aperture_spectrum, "g_aperture_input");
             shader.bind(&self.b_aperture_spectrum, "b_aperture_input");
         });
 
-        if current_input {
-            self.spectrum_temp2_fbo.draw(DrawOptions {
-                viewport: [0, 0, 2048, 1024],
-                scissor: None,
-                blend: None,
-            });
-        } else {
-            self.spectrum_temp1_fbo.draw(DrawOptions {
-                viewport: [0, 0, 2048, 1024],
-                scissor: None,
-                blend: None,
-            });
-        }
+        self.target_framebuffer(*location).draw(DrawOptions {
+            viewport: [0, 0, 2048, 1024],
+            scissor: None,
+            blend: None,
+        });
 
-        current_input = !current_input;
+        location.swap();
+    }
 
-        // STEP 5: perform per-row IFFT
-
-        let transform_size = 2048;
-        let row_iterations = 11; // log2(2048)
-
-        for i in 0..row_iterations {
-            let subtransform_size = 2i32.pow(i + 1);
-
-            self.fft_buffer.write(&FFTData {
-                direction: -1.0,
-                horizontal: 1.0,
-                transform_size,
-                subtransform_size,
-            });
-
-            if current_input {
-                // render into TEMP2 from TEMP1
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp1, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp1, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp1, "b_spectrum_input");
-                });
-
-                self.spectrum_temp2_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            } else {
-                // render into TEMP1 from TEMP2
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp2, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp2, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp2, "b_spectrum_input");
-                });
-
-                self.spectrum_temp1_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            }
-
-            current_input = !current_input;
-        }
-
-        // STEP 6: perform per-column IFFT
-
-        let transform_size = 1024;
-        let row_iterations = 10; // log2(1024)
-
-        for i in 0..row_iterations {
-            let subtransform_size = 2i32.pow(i + 1);
-
-            self.fft_buffer.write(&FFTData {
-                direction: -1.0,
-                horizontal: 0.0,
-                transform_size,
-                subtransform_size,
-            });
-
-            if current_input {
-                // render into TEMP2 from TEMP1
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp1, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp1, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp1, "b_spectrum_input");
-                });
-
-                self.spectrum_temp2_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            } else {
-                // render into TEMP1 from TEMP2
-
-                self.fft_shader.bind_to_pipeline(|shader| {
-                    shader.bind(&self.fft_buffer, "FFT");
-                    shader.bind(&self.rspectrum_temp2, "r_spectrum_input");
-                    shader.bind(&self.gspectrum_temp2, "g_spectrum_input");
-                    shader.bind(&self.bspectrum_temp2, "b_spectrum_input");
-                });
-
-                self.spectrum_temp1_fbo.draw(DrawOptions {
-                    viewport: [0, 0, 2048, 1024],
-                    scissor: None,
-                    blend: None,
-                });
-            }
-
-            current_input = !current_input;
-        }
-
-        // STEP 7: recombine the three channels into the final "render" buffer
-
-        /*
-
-        Resize logic: we need to copy the spectrum data out into the final render buffer, but
-        only the first 1024x512 pixels. So render over the entire render buffer, but only sample
-        half of the texture by multiplying the UV by 0.5
-
-        */
-
+    fn load_convolved_render_from_convolution_buffers(&mut self, location: &mut DataLocation) {
         self.copy_from_spectrum_shader.bind_to_pipeline(|shader| {
-            if current_input {
-                // render from TEMP1
+            shader.bind(self.source_r_buffer(*location), "r_spectrum");
+            shader.bind(self.source_g_buffer(*location), "g_spectrum");
+            shader.bind(self.source_b_buffer(*location), "b_spectrum");
 
-                shader.bind(&self.rspectrum_temp1, "r_spectrum");
-                shader.bind(&self.gspectrum_temp1, "g_spectrum");
-                shader.bind(&self.bspectrum_temp1, "b_spectrum");
-            } else {
-                // render from TEMP2
-
-                shader.bind(&self.rspectrum_temp2, "r_spectrum");
-                shader.bind(&self.gspectrum_temp2, "g_spectrum");
-                shader.bind(&self.bspectrum_temp2, "b_spectrum");
-            }
-
-            shader.bind(&self.samples, "add");
-            shader.bind(&self.conv_source, "subtract");
+            // shader.bind(&self.samples, "add");
+            // shader.bind(&self.conv_source, "subtract");
         });
 
         self.render_fbo.draw(DrawOptions {
@@ -582,51 +249,19 @@ impl Device {
             blend: None,
         });
     }
-
-    // TODO: in the future, pack the real data into a half-size complex FFT and do
-    // the convolution using that, to get hopefully a 2x speed boost?
-    // TODO: see if we can just compute the FFT of the non-padded data and then
-    // "stretch" it as-if it had been zero-padded? not sure if possible
-
-    /*
-
-    The aperture will be modified whenever the aspect ratio changes, to scale it
-    accordingly to ensure the lens flares are correctly scaled
-
-    If our convolution resolution is MxN, then the render resolution will be
-    (M / 2)x(N / 2) and the aperture resolution is (M / 2 - 1)x(N / 2 - 1)
-
-    This ensures there is no bleeding, and because the aperture has an odd
-    resolution there is a single center which can be centered on zero, which
-    should make edge effects disappear
-
-    Can pick radix-16 algorithm and radix-8, so we can do:
-
-    M = 16 * 16 = 256
-    N = 8 * 8 = 64
-
-    */
-
-    fn perform_convolution(&mut self) {
-        // Compute the (normalized) FFT of all three channels of the image to be
-        // convolved. The first pass loads each channel from the source texture.
-
-        // TODO
-
-        // Perform a point-wise multiplication of the convolution buffers in the
-        // frequency domain with the (also frequency-domain) aperture buffers.
-
-        // TODO
-
-        // Compute the inverse FFT of all three channels, which recovers the
-        // convolved result in the spatial domain. The final pass loads each
-        // channel into the output texture now ready for further processing.
-
-        // TODO
-    }
 }
 
+#[derive(Clone, Copy)]
 enum DataLocation {
     Temp1,
     Temp2,
+}
+
+impl DataLocation {
+    pub fn swap(&mut self) {
+        match self {
+            DataLocation::Temp1 => *self = DataLocation::Temp2,
+            DataLocation::Temp2 => *self = DataLocation::Temp1,
+        }
+    }
 }

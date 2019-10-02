@@ -38,7 +38,6 @@ pub struct Device {
     present_program: Shader,
 
     copy_from_spectrum_shader: Shader,
-    copy_into_spectrum_shader: Shader,
     fft_shader: Shader,
     pointwise_multiply_shader: Shader,
     draw_aperture_shader: Shader,
@@ -90,6 +89,8 @@ pub struct Device {
     aperture_fbo: Framebuffer,
     aperture_source_fbo: Framebuffer,
 
+    load_convolution_buffers: Shader,
+
     refine_query: Query,
     render_query: Query,
 
@@ -106,6 +107,14 @@ impl Device {
         Ok(Self {
             allocator: Allocator::new(),
             gl: gl.clone(),
+            load_convolution_buffers: Shader::new(
+                gl.clone(),
+                ShaderBuilder::new(shaders::VS_FULLSCREEN),
+                ShaderBuilder::new(shaders::PS_LOAD_CONVOLUTION_BUFFERS),
+                hashmap! {
+                    "image" => BindingPoint::Texture(0),
+                },
+            ),
             direct_copy_shader: Shader::new(
                 gl.clone(),
                 ShaderBuilder::new(shaders::VS_FULLSCREEN),
@@ -154,14 +163,6 @@ impl Device {
                     "b_spectrum" => BindingPoint::Texture(2),
                     "add" => BindingPoint::Texture(3),
                     "subtract" => BindingPoint::Texture(4),
-                },
-            ),
-            copy_into_spectrum_shader: Shader::new(
-                gl.clone(),
-                ShaderBuilder::new(shaders::VS_FULLSCREEN),
-                ShaderBuilder::new(shaders::COPY_INTO_SPECTRUM),
-                hashmap! {
-                    "source" => BindingPoint::Texture(0),
                 },
             ),
             program: Shader::new(
@@ -310,6 +311,21 @@ impl Device {
             self.render
                 .create(raster.width.get() as usize, raster.height.get() as usize);
 
+            // Configure the shaders with the desired resolutions...
+
+            self.load_convolution_buffers
+                .frag_shader()
+                .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
+
+            self.load_convolution_buffers.frag_shader().set_define(
+                "IMAGE_DIMS",
+                format!(
+                    "vec2({:+e}, {:+e})",
+                    raster.width.get() as f32,
+                    raster.height.get() as f32
+                ),
+            );
+
             self.rspectrum_temp1.create(2048, 1024);
             self.gspectrum_temp1.create(2048, 1024);
             self.bspectrum_temp1.create(2048, 1024);
@@ -371,11 +387,11 @@ impl Device {
         self.present_program.rebuild()?;
 
         self.copy_from_spectrum_shader.rebuild()?;
-        self.copy_into_spectrum_shader.rebuild()?;
         self.fft_shader.rebuild()?;
         self.draw_aperture_shader.rebuild()?;
         self.pointwise_multiply_shader.rebuild()?;
         self.direct_copy_shader.rebuild()?;
+        self.load_convolution_buffers.rebuild()?;
 
         if invalidated {
             self.state.reset(scene);
@@ -434,14 +450,14 @@ impl Device {
             return None;
         }
 
+        self.render_query.start_query();
+
         self.render_lens_flare();
 
         self.present_program.bind_to_pipeline(|shader| {
             shader.bind(&self.render, "samples");
             shader.bind(&self.display_buffer, "Display");
         });
-
-        let render_query = self.render_query.query_time_elapsed();
 
         Framebuffer::draw_to_canvas(
             &self.gl,
@@ -456,8 +472,10 @@ impl Device {
             return None; // no statistics
         }
 
+        let render_query = self.render_query.end_query();
+
         Some(RenderStatistics {
-            frame_time_us: render_query.end().unwrap_or_default() / 1000.0,
+            frame_time_us: render_query.unwrap_or_default() / 1000.0,
         })
     }
 
@@ -471,12 +489,12 @@ impl Device {
 
         self.program.invalidate();
         self.present_program.invalidate();
-        self.copy_into_spectrum_shader.invalidate();
         self.copy_from_spectrum_shader.invalidate();
         self.fft_shader.invalidate();
         self.draw_aperture_shader.invalidate();
         self.pointwise_multiply_shader.invalidate();
         self.direct_copy_shader.invalidate();
+        self.load_convolution_buffers.invalidate();
 
         self.refine_query.reset();
         self.render_query.reset();
