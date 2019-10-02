@@ -13,8 +13,11 @@ use zerocopy::{AsBytes, FromBytes};
 pub struct FFTData {
     pub transform_size: i32,
     pub subtransform_size: i32,
+    pub subtransformShift: i32,
+    pub subtransformMask: i32,
     pub horizontal: f32,
     pub direction: f32,
+    pub padding: [f32; 2],
 }
 
 // TODO: possible speed-ups:
@@ -26,7 +29,7 @@ impl Device {
     pub(crate) fn render_lens_flare(&mut self) {
         let mut location = self.load_path_traced_render_into_convolution_buffers();
         self.perform_forward_fft(&mut location);
-        self.perform_pointwise_multiplication(&mut location);
+        // self.perform_pointwise_multiplication(&mut location);
         self.perform_inverse_fft(&mut location);
         self.load_convolved_render_from_convolution_buffers(&mut location);
     }
@@ -82,25 +85,40 @@ impl Device {
     // useProgram (which I suspect might not be the fastest operation out there)
 
     fn perform_forward_fft(&mut self, location: &mut DataLocation) {
+        self.fft_buffer.write(&FFTData {
+            direction: 1.0,
+            horizontal: 1.0,
+            transform_size: 2048,
+            subtransform_size: 4096 / 2,
+            subtransformShift: 12 - 1,
+            subtransformMask: 4096 / 2 - 1,
+            padding: [0.0, 0.0],
+        });
+
+        self.fft_shader.TEMP_use_program();
+        self.fft_shader.TEMP_bind_directly(&self.fft_buffer, "FFT");
+
         // per-row pass, transform size will be row size
 
         let (mut s, mut m) = (1, 2);
 
         while m <= 2048 {
-            self.fft_buffer.write(&FFTData {
+            /*self.fft_buffer.write(&FFTData {
                 direction: 1.0,
                 horizontal: 1.0,
                 transform_size: 2048,
-                subtransform_size: m,
-            });
+                subtransform_size: 4096 / m,
+                subtransformShift: 12 - s,
+                subtransformMask: 4096 / m - 1,
+                padding: [0.0, 0.0],
+            });*/
 
-            self.fft_shader.bind_to_pipeline(|shader| {
-                shader.bind(&self.fft_buffer, "FFT");
-
-                shader.bind(self.source_r_buffer(*location), "r_spectrum_input");
-                shader.bind(self.source_g_buffer(*location), "g_spectrum_input");
-                shader.bind(self.source_b_buffer(*location), "b_spectrum_input");
-            });
+            self.fft_shader
+                .TEMP_bind_directly(self.source_r_buffer(*location), "r_spectrum_input");
+            self.fft_shader
+                .TEMP_bind_directly(self.source_g_buffer(*location), "g_spectrum_input");
+            self.fft_shader
+                .TEMP_bind_directly(self.source_b_buffer(*location), "b_spectrum_input");
 
             self.target_framebuffer(*location).draw(DrawOptions {
                 viewport: [0, 0, 2048, 1024],
@@ -119,20 +137,22 @@ impl Device {
         let (mut s, mut m) = (1, 2);
 
         while m <= 1024 {
-            self.fft_buffer.write(&FFTData {
+            /*self.fft_buffer.write(&FFTData {
                 direction: 1.0,
                 horizontal: 0.0,
                 transform_size: 1024,
-                subtransform_size: m,
-            });
+                subtransform_size: 2048 / m,
+                subtransformShift: 11 - s,
+                subtransformMask: 2048 / m - 1,
+                padding: [0.0, 0.0],
+            });*/
 
-            self.fft_shader.bind_to_pipeline(|shader| {
-                shader.bind(&self.fft_buffer, "FFT");
-
-                shader.bind(self.source_r_buffer(*location), "r_spectrum_input");
-                shader.bind(self.source_g_buffer(*location), "g_spectrum_input");
-                shader.bind(self.source_b_buffer(*location), "b_spectrum_input");
-            });
+            self.fft_shader
+                .TEMP_bind_directly(self.source_r_buffer(*location), "r_spectrum_input");
+            self.fft_shader
+                .TEMP_bind_directly(self.source_g_buffer(*location), "g_spectrum_input");
+            self.fft_shader
+                .TEMP_bind_directly(self.source_b_buffer(*location), "b_spectrum_input");
 
             self.target_framebuffer(*location).draw(DrawOptions {
                 viewport: [0, 0, 2048, 1024],
@@ -148,25 +168,40 @@ impl Device {
     }
 
     fn perform_inverse_fft(&mut self, location: &mut DataLocation) {
-        // per-row pass, transform size will be row size
+        self.fft_buffer.write(&FFTData {
+            direction: -1.0,
+            horizontal: 0.0,
+            transform_size: 1024,
+            subtransform_size: 2,
+            subtransformShift: 1,
+            subtransformMask: 2 - 1,
+            padding: [0.0, 0.0],
+        });
+
+        self.fft_shader.TEMP_use_program();
+        self.fft_shader.TEMP_bind_directly(&self.fft_buffer, "FFT");
+
+        // per-column pass, transform size will be column size
 
         let (mut s, mut m) = (1, 2);
 
-        while m <= 2048 {
-            self.fft_buffer.write(&FFTData {
+        while m <= 1024 {
+            /*self.fft_buffer.write(&FFTData {
                 direction: -1.0,
-                horizontal: 1.0,
-                transform_size: 2048,
+                horizontal: 0.0,
+                transform_size: 1024,
                 subtransform_size: m,
-            });
+                subtransformShift: s,
+                subtransformMask: m - 1,
+                padding: [0.0, 0.0],
+            });*/
 
-            self.fft_shader.bind_to_pipeline(|shader| {
-                shader.bind(&self.fft_buffer, "FFT");
-
-                shader.bind(self.source_r_buffer(*location), "r_spectrum_input");
-                shader.bind(self.source_g_buffer(*location), "g_spectrum_input");
-                shader.bind(self.source_b_buffer(*location), "b_spectrum_input");
-            });
+            self.fft_shader
+                .TEMP_bind_directly(self.source_r_buffer(*location), "r_spectrum_input");
+            self.fft_shader
+                .TEMP_bind_directly(self.source_g_buffer(*location), "g_spectrum_input");
+            self.fft_shader
+                .TEMP_bind_directly(self.source_b_buffer(*location), "b_spectrum_input");
 
             self.target_framebuffer(*location).draw(DrawOptions {
                 viewport: [0, 0, 2048, 1024],
@@ -180,25 +215,27 @@ impl Device {
             m *= 2;
         }
 
-        // per-column pass, transform size will be column size
+        // per-row pass, transform size will be row size
 
         let (mut s, mut m) = (1, 2);
 
-        while m <= 1024 {
-            self.fft_buffer.write(&FFTData {
+        while m <= 2048 {
+            /*self.fft_buffer.write(&FFTData {
                 direction: -1.0,
-                horizontal: 0.0,
-                transform_size: 1024,
+                horizontal: 1.0,
+                transform_size: 2048,
                 subtransform_size: m,
-            });
+                subtransformShift: s,
+                subtransformMask: m - 1,
+                padding: [0.0, 0.0],
+            });*/
 
-            self.fft_shader.bind_to_pipeline(|shader| {
-                shader.bind(&self.fft_buffer, "FFT");
-
-                shader.bind(self.source_r_buffer(*location), "r_spectrum_input");
-                shader.bind(self.source_g_buffer(*location), "g_spectrum_input");
-                shader.bind(self.source_b_buffer(*location), "b_spectrum_input");
-            });
+            self.fft_shader
+                .TEMP_bind_directly(self.source_r_buffer(*location), "r_spectrum_input");
+            self.fft_shader
+                .TEMP_bind_directly(self.source_g_buffer(*location), "g_spectrum_input");
+            self.fft_shader
+                .TEMP_bind_directly(self.source_b_buffer(*location), "b_spectrum_input");
 
             self.target_framebuffer(*location).draw(DrawOptions {
                 viewport: [0, 0, 2048, 1024],

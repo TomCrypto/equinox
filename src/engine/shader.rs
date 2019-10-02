@@ -133,6 +133,19 @@ impl Shader {
         &mut self.fragment
     }
 
+    pub fn TEMP_use_program(&self) {
+        self.gl.use_program(self.handle.as_ref());
+    }
+
+    pub fn TEMP_bind_directly(&self, target: &dyn AsBindTarget, slot: &str) {
+        let shader = ActiveShader {
+            gl: &self.gl,
+            binds: &self.binds,
+        };
+
+        shader.bind(target, slot);
+    }
+
     pub fn bind_to_pipeline(&self, callback: impl FnOnce(ActiveShader)) {
         self.gl.use_program(self.handle.as_ref());
 
