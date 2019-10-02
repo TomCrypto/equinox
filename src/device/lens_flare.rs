@@ -3,21 +3,26 @@ use log::{debug, info, warn};
 
 use crate::Device;
 use crate::DrawOptions;
+use crate::DrawRange;
 use crate::Framebuffer;
 use crate::{Texture, RG32F};
+use crate::{VertexAttribute, VertexAttributeKind, VertexLayout};
 
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]
 #[derive(AsBytes, FromBytes, Debug)]
-pub struct FFTData {
-    pub transform_size: i32,
-    pub subtransform_size: i32,
-    pub subtransformShift: i32,
-    pub subtransformMask: i32,
-    pub horizontal: f32,
-    pub direction: f32,
-    pub padding: [f32; 2],
+pub struct FFTPassData {
+    pub horizontal: u16,
+    pub direction: u16,
+    pub subtransform_size: u16,
+    pub convolve: u16,
+}
+
+impl VertexLayout for FFTPassData {
+    fn vertex_layout() -> Vec<VertexAttribute> {
+        vec![VertexAttribute::new(0, 0, VertexAttributeKind::UShort4)]
+    }
 }
 
 // TODO: possible speed-ups:
@@ -28,10 +33,84 @@ pub struct FFTData {
 impl Device {
     pub(crate) fn render_lens_flare(&mut self) {
         let mut location = self.load_path_traced_render_into_convolution_buffers();
-        self.perform_forward_fft(&mut location);
-        // self.perform_pointwise_multiplication(&mut location);
-        self.perform_inverse_fft(&mut location);
+        self.perform_convolution(&mut location);
         self.load_convolved_render_from_convolution_buffers(&mut location);
+    }
+
+    pub(crate) fn prepare_fft_pass_data(&mut self) {
+        let mut passes = vec![];
+
+        // forward passes, rows
+
+        let mut m = 2;
+
+        while m <= 2048 {
+            for _ in 0..3 {
+                passes.push(FFTPassData {
+                    horizontal: 1,
+                    direction: 1,                // "forward"
+                    subtransform_size: 4096 / m, // inverse order
+                    convolve: 0,
+                });
+            }
+
+            m *= 2;
+        }
+
+        // forward passes, columns
+
+        let mut m = 2;
+
+        while m <= 1024 {
+            for _ in 0..3 {
+                passes.push(FFTPassData {
+                    horizontal: 0,
+                    direction: 1,                // "forward"
+                    subtransform_size: 2048 / m, // inverse order
+                    convolve: (m == 1024) as u16,
+                });
+            }
+
+            m *= 2;
+        }
+
+        // inverse passes, columns
+
+        let mut m = 2;
+
+        while m <= 1024 {
+            for _ in 0..3 {
+                passes.push(FFTPassData {
+                    horizontal: 0,
+                    direction: 0, // "inverse"
+                    subtransform_size: m,
+                    convolve: 0, // m == 0 if we want to do it inline here?
+                });
+            }
+
+            m *= 2;
+        }
+
+        // inverse passes, rows
+
+        let mut m = 2;
+
+        while m <= 2048 {
+            for _ in 0..3 {
+                passes.push(FFTPassData {
+                    horizontal: 1,
+                    direction: 0, // "inverse"
+                    subtransform_size: m,
+                    convolve: 0,
+                });
+            }
+
+            m *= 2;
+        }
+
+        info!("FFT passes: {:?}", passes);
+
+        self.fft_pass_data.upload(&passes);
     }
 
     // TODO: in the future, pack the real data into a half-size complex FFT and do
@@ -48,6 +127,7 @@ impl Device {
             viewport: [0, 0, 2048, 1024], // TODO: get this data from a central place
             scissor: None,
             blend: None,
+            vertices: None,
         });
 
         DataLocation::Temp1
@@ -81,38 +161,19 @@ impl Device {
         }
     }
 
-    // TODO: might be a way to speed things up here by avoiding unnecessary
-    // useProgram (which I suspect might not be the fastest operation out there)
-
-    fn perform_forward_fft(&mut self, location: &mut DataLocation) {
-        self.fft_buffer.write(&FFTData {
-            direction: 1.0,
-            horizontal: 1.0,
-            transform_size: 2048,
-            subtransform_size: 4096 / 2,
-            subtransformShift: 12 - 1,
-            subtransformMask: 4096 / 2 - 1,
-            padding: [0.0, 0.0],
-        });
-
+    fn perform_convolution(&mut self, location: &mut DataLocation) {
         self.fft_shader.TEMP_use_program();
-        self.fft_shader.TEMP_bind_directly(&self.fft_buffer, "FFT");
 
-        // per-row pass, transform size will be row size
+        self.fft_pass_data.bind();
 
-        let (mut s, mut m) = (1, 2);
+        self.fft_shader
+            .TEMP_bind_directly(&self.r_aperture_spectrum, "r_aperture_input");
+        self.fft_shader
+            .TEMP_bind_directly(&self.g_aperture_spectrum, "g_aperture_input");
+        self.fft_shader
+            .TEMP_bind_directly(&self.b_aperture_spectrum, "b_aperture_input");
 
-        while m <= 2048 {
-            /*self.fft_buffer.write(&FFTData {
-                direction: 1.0,
-                horizontal: 1.0,
-                transform_size: 2048,
-                subtransform_size: 4096 / m,
-                subtransformShift: 12 - s,
-                subtransformMask: 4096 / m - 1,
-                padding: [0.0, 0.0],
-            });*/
-
+        for triangle_index in 0..(self.fft_pass_data.vertex_count() / 3) {
             self.fft_shader
                 .TEMP_bind_directly(self.source_r_buffer(*location), "r_spectrum_input");
             self.fft_shader
@@ -120,154 +181,22 @@ impl Device {
             self.fft_shader
                 .TEMP_bind_directly(self.source_b_buffer(*location), "b_spectrum_input");
 
-            self.target_framebuffer(*location).draw(DrawOptions {
-                viewport: [0, 0, 2048, 1024],
-                scissor: None,
-                blend: None,
-            });
-
-            location.swap();
-
-            s += 1;
-            m *= 2;
-        }
-
-        // per-column pass, transform size will be column size
-
-        let (mut s, mut m) = (1, 2);
-
-        while m <= 1024 {
-            /*self.fft_buffer.write(&FFTData {
-                direction: 1.0,
-                horizontal: 0.0,
-                transform_size: 1024,
-                subtransform_size: 2048 / m,
-                subtransformShift: 11 - s,
-                subtransformMask: 2048 / m - 1,
-                padding: [0.0, 0.0],
-            });*/
-
-            self.fft_shader
-                .TEMP_bind_directly(self.source_r_buffer(*location), "r_spectrum_input");
-            self.fft_shader
-                .TEMP_bind_directly(self.source_g_buffer(*location), "g_spectrum_input");
-            self.fft_shader
-                .TEMP_bind_directly(self.source_b_buffer(*location), "b_spectrum_input");
+            // TODO: do the draw with the vertex array at this point!
 
             self.target_framebuffer(*location).draw(DrawOptions {
                 viewport: [0, 0, 2048, 1024],
                 scissor: None,
                 blend: None,
+                vertices: Some(DrawRange {
+                    index: 3 * triangle_index,
+                    count: 3,
+                }),
             });
 
             location.swap();
-
-            s += 1;
-            m *= 2;
-        }
-    }
-
-    fn perform_inverse_fft(&mut self, location: &mut DataLocation) {
-        self.fft_buffer.write(&FFTData {
-            direction: -1.0,
-            horizontal: 0.0,
-            transform_size: 1024,
-            subtransform_size: 2,
-            subtransformShift: 1,
-            subtransformMask: 2 - 1,
-            padding: [0.0, 0.0],
-        });
-
-        self.fft_shader.TEMP_use_program();
-        self.fft_shader.TEMP_bind_directly(&self.fft_buffer, "FFT");
-
-        // per-column pass, transform size will be column size
-
-        let (mut s, mut m) = (1, 2);
-
-        while m <= 1024 {
-            /*self.fft_buffer.write(&FFTData {
-                direction: -1.0,
-                horizontal: 0.0,
-                transform_size: 1024,
-                subtransform_size: m,
-                subtransformShift: s,
-                subtransformMask: m - 1,
-                padding: [0.0, 0.0],
-            });*/
-
-            self.fft_shader
-                .TEMP_bind_directly(self.source_r_buffer(*location), "r_spectrum_input");
-            self.fft_shader
-                .TEMP_bind_directly(self.source_g_buffer(*location), "g_spectrum_input");
-            self.fft_shader
-                .TEMP_bind_directly(self.source_b_buffer(*location), "b_spectrum_input");
-
-            self.target_framebuffer(*location).draw(DrawOptions {
-                viewport: [0, 0, 2048, 1024],
-                scissor: None,
-                blend: None,
-            });
-
-            location.swap();
-
-            s += 1;
-            m *= 2;
         }
 
-        // per-row pass, transform size will be row size
-
-        let (mut s, mut m) = (1, 2);
-
-        while m <= 2048 {
-            /*self.fft_buffer.write(&FFTData {
-                direction: -1.0,
-                horizontal: 1.0,
-                transform_size: 2048,
-                subtransform_size: m,
-                subtransformShift: s,
-                subtransformMask: m - 1,
-                padding: [0.0, 0.0],
-            });*/
-
-            self.fft_shader
-                .TEMP_bind_directly(self.source_r_buffer(*location), "r_spectrum_input");
-            self.fft_shader
-                .TEMP_bind_directly(self.source_g_buffer(*location), "g_spectrum_input");
-            self.fft_shader
-                .TEMP_bind_directly(self.source_b_buffer(*location), "b_spectrum_input");
-
-            self.target_framebuffer(*location).draw(DrawOptions {
-                viewport: [0, 0, 2048, 1024],
-                scissor: None,
-                blend: None,
-            });
-
-            location.swap();
-
-            s += 1;
-            m *= 2;
-        }
-    }
-
-    fn perform_pointwise_multiplication(&mut self, location: &mut DataLocation) {
-        self.pointwise_multiply_shader.bind_to_pipeline(|shader| {
-            shader.bind(self.source_r_buffer(*location), "r_spectrum_input");
-            shader.bind(self.source_g_buffer(*location), "g_spectrum_input");
-            shader.bind(self.source_b_buffer(*location), "b_spectrum_input");
-
-            shader.bind(&self.r_aperture_spectrum, "r_aperture_input");
-            shader.bind(&self.g_aperture_spectrum, "g_aperture_input");
-            shader.bind(&self.b_aperture_spectrum, "b_aperture_input");
-        });
-
-        self.target_framebuffer(*location).draw(DrawOptions {
-            viewport: [0, 0, 2048, 1024],
-            scissor: None,
-            blend: None,
-        });
-
-        location.swap();
+        self.fft_pass_data.unbind();
     }
 
     fn load_convolved_render_from_convolution_buffers(&mut self, location: &mut DataLocation) {
@@ -284,6 +213,7 @@ impl Device {
             viewport: [0, 0, self.render.cols() as i32, self.render.rows() as i32],
             scissor: None,
             blend: None,
+            vertices: None,
         });
     }
 }

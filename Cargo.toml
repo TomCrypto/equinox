@@ -75,6 +75,7 @@ features = [
   'WebGlUniformLocation',
   'ExtDisjointTimerQuery',
   'WebGlFramebuffer',
+  'WebGlVertexArrayObject',
 ]
 
 [dependencies.zerocopy]

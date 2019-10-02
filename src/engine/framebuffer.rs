@@ -120,8 +120,12 @@ impl Framebuffer {
             gl.disable(Context::BLEND);
         }
 
-        gl.bind_buffer(Context::ARRAY_BUFFER, None);
-        gl.draw_arrays(Context::TRIANGLES, 0, 3);
+        if let Some(range) = options.vertices {
+            gl.draw_arrays(Context::TRIANGLES, range.index as i32, range.count as i32);
+        } else {
+            gl.bind_buffer(Context::ARRAY_BUFFER, None);
+            gl.draw_arrays(Context::TRIANGLES, 0, 3);
+        }
     }
 }
 
@@ -139,4 +143,10 @@ pub struct DrawOptions {
     pub viewport: [i32; 4],
     pub scissor: Option<[i32; 4]>,
     pub blend: Option<BlendMode>,
+    pub vertices: Option<DrawRange>,
+}
+
+pub struct DrawRange {
+    pub index: usize,
+    pub count: usize,
 }

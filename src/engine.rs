@@ -1,1 +1,8 @@
-export![framebuffer, query, shader, texture, uniform_buffer];
+export![
+    framebuffer,
+    query,
+    shader,
+    texture,
+    uniform_buffer,
+    vertex_array,
+];

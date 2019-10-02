@@ -39,11 +39,6 @@ pub struct Device {
 
     copy_from_spectrum_shader: Shader,
     fft_shader: Shader,
-    pointwise_multiply_shader: Shader,
-    draw_aperture_shader: Shader,
-    direct_copy_shader: Shader,
-
-    fft_buffer: UniformBuffer<FFTData>,
 
     camera_buffer: UniformBuffer<CameraData>,
 
@@ -83,6 +78,8 @@ pub struct Device {
     // Final convolved render output (real-valued)
     render: Texture<RGBA32F>,
 
+    fft_pass_data: VertexArray<[FFTPassData]>,
+
     spectrum_temp1_fbo: Framebuffer,
     spectrum_temp2_fbo: Framebuffer,
     render_fbo: Framebuffer,
@@ -101,49 +98,27 @@ pub struct Device {
     state: DeviceState,
 }
 
+static done: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 impl Device {
     /// Creates a new device using a WebGL2 context.
     pub fn new(gl: &Context) -> Result<Self, Error> {
         Ok(Self {
             allocator: Allocator::new(),
             gl: gl.clone(),
+            fft_pass_data: VertexArray::new(gl.clone()),
             load_convolution_buffers: Shader::new(
                 gl.clone(),
                 ShaderBuilder::new(shaders::VS_FULLSCREEN),
-                ShaderBuilder::new(shaders::PS_LOAD_CONVOLUTION_BUFFERS),
+                ShaderBuilder::new(shaders::FS_LOAD_CONVOLUTION_BUFFERS),
                 hashmap! {
                     "image" => BindingPoint::Texture(0),
                 },
             ),
-            direct_copy_shader: Shader::new(
-                gl.clone(),
-                ShaderBuilder::new(shaders::VS_FULLSCREEN),
-                ShaderBuilder::new(shaders::DIRECT_COPY),
-                hashmap! {
-                    "source" => BindingPoint::Texture(0),
-                },
-            ),
-            draw_aperture_shader: Shader::new(
-                gl.clone(),
-                ShaderBuilder::new(shaders::VS_FULLSCREEN),
-                ShaderBuilder::new(shaders::DRAW_APERTURE),
-                hashmap! {},
-            ),
             fft_shader: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VS_FULLSCREEN),
+                ShaderBuilder::new(shaders::VS_FFT_PASS),
                 ShaderBuilder::new(shaders::FFT),
-                hashmap! {
-                    "r_spectrum_input" => BindingPoint::Texture(0),
-                    "g_spectrum_input" => BindingPoint::Texture(1),
-                    "b_spectrum_input" => BindingPoint::Texture(2),
-                    "FFT" => BindingPoint::UniformBlock(0),
-                },
-            ),
-            pointwise_multiply_shader: Shader::new(
-                gl.clone(),
-                ShaderBuilder::new(shaders::VS_FULLSCREEN),
-                ShaderBuilder::new(shaders::POINTWISE_MULTIPLY),
                 hashmap! {
                     "r_spectrum_input" => BindingPoint::Texture(0),
                     "g_spectrum_input" => BindingPoint::Texture(1),
@@ -197,7 +172,6 @@ impl Device {
             //  -> #define them in the shader from some shared value obtained from the WebGL
             // context!
             instance_buffer: UniformBuffer::new_array(gl.clone(), 256),
-            fft_buffer: UniformBuffer::new(gl.clone()),
             raster_buffer: UniformBuffer::new(gl.clone()),
             display_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
@@ -247,23 +221,27 @@ impl Device {
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
             self.update_camera(camera);
 
-            self.r_aperture_spectrum.upload(
-                camera.aperture_width as usize,
-                camera.aperture_height as usize,
-                &camera.aperture_r_spectrum,
-            );
+            if !done.load(std::sync::atomic::Ordering::Relaxed) {
+                self.r_aperture_spectrum.upload(
+                    camera.aperture_width as usize,
+                    camera.aperture_height as usize,
+                    &camera.aperture_r_spectrum,
+                );
 
-            self.g_aperture_spectrum.upload(
-                camera.aperture_width as usize,
-                camera.aperture_height as usize,
-                &camera.aperture_g_spectrum,
-            );
+                self.g_aperture_spectrum.upload(
+                    camera.aperture_width as usize,
+                    camera.aperture_height as usize,
+                    &camera.aperture_g_spectrum,
+                );
 
-            self.b_aperture_spectrum.upload(
-                camera.aperture_width as usize,
-                camera.aperture_height as usize,
-                &camera.aperture_b_spectrum,
-            );
+                self.b_aperture_spectrum.upload(
+                    camera.aperture_width as usize,
+                    camera.aperture_height as usize,
+                    &camera.aperture_b_spectrum,
+                );
+
+                done.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
         });
 
         invalidated |= Dirty::clean(&mut scene.geometries, |geometries| {
@@ -326,6 +304,19 @@ impl Device {
                 ),
             );
 
+            self.copy_from_spectrum_shader
+                .frag_shader()
+                .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
+
+            self.copy_from_spectrum_shader.frag_shader().set_define(
+                "IMAGE_DIMS",
+                format!(
+                    "vec2({:+e}, {:+e})",
+                    raster.width.get() as f32,
+                    raster.height.get() as f32
+                ),
+            );
+
             self.rspectrum_temp1.create(2048, 1024);
             self.gspectrum_temp1.create(2048, 1024);
             self.bspectrum_temp1.create(2048, 1024);
@@ -366,6 +357,10 @@ impl Device {
                 &self.bspectrum_temp2,
             ]);
 
+            // TODO: initialize the fft_pass_data in here with the proper
+            // passes...
+            self.prepare_fft_pass_data();
+
             // TODO: invalidate spectrum FBOs, resize etc...
             // for now let's just always do a 2048x1024 FFT
             // we'll simply resize the input render to always be < 1024 during
@@ -388,9 +383,6 @@ impl Device {
 
         self.copy_from_spectrum_shader.rebuild()?;
         self.fft_shader.rebuild()?;
-        self.draw_aperture_shader.rebuild()?;
-        self.pointwise_multiply_shader.rebuild()?;
-        self.direct_copy_shader.rebuild()?;
         self.load_convolution_buffers.rebuild()?;
 
         if invalidated {
@@ -433,6 +425,7 @@ impl Device {
             viewport: [0, 0, self.samples.cols() as i32, self.samples.rows() as i32],
             scissor: None,
             blend: Some(BlendMode::Accumulative { weight }),
+            vertices: None,
         });
 
         if !Query::is_supported(&self.gl) {
@@ -465,6 +458,7 @@ impl Device {
                 viewport: [0, 0, self.samples.cols() as i32, self.samples.rows() as i32],
                 scissor: None,
                 blend: None,
+                vertices: None,
             },
         );
 
@@ -491,9 +485,6 @@ impl Device {
         self.present_program.invalidate();
         self.copy_from_spectrum_shader.invalidate();
         self.fft_shader.invalidate();
-        self.draw_aperture_shader.invalidate();
-        self.pointwise_multiply_shader.invalidate();
-        self.direct_copy_shader.invalidate();
         self.load_convolution_buffers.invalidate();
 
         self.refine_query.reset();
