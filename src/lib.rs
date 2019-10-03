@@ -718,9 +718,13 @@ impl WasmRunner {
             albedo: [0.25, 0.25, 0.75],
         });
 
-        self.scene.materials.push(Material::Phong {
+        /*self.scene.materials.push(Material::Phong {
             albedo: [0.9, 0.9, 0.9],
             shininess: 1024.0,
+        });*/
+
+        self.scene.materials.push(Material::IdealReflection {
+            reflectance: [1.0, 1.0, 1.0],
         });
 
         /*self.scene.instances.push(Instance {

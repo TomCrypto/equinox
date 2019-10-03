@@ -1,7 +1,7 @@
 // #define CONV_DIMS            vec2      <dimensions of the entire convolution buffer>
 // #define IMAGE_DIMS           vec2      <dimensions of the source image to read out>
 
-out vec4 target;
+out vec3 target;
 
 uniform sampler2D r_spectrum;
 uniform sampler2D g_spectrum;
@@ -15,17 +15,16 @@ void main() {
     float ty = (gl_FragCoord.y - 0.5) / (IMAGE_DIMS.y - 1.0);
 
     // TODO: when convolution is properly centered, the offset should be 0.5 / ...
-    float u = 1.0 / CONV_DIMS.x + tx * (0.5 - 1.0 / CONV_DIMS.x);
-    float v = 1.0 / CONV_DIMS.y + ty * (0.5 - 1.0 / CONV_DIMS.y);
+    float u = 1.5 / CONV_DIMS.x + tx * (0.5 - 1.0 / CONV_DIMS.x);
+    float v = 1.5 / CONV_DIMS.y + ty * (0.5 - 1.0 / CONV_DIMS.y);
 
     vec2 coords = vec2(u, v);
 
-    float r = texture(r_spectrum, coords).r / (1024.0 * 2048.0);
-    float g = texture(g_spectrum, coords).r / (1024.0 * 2048.0);
-    float b = texture(b_spectrum, coords).r / (1024.0 * 2048.0);
+    float r = texture(r_spectrum, coords).r / (CONV_DIMS.x * CONV_DIMS.y);
+    float g = texture(g_spectrum, coords).r / (CONV_DIMS.x * CONV_DIMS.y);
+    float b = texture(b_spectrum, coords).r / (CONV_DIMS.x * CONV_DIMS.y);
 
-    // TODO: add in the original data as well; do this once we have updated the aperture kernel
-    // to automatically subtract the original data from the convolution
-
-    target = vec4(r, g, b, 0.0);
+    target = vec3(r, g, b) + texelFetch(add, ivec2(gl_FragCoord.xy - 0.5), 0).rgb * vec3(0.5515, 0.4946, 0.4451); // * vec3(0.18824, 0.16128, 0.13659);
 }
+
+

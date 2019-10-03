@@ -190,7 +190,7 @@ impl Device {
         command.bind(self.source_g_buffer(*location), "g_spectrum");
         command.bind(self.source_b_buffer(*location), "b_spectrum");
 
-        // shader.bind(&self.samples, "add");
+        command.bind(&self.samples, "add");
         // shader.bind(&self.conv_source, "subtract");
 
         command.set_framebuffer(&self.render_fbo);
