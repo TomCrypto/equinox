@@ -104,7 +104,7 @@ vec3 mat_sample_brdf(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo
         case 0U:
             return mat_lambertian_sample_brdf(inst, normal, wi, wo, pdf, random);
         case 1U:
-            return mat_lambertian_sample_brdf(inst, normal, wi, wo, pdf, random);
+            return mat_ideal_reflection_sample_brdf(inst, normal, wi, wo, pdf, random);
         case 2U:
             return mat_phong_sample_brdf(inst, normal, wi, wo, pdf, random);
         case 3U:
