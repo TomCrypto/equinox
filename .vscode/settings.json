@@ -2,12 +2,12 @@
   "[rust]": {
     "editor.formatOnSave": true,
     "editor.rulers": [100],
-    "editor.tabSize": 4,
+    "editor.tabSize": 4
   },
 
   "[glsl]": {
     "editor.rulers": [100],
-    "editor.tabSize": 4,
+    "editor.tabSize": 4
   },
 
   "files.exclude": {
@@ -15,8 +15,8 @@
     ".vscode": true,
     "Cargo.lock": true,
     "target": true,
-    "pkg": "true",
+    "pkg": true
   },
 
-  "files.insertFinalNewline": true,
+  "files.insertFinalNewline": true
 }
