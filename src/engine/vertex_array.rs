@@ -98,9 +98,6 @@ impl<T: VertexLayout> VertexArray<[T]> {
 
             self.gl.enable_vertex_attrib_array(attribute.index as u32);
         }
-
-        // TODO: can remove this when we are VAO-clean?
-        self.gl.bind_vertex_array(None);
     }
 
     fn create_buffer(&mut self, vertex_count: usize) {

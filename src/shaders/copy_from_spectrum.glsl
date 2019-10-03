@@ -1,5 +1,5 @@
 // #define CONV_DIMS            vec2      <dimensions of the entire convolution buffer>
-// #define IMAGE_DIMS           vec2      <dimensions of the source image to load in>
+// #define IMAGE_DIMS           vec2      <dimensions of the source image to read out>
 
 out vec4 target;
 
@@ -11,27 +11,14 @@ uniform sampler2D add;
 uniform sampler2D subtract;
 
 void main() {
-    /*
-
-    our linear coordinates across the draw call are:
-
-    */
-
     float tx = (gl_FragCoord.x - 0.5) / (IMAGE_DIMS.x - 1.0);
     float ty = (gl_FragCoord.y - 0.5) / (IMAGE_DIMS.y - 1.0);
 
-    /*
+    // TODO: when convolution is properly centered, the offset should be 0.5 / ...
+    float u = 1.0 / CONV_DIMS.x + tx * (0.5 - 1.0 / CONV_DIMS.x);
+    float v = 1.0 / CONV_DIMS.y + ty * (0.5 - 1.0 / CONV_DIMS.y);
 
-    the min texel we need to hit is (0.5, 0.5) / (CONV_WIDTH, CONV_HEIGHT)
-
-    and the max is given as 0.5 - 0.5 / (CONV_WIDTH, CONV_HEIGHT)
-
-    */
-
-    float u = 0.5 / CONV_DIMS.x + tx * (0.5 - 1.0 / CONV_DIMS.x);
-    float v = 0.5 / CONV_DIMS.y + ty * (0.5 - 1.0 / CONV_DIMS.y);
-
-    vec2 coords = vec2(u, v); // + vec2(0.5); // offset for now since we convolve to the top-right quadrant
+    vec2 coords = vec2(u, v);
 
     float r = texture(r_spectrum, coords).r / (1024.0 * 2048.0);
     float g = texture(g_spectrum, coords).r / (1024.0 * 2048.0);

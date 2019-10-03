@@ -274,9 +274,6 @@ impl Device {
         });
 
         invalidated |= Dirty::clean(&mut scene.environment, |environment| {
-            // TODO: maybe avoid invalidating the shader if the define hasn't actually
-            // changed... there is probably a nicer way to do this honestly
-
             self.update_environment(environment);
         });
 
