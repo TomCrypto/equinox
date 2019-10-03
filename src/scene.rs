@@ -10,4 +10,5 @@ export![
     material,
     raster,
     scene,
+    aperture,
 ];

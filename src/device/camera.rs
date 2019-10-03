@@ -1,5 +1,5 @@
 use crate::Device;
-use crate::{Aperture, Camera};
+use crate::{ApertureShape, Camera};
 use cgmath::prelude::*;
 use cgmath::Point3;
 use itertools::iproduct;
@@ -52,11 +52,11 @@ impl Device {
     }
 }
 
-fn aperture_settings(aperture: &Aperture) -> [f32; 4] {
+fn aperture_settings(aperture: &ApertureShape) -> [f32; 4] {
     match aperture {
-        Aperture::Point => [-1.0; 4],
-        Aperture::Circle { .. } => [0.0, 0.0, 0.0, 0.0],
-        Aperture::Ngon {
+        ApertureShape::Point => [-1.0; 4],
+        ApertureShape::Circle { .. } => [0.0, 0.0, 0.0, 0.0],
+        ApertureShape::Ngon {
             sides, rotation, ..
         } => [1.0, *sides as f32, *rotation as f32, 1.0 / (*sides as f32)],
     }

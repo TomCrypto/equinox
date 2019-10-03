@@ -98,8 +98,6 @@ pub struct Device {
     state: DeviceState,
 }
 
-static done: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
 impl Device {
     /// Creates a new device using a WebGL2 context.
     pub fn new(gl: &Context) -> Result<Self, Error> {
@@ -218,30 +216,28 @@ impl Device {
 
         let mut invalidated = false;
 
+        invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
+            self.r_aperture_spectrum.upload(
+                aperture.aperture_width as usize,
+                aperture.aperture_height as usize,
+                &aperture.aperture_r_spectrum,
+            );
+
+            self.g_aperture_spectrum.upload(
+                aperture.aperture_width as usize,
+                aperture.aperture_height as usize,
+                &aperture.aperture_g_spectrum,
+            );
+
+            self.b_aperture_spectrum.upload(
+                aperture.aperture_width as usize,
+                aperture.aperture_height as usize,
+                &aperture.aperture_b_spectrum,
+            );
+        });
+
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
             self.update_camera(camera);
-
-            if !done.load(std::sync::atomic::Ordering::Relaxed) {
-                self.r_aperture_spectrum.upload(
-                    camera.aperture_width as usize,
-                    camera.aperture_height as usize,
-                    &camera.aperture_r_spectrum,
-                );
-
-                self.g_aperture_spectrum.upload(
-                    camera.aperture_width as usize,
-                    camera.aperture_height as usize,
-                    &camera.aperture_g_spectrum,
-                );
-
-                self.b_aperture_spectrum.upload(
-                    camera.aperture_width as usize,
-                    camera.aperture_height as usize,
-                    &camera.aperture_b_spectrum,
-                );
-
-                done.store(true, std::sync::atomic::Ordering::Relaxed);
-            }
         });
 
         invalidated |= Dirty::clean(&mut scene.geometries, |geometries| {
@@ -663,15 +659,15 @@ impl WasmRunner {
     }
 
     pub fn set_camera_aperture(&mut self, radius: f32) {
-        self.scene.camera.aperture = Aperture::Circle { radius };
+        self.scene.camera.aperture = ApertureShape::Circle { radius };
     }
 
     pub fn set_aperture_data(&mut self, r: &[f32], g: &[f32], b: &[f32], width: u32, height: u32) {
-        self.scene.camera.aperture_width = width;
-        self.scene.camera.aperture_height = height;
-        self.scene.camera.aperture_r_spectrum = Alias::new("r", r.to_vec());
-        self.scene.camera.aperture_g_spectrum = Alias::new("g", g.to_vec());
-        self.scene.camera.aperture_b_spectrum = Alias::new("b", b.to_vec());
+        self.scene.aperture.aperture_width = width;
+        self.scene.aperture.aperture_height = height;
+        self.scene.aperture.aperture_r_spectrum = Alias::new("r", r.to_vec());
+        self.scene.aperture.aperture_g_spectrum = Alias::new("g", g.to_vec());
+        self.scene.aperture.aperture_b_spectrum = Alias::new("b", b.to_vec());
     }
 
     pub fn set_envmap(&mut self, data: &[f32], cols: usize, rows: usize) {
