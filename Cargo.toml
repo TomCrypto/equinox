@@ -68,15 +68,15 @@ features = ["serde-serialize"]
 [dependencies.web-sys]
 version = "0.3"
 features = [
-  'WebGlBuffer',
+  'ExtDisjointTimerQuery',
   'WebGl2RenderingContext',
+  'WebGlBuffer',
+  'WebGlFramebuffer',
   'WebGlProgram',
+  'WebGlQuery',
   'WebGlShader',
   'WebGlTexture',
-  'WebGlQuery',
   'WebGlUniformLocation',
-  'ExtDisjointTimerQuery',
-  'WebGlFramebuffer',
   'WebGlVertexArrayObject',
 ]
 
