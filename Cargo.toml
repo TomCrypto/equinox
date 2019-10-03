@@ -1,10 +1,12 @@
 [package]
 name = "equinox"
+edition = "2018"
 version = "0.1.0"
+build = "build.rs"
+license = "MIT"
+repository = "https://github.com/TomCrypto/equinox"
 authors = ["Thomas Bénéteau <thomas@bitwise.me>"]
 description = "WebGL2 real-time path tracer"
-edition = "2018"
-build = "build.rs"
 
 [dependencies.cgmath]
 version = "0.17"
