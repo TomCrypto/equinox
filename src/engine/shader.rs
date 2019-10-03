@@ -1,11 +1,13 @@
 #[allow(unused_imports)]
 use log::{debug, error, info, warn};
 
+use crate::Framebuffer;
 use js_sys::Error;
 use regex::Regex;
 use std::collections::HashMap;
 use web_sys::{
     WebGl2RenderingContext as Context, WebGlBuffer, WebGlProgram, WebGlShader, WebGlTexture,
+    WebGlVertexArrayObject,
 };
 
 #[derive(Debug)]
@@ -133,26 +135,8 @@ impl Shader {
         &mut self.fragment
     }
 
-    pub fn TEMP_use_program(&self) {
-        self.gl.use_program(self.handle.as_ref());
-    }
-
-    pub fn TEMP_bind_directly(&self, target: &dyn AsBindTarget, slot: &str) {
-        let shader = ActiveShader {
-            gl: &self.gl,
-            binds: &self.binds,
-        };
-
-        shader.bind(target, slot);
-    }
-
-    pub fn bind_to_pipeline(&self, callback: impl FnOnce(ActiveShader)) {
-        self.gl.use_program(self.handle.as_ref());
-
-        callback(ActiveShader {
-            gl: &self.gl,
-            binds: &self.binds,
-        })
+    pub fn begin_draw(&self) -> DrawCommand {
+        DrawCommand::new(self)
     }
 
     pub fn invalidate(&mut self) {
@@ -303,9 +287,8 @@ impl Shader {
 }
 
 #[derive(Debug)]
-pub struct ActiveShader<'a> {
-    gl: &'a Context,
-    binds: &'a HashMap<&'static str, BindingPoint>,
+pub struct DrawCommand<'a> {
+    shader: &'a Shader,
 }
 
 #[derive(Debug)]
@@ -318,7 +301,21 @@ pub trait AsBindTarget {
     fn bind_target(&self) -> BindTarget;
 }
 
-impl ActiveShader<'_> {
+pub trait AsVertexArray {
+    fn vertex_array(&self) -> Option<&WebGlVertexArrayObject>;
+}
+
+impl<'a> DrawCommand<'a> {
+    fn new(shader: &'a Shader) -> Self {
+        shader.gl.use_program(shader.handle.as_ref());
+
+        shader.gl.disable(Context::SCISSOR_TEST);
+        shader.gl.disable(Context::BLEND);
+        shader.gl.viewport(0, 0, 0, 0);
+
+        Self { shader }
+    }
+
     pub fn bind(&self, target: &dyn AsBindTarget, slot: &str) {
         match target.bind_target() {
             BindTarget::UniformBuffer(handle) => self.bind_uniform_buffer(handle, slot),
@@ -326,9 +323,69 @@ impl ActiveShader<'_> {
         }
     }
 
+    // other things
+
+    pub fn set_viewport(&self, x: i32, y: i32, w: i32, h: i32) {
+        self.shader.gl.viewport(x, y, w, h);
+    }
+
+    pub fn set_scissor(&self, x: i32, y: i32, w: i32, h: i32) {
+        self.shader.gl.enable(Context::SCISSOR_TEST);
+        self.shader.gl.scissor(x, y, w, h);
+    }
+
+    pub fn unset_scissor(&self) {
+        self.shader.gl.disable(Context::SCISSOR_TEST);
+    }
+
+    pub fn set_blend_mode(&self, mode: BlendMode) {
+        self.shader.gl.enable(Context::BLEND);
+
+        match mode {
+            BlendMode::Accumulate { weight } => {
+                self.shader.gl.blend_equation(Context::FUNC_ADD);
+                self.shader
+                    .gl
+                    .blend_func(Context::CONSTANT_ALPHA, Context::ONE_MINUS_CONSTANT_ALPHA);
+                self.shader.gl.blend_color(0.0, 0.0, 0.0, 1.0 - weight);
+            }
+        }
+    }
+
+    pub fn unset_blending_mode(&self) {
+        self.shader.gl.disable(Context::BLEND);
+    }
+
+    pub fn set_vertex_array(&self, target: &dyn AsVertexArray) {
+        self.shader.gl.bind_vertex_array(target.vertex_array());
+    }
+
+    pub fn unset_vertex_array(&self) {
+        self.shader.gl.bind_vertex_array(None);
+    }
+
+    pub fn set_framebuffer(&self, target: &Framebuffer) {
+        self.shader
+            .gl
+            .bind_framebuffer(Context::DRAW_FRAMEBUFFER, target.handle());
+    }
+
+    pub fn set_canvas_framebuffer(&self) {
+        self.shader
+            .gl
+            .bind_framebuffer(Context::DRAW_FRAMEBUFFER, None);
+    }
+
+    pub fn draw_triangles(&self, index: usize, triangles: usize) {
+        self.shader
+            .gl
+            .draw_arrays(Context::TRIANGLES, 3 * index as i32, 3 * triangles as i32);
+    }
+
     fn bind_uniform_buffer(&self, handle: Option<&WebGlBuffer>, slot: &str) {
-        if let Some(&BindingPoint::UniformBlock(slot)) = self.binds.get(slot) {
-            self.gl
+        if let Some(&BindingPoint::UniformBlock(slot)) = self.shader.binds.get(slot) {
+            self.shader
+                .gl
                 .bind_buffer_base(Context::UNIFORM_BUFFER, slot, handle);
         } else {
             panic!("slot '{}' does not map to a binding point", slot);
@@ -336,11 +393,15 @@ impl ActiveShader<'_> {
     }
 
     fn bind_texture(&self, handle: Option<&WebGlTexture>, slot: &str) {
-        if let Some(&BindingPoint::Texture(slot)) = self.binds.get(slot) {
-            self.gl.active_texture(Context::TEXTURE0 + slot);
-            self.gl.bind_texture(Context::TEXTURE_2D, handle);
+        if let Some(&BindingPoint::Texture(slot)) = self.shader.binds.get(slot) {
+            self.shader.gl.active_texture(Context::TEXTURE0 + slot);
+            self.shader.gl.bind_texture(Context::TEXTURE_2D, handle);
         } else {
             panic!("slot '{}' does not map to a binding point", slot);
         }
     }
+}
+
+pub enum BlendMode {
+    Accumulate { weight: f32 },
 }

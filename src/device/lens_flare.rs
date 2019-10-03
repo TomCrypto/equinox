@@ -2,8 +2,6 @@
 use log::{debug, info, warn};
 
 use crate::Device;
-use crate::DrawOptions;
-use crate::DrawRange;
 use crate::Framebuffer;
 use crate::{Texture, RG32F};
 use crate::{VertexAttribute, VertexAttributeKind, VertexLayout};
@@ -20,9 +18,8 @@ pub struct FFTPassData {
 }
 
 impl VertexLayout for FFTPassData {
-    fn vertex_layout() -> Vec<VertexAttribute> {
-        vec![VertexAttribute::new(0, 0, VertexAttributeKind::UShort4)]
-    }
+    const VERTEX_LAYOUT: &'static [VertexAttribute] =
+        &[VertexAttribute::new(0, 0, VertexAttributeKind::UShort4)];
 }
 
 // TODO: possible speed-ups:
@@ -119,16 +116,15 @@ impl Device {
     // "stretch" it as-if it had been zero-padded? not sure if possible
 
     fn load_path_traced_render_into_convolution_buffers(&mut self) -> DataLocation {
-        self.load_convolution_buffers.bind_to_pipeline(|shader| {
-            shader.bind(&self.samples, "image");
-        });
+        let command = self.load_convolution_buffers.begin_draw();
 
-        self.spectrum_temp1_fbo.draw(DrawOptions {
-            viewport: [0, 0, 2048, 1024], // TODO: get this data from a central place
-            scissor: None,
-            blend: None,
-            vertices: None,
-        });
+        command.bind(&self.samples, "image");
+
+        command.set_viewport(0, 0, 2048, 1024);
+        command.set_framebuffer(&self.spectrum_temp1_fbo);
+
+        command.unset_vertex_array();
+        command.draw_triangles(0, 1);
 
         DataLocation::Temp1
     }
@@ -162,36 +158,24 @@ impl Device {
     }
 
     fn perform_convolution(&mut self, location: &mut DataLocation) {
-        self.fft_shader.TEMP_use_program();
+        let command = self.fft_shader.begin_draw();
 
-        self.fft_pass_data.bind();
+        command.set_vertex_array(&self.fft_pass_data);
 
-        self.fft_shader
-            .TEMP_bind_directly(&self.r_aperture_spectrum, "r_aperture_input");
-        self.fft_shader
-            .TEMP_bind_directly(&self.g_aperture_spectrum, "g_aperture_input");
-        self.fft_shader
-            .TEMP_bind_directly(&self.b_aperture_spectrum, "b_aperture_input");
+        command.bind(&self.r_aperture_spectrum, "r_aperture_input");
+        command.bind(&self.g_aperture_spectrum, "g_aperture_input");
+        command.bind(&self.b_aperture_spectrum, "b_aperture_input");
+
+        command.set_viewport(0, 0, 2048, 1024);
 
         for triangle_index in 0..(self.fft_pass_data.vertex_count() / 3) {
-            self.fft_shader
-                .TEMP_bind_directly(self.source_r_buffer(*location), "r_spectrum_input");
-            self.fft_shader
-                .TEMP_bind_directly(self.source_g_buffer(*location), "g_spectrum_input");
-            self.fft_shader
-                .TEMP_bind_directly(self.source_b_buffer(*location), "b_spectrum_input");
+            command.bind(self.source_r_buffer(*location), "r_spectrum_input");
+            command.bind(self.source_g_buffer(*location), "g_spectrum_input");
+            command.bind(self.source_b_buffer(*location), "b_spectrum_input");
 
-            // TODO: do the draw with the vertex array at this point!
+            command.set_framebuffer(self.target_framebuffer(*location));
 
-            self.target_framebuffer(*location).draw(DrawOptions {
-                viewport: [0, 0, 2048, 1024],
-                scissor: None,
-                blend: None,
-                vertices: Some(DrawRange {
-                    index: 3 * triangle_index,
-                    count: 3,
-                }),
-            });
+            command.draw_triangles(triangle_index, 1);
 
             location.swap();
         }
@@ -200,21 +184,21 @@ impl Device {
     }
 
     fn load_convolved_render_from_convolution_buffers(&mut self, location: &mut DataLocation) {
-        self.copy_from_spectrum_shader.bind_to_pipeline(|shader| {
-            shader.bind(self.source_r_buffer(*location), "r_spectrum");
-            shader.bind(self.source_g_buffer(*location), "g_spectrum");
-            shader.bind(self.source_b_buffer(*location), "b_spectrum");
+        let command = self.copy_from_spectrum_shader.begin_draw();
 
-            // shader.bind(&self.samples, "add");
-            // shader.bind(&self.conv_source, "subtract");
-        });
+        command.bind(self.source_r_buffer(*location), "r_spectrum");
+        command.bind(self.source_g_buffer(*location), "g_spectrum");
+        command.bind(self.source_b_buffer(*location), "b_spectrum");
 
-        self.render_fbo.draw(DrawOptions {
-            viewport: [0, 0, self.render.cols() as i32, self.render.rows() as i32],
-            scissor: None,
-            blend: None,
-            vertices: None,
-        });
+        // shader.bind(&self.samples, "add");
+        // shader.bind(&self.conv_source, "subtract");
+
+        command.set_framebuffer(&self.render_fbo);
+
+        command.set_viewport(0, 0, self.render.cols() as i32, self.render.rows() as i32);
+
+        command.unset_vertex_array();
+        command.draw_triangles(0, 1);
     }
 }
 

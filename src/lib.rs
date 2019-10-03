@@ -357,18 +357,7 @@ impl Device {
                 &self.bspectrum_temp2,
             ]);
 
-            // TODO: initialize the fft_pass_data in here with the proper
-            // passes...
             self.prepare_fft_pass_data();
-
-            // TODO: invalidate spectrum FBOs, resize etc...
-            // for now let's just always do a 2048x1024 FFT
-            // we'll simply resize the input render to always be < 1024 during
-            // the spectrum construction phase
-            // then the aperture will be < 1024 as well
-            // then the final result will simply be composited directly on top
-            // of the original data, stretched out with linear
-            // filtering to provide extra detail cheaply...
         });
 
         // These are post-processing settings that don't apply to the path-traced light
@@ -405,28 +394,28 @@ impl Device {
         self.state
             .update(&mut self.allocator, &mut self.globals_buffer);
 
-        self.program.bind_to_pipeline(|shader| {
-            shader.bind(&self.camera_buffer, "Camera");
-            shader.bind(&self.geometry_buffer, "Geometry");
-            shader.bind(&self.material_buffer, "Material");
-            shader.bind(&self.instance_buffer, "Instance");
-            shader.bind(&self.globals_buffer, "Globals");
-            shader.bind(&self.raster_buffer, "Raster");
-            shader.bind(&self.envmap_texture, "envmap_pix_tex");
-            shader.bind(&self.envmap_marginal_cdf, "envmap_marginal_cdf");
-            shader.bind(&self.envmap_conditional_cdfs, "envmap_conditional_cdfs");
-        });
+        let command = self.program.begin_draw();
+
+        command.bind(&self.camera_buffer, "Camera");
+        command.bind(&self.geometry_buffer, "Geometry");
+        command.bind(&self.material_buffer, "Material");
+        command.bind(&self.instance_buffer, "Instance");
+        command.bind(&self.globals_buffer, "Globals");
+        command.bind(&self.raster_buffer, "Raster");
+        command.bind(&self.envmap_texture, "envmap_pix_tex");
+        command.bind(&self.envmap_marginal_cdf, "envmap_marginal_cdf");
+        command.bind(&self.envmap_conditional_cdfs, "envmap_conditional_cdfs");
 
         let weight = (self.state.frame as f32 - 1.0) / (self.state.frame as f32);
 
         let refine_query = self.refine_query.query_time_elapsed();
 
-        self.samples_fbo.draw(DrawOptions {
-            viewport: [0, 0, self.samples.cols() as i32, self.samples.rows() as i32],
-            scissor: None,
-            blend: Some(BlendMode::Accumulative { weight }),
-            vertices: None,
-        });
+        command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
+        command.set_blend_mode(BlendMode::Accumulate { weight });
+        command.set_framebuffer(&self.samples_fbo);
+
+        command.unset_vertex_array();
+        command.draw_triangles(0, 1);
 
         if !Query::is_supported(&self.gl) {
             return None; // no statistics
@@ -447,20 +436,17 @@ impl Device {
 
         self.render_lens_flare();
 
-        self.present_program.bind_to_pipeline(|shader| {
-            shader.bind(&self.render, "samples");
-            shader.bind(&self.display_buffer, "Display");
-        });
+        let command = self.present_program.begin_draw();
 
-        Framebuffer::draw_to_canvas(
-            &self.gl,
-            DrawOptions {
-                viewport: [0, 0, self.samples.cols() as i32, self.samples.rows() as i32],
-                scissor: None,
-                blend: None,
-                vertices: None,
-            },
-        );
+        command.bind(&self.render, "samples");
+        command.bind(&self.display_buffer, "Display");
+
+        command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
+
+        command.set_canvas_framebuffer();
+
+        command.unset_vertex_array();
+        command.draw_triangles(0, 1);
 
         if !Query::is_supported(&self.gl) {
             return None; // no statistics

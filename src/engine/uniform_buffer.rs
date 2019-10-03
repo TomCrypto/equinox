@@ -3,6 +3,7 @@ use log::{debug, info, warn};
 
 use crate::{AsBindTarget, BindTarget};
 use std::marker::PhantomData;
+use std::mem::size_of;
 use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer};
 use zerocopy::{AsBytes, FromBytes};
 
@@ -19,7 +20,7 @@ impl<T: AsBytes + FromBytes> UniformBuffer<[T]> {
         Self {
             gl,
             handle: None,
-            size: count * std::mem::size_of::<T>(),
+            size: count * size_of::<T>(),
             phantom: PhantomData,
         }
     }
@@ -45,7 +46,7 @@ impl<T: AsBytes + FromBytes> UniformBuffer<T> {
         Self {
             gl,
             handle: None,
-            size: std::mem::size_of::<T>(),
+            size: size_of::<T>(),
             phantom: PhantomData,
         }
     }
