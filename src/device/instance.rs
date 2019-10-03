@@ -11,27 +11,27 @@ use zerocopy::{AsBytes, FromBytes};
 impl Device {
     pub(crate) fn update_instances(
         &mut self,
-        geometries: &[Geometry],
-        materials: &[Material],
-        instances: &[Instance],
+        geometry_list: &[Geometry],
+        material_list: &[Material],
+        instance_list: &[Instance],
     ) {
         // update the instance BVH
 
         let mut material_starts = vec![];
         let mut count = 0;
 
-        for material in materials {
+        for material in material_list {
             material_starts.push(count);
 
             count += material_parameter_block_count(material) as u16;
         }
 
-        let mut instance_info = Vec::with_capacity(instances.len());
+        let mut instance_info = Vec::with_capacity(instance_list.len());
         let mut geometry_start = 0;
 
-        for instance in instances {
-            let geometry = &geometries[instance.geometry];
-            let material = &materials[instance.material];
+        for instance in instance_list {
+            let geometry = &geometry_list[instance.geometry];
+            let material = &material_list[instance.material];
 
             // TODO: handle errors gracefully here somehow? it would indicate bad data
             let bbox = geometry.bounding_box(&instance.geometry_values).unwrap();
@@ -51,7 +51,7 @@ impl Device {
             geometry_start += (instance.geometry_values.len() as u16) / 4;
         }
 
-        let node_count = HierarchyBuilder::node_count_for_leaves(instances.len());
+        let node_count = HierarchyBuilder::node_count_for_leaves(instance_list.len());
 
         let mut nodes = self.allocator.allocate(node_count);
 
@@ -65,7 +65,7 @@ impl Device {
         // the parameter array are coherent and that all fields are nicely packed into
         // individual vec4 elements. Out-of-bounds parameter indices are checked here.
 
-        let geometry_parameter_count: usize = instances
+        let geometry_parameter_count: usize = instance_list
             .iter()
             .map(|inst| inst.geometry_values.len())
             .sum();
@@ -73,8 +73,8 @@ impl Device {
         let mut params: &mut [GeometryParameter] =
             self.allocator.allocate(geometry_parameter_count / 4);
 
-        for instance in instances {
-            let indices = renumber_parameters(&geometries[instance.geometry]);
+        for instance in instance_list {
+            let indices = renumber_parameters(&geometry_list[instance.geometry]);
             let (region, remaining_data) = params.split_at_mut((indices.len() + 3) / 4);
 
             for (data, indices) in izip!(region, indices.chunks(4)) {

@@ -262,15 +262,19 @@ impl Device {
             );
         });
 
+        let instances = &mut scene.instances;
+
+        invalidated |= Dirty::clean(&mut scene.materials, |materials| {
+            self.update_materials(materials);
+
+            Dirty::dirty(instances);
+        });
+
         let geometry_list = &scene.geometries;
         let material_list = &scene.materials;
 
         invalidated |= Dirty::clean(&mut scene.instances, |instances| {
             self.update_instances(geometry_list, material_list, instances);
-        });
-
-        invalidated |= Dirty::clean(&mut scene.materials, |materials| {
-            self.update_materials(materials);
         });
 
         invalidated |= Dirty::clean(&mut scene.environment, |environment| {
