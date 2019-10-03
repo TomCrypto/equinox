@@ -584,17 +584,17 @@ impl WasmRunner {
     }
 
     pub fn scene_json(&self) -> Result<JsValue, JsValue> {
-        Self::as_json(&self.scene)
+        as_json(&self.scene)
     }
 
     pub fn set_camera_from_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
-        self.scene.camera = Self::from_json(json)?;
+        self.scene.camera = from_json(json)?;
 
         Ok(())
     }
 
     pub fn set_materials_from_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
-        self.scene.materials = Self::from_json(json)?;
+        self.scene.materials = from_json(json)?;
 
         Ok(())
     }
@@ -605,16 +605,6 @@ impl WasmRunner {
 
     pub fn context(&self) -> WebGl2RenderingContext {
         self.device.gl.clone()
-    }
-
-    fn as_json<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
-        Ok(JsValue::from_serde(value).map_err(|err| Error::new(&err.to_string()))?)
-    }
-
-    fn from_json<T: DeserializeOwned>(json: &JsValue) -> Result<T, JsValue> {
-        Ok(json
-            .into_serde()
-            .map_err(|err| Error::new(&err.to_string()))?)
     }
 
     pub fn update(&mut self) -> Result<bool, JsValue> {
@@ -822,6 +812,16 @@ impl WasmRunner {
     pub fn remove_instance(&mut self, index: usize) {
         self.scene.instances.remove(index);
     }
+}
+
+fn as_json<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
+    Ok(JsValue::from_serde(value).map_err(|err| Error::new(&err.to_string()))?)
+}
+
+fn from_json<T: DeserializeOwned>(json: &JsValue) -> Result<T, JsValue> {
+    Ok(json
+        .into_serde()
+        .map_err(|err| Error::new(&err.to_string()))?)
 }
 
 export![device, engine, scene];
