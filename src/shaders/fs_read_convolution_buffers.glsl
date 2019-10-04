@@ -17,6 +17,7 @@ const float NORMALIZATION = 1.0 / (CONV_DIMS.x * CONV_DIMS.y);
 
 void main() {
     vec2 p = (0.5 - 1.0 / CONV_DIMS) * (gl_FragCoord.xy - 0.5) / (IMAGE_DIMS - 1.0);
+    p += 0.5 / CONV_DIMS;
 
     // Normalize the output data from the FFT -> IFFT step
     float r = texture(r_conv_buffer, p).r * NORMALIZATION;

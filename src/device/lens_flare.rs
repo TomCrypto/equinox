@@ -39,6 +39,8 @@ fn bilinear_interpolation(psf: &[f32], width: usize, height: usize, mut x: f32, 
 
     x *= width as f32;
     y *= height as f32;
+    x -= 0.5;
+    y -= 0.5;
 
     let mut x_first = x.floor() as usize;
     let mut x_after = x_first + 1;
