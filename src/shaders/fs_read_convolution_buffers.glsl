@@ -10,13 +10,13 @@ uniform sampler2D b_conv_buffer;
 uniform sampler2D source;
 
 // const vec3 WEIGHT = vec3(0.5515, 0.4946, 0.4451); // TODO: depends on the aperture!
-const vec3 WEIGHT = vec3(0.8456, 0.8237, 0.7448);
+// const vec3 WEIGHT = vec3(0.3158, 0.2706, 0.2174);
+const vec3 WEIGHT = vec3(0.1397, 0.1171, 0.0978);
 
 const float NORMALIZATION = 1.0 / (CONV_DIMS.x * CONV_DIMS.y);
 
 void main() {
     vec2 p = (0.5 - 1.0 / CONV_DIMS) * (gl_FragCoord.xy - 0.5) / (IMAGE_DIMS - 1.0);
-    p += 0.25 - vec2(1.5, 0.5) / CONV_DIMS;
 
     // Normalize the output data from the FFT -> IFFT step
     float r = texture(r_conv_buffer, p).r * NORMALIZATION;

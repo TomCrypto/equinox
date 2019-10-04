@@ -3,7 +3,7 @@ use log::{debug, info, warn};
 
 use crate::Device;
 use crate::Framebuffer;
-use crate::{Texture, RG32F, RGBA32F, RGBA8};
+use crate::{Texture, RG32F, RGBA32F};
 use crate::{VertexArray, VertexAttribute, VertexAttributeKind, VertexLayout};
 use rustfft::{num_complex::Complex, FFTplanner};
 use zerocopy::{AsBytes, FromBytes};
@@ -251,29 +251,25 @@ impl Device {
         // row/col (for even row/col) will be zero (unused) only at that point
         // will it be ready to be convolved
 
-        // TODO: exactly half the resolution of the convolution buffers
-
-        let mut filter: Texture<RGBA32F> = Texture::new(self.gl.clone());
-
-        let mut filter_data = vec![0.0f32; 4 * 1024 * 512];
+        let mut filter_data = vec![0.0f32; 4 * 2048 * 1024];
 
         let mut total_r = 0.0;
         let mut total_g = 0.0;
         let mut total_b = 0.0;
 
-        let z0 = 2.0;
+        let z0 = 1.5;
 
-        for y in 0..511 {
-            for x in 0..1023 {
+        for y in 0..1023 {
+            for x in 0..2047 {
                 for wavelength in 380..750 {
-                    let scaleX = z0 * (wavelength as f32) / 749.0 * 1.78075;
-                    let scaleY = z0 * (wavelength as f32) / 749.0;
+                    let scale_x = z0 * (wavelength as f32) / 749.0 * 1.78075;
+                    let scale_y = z0 * (wavelength as f32) / 749.0;
 
-                    let mut px = (x as f32 + 0.5) / 1023.0;
-                    let mut py = (y as f32 + 0.5) / 511.0;
+                    let mut px = (x as f32 + 0.5) / 2047.0;
+                    let mut py = (y as f32 + 0.5) / 1023.0;
 
-                    px = (px - 0.5) * scaleX + 0.5;
-                    py = (py - 0.5) * scaleY + 0.5;
+                    px = (px - 0.5) * scale_x + 0.5;
+                    py = (py - 0.5) * scale_y + 0.5;
 
                     let value = bilinear_interpolation(&psf, psf_cols, psf_rows, px, py);
 
@@ -290,7 +286,7 @@ impl Device {
                     total_g += g;
                     total_b += b;
 
-                    let offset = y * 1024 + x;
+                    let offset = y * 2048 + x;
 
                     filter_data[4 * offset + 0] += r;
                     filter_data[4 * offset + 1] += g;
@@ -299,24 +295,48 @@ impl Device {
             }
         }
 
-        for i in 0..(1024 * 512) {
+        for i in 0..(2048 * 1024) {
             filter_data[4 * i + 0] /= total_r;
             filter_data[4 * i + 1] /= total_g;
             filter_data[4 * i + 2] /= total_b;
         }
 
-        let mid_x = (1024 - 1) / 2;
-        let mid_y = (512 - 1) / 2;
+        let mid_x = (2048 - 1) / 2;
+        let mid_y = (1024 - 1) / 2;
 
-        info!("R weight = {}", filter_data[4 * (mid_y * 1024 + mid_x) + 0]);
-        info!("G weight = {}", filter_data[4 * (mid_y * 1024 + mid_x) + 1]);
-        info!("B weight = {}", filter_data[4 * (mid_y * 1024 + mid_x) + 2]);
+        info!("R weight = {}", filter_data[4 * (mid_y * 2048 + mid_x) + 0]);
+        info!("G weight = {}", filter_data[4 * (mid_y * 2048 + mid_x) + 1]);
+        info!("B weight = {}", filter_data[4 * (mid_y * 2048 + mid_x) + 2]);
 
-        filter_data[4 * (mid_y * 1024 + mid_x) + 0] = 0.0;
-        filter_data[4 * (mid_y * 1024 + mid_x) + 1] = 0.0;
-        filter_data[4 * (mid_y * 1024 + mid_x) + 2] = 0.0;
+        filter_data[4 * (mid_y * 2048 + mid_x) + 0] = 0.0;
+        filter_data[4 * (mid_y * 2048 + mid_x) + 1] = 0.0;
+        filter_data[4 * (mid_y * 2048 + mid_x) + 2] = 0.0;
 
-        filter.upload(1024, 512, &filter_data);
+        // filter.upload(1024, 512, &filter_data);
+
+        let mut r_filter_data = vec![0.0; 2 * 1024 * 2048];
+        let mut g_filter_data = vec![0.0; 2 * 1024 * 2048];
+        let mut b_filter_data = vec![0.0; 2 * 1024 * 2048];
+
+        for y in 0..1024 {
+            for x in 0..2048 {
+                // shift the data here...
+                let sx = (x + 2047 / 2) % 2048;
+                let sy = (y + 1023 / 2) % 1024;
+
+                let r = filter_data[4 * (sy * 2048 + sx) + 0];
+                let g = filter_data[4 * (sy * 2048 + sx) + 1];
+                let b = filter_data[4 * (sy * 2048 + sx) + 2];
+
+                r_filter_data[2 * (y * 2048 + x)] = r;
+                g_filter_data[2 * (y * 2048 + x)] = g;
+                b_filter_data[2 * (y * 2048 + x)] = b;
+            }
+        }
+
+        self.rspectrum_temp1.upload(2048, 1024, &r_filter_data);
+        self.gspectrum_temp1.upload(2048, 1024, &g_filter_data);
+        self.bspectrum_temp1.upload(2048, 1024, &b_filter_data);
 
         // STEP 4: compute FFT (we can actually reuse the FFT passes previously defined,
         // just stopping at the forward rows/columns and without requesting any
@@ -327,7 +347,7 @@ impl Device {
         // can just invoke the load_into_convolution_buffers and FFT shaders,
         // outputting the final result into the aperture spectrum buffers!
 
-        let mut location = self.load_into_convolution_buffers(&filter);
+        let mut location = DataLocation::Temp1; // self.load_into_convolution_buffers(&filter);
 
         let mut passes = vec![];
 
