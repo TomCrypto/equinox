@@ -57,7 +57,8 @@ import('../pkg/equinox').catch(console.error).then(async gl => {
   let aperture_r = new Float32Array(await fetch_bytes("assets/r_spectrum.dat"))
   let aperture_g = new Float32Array(await fetch_bytes("assets/g_spectrum.dat"))
   let aperture_b = new Float32Array(await fetch_bytes("assets/b_spectrum.dat"))
-  runner.set_aperture_data(aperture_r, aperture_g, aperture_b, 2048, 1024)
+  let aperture = new Uint8Array(await fetch_bytes("assets/aperture.bin"))
+  runner.set_aperture_data(aperture, 1024, 1024)
 
   //let envmap_data = new Float32Array(await fetch_bytes("assets/envmap.dat"))
   //runner.set_envmap(envmap_data, 4096, 2048)

@@ -278,6 +278,8 @@ pub struct RGBA32F;
 pub struct R32F;
 #[derive(Debug)]
 pub struct RG32F;
+#[derive(Debug)]
+pub struct RGBA8;
 
 impl TextureFormat for RGBA32UI {
     type Data = u32;
@@ -302,7 +304,7 @@ impl TextureFormat for RGBA32UI {
 
             let (level_data, remaining) = data.split_at(level_size);
 
-            views.push(unsafe_helpers::u32_slice_to_float32_array(level_data).into());
+            views.push(unsafe_helpers::u32_slice_to_uint32_array(level_data).into());
 
             data = remaining;
         }
@@ -415,19 +417,57 @@ impl TextureFormat for RG32F {
     }
 }
 
+impl TextureFormat for RGBA8 {
+    type Data = u8;
+
+    type Compressed = False;
+    type Filterable = True;
+    type Renderable = True;
+
+    const GL_INTERNAL_FORMAT: u32 = Context::RGBA8;
+    const GL_FORMAT: u32 = Context::RGBA;
+    const GL_TYPE: u32 = Context::UNSIGNED_BYTE;
+
+    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
+        let mut views = Vec::with_capacity(levels);
+
+        for level in 0..levels {
+            let level_cols = (cols / (1 << level)).max(1);
+            let level_rows = (rows / (1 << level)).max(1);
+            let level_size = level_cols * level_rows * 4;
+
+            assert!(data.len() >= level_size);
+
+            let (level_data, remaining) = data.split_at(level_size);
+
+            views.push(unsafe_helpers::u8_slice_to_uint8_array(level_data).into());
+
+            data = remaining;
+        }
+
+        assert!(data.is_empty());
+
+        views
+    }
+}
+
 // SAFETY: the objects returned by these methods are immediately fed into WebGL
 // APIs to upload some data to a WebGL resource and are not held onto. There is
 // no reallocation happening in between, so the `view` requirements are upheld.
 
 #[allow(unsafe_code)]
 mod unsafe_helpers {
-    use js_sys::{Float32Array, Uint32Array};
+    use js_sys::{Float32Array, Uint32Array, Uint8Array};
 
     pub fn f32_slice_to_float32_array(slice: &[f32]) -> Float32Array {
         unsafe { Float32Array::view(slice) }
     }
 
-    pub fn u32_slice_to_float32_array(slice: &[u32]) -> Uint32Array {
+    pub fn u32_slice_to_uint32_array(slice: &[u32]) -> Uint32Array {
         unsafe { Uint32Array::view(slice) }
+    }
+
+    pub fn u8_slice_to_uint8_array(slice: &[u8]) -> Uint8Array {
+        unsafe { Uint8Array::view(slice) }
     }
 }

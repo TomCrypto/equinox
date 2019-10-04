@@ -67,10 +67,6 @@ pub struct Device {
     gspectrum_temp2: Texture<RG32F>,
     bspectrum_temp2: Texture<RG32F>,
 
-    conv_source: Texture<RGBA32F>,
-    conv_fbo: Framebuffer,
-
-    aperture_source: Texture<RG32F>,
     r_aperture_spectrum: Texture<RG32F>,
     g_aperture_spectrum: Texture<RG32F>,
     b_aperture_spectrum: Texture<RG32F>,
@@ -84,7 +80,6 @@ pub struct Device {
     spectrum_temp2_fbo: Framebuffer,
     render_fbo: Framebuffer,
     aperture_fbo: Framebuffer,
-    aperture_source_fbo: Framebuffer,
 
     load_convolution_buffers_shader: Shader,
 
@@ -182,18 +177,14 @@ impl Device {
             rspectrum_temp2: Texture::new(gl.clone()),
             gspectrum_temp2: Texture::new(gl.clone()),
             bspectrum_temp2: Texture::new(gl.clone()),
-            aperture_source: Texture::new(gl.clone()),
             r_aperture_spectrum: Texture::new(gl.clone()),
             g_aperture_spectrum: Texture::new(gl.clone()),
             b_aperture_spectrum: Texture::new(gl.clone()),
             render: Texture::new(gl.clone()),
             render_fbo: Framebuffer::new(gl.clone()),
             aperture_fbo: Framebuffer::new(gl.clone()),
-            aperture_source_fbo: Framebuffer::new(gl.clone()),
             spectrum_temp1_fbo: Framebuffer::new(gl.clone()),
             spectrum_temp2_fbo: Framebuffer::new(gl.clone()),
-            conv_source: Texture::new(gl.clone()),
-            conv_fbo: Framebuffer::new(gl.clone()),
             refine_query: Query::new(gl.clone()),
             render_query: Query::new(gl.clone()),
             samples: Texture::new(gl.clone()),
@@ -305,18 +296,11 @@ impl Device {
             self.gspectrum_temp2.create(2048, 1024);
             self.bspectrum_temp2.create(2048, 1024);
 
-            self.aperture_source.create(2048, 1024);
             self.r_aperture_spectrum.create(2048, 1024);
             self.g_aperture_spectrum.create(2048, 1024);
             self.b_aperture_spectrum.create(2048, 1024);
 
-            self.conv_source.create(2048, 1024);
-
             self.samples_fbo.invalidate(&[&self.samples]);
-            self.conv_fbo.invalidate(&[&self.conv_source]);
-
-            self.aperture_source_fbo
-                .invalidate(&[&self.aperture_source]);
 
             self.render_fbo.invalidate(&[&self.render]);
             self.aperture_fbo.invalidate(&[
@@ -340,6 +324,13 @@ impl Device {
             self.prepare_fft_pass_data();
         });
 
+        self.program.rebuild()?;
+        self.present_program.rebuild()?;
+
+        self.read_convolution_buffers_shader.rebuild()?;
+        self.fft_shader.rebuild()?;
+        self.load_convolution_buffers_shader.rebuild()?;
+
         invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
             self.preprocess_filter(
                 &aperture.aperture_texels,
@@ -354,13 +345,6 @@ impl Device {
         Dirty::clean(&mut scene.display, |display| {
             self.update_display(display);
         });
-
-        self.program.rebuild()?;
-        self.present_program.rebuild()?;
-
-        self.read_convolution_buffers_shader.rebuild()?;
-        self.fft_shader.rebuild()?;
-        self.load_convolution_buffers_shader.rebuild()?;
 
         if invalidated {
             self.state.reset(scene);

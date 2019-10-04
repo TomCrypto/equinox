@@ -29,14 +29,6 @@ impl<T: ?Sized> VertexArray<T> {
 }
 
 impl<T: VertexLayout> VertexArray<[T]> {
-    pub fn bind(&self) {
-        self.gl.bind_vertex_array(self.vao_handle.as_ref());
-    }
-
-    pub fn unbind(&self) {
-        self.gl.bind_vertex_array(None);
-    }
-
     pub fn upload(&mut self, vertices: &[T]) {
         assert!(!vertices.is_empty());
 
