@@ -259,7 +259,7 @@ impl Device {
         let mut total_g = 0.0;
         let mut total_b = 0.0;
 
-        let z0 = 1.5;
+        let z0 = 1.0;
 
         for y in 0..1023 {
             for x in 0..2047 {
