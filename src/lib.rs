@@ -37,7 +37,7 @@ pub struct Device {
     program: Shader,
     present_program: Shader,
 
-    copy_from_spectrum_shader: Shader,
+    read_convolution_buffers_shader: Shader,
     fft_shader: Shader,
 
     camera_buffer: UniformBuffer<CameraData>,
@@ -86,7 +86,7 @@ pub struct Device {
     aperture_fbo: Framebuffer,
     aperture_source_fbo: Framebuffer,
 
-    load_convolution_buffers: Shader,
+    load_convolution_buffers_shader: Shader,
 
     refine_query: Query,
     render_query: Query,
@@ -105,7 +105,7 @@ impl Device {
             allocator: Allocator::new(),
             gl: gl.clone(),
             fft_pass_data: VertexArray::new(gl.clone()),
-            load_convolution_buffers: Shader::new(
+            load_convolution_buffers_shader: Shader::new(
                 gl.clone(),
                 ShaderBuilder::new(shaders::VS_FULLSCREEN),
                 ShaderBuilder::new(shaders::FS_LOAD_CONVOLUTION_BUFFERS),
@@ -126,16 +126,15 @@ impl Device {
                     "b_aperture_input" => BindingPoint::Texture(5),
                 },
             ),
-            copy_from_spectrum_shader: Shader::new(
+            read_convolution_buffers_shader: Shader::new(
                 gl.clone(),
                 ShaderBuilder::new(shaders::VS_FULLSCREEN),
-                ShaderBuilder::new(shaders::COPY_FROM_SPECTRUM),
+                ShaderBuilder::new(shaders::FS_READ_CONVOLUTION_BUFFERS),
                 hashmap! {
                     "r_spectrum" => BindingPoint::Texture(0),
                     "g_spectrum" => BindingPoint::Texture(1),
                     "b_spectrum" => BindingPoint::Texture(2),
-                    "add" => BindingPoint::Texture(3),
-                    "subtract" => BindingPoint::Texture(4),
+                    "source" => BindingPoint::Texture(3),
                 },
             ),
             program: Shader::new(
@@ -288,31 +287,35 @@ impl Device {
 
             // Configure the shaders with the desired resolutions...
 
-            self.load_convolution_buffers
+            self.load_convolution_buffers_shader
                 .frag_shader()
                 .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
 
-            self.load_convolution_buffers.frag_shader().set_define(
-                "IMAGE_DIMS",
-                format!(
-                    "vec2({:+e}, {:+e})",
-                    raster.width.get() as f32,
-                    raster.height.get() as f32
-                ),
-            );
+            self.load_convolution_buffers_shader
+                .frag_shader()
+                .set_define(
+                    "IMAGE_DIMS",
+                    format!(
+                        "vec2({:+e}, {:+e})",
+                        raster.width.get() as f32,
+                        raster.height.get() as f32
+                    ),
+                );
 
-            self.copy_from_spectrum_shader
+            self.read_convolution_buffers_shader
                 .frag_shader()
                 .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
 
-            self.copy_from_spectrum_shader.frag_shader().set_define(
-                "IMAGE_DIMS",
-                format!(
-                    "vec2({:+e}, {:+e})",
-                    raster.width.get() as f32,
-                    raster.height.get() as f32
-                ),
-            );
+            self.read_convolution_buffers_shader
+                .frag_shader()
+                .set_define(
+                    "IMAGE_DIMS",
+                    format!(
+                        "vec2({:+e}, {:+e})",
+                        raster.width.get() as f32,
+                        raster.height.get() as f32
+                    ),
+                );
 
             self.rspectrum_temp1.create(2048, 1024);
             self.gspectrum_temp1.create(2048, 1024);
@@ -367,9 +370,9 @@ impl Device {
         self.program.rebuild()?;
         self.present_program.rebuild()?;
 
-        self.copy_from_spectrum_shader.rebuild()?;
+        self.read_convolution_buffers_shader.rebuild()?;
         self.fft_shader.rebuild()?;
-        self.load_convolution_buffers.rebuild()?;
+        self.load_convolution_buffers_shader.rebuild()?;
 
         if invalidated {
             self.state.reset(scene);
@@ -466,9 +469,9 @@ impl Device {
 
         self.program.invalidate();
         self.present_program.invalidate();
-        self.copy_from_spectrum_shader.invalidate();
+        self.read_convolution_buffers_shader.invalidate();
         self.fft_shader.invalidate();
-        self.load_convolution_buffers.invalidate();
+        self.load_convolution_buffers_shader.invalidate();
 
         self.refine_query.reset();
         self.render_query.reset();

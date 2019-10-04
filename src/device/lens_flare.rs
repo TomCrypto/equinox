@@ -116,7 +116,7 @@ impl Device {
     // "stretch" it as-if it had been zero-padded? not sure if possible
 
     fn load_path_traced_render_into_convolution_buffers(&mut self) -> DataLocation {
-        let command = self.load_convolution_buffers.begin_draw();
+        let command = self.load_convolution_buffers_shader.begin_draw();
 
         command.bind(&self.samples, "image");
 
@@ -184,14 +184,13 @@ impl Device {
     }
 
     fn load_convolved_render_from_convolution_buffers(&mut self, location: &mut DataLocation) {
-        let command = self.copy_from_spectrum_shader.begin_draw();
+        let command = self.read_convolution_buffers_shader.begin_draw();
 
         command.bind(self.source_r_buffer(*location), "r_spectrum");
         command.bind(self.source_g_buffer(*location), "g_spectrum");
         command.bind(self.source_b_buffer(*location), "b_spectrum");
 
-        command.bind(&self.samples, "add");
-        // shader.bind(&self.conv_source, "subtract");
+        command.bind(&self.samples, "source");
 
         command.set_framebuffer(&self.render_fbo);
 

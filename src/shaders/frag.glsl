@@ -5,7 +5,7 @@
 #include <instance.glsl>
 #include <material.glsl>
 
-out vec4 color;
+out vec3 color;
 
 layout (std140) uniform Camera {
     vec4 origin_plane[4];
@@ -263,5 +263,5 @@ void main() {
         }
     }
 
-    color = vec4(radiance, 1.0);
+    color = radiance;
 }
