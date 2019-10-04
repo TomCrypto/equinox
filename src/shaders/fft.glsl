@@ -14,142 +14,120 @@ layout(location = 2) out vec2 b_conv_output;
 
 flat in uvec4 fft_pass_data;
 
-#define SUBTRANSFORM_SIZE (int(fft_pass_data.z))
-#define HORIZONTAL (fft_pass_data.x == 1U)
-#define DIRECTION (fft_pass_data.y == 1U)
-#define CONVOLVE (fft_pass_data.w == 1U)
+#define BUTTERFLY   (int(fft_pass_data.z))
+#define HORIZONTAL  (fft_pass_data.x == 1U)
+#define DIRECTION   (fft_pass_data.y == 1U)
+#define CONVOLVE    (fft_pass_data.w == 1U)
 
-void forward_fft() {
-    int i = int((HORIZONTAL ? gl_FragCoord.x : gl_FragCoord.y) - 0.5);
-    
-    int j = i & (SUBTRANSFORM_SIZE - 1);
+// DIF-FFT, ordered -> scrambled
+void forward_fft(int i, int j) {
+    int ti = (2 * j < BUTTERFLY) ? i : (i - BUTTERFLY / 2);
+    int ui = (2 * j < BUTTERFLY) ? (i + BUTTERFLY / 2) : i;
 
-    if (2 * j < SUBTRANSFORM_SIZE) {
-        if (HORIZONTAL) {
-            int z = int(gl_FragCoord.y - 0.5);
-
-            vec2 r_t = texelFetch(r_conv_buffer, ivec2(i, z), 0).rg;
-            vec2 g_t = texelFetch(g_conv_buffer, ivec2(i, z), 0).rg;
-            vec2 b_t = texelFetch(b_conv_buffer, ivec2(i, z), 0).rg;
-
-            vec2 r_u = texelFetch(r_conv_buffer, ivec2(i + SUBTRANSFORM_SIZE / 2, z), 0).rg;
-            vec2 g_u = texelFetch(g_conv_buffer, ivec2(i + SUBTRANSFORM_SIZE / 2, z), 0).rg;
-            vec2 b_u = texelFetch(b_conv_buffer, ivec2(i + SUBTRANSFORM_SIZE / 2, z), 0).rg;
-
-            r_conv_output = r_t + r_u;
-            g_conv_output = g_t + g_u;
-            b_conv_output = b_t + b_u;
-        } else {
-            int z = int(gl_FragCoord.x - 0.5);
-
-            vec2 r_t = texelFetch(r_conv_buffer, ivec2(z, i), 0).rg;
-            vec2 g_t = texelFetch(g_conv_buffer, ivec2(z, i), 0).rg;
-            vec2 b_t = texelFetch(b_conv_buffer, ivec2(z, i), 0).rg;
-
-            vec2 r_u = texelFetch(r_conv_buffer, ivec2(z, i + SUBTRANSFORM_SIZE / 2), 0).rg;
-            vec2 g_u = texelFetch(g_conv_buffer, ivec2(z, i + SUBTRANSFORM_SIZE / 2), 0).rg;
-            vec2 b_u = texelFetch(b_conv_buffer, ivec2(z, i + SUBTRANSFORM_SIZE / 2), 0).rg;
-
-            r_conv_output = r_t + r_u;
-            g_conv_output = g_t + g_u;
-            b_conv_output = b_t + b_u;
-        }
-    } else {
-        float twiddle = M_2PI * float(j) / float(SUBTRANSFORM_SIZE);
-
-        vec2 w = vec2(-cos(twiddle), sin(twiddle));
-
-        if (HORIZONTAL) {
-            int z = int(gl_FragCoord.y - 0.5);
-
-            vec2 r_t = texelFetch(r_conv_buffer, ivec2(i - SUBTRANSFORM_SIZE / 2, z), 0).rg;
-            vec2 g_t = texelFetch(g_conv_buffer, ivec2(i - SUBTRANSFORM_SIZE / 2, z), 0).rg;
-            vec2 b_t = texelFetch(b_conv_buffer, ivec2(i - SUBTRANSFORM_SIZE / 2, z), 0).rg;
-
-            vec2 r_u = texelFetch(r_conv_buffer, ivec2(i, z), 0).rg;
-            vec2 g_u = texelFetch(g_conv_buffer, ivec2(i, z), 0).rg;
-            vec2 b_u = texelFetch(b_conv_buffer, ivec2(i, z), 0).rg;
-
-            r_conv_output = complex_mul(w, r_t - r_u);
-            g_conv_output = complex_mul(w, g_t - g_u);
-            b_conv_output = complex_mul(w, b_t - b_u);
-        } else {
-            int z = int(gl_FragCoord.x - 0.5);
-
-            vec2 r_t = texelFetch(r_conv_buffer, ivec2(z, i - SUBTRANSFORM_SIZE / 2), 0).rg;
-            vec2 g_t = texelFetch(g_conv_buffer, ivec2(z, i - SUBTRANSFORM_SIZE / 2), 0).rg;
-            vec2 b_t = texelFetch(b_conv_buffer, ivec2(z, i - SUBTRANSFORM_SIZE / 2), 0).rg;
-
-            vec2 r_u = texelFetch(r_conv_buffer, ivec2(z, i), 0).rg;
-            vec2 g_u = texelFetch(g_conv_buffer, ivec2(z, i), 0).rg;
-            vec2 b_u = texelFetch(b_conv_buffer, ivec2(z, i), 0).rg;
-
-            r_conv_output = complex_mul(w, r_t - r_u);
-            g_conv_output = complex_mul(w, g_t - g_u);
-            b_conv_output = complex_mul(w, b_t - b_u);
-        }
-    }
-}
-
-void inverse_fft() {
-    int i = int((HORIZONTAL ? gl_FragCoord.x : gl_FragCoord.y) - 0.5);
-
-    int j = i & (SUBTRANSFORM_SIZE - 1);
-
-    float twiddle = -M_2PI * float(j) / float(SUBTRANSFORM_SIZE);
-
-    vec2 w = vec2(cos(twiddle), -sin(twiddle));
-
-    int ti = i - (j / (SUBTRANSFORM_SIZE / 2)) * (SUBTRANSFORM_SIZE / 2);
-    int ui = ti + SUBTRANSFORM_SIZE / 2;
+    vec2 rt, gt, bt;
+    vec2 ru, gu, bu;
 
     if (HORIZONTAL) {
-        int z = int(gl_FragCoord.y - 0.5);
+        int y = int(gl_FragCoord.y - 0.5);
 
-        vec2 r_t = texelFetch(r_conv_buffer, ivec2(ti, z), 0).rg;
-        vec2 g_t = texelFetch(g_conv_buffer, ivec2(ti, z), 0).rg;
-        vec2 b_t = texelFetch(b_conv_buffer, ivec2(ti, z), 0).rg;
-
-        vec2 r_u = texelFetch(r_conv_buffer, ivec2(ui, z), 0).rg;
-        vec2 g_u = texelFetch(g_conv_buffer, ivec2(ui, z), 0).rg;
-        vec2 b_u = texelFetch(b_conv_buffer, ivec2(ui, z), 0).rg;
-
-        r_conv_output = r_t + complex_mul(w, r_u);
-        g_conv_output = g_t + complex_mul(w, g_u);
-        b_conv_output = b_t + complex_mul(w, b_u);
+        rt = texelFetch(r_conv_buffer, ivec2(ti, y), 0).rg;
+        ru = texelFetch(r_conv_buffer, ivec2(ui, y), 0).rg;
+        gt = texelFetch(g_conv_buffer, ivec2(ti, y), 0).rg;
+        gu = texelFetch(g_conv_buffer, ivec2(ui, y), 0).rg;
+        bt = texelFetch(b_conv_buffer, ivec2(ti, y), 0).rg;
+        bu = texelFetch(b_conv_buffer, ivec2(ui, y), 0).rg;
     } else {
-        int z = int(gl_FragCoord.x - 0.5);
+        int x = int(gl_FragCoord.x - 0.5);
 
-        vec2 r_t = texelFetch(r_conv_buffer, ivec2(z, ti), 0).rg;
-        vec2 g_t = texelFetch(g_conv_buffer, ivec2(z, ti), 0).rg;
-        vec2 b_t = texelFetch(b_conv_buffer, ivec2(z, ti), 0).rg;
-
-        vec2 r_u = texelFetch(r_conv_buffer, ivec2(z, ui), 0).rg;
-        vec2 g_u = texelFetch(g_conv_buffer, ivec2(z, ui), 0).rg;
-        vec2 b_u = texelFetch(b_conv_buffer, ivec2(z, ui), 0).rg;
-
-        r_conv_output = r_t + complex_mul(w, r_u);
-        g_conv_output = g_t + complex_mul(w, g_u);
-        b_conv_output = b_t + complex_mul(w, b_u);
+        rt = texelFetch(r_conv_buffer, ivec2(x, ti), 0).rg;
+        ru = texelFetch(r_conv_buffer, ivec2(x, ui), 0).rg;
+        gt = texelFetch(g_conv_buffer, ivec2(x, ti), 0).rg;
+        gu = texelFetch(g_conv_buffer, ivec2(x, ui), 0).rg;
+        bt = texelFetch(b_conv_buffer, ivec2(x, ti), 0).rg;
+        bu = texelFetch(b_conv_buffer, ivec2(x, ui), 0).rg;
     }
+
+    if (2 * j < BUTTERFLY) {
+        r_conv_output = rt + ru;
+        g_conv_output = gt + gu;
+        b_conv_output = bt + bu;
+        return; // no twiddling
+    }
+
+    ru -= rt;
+    gu -= gt;
+    bu -= bt;
+
+    float twiddle = M_2PI * float(j) / float(BUTTERFLY);
+
+    float cosW = cos(twiddle);
+    float sinW = sin(twiddle);
+
+    r_conv_output = vec2(cosW * ru.x + sinW * ru.y, cosW * ru.y - sinW * ru.x);
+    g_conv_output = vec2(cosW * gu.x + sinW * gu.y, cosW * gu.y - sinW * gu.x);
+    b_conv_output = vec2(cosW * bu.x + sinW * bu.y, cosW * bu.y - sinW * bu.x);
+}
+
+// DIT-FFT, scrambled -> ordered
+void inverse_fft(int i, int j) {
+    int ti = (j < BUTTERFLY / 2) ? i : (i - BUTTERFLY / 2);
+    int ui = (j < BUTTERFLY / 2) ? (i + BUTTERFLY / 2) : i;
+
+    vec2 rt, gt, bt;
+    vec2 ru, gu, bu;
+
+    if (HORIZONTAL) {
+        int y = int(gl_FragCoord.y - 0.5);
+
+        rt = texelFetch(r_conv_buffer, ivec2(ti, y), 0).rg;
+        ru = texelFetch(r_conv_buffer, ivec2(ui, y), 0).rg;
+        gt = texelFetch(g_conv_buffer, ivec2(ti, y), 0).rg;
+        gu = texelFetch(g_conv_buffer, ivec2(ui, y), 0).rg;
+        bt = texelFetch(b_conv_buffer, ivec2(ti, y), 0).rg;
+        bu = texelFetch(b_conv_buffer, ivec2(ui, y), 0).rg;
+    } else {
+        int x = int(gl_FragCoord.x - 0.5);
+
+        rt = texelFetch(r_conv_buffer, ivec2(x, ti), 0).rg;
+        ru = texelFetch(r_conv_buffer, ivec2(x, ui), 0).rg;
+        gt = texelFetch(g_conv_buffer, ivec2(x, ti), 0).rg;
+        gu = texelFetch(g_conv_buffer, ivec2(x, ui), 0).rg;
+        bt = texelFetch(b_conv_buffer, ivec2(x, ti), 0).rg;
+        bu = texelFetch(b_conv_buffer, ivec2(x, ui), 0).rg;
+    }
+
+    float twiddle = M_2PI * float(j) / float(BUTTERFLY);
+
+    float cosW = cos(twiddle);
+    float sinW = sin(twiddle);
+
+    r_conv_output = rt + vec2(cosW * ru.r - sinW * ru.g, sinW * ru.r + cosW * ru.g);
+    g_conv_output = gt + vec2(cosW * gu.r - sinW * gu.g, sinW * gu.r + cosW * gu.g);
+    b_conv_output = bt + vec2(cosW * bu.r - sinW * bu.g, sinW * bu.r + cosW * bu.g);
 }
 
 void main(void){
+    int i = int((HORIZONTAL ? gl_FragCoord.x : gl_FragCoord.y) - 0.5);
+    int j = i & (BUTTERFLY - 1); // butterfly is always a power of two
+
     if (DIRECTION) {
-        forward_fft();
+        forward_fft(i, j);
     } else {
-        inverse_fft();
+        inverse_fft(i, j);
     }
 
     if (CONVOLVE) {
-        ivec2 coords = ivec2(gl_FragCoord.xy - vec2(0.5));
+        ivec2 p = ivec2(gl_FragCoord.xy - vec2(0.5));
 
-        vec2 r_aperture = texelFetch(r_conv_filter, coords, 0).rg;
-        vec2 g_aperture = texelFetch(g_conv_filter, coords, 0).rg;
-        vec2 b_aperture = texelFetch(b_conv_filter, coords, 0).rg;
+        vec2 r_filter = texelFetch(r_conv_filter, p, 0).rg;
+        vec2 g_filter = texelFetch(g_conv_filter, p, 0).rg;
+        vec2 b_filter = texelFetch(b_conv_filter, p, 0).rg;
 
-        r_conv_output = complex_mul(r_conv_output, r_aperture);
-        g_conv_output = complex_mul(g_conv_output, g_aperture);
-        b_conv_output = complex_mul(b_conv_output, b_aperture);
+        r_conv_output = vec2(r_conv_output.r * r_filter.r - r_conv_output.g * r_filter.g,
+                             r_conv_output.g * r_filter.r + r_conv_output.r * r_filter.g);
+        g_conv_output = vec2(g_conv_output.r * g_filter.r - g_conv_output.g * g_filter.g,
+                             g_conv_output.g * g_filter.r + g_conv_output.r * g_filter.g);
+        b_conv_output = vec2(b_conv_output.r * b_filter.r - b_conv_output.g * b_filter.g,
+                             b_conv_output.g * b_filter.r + b_conv_output.r * b_filter.g);
     }
 }

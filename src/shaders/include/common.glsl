@@ -71,7 +71,3 @@ vec3 rotate(vec3 a, vec3 n) {
 
     return n * (dot(a, n) / n.y) - a * dir;
 }
-
-vec2 complex_mul(vec2 lhs, vec2 rhs) {
-    return vec2(lhs.x * rhs.x - lhs.y * rhs.y, dot(lhs.yx, rhs));
-}
