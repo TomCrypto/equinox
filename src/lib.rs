@@ -215,26 +215,6 @@ impl Device {
 
         let mut invalidated = false;
 
-        invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
-            self.r_aperture_spectrum.upload(
-                aperture.aperture_width as usize,
-                aperture.aperture_height as usize,
-                &aperture.aperture_r_spectrum,
-            );
-
-            self.g_aperture_spectrum.upload(
-                aperture.aperture_width as usize,
-                aperture.aperture_height as usize,
-                &aperture.aperture_g_spectrum,
-            );
-
-            self.b_aperture_spectrum.upload(
-                aperture.aperture_width as usize,
-                aperture.aperture_height as usize,
-                &aperture.aperture_b_spectrum,
-            );
-        });
-
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
             self.update_camera(camera);
         });
@@ -358,6 +338,14 @@ impl Device {
             ]);
 
             self.prepare_fft_pass_data();
+        });
+
+        invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
+            self.preprocess_filter(
+                &aperture.aperture_texels,
+                aperture.aperture_width as usize,
+                aperture.aperture_height as usize,
+            );
         });
 
         // These are post-processing settings that don't apply to the path-traced light
@@ -652,12 +640,10 @@ impl WasmRunner {
         self.scene.camera.aperture = ApertureShape::Circle { radius };
     }
 
-    pub fn set_aperture_data(&mut self, r: &[f32], g: &[f32], b: &[f32], width: u32, height: u32) {
+    pub fn set_aperture_data(&mut self, data: &[u8], width: u32, height: u32) {
         self.scene.aperture.aperture_width = width;
         self.scene.aperture.aperture_height = height;
-        self.scene.aperture.aperture_r_spectrum = Alias::new("r", r.to_vec());
-        self.scene.aperture.aperture_g_spectrum = Alias::new("g", g.to_vec());
-        self.scene.aperture.aperture_b_spectrum = Alias::new("b", b.to_vec());
+        self.scene.aperture.aperture_texels = Alias::new("aperture", data.to_vec());
     }
 
     pub fn set_envmap(&mut self, data: &[f32], cols: usize, rows: usize) {

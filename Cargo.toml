@@ -54,6 +54,9 @@ version = "1.3"
 [dependencies.quasirandom]
 version = "0.2"
 
+[dependencies.rustfft]
+version = "3.0"
+
 [dependencies.serde]
 version = "1.0"
 features = ["derive"]
