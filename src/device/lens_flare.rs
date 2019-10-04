@@ -162,16 +162,16 @@ impl Device {
 
         command.set_vertex_array(&self.fft_pass_data);
 
-        command.bind(&self.r_aperture_spectrum, "r_aperture_input");
-        command.bind(&self.g_aperture_spectrum, "g_aperture_input");
-        command.bind(&self.b_aperture_spectrum, "b_aperture_input");
+        command.bind(&self.r_aperture_spectrum, "r_conv_filter");
+        command.bind(&self.g_aperture_spectrum, "g_conv_filter");
+        command.bind(&self.b_aperture_spectrum, "b_conv_filter");
 
         command.set_viewport(0, 0, 2048, 1024);
 
         for triangle_index in 0..(self.fft_pass_data.vertex_count() / 3) {
-            command.bind(self.source_r_buffer(*location), "r_spectrum_input");
-            command.bind(self.source_g_buffer(*location), "g_spectrum_input");
-            command.bind(self.source_b_buffer(*location), "b_spectrum_input");
+            command.bind(self.source_r_buffer(*location), "r_conv_buffer");
+            command.bind(self.source_g_buffer(*location), "g_conv_buffer");
+            command.bind(self.source_b_buffer(*location), "b_conv_buffer");
 
             command.set_framebuffer(self.target_framebuffer(*location));
 
@@ -186,9 +186,9 @@ impl Device {
     fn load_convolved_render_from_convolution_buffers(&mut self, location: &mut DataLocation) {
         let command = self.read_convolution_buffers_shader.begin_draw();
 
-        command.bind(self.source_r_buffer(*location), "r_spectrum");
-        command.bind(self.source_g_buffer(*location), "g_spectrum");
-        command.bind(self.source_b_buffer(*location), "b_spectrum");
+        command.bind(self.source_r_buffer(*location), "r_conv_buffer");
+        command.bind(self.source_g_buffer(*location), "g_conv_buffer");
+        command.bind(self.source_b_buffer(*location), "b_conv_buffer");
 
         command.bind(&self.samples, "source");
 

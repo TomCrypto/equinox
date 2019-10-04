@@ -3,9 +3,9 @@
 
 out vec3 target;
 
-uniform sampler2D r_spectrum;
-uniform sampler2D g_spectrum;
-uniform sampler2D b_spectrum;
+uniform sampler2D r_conv_buffer;
+uniform sampler2D g_conv_buffer;
+uniform sampler2D b_conv_buffer;
 
 uniform sampler2D source;
 
@@ -17,10 +17,10 @@ void main() {
     vec2 p = (0.5 - 1.0 / CONV_DIMS) * (gl_FragCoord.xy - 0.5) / (IMAGE_DIMS - 1.0);
     p += 0.5 / CONV_DIMS;
 
-    // Normalize the output from the FFT -> IFFT passes
-    float r = texture(r_spectrum, p).r * NORMALIZATION;
-    float g = texture(g_spectrum, p).r * NORMALIZATION;
-    float b = texture(b_spectrum, p).r * NORMALIZATION;
+    // Normalize the output data from the FFT -> IFFT step
+    float r = texture(r_conv_buffer, p).r * NORMALIZATION;
+    float g = texture(g_conv_buffer, p).r * NORMALIZATION;
+    float b = texture(b_conv_buffer, p).r * NORMALIZATION;
 
     target = vec3(r, g, b) + texelFetch(source, ivec2(gl_FragCoord.xy - 0.5), 0).rgb * WEIGHT;
 }

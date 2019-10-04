@@ -1,16 +1,16 @@
 #include <common.glsl>
 
-uniform sampler2D r_spectrum_input;
-uniform sampler2D g_spectrum_input;
-uniform sampler2D b_spectrum_input;
+uniform sampler2D r_conv_buffer;
+uniform sampler2D g_conv_buffer;
+uniform sampler2D b_conv_buffer;
 
-uniform sampler2D r_aperture_input;
-uniform sampler2D g_aperture_input;
-uniform sampler2D b_aperture_input;
+uniform sampler2D r_conv_filter;
+uniform sampler2D g_conv_filter;
+uniform sampler2D b_conv_filter;
 
-layout(location = 0) out vec2 r_spectrum_output;
-layout(location = 1) out vec2 g_spectrum_output;
-layout(location = 2) out vec2 b_spectrum_output;
+layout(location = 0) out vec2 r_conv_output;
+layout(location = 1) out vec2 g_conv_output;
+layout(location = 2) out vec2 b_conv_output;
 
 flat in uvec4 fft_pass_data;
 
@@ -28,31 +28,31 @@ void forward_fft() {
         if (HORIZONTAL) {
             int z = int(gl_FragCoord.y - 0.5);
 
-            vec2 r_t = texelFetch(r_spectrum_input, ivec2(i, z), 0).rg;
-            vec2 g_t = texelFetch(g_spectrum_input, ivec2(i, z), 0).rg;
-            vec2 b_t = texelFetch(b_spectrum_input, ivec2(i, z), 0).rg;
+            vec2 r_t = texelFetch(r_conv_buffer, ivec2(i, z), 0).rg;
+            vec2 g_t = texelFetch(g_conv_buffer, ivec2(i, z), 0).rg;
+            vec2 b_t = texelFetch(b_conv_buffer, ivec2(i, z), 0).rg;
 
-            vec2 r_u = texelFetch(r_spectrum_input, ivec2(i + SUBTRANSFORM_SIZE / 2, z), 0).rg;
-            vec2 g_u = texelFetch(g_spectrum_input, ivec2(i + SUBTRANSFORM_SIZE / 2, z), 0).rg;
-            vec2 b_u = texelFetch(b_spectrum_input, ivec2(i + SUBTRANSFORM_SIZE / 2, z), 0).rg;
+            vec2 r_u = texelFetch(r_conv_buffer, ivec2(i + SUBTRANSFORM_SIZE / 2, z), 0).rg;
+            vec2 g_u = texelFetch(g_conv_buffer, ivec2(i + SUBTRANSFORM_SIZE / 2, z), 0).rg;
+            vec2 b_u = texelFetch(b_conv_buffer, ivec2(i + SUBTRANSFORM_SIZE / 2, z), 0).rg;
 
-            r_spectrum_output = r_t + r_u;
-            g_spectrum_output = g_t + g_u;
-            b_spectrum_output = b_t + b_u;
+            r_conv_output = r_t + r_u;
+            g_conv_output = g_t + g_u;
+            b_conv_output = b_t + b_u;
         } else {
             int z = int(gl_FragCoord.x - 0.5);
 
-            vec2 r_t = texelFetch(r_spectrum_input, ivec2(z, i), 0).rg;
-            vec2 g_t = texelFetch(g_spectrum_input, ivec2(z, i), 0).rg;
-            vec2 b_t = texelFetch(b_spectrum_input, ivec2(z, i), 0).rg;
+            vec2 r_t = texelFetch(r_conv_buffer, ivec2(z, i), 0).rg;
+            vec2 g_t = texelFetch(g_conv_buffer, ivec2(z, i), 0).rg;
+            vec2 b_t = texelFetch(b_conv_buffer, ivec2(z, i), 0).rg;
 
-            vec2 r_u = texelFetch(r_spectrum_input, ivec2(z, i + SUBTRANSFORM_SIZE / 2), 0).rg;
-            vec2 g_u = texelFetch(g_spectrum_input, ivec2(z, i + SUBTRANSFORM_SIZE / 2), 0).rg;
-            vec2 b_u = texelFetch(b_spectrum_input, ivec2(z, i + SUBTRANSFORM_SIZE / 2), 0).rg;
+            vec2 r_u = texelFetch(r_conv_buffer, ivec2(z, i + SUBTRANSFORM_SIZE / 2), 0).rg;
+            vec2 g_u = texelFetch(g_conv_buffer, ivec2(z, i + SUBTRANSFORM_SIZE / 2), 0).rg;
+            vec2 b_u = texelFetch(b_conv_buffer, ivec2(z, i + SUBTRANSFORM_SIZE / 2), 0).rg;
 
-            r_spectrum_output = r_t + r_u;
-            g_spectrum_output = g_t + g_u;
-            b_spectrum_output = b_t + b_u;
+            r_conv_output = r_t + r_u;
+            g_conv_output = g_t + g_u;
+            b_conv_output = b_t + b_u;
         }
     } else {
         float twiddle = M_2PI * float(j) / float(SUBTRANSFORM_SIZE);
@@ -62,31 +62,31 @@ void forward_fft() {
         if (HORIZONTAL) {
             int z = int(gl_FragCoord.y - 0.5);
 
-            vec2 r_t = texelFetch(r_spectrum_input, ivec2(i - SUBTRANSFORM_SIZE / 2, z), 0).rg;
-            vec2 g_t = texelFetch(g_spectrum_input, ivec2(i - SUBTRANSFORM_SIZE / 2, z), 0).rg;
-            vec2 b_t = texelFetch(b_spectrum_input, ivec2(i - SUBTRANSFORM_SIZE / 2, z), 0).rg;
+            vec2 r_t = texelFetch(r_conv_buffer, ivec2(i - SUBTRANSFORM_SIZE / 2, z), 0).rg;
+            vec2 g_t = texelFetch(g_conv_buffer, ivec2(i - SUBTRANSFORM_SIZE / 2, z), 0).rg;
+            vec2 b_t = texelFetch(b_conv_buffer, ivec2(i - SUBTRANSFORM_SIZE / 2, z), 0).rg;
 
-            vec2 r_u = texelFetch(r_spectrum_input, ivec2(i, z), 0).rg;
-            vec2 g_u = texelFetch(g_spectrum_input, ivec2(i, z), 0).rg;
-            vec2 b_u = texelFetch(b_spectrum_input, ivec2(i, z), 0).rg;
+            vec2 r_u = texelFetch(r_conv_buffer, ivec2(i, z), 0).rg;
+            vec2 g_u = texelFetch(g_conv_buffer, ivec2(i, z), 0).rg;
+            vec2 b_u = texelFetch(b_conv_buffer, ivec2(i, z), 0).rg;
 
-            r_spectrum_output = complex_mul(w, r_t - r_u);
-            g_spectrum_output = complex_mul(w, g_t - g_u);
-            b_spectrum_output = complex_mul(w, b_t - b_u);
+            r_conv_output = complex_mul(w, r_t - r_u);
+            g_conv_output = complex_mul(w, g_t - g_u);
+            b_conv_output = complex_mul(w, b_t - b_u);
         } else {
             int z = int(gl_FragCoord.x - 0.5);
 
-            vec2 r_t = texelFetch(r_spectrum_input, ivec2(z, i - SUBTRANSFORM_SIZE / 2), 0).rg;
-            vec2 g_t = texelFetch(g_spectrum_input, ivec2(z, i - SUBTRANSFORM_SIZE / 2), 0).rg;
-            vec2 b_t = texelFetch(b_spectrum_input, ivec2(z, i - SUBTRANSFORM_SIZE / 2), 0).rg;
+            vec2 r_t = texelFetch(r_conv_buffer, ivec2(z, i - SUBTRANSFORM_SIZE / 2), 0).rg;
+            vec2 g_t = texelFetch(g_conv_buffer, ivec2(z, i - SUBTRANSFORM_SIZE / 2), 0).rg;
+            vec2 b_t = texelFetch(b_conv_buffer, ivec2(z, i - SUBTRANSFORM_SIZE / 2), 0).rg;
 
-            vec2 r_u = texelFetch(r_spectrum_input, ivec2(z, i), 0).rg;
-            vec2 g_u = texelFetch(g_spectrum_input, ivec2(z, i), 0).rg;
-            vec2 b_u = texelFetch(b_spectrum_input, ivec2(z, i), 0).rg;
+            vec2 r_u = texelFetch(r_conv_buffer, ivec2(z, i), 0).rg;
+            vec2 g_u = texelFetch(g_conv_buffer, ivec2(z, i), 0).rg;
+            vec2 b_u = texelFetch(b_conv_buffer, ivec2(z, i), 0).rg;
 
-            r_spectrum_output = complex_mul(w, r_t - r_u);
-            g_spectrum_output = complex_mul(w, g_t - g_u);
-            b_spectrum_output = complex_mul(w, b_t - b_u);
+            r_conv_output = complex_mul(w, r_t - r_u);
+            g_conv_output = complex_mul(w, g_t - g_u);
+            b_conv_output = complex_mul(w, b_t - b_u);
         }
     }
 }
@@ -106,31 +106,31 @@ void inverse_fft() {
     if (HORIZONTAL) {
         int z = int(gl_FragCoord.y - 0.5);
 
-        vec2 r_t = texelFetch(r_spectrum_input, ivec2(ti, z), 0).rg;
-        vec2 g_t = texelFetch(g_spectrum_input, ivec2(ti, z), 0).rg;
-        vec2 b_t = texelFetch(b_spectrum_input, ivec2(ti, z), 0).rg;
+        vec2 r_t = texelFetch(r_conv_buffer, ivec2(ti, z), 0).rg;
+        vec2 g_t = texelFetch(g_conv_buffer, ivec2(ti, z), 0).rg;
+        vec2 b_t = texelFetch(b_conv_buffer, ivec2(ti, z), 0).rg;
 
-        vec2 r_u = texelFetch(r_spectrum_input, ivec2(ui, z), 0).rg;
-        vec2 g_u = texelFetch(g_spectrum_input, ivec2(ui, z), 0).rg;
-        vec2 b_u = texelFetch(b_spectrum_input, ivec2(ui, z), 0).rg;
+        vec2 r_u = texelFetch(r_conv_buffer, ivec2(ui, z), 0).rg;
+        vec2 g_u = texelFetch(g_conv_buffer, ivec2(ui, z), 0).rg;
+        vec2 b_u = texelFetch(b_conv_buffer, ivec2(ui, z), 0).rg;
 
-        r_spectrum_output = r_t + complex_mul(w, r_u);
-        g_spectrum_output = g_t + complex_mul(w, g_u);
-        b_spectrum_output = b_t + complex_mul(w, b_u);
+        r_conv_output = r_t + complex_mul(w, r_u);
+        g_conv_output = g_t + complex_mul(w, g_u);
+        b_conv_output = b_t + complex_mul(w, b_u);
     } else {
         int z = int(gl_FragCoord.x - 0.5);
 
-        vec2 r_t = texelFetch(r_spectrum_input, ivec2(z, ti), 0).rg;
-        vec2 g_t = texelFetch(g_spectrum_input, ivec2(z, ti), 0).rg;
-        vec2 b_t = texelFetch(b_spectrum_input, ivec2(z, ti), 0).rg;
+        vec2 r_t = texelFetch(r_conv_buffer, ivec2(z, ti), 0).rg;
+        vec2 g_t = texelFetch(g_conv_buffer, ivec2(z, ti), 0).rg;
+        vec2 b_t = texelFetch(b_conv_buffer, ivec2(z, ti), 0).rg;
 
-        vec2 r_u = texelFetch(r_spectrum_input, ivec2(z, ui), 0).rg;
-        vec2 g_u = texelFetch(g_spectrum_input, ivec2(z, ui), 0).rg;
-        vec2 b_u = texelFetch(b_spectrum_input, ivec2(z, ui), 0).rg;
+        vec2 r_u = texelFetch(r_conv_buffer, ivec2(z, ui), 0).rg;
+        vec2 g_u = texelFetch(g_conv_buffer, ivec2(z, ui), 0).rg;
+        vec2 b_u = texelFetch(b_conv_buffer, ivec2(z, ui), 0).rg;
 
-        r_spectrum_output = r_t + complex_mul(w, r_u);
-        g_spectrum_output = g_t + complex_mul(w, g_u);
-        b_spectrum_output = b_t + complex_mul(w, b_u);
+        r_conv_output = r_t + complex_mul(w, r_u);
+        g_conv_output = g_t + complex_mul(w, g_u);
+        b_conv_output = b_t + complex_mul(w, b_u);
     }
 }
 
@@ -144,12 +144,12 @@ void main(void){
     if (CONVOLVE) {
         ivec2 coords = ivec2(gl_FragCoord.xy - vec2(0.5));
 
-        vec2 r_aperture = texelFetch(r_aperture_input, coords, 0).rg;
-        vec2 g_aperture = texelFetch(g_aperture_input, coords, 0).rg;
-        vec2 b_aperture = texelFetch(b_aperture_input, coords, 0).rg;
+        vec2 r_aperture = texelFetch(r_conv_filter, coords, 0).rg;
+        vec2 g_aperture = texelFetch(g_conv_filter, coords, 0).rg;
+        vec2 b_aperture = texelFetch(b_conv_filter, coords, 0).rg;
 
-        r_spectrum_output = complex_mul(r_spectrum_output, r_aperture);
-        g_spectrum_output = complex_mul(g_spectrum_output, g_aperture);
-        b_spectrum_output = complex_mul(b_spectrum_output, b_aperture);
+        r_conv_output = complex_mul(r_conv_output, r_aperture);
+        g_conv_output = complex_mul(g_conv_output, g_aperture);
+        b_conv_output = complex_mul(b_conv_output, b_aperture);
     }
 }
