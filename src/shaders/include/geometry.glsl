@@ -11,6 +11,8 @@ bool ray_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
     // TODO: possibly dynamically adjust precision based on initial distance?
     // this would be neat if it worked honestly
 
+    // float prec = range.y / 1000.0;
+
     while (range.x <= range.y) {
         // need to take the absolute value here in case we're on the inside of a distance field
         // I'm not sure if this is always valid?

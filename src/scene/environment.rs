@@ -11,6 +11,6 @@ pub struct EnvironmentMap {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Environment {
-    pub map: Option<EnvironmentMap>, // TODO: rename MapData
+    pub map: Option<EnvironmentMap>,
     pub multiplier: [f32; 3],
 }

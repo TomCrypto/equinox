@@ -89,7 +89,6 @@ impl Geometry {
                     .map(|c| c.bounding_box(symbolic_values))
                     .collect::<Option<Vec<_>>>()?,
             )),
-            // TODO: can we be smarter here? can we get a better AABB in general??
             Self::Subtraction { lhs, rhs } => Some(BoundingBox::union(
                 [
                     lhs.bounding_box(symbolic_values)?,
