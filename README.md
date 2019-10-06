@@ -16,7 +16,7 @@ The `viewer` project can also automatically build the module on any code change:
 
 ## License
 
-This software is licensed under the MIT license.
+This software is provided under the MIT license.
 
 ## Gallery
 

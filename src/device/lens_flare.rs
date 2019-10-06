@@ -264,7 +264,7 @@ impl Device {
         for y in 0..1023 {
             for x in 0..2047 {
                 for wavelength in 380..750 {
-                    let scale_x = z0 * (wavelength as f32) / 749.0 * 1.78075;
+                    let scale_x = z0 * (wavelength as f32) / 749.0 * 1.77777;
                     let scale_y = z0 * (wavelength as f32) / 749.0;
 
                     let mut px = (x as f32 + 0.5) / 2047.0;

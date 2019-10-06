@@ -300,22 +300,22 @@ impl Device {
             self.g_aperture_spectrum.create(2048, 1024);
             self.b_aperture_spectrum.create(2048, 1024);
 
-            self.samples_fbo.invalidate(&[&self.samples]);
+            self.samples_fbo.rebuild(&[&self.samples]);
 
-            self.render_fbo.invalidate(&[&self.render]);
-            self.aperture_fbo.invalidate(&[
+            self.render_fbo.rebuild(&[&self.render]);
+            self.aperture_fbo.rebuild(&[
                 &self.r_aperture_spectrum,
                 &self.g_aperture_spectrum,
                 &self.b_aperture_spectrum,
             ]);
 
-            self.spectrum_temp1_fbo.invalidate(&[
+            self.spectrum_temp1_fbo.rebuild(&[
                 &self.rspectrum_temp1,
                 &self.gspectrum_temp1,
                 &self.bspectrum_temp1,
             ]);
 
-            self.spectrum_temp2_fbo.invalidate(&[
+            self.spectrum_temp2_fbo.rebuild(&[
                 &self.rspectrum_temp2,
                 &self.gspectrum_temp2,
                 &self.bspectrum_temp2,
@@ -436,17 +436,44 @@ impl Device {
             return Ok(false);
         }
 
-        // Unfortunately the isProgram call is extremely slow so we can't use it to
-        // lazily check for context loss on the programs; manually invalidate them.
-
         self.program.invalidate();
         self.present_program.invalidate();
         self.read_convolution_buffers_shader.invalidate();
         self.fft_shader.invalidate();
         self.load_convolution_buffers_shader.invalidate();
+        self.camera_buffer.invalidate();
+        self.geometry_buffer.invalidate();
+        self.material_buffer.invalidate();
+        self.instance_buffer.invalidate();
+        self.display_buffer.invalidate();
+        self.envmap_marginal_cdf.invalidate();
+        self.envmap_conditional_cdfs.invalidate();
+        self.envmap_texture.invalidate();
+        self.globals_buffer.invalidate();
+        self.raster_buffer.invalidate();
+        self.samples.invalidate();
+        self.samples_fbo.invalidate();
+        self.rspectrum_temp1.invalidate();
+        self.gspectrum_temp1.invalidate();
+        self.bspectrum_temp1.invalidate();
 
-        self.refine_query.reset();
-        self.render_query.reset();
+        self.rspectrum_temp2.invalidate();
+        self.gspectrum_temp2.invalidate();
+        self.bspectrum_temp2.invalidate();
+
+        self.r_aperture_spectrum.invalidate();
+        self.g_aperture_spectrum.invalidate();
+        self.b_aperture_spectrum.invalidate();
+
+        self.render.invalidate();
+        self.fft_pass_data.invalidate();
+        self.spectrum_temp1_fbo.invalidate();
+        self.spectrum_temp2_fbo.invalidate();
+        self.render_fbo.invalidate();
+        self.aperture_fbo.invalidate();
+
+        self.refine_query.invalidate();
+        self.render_query.invalidate();
 
         scene.dirty_all_fields();
         self.device_lost = false;

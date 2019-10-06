@@ -47,14 +47,20 @@ impl<T> Texture<T> {
         self.layout.1
     }
 
+    pub fn invalidate(&mut self) {
+        self.handle = None;
+    }
+
     fn create_texture(&mut self, cols: usize, rows: usize, mip_levels: usize) -> bool {
         assert!(
             cols > 0 && rows > 0 && mip_levels > 0,
             "invalid texture layout/size requested"
         );
 
-        if self.layout != (cols, rows, mip_levels) || self.is_webgl_texture_invalid() {
-            self.gl.delete_texture(self.handle.as_ref());
+        if self.layout != (cols, rows, mip_levels) || self.handle.is_none() {
+            if let Some(texture_handle) = &self.handle {
+                self.gl.delete_texture(Some(texture_handle));
+            }
 
             self.handle = self.gl.create_texture();
             self.layout = (cols, rows, mip_levels);
@@ -67,10 +73,6 @@ impl<T> Texture<T> {
         } else {
             true
         }
-    }
-
-    fn is_webgl_texture_invalid(&self) -> bool {
-        !self.gl.is_texture(self.handle.as_ref())
     }
 }
 
@@ -252,7 +254,9 @@ impl<T: TextureFormat> AsBindTarget for Texture<T> {
 
 impl<T> Drop for Texture<T> {
     fn drop(&mut self) {
-        self.gl.delete_texture(self.handle.as_ref());
+        if let Some(texture_handle) = &self.handle {
+            self.gl.delete_texture(Some(texture_handle));
+        }
     }
 }
 

@@ -28,14 +28,20 @@ impl Framebuffer {
         self.handle.as_ref()
     }
 
-    pub fn invalidate(&mut self, attachments: &[&dyn AsAttachment]) {
+    pub fn invalidate(&mut self) {
+        self.handle = None;
+    }
+
+    pub fn rebuild(&mut self, attachments: &[&dyn AsAttachment]) {
         if let Err(_) | Ok(None) = self.gl.get_extension("EXT_color_buffer_float") {
             panic!("the WebGL2 extension `EXT_color_buffer_float' is unavailable");
         }
 
         assert!(!attachments.is_empty());
 
-        self.gl.delete_framebuffer(self.handle.as_ref());
+        if let Some(framebuffer_handle) = &self.handle {
+            self.gl.delete_framebuffer(Some(framebuffer_handle));
+        }
 
         self.handle = self.gl.create_framebuffer();
 
@@ -76,6 +82,8 @@ impl Framebuffer {
 
 impl Drop for Framebuffer {
     fn drop(&mut self) {
-        self.gl.delete_framebuffer(self.handle.as_ref());
+        if let Some(framebuffer_handle) = &self.handle {
+            self.gl.delete_framebuffer(Some(framebuffer_handle));
+        }
     }
 }

@@ -19,7 +19,7 @@ impl Query {
         }
     }
 
-    pub(crate) fn reset(&mut self) {
+    pub(crate) fn invalidate(&mut self) {
         if Self::is_supported(&self.gl) {
             self.handle = self.gl.create_query();
             self.busy = false;

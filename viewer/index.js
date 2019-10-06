@@ -60,12 +60,12 @@ import('../pkg/equinox').catch(console.error).then(async gl => {
   let aperture = new Uint8Array(await fetch_bytes("assets/aperture.bin"))
   runner.set_aperture_data(aperture, 1024, 1024)
 
-  //let envmap_data = new Float32Array(await fetch_bytes("assets/envmap2.dat"))
-  //runner.set_envmap(envmap_data, 4096, 2048)
+  let envmap_data = new Float32Array(await fetch_bytes("assets/blue_grotto_4k.raw"))
+  runner.set_envmap(envmap_data, 4096, 2048)
 
-  // 5 or 7
-  let envmap_data = new Float32Array(await fetch_bytes("assets/envmap7.dat"))
-  runner.set_envmap(envmap_data, 8192, 4096)
+  // 5 or 7 or 8
+  //let envmap_data = new Float32Array(await fetch_bytes("assets/envmap5.dat"))
+  //runner.set_envmap(envmap_data, 8192, 4096)
 
   runner.set_camera_position(0.5, 4, -12)
 
@@ -244,7 +244,7 @@ import('../pkg/equinox').catch(console.error).then(async gl => {
         refineCount = Math.floor((1000000.0 / 60.0 - 2000.0 - renderEMA.average()) / refineEMA.average())
       }
 
-      refineCount = Math.min(9, Math.max(refineCount, 1))
+      refineCount = 1 // Math.min(40, Math.max(refineCount, 1))
 
       let now = performance.now()
       runner.update()

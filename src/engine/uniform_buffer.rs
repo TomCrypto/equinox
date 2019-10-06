@@ -26,7 +26,7 @@ impl<T: AsBytes + FromBytes> UniformBuffer<[T]> {
     }
 
     pub fn write_array(&mut self, contents: &[T]) {
-        if !self.gl.is_buffer(self.handle.as_ref()) {
+        if self.handle.is_none() {
             self.create_and_allocate();
         }
 
@@ -52,7 +52,7 @@ impl<T: AsBytes + FromBytes> UniformBuffer<T> {
     }
 
     pub fn write(&mut self, contents: &T) {
-        if !self.gl.is_buffer(self.handle.as_ref()) {
+        if self.handle.is_none() {
             self.create_and_allocate();
         }
 
@@ -68,6 +68,10 @@ impl<T: AsBytes + FromBytes> UniformBuffer<T> {
 }
 
 impl<T: ?Sized> UniformBuffer<T> {
+    pub fn invalidate(&mut self) {
+        self.handle = None;
+    }
+
     fn create_and_allocate(&mut self) {
         self.handle = self.gl.create_buffer();
 
@@ -83,7 +87,9 @@ impl<T: ?Sized> UniformBuffer<T> {
 
 impl<T: ?Sized> Drop for UniformBuffer<T> {
     fn drop(&mut self) {
-        self.gl.delete_buffer(self.handle.as_ref());
+        if let Some(buffer_handle) = &self.handle {
+            self.gl.delete_buffer(Some(buffer_handle));
+        }
     }
 }
 

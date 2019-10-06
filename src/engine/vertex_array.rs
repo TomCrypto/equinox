@@ -32,11 +32,11 @@ impl<T: VertexLayout> VertexArray<[T]> {
     pub fn upload(&mut self, vertices: &[T]) {
         assert!(!vertices.is_empty());
 
-        if vertices.len() != self.vertex_count || !self.gl.is_buffer(self.buf_handle.as_ref()) {
+        if vertices.len() != self.vertex_count || self.buf_handle.is_none() {
             self.create_buffer(vertices.len());
         }
 
-        if !self.gl.is_vertex_array(self.vao_handle.as_ref()) {
+        if self.vao_handle.is_none() {
             self.create_vertex_array();
         }
 
@@ -54,11 +54,12 @@ impl<T: VertexLayout> VertexArray<[T]> {
         self.vertex_count
     }
 
-    fn create_vertex_array(&mut self) {
-        if self.gl.is_vertex_array(self.vao_handle.as_ref()) {
-            self.gl.delete_vertex_array(self.vao_handle.as_ref());
-        }
+    pub fn invalidate(&mut self) {
+        self.buf_handle = None;
+        self.vao_handle = None;
+    }
 
+    fn create_vertex_array(&mut self) {
         self.vao_handle = self.gl.create_vertex_array();
 
         self.gl.bind_vertex_array(self.vao_handle.as_ref());
@@ -93,8 +94,8 @@ impl<T: VertexLayout> VertexArray<[T]> {
     }
 
     fn create_buffer(&mut self, vertex_count: usize) {
-        if self.gl.is_buffer(self.buf_handle.as_ref()) {
-            self.gl.delete_buffer(self.buf_handle.as_ref());
+        if let Some(buffer_handle) = &self.buf_handle {
+            self.gl.delete_buffer(Some(buffer_handle));
         }
 
         self.buf_handle = self.gl.create_buffer();
@@ -120,12 +121,12 @@ impl<T: VertexLayout> AsVertexArray for VertexArray<[T]> {
 
 impl<T: ?Sized> Drop for VertexArray<T> {
     fn drop(&mut self) {
-        if self.gl.is_buffer(self.buf_handle.as_ref()) {
-            self.gl.delete_buffer(self.buf_handle.as_ref());
+        if let Some(buffer_handle) = &self.buf_handle {
+            self.gl.delete_buffer(Some(buffer_handle));
         }
 
-        if self.gl.is_vertex_array(self.vao_handle.as_ref()) {
-            self.gl.delete_vertex_array(self.vao_handle.as_ref());
+        if let Some(vao_handle) = &self.vao_handle {
+            self.gl.delete_vertex_array(Some(vao_handle));
         }
     }
 }
