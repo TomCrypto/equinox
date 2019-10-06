@@ -32,7 +32,7 @@ pub struct RenderStatistics {
 
 #[derive(Debug)]
 pub struct Device {
-    pub gl: Context, // TODO: shouldn't be publicly exposed
+    gl: Context,
 
     program: Shader,
     present_program: Shader,
@@ -600,10 +600,6 @@ impl WasmRunner {
 
     pub fn context_lost(&mut self) {
         self.device.context_lost();
-    }
-
-    pub fn context(&self) -> WebGl2RenderingContext {
-        self.device.gl.clone()
     }
 
     pub fn update(&mut self) -> Result<bool, JsValue> {

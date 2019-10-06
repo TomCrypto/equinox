@@ -16,13 +16,15 @@ import('../pkg/equinox').catch(console.error).then(async gl => {
   canvas.width = canvas.clientWidth
   canvas.height = canvas.clientHeight
 
-  runner = new gl.WasmRunner(canvas.getContext("webgl2", {
+  const context = canvas.getContext("webgl2", {
     alpha: false,
     antialias: false,
     depth: false,
     premultipliedAlpha: false,
     stencil: false,
-  }))
+  })
+
+  runner = new gl.WasmRunner(context)
 
   runner.set_dimensions(canvas.width, canvas.height)
   document.getElementById("resolution").innerText = `${canvas.width} × ${canvas.height}`
@@ -44,7 +46,7 @@ import('../pkg/equinox').catch(console.error).then(async gl => {
     e.preventDefault()
   })
 
-  ctx = runner.context().getExtension("WEBGL_lose_context");
+  ctx = context.getExtension("WEBGL_lose_context");
 
   document.getElementById("lose").addEventListener("click", () => {
     ctx.loseContext();
