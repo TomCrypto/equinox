@@ -564,10 +564,17 @@ pub struct WasmRunner {
     refine_stats: Option<RefineStatistics>,
 }
 
+const VERSION: &'static str = concat!("Equinox v", env!("CARGO_PKG_VERSION"), " (WebGL2)");
+
+#[wasm_bindgen]
+pub fn version() -> String {
+    VERSION.to_owned()
+}
+
 #[wasm_bindgen]
 pub fn initialize_logging() {
     console_error_panic_hook::set_once();
-    console_log::init().unwrap();
+    let _ = console_log::init();
 }
 
 #[wasm_bindgen]
