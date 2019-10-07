@@ -76,7 +76,7 @@ fn preprocess_glsl_shader(path: PathBuf, include_path: &str) -> Result<()> {
 }
 
 lazy_static! {
-    static ref REGEX: Regex = Regex::new(r#"^\s*#\s*include\s+<([[:graph:]]*)>\s*$"#).unwrap();
+    static ref REGEX: Regex = Regex::new(r#"^#include <([[:graph:]]*)>$"#).unwrap();
 }
 
 fn preprocess(

@@ -1,0 +1,5 @@
+/node_modules
+/dist
+/public/assets
+yarn-debug.log*
+yarn-error.log*

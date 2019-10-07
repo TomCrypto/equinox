@@ -1,0 +1,21 @@
+{
+  "[typescript]": {
+    "editor.formatOnSave": true,
+    "editor.rulers": [100],
+    "editor.tabSize": 4
+  },
+
+  "[vue]": {
+    "editor.formatOnSave": true,
+    "editor.rulers": [100],
+    "editor.tabSize": 4
+  },
+
+  "files.exclude": {
+    ".gitignore": true,
+    "dist": true,
+    "node_modules": true
+  },
+
+  "files.insertFinalNewline": true
+}

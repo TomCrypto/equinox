@@ -36,7 +36,7 @@ impl ShaderBuilder {
 
     /// Returns the final GLSL shader source.
     pub fn generate_source(&self) -> String {
-        let pattern = Regex::new(r#"^\s*#\s*include\s+<([[:graph:]]*)>\s*$"#).unwrap();
+        let pattern = Regex::new(r#"^#include <([[:graph:]]*)>$"#).unwrap();
 
         let mut source = String::from("#version 300 es\nprecision highp float;\n");
         source.reserve(self.source.len()); // avoid unnecessary data reallocations

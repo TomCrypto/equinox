@@ -5,3 +5,4 @@ node_modules
 assets
 /pkg
 /.vscode/tasks.json
+/deploy.sh
