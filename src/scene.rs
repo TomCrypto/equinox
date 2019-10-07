@@ -1,5 +1,4 @@
 export![
-    alias,
     bounding_box,
     camera,
     dirty,

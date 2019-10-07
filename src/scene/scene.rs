@@ -1,6 +1,7 @@
 use crate::{Aperture, Camera, Dirty, Display, Environment, Geometry, Instance, Material, Raster};
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// # Dirty Flags
 ///
@@ -17,6 +18,8 @@ pub struct Scene {
     pub environment: Dirty<Environment>,
     pub display: Dirty<Display>,
     pub aperture: Dirty<Aperture>,
+
+    pub assets: HashMap<String, Vec<u8>>,
 }
 
 impl Scene {

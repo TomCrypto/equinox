@@ -1,9 +1,8 @@
-use crate::Alias;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct EnvironmentMap {
-    pub pixels: Alias<Vec<f32>>,
+    pub pixels: String,
     pub width: u32,
     pub height: u32,
     // TODO: assume equirectangular projection for now (most common by far)

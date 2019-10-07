@@ -49,9 +49,13 @@ uniform sampler2D envmap_conditional_cdfs;
 // TODO: add PDFs later on (see the PBR book for correct values...)
 
 vec3 sample_envmap(vec3 direction) {
-    vec2 uv = direction_to_equirectangular(direction, 0.0);
+    if (HAS_ENVMAP == 1) {
+        vec2 uv = direction_to_equirectangular(direction, 0.0);
 
-    return texture(envmap_pix_tex, uv).xyz;
+        return texture(envmap_pix_tex, uv).xyz;
+    } else {
+        return vec3(1.0);
+    }
 }
 
 uint find_interval(sampler2D texture, int y, float u) {

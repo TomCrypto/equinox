@@ -51,7 +51,7 @@ pub struct Device {
     envmap_marginal_cdf: Texture<RG32F>,
     envmap_conditional_cdfs: Texture<RG32F>,
 
-    envmap_texture: Texture<RGBA32F>,
+    envmap_texture: Texture<RGBA16F>,
 
     globals_buffer: UniformBuffer<GlobalData>,
     raster_buffer: UniformBuffer<RasterData>,
@@ -243,8 +243,10 @@ impl Device {
             self.update_instances(geometry_list, material_list, instances);
         });
 
+        let assets = &scene.assets;
+
         invalidated |= Dirty::clean(&mut scene.environment, |environment| {
-            self.update_environment(environment);
+            self.update_environment(assets, environment);
         });
 
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
@@ -256,9 +258,11 @@ impl Device {
             self.render
                 .create(raster.width.get() as usize, raster.height.get() as usize);
 
+            self.samples_fbo.rebuild(&[&self.samples]);
+
             // Configure the shaders with the desired resolutions...
 
-            self.load_convolution_buffers_shader
+            /*self.load_convolution_buffers_shader
                 .frag_shader()
                 .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
 
@@ -300,8 +304,6 @@ impl Device {
             self.g_aperture_spectrum.create(2048, 1024);
             self.b_aperture_spectrum.create(2048, 1024);
 
-            self.samples_fbo.rebuild(&[&self.samples]);
-
             self.render_fbo.rebuild(&[&self.render]);
             self.aperture_fbo.rebuild(&[
                 &self.r_aperture_spectrum,
@@ -321,23 +323,23 @@ impl Device {
                 &self.bspectrum_temp2,
             ]);
 
-            self.prepare_fft_pass_data();
+            self.prepare_fft_pass_data();*/
         });
 
         self.program.rebuild()?;
         self.present_program.rebuild()?;
 
-        self.read_convolution_buffers_shader.rebuild()?;
+        /*self.read_convolution_buffers_shader.rebuild()?;
         self.fft_shader.rebuild()?;
-        self.load_convolution_buffers_shader.rebuild()?;
+        self.load_convolution_buffers_shader.rebuild()?;*/
 
-        invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
+        /*invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
             self.preprocess_filter(
                 &aperture.aperture_texels,
                 aperture.aperture_width as usize,
                 aperture.aperture_height as usize,
             );
-        });
+        });*/
 
         // These are post-processing settings that don't apply to the path-traced light
         // transport simulation, so we don't need to invalidate the render buffer here.
@@ -380,7 +382,7 @@ impl Device {
 
         let weight = (self.state.frame as f32 - 1.0) / (self.state.frame as f32);
 
-        let refine_query = self.refine_query.query_time_elapsed();
+        // let refine_query = self.refine_query.query_time_elapsed();
 
         command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
         command.set_blend_mode(BlendMode::Accumulate { weight });
@@ -389,13 +391,15 @@ impl Device {
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
 
-        if !Query::is_supported(&self.gl) {
+        /*if !Query::is_supported(&self.gl) {
             return None; // no statistics
         }
 
         Some(RefineStatistics {
             frame_time_us: refine_query.end().unwrap_or_default() / 1000.0,
-        })
+        })*/
+
+        None
     }
 
     /// Displays the current render buffer to the screen.
@@ -404,13 +408,13 @@ impl Device {
             return None;
         }
 
-        self.render_query.start_query();
+        // self.render_query.start_query();
 
-        self.render_lens_flare();
+        //self.render_lens_flare();
 
         let command = self.present_program.begin_draw();
 
-        command.bind(&self.render, "samples");
+        command.bind(&self.samples, "samples");
         command.bind(&self.display_buffer, "Display");
 
         command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
@@ -420,7 +424,7 @@ impl Device {
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
 
-        if !Query::is_supported(&self.gl) {
+        /*if !Query::is_supported(&self.gl) {
             return None; // no statistics
         }
 
@@ -428,7 +432,9 @@ impl Device {
 
         Some(RenderStatistics {
             frame_time_us: render_query.unwrap_or_default() / 1000.0,
-        })
+        })*/
+
+        None
     }
 
     fn try_restore(&mut self, scene: &mut Scene) -> Result<bool, Error> {
@@ -556,6 +562,204 @@ use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
 
 #[wasm_bindgen]
+pub struct WebScene {
+    scene: Scene,
+}
+
+#[wasm_bindgen]
+impl WebScene {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Result<WebScene, JsValue> {
+        Ok(Self {
+            scene: Scene::default(),
+        })
+    }
+
+    pub fn set_raster_dimensions(&mut self, width: u32, height: u32) {
+        if self.scene.raster.width.get() != width {
+            self.scene.raster.width = NonZeroU32::new(width).unwrap();
+        }
+
+        if self.scene.raster.height.get() != height {
+            self.scene.raster.height = NonZeroU32::new(height).unwrap();
+        }
+    }
+
+    pub fn insert_asset(&mut self, name: &str, data: &[u8]) {
+        self.scene.assets.insert(name.to_owned(), data.to_vec());
+    }
+
+    pub fn remove_asset(&mut self, name: &str) {
+        self.scene.assets.remove(name);
+    }
+
+    pub fn set_envmap(&mut self, name: &str, width: u32, height: u32) {
+        self.scene.environment.map = Some(EnvironmentMap {
+            pixels: name.to_owned(),
+            width,
+            height,
+        });
+    }
+
+    // TODO: bunch of getters and setters for the scene, dirtying as needed
+
+    pub fn move_camera(&mut self, forward: f32, sideways: f32) {
+        let sideways_vector = self
+            .scene
+            .camera
+            .up_vector
+            .cross(self.scene.camera.direction)
+            .normalize();
+
+        let direction = self.scene.camera.direction;
+
+        self.scene.camera.position += forward * direction + sideways_vector * sideways;
+    }
+
+    pub fn set_camera_direction(&mut self, x: f32, y: f32, z: f32) {
+        self.scene.camera.direction = Vector3::new(x, y, z);
+    }
+
+    pub fn orient_camera(&mut self, phi: f32, theta: f32) {
+        let new_vector = Vector3::new(
+            phi.cos() * theta.sin(),
+            theta.cos(),
+            phi.sin() * theta.sin(),
+        );
+
+        let change = cgmath::Quaternion::between_vectors(Vector3::new(0.0, 1.0, 0.0), new_vector);
+
+        self.scene.camera.direction = change.rotate_vector(self.scene.camera.direction);
+    }
+
+    // TODO: remove eventually
+    pub fn setup_test_scene(&mut self) {
+        self.scene.camera.position.x = 0.0;
+        self.scene.camera.position.y = 1.0;
+        self.scene.camera.position.z = 5.0;
+
+        self.scene.geometries.push(Geometry::Plane {
+            width: Parameter::Constant { value: 2.0 },
+            length: Parameter::Constant { value: 2.0 },
+        });
+
+        self.scene.geometries.push(Geometry::Translate {
+            f: Box::new(Geometry::UnitSphere),
+            translation: [
+                Parameter::Constant { value: 0.0 },
+                Parameter::Constant { value: 1.01 },
+                Parameter::Constant { value: 0.0 },
+            ],
+        });
+
+        self.scene.geometries.push(Geometry::Union {
+            children: vec![
+                Geometry::Translate {
+                    f: Box::new(Geometry::Scale {
+                        f: Box::new(Geometry::UnitSphere),
+                        factor: Parameter::Constant { value: 0.333 },
+                    }),
+                    translation: [
+                        Parameter::Constant { value: 2.0 },
+                        Parameter::Constant { value: 0.0 },
+                        Parameter::Constant { value: 0.2 },
+                    ],
+                },
+                Geometry::Translate {
+                    f: Box::new(Geometry::Scale {
+                        f: Box::new(Geometry::UnitSphere),
+                        factor: Parameter::Constant { value: 0.333 },
+                    }),
+                    translation: [
+                        Parameter::Constant { value: 2.0 },
+                        Parameter::Constant { value: 0.0 },
+                        Parameter::Constant { value: -0.2 },
+                    ],
+                },
+            ],
+        });
+
+        // white lambertian
+        self.scene.materials.push(Material::Lambertian {
+            albedo: [0.9, 0.9, 0.9],
+        });
+
+        self.scene.materials.push(Material::Lambertian {
+            albedo: [0.25, 0.25, 0.75],
+        });
+
+        /*self.scene.materials.push(Material::Phong {
+            albedo: [0.9, 0.9, 0.9],
+            shininess: 1024.0,
+        });*/
+
+        self.scene.materials.push(Material::IdealReflection {
+            reflectance: [0.9, 0.9, 0.9],
+        });
+
+        self.scene.instances.push(Instance {
+            geometry: 0,
+            material: 0,
+            geometry_values: vec![],
+        });
+
+        /*self.scene.instances.push(Instance {
+            geometry: 1,
+            material: 1,
+            geometry_values: vec![],
+            material_values: vec![0.8, 0.8, 0.8, 0.0],
+        });*/
+
+        self.scene.instances.push(Instance {
+            geometry: 1,
+            material: 2,
+            geometry_values: vec![],
+        });
+
+        /*self.scene.instances.push(Instance {
+            geometry: 1,
+            material: 3,
+            geometry_values: vec![],
+            material_values: vec![0.8, 0.8, 0.8, 1.55],
+        });*/
+
+        /*self.scene.instances.push(Instance {
+            geometry: 2,
+            material: 1,
+            geometry_values: vec![],
+        });*/
+    }
+}
+
+#[wasm_bindgen]
+pub struct WebDevice {
+    device: Device,
+}
+
+#[wasm_bindgen]
+impl WebDevice {
+    #[wasm_bindgen(constructor)]
+    pub fn new(context: &WebGl2RenderingContext) -> Result<WebDevice, JsValue> {
+        Ok(Self {
+            device: Device::new(context)?,
+        })
+    }
+
+    pub fn update(&mut self, scene: &mut WebScene) -> Result<bool, JsValue> {
+        Ok(self.device.update(&mut scene.scene)?)
+    }
+
+    pub fn refine(&mut self) {
+        self.device.refine();
+    }
+
+    pub fn render(&mut self) {
+        self.device.render();
+    }
+}
+
+/*
+#[wasm_bindgen]
 pub struct WasmRunner {
     device: Device,
     scene: Scene,
@@ -563,6 +767,7 @@ pub struct WasmRunner {
     render_stats: Option<RenderStatistics>,
     refine_stats: Option<RefineStatistics>,
 }
+*/
 
 const VERSION: &'static str = concat!("Equinox v", env!("CARGO_PKG_VERSION"), " (WebGL2)");
 
@@ -577,6 +782,7 @@ pub fn initialize_logging() {
     let _ = console_log::init();
 }
 
+/*
 #[wasm_bindgen]
 impl WasmRunner {
     #[wasm_bindgen(constructor)]
@@ -827,6 +1033,7 @@ fn from_json<T: DeserializeOwned>(json: &JsValue) -> Result<T, JsValue> {
         .into_serde()
         .map_err(|err| Error::new(&err.to_string()))?)
 }
+*/
 
 export![device, engine, scene];
 
