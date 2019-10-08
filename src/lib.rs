@@ -20,16 +20,6 @@ use rand_chacha::ChaCha20Rng;
 use web_sys::WebGl2RenderingContext as Context;
 use zerocopy::{AsBytes, FromBytes};
 
-#[derive(Clone, Copy, Debug)]
-pub struct RefineStatistics {
-    pub frame_time_us: f32,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct RenderStatistics {
-    pub frame_time_us: f32,
-}
-
 #[derive(Debug)]
 pub struct Device {
     gl: Context,
@@ -82,9 +72,6 @@ pub struct Device {
     aperture_fbo: Framebuffer,
 
     load_convolution_buffers_shader: Shader,
-
-    refine_query: Query,
-    render_query: Query,
 
     allocator: Allocator,
 
@@ -185,8 +172,6 @@ impl Device {
             aperture_fbo: Framebuffer::new(gl.clone()),
             spectrum_temp1_fbo: Framebuffer::new(gl.clone()),
             spectrum_temp2_fbo: Framebuffer::new(gl.clone()),
-            refine_query: Query::new(gl.clone()),
-            render_query: Query::new(gl.clone()),
             samples: Texture::new(gl.clone()),
             device_lost: true,
             state: DeviceState::new(),
@@ -359,9 +344,9 @@ impl Device {
     }
 
     /// Further refines the path-traced render buffer.
-    pub fn refine(&mut self) -> Option<RefineStatistics> {
+    pub fn refine(&mut self) {
         if self.device_lost {
-            return None;
+            return;
         }
 
         // TODO: not happy with this, can we improve it
@@ -382,33 +367,18 @@ impl Device {
 
         let weight = (self.state.frame as f32 - 1.0) / (self.state.frame as f32);
 
-        // let refine_query = self.refine_query.query_time_elapsed();
-
         command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
         command.set_blend_mode(BlendMode::Accumulate { weight });
         command.set_framebuffer(&self.samples_fbo);
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
-
-        /*if !Query::is_supported(&self.gl) {
-            return None; // no statistics
-        }
-
-        Some(RefineStatistics {
-            frame_time_us: refine_query.end().unwrap_or_default() / 1000.0,
-        })*/
-
-        None
     }
 
-    /// Displays the current render buffer to the screen.
-    pub fn render(&mut self) -> Option<RenderStatistics> {
+    pub fn render(&mut self) {
         if self.device_lost {
-            return None;
+            return;
         }
-
-        // self.render_query.start_query();
 
         //self.render_lens_flare();
 
@@ -423,18 +393,6 @@ impl Device {
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
-
-        /*if !Query::is_supported(&self.gl) {
-            return None; // no statistics
-        }
-
-        let render_query = self.render_query.end_query();
-
-        Some(RenderStatistics {
-            frame_time_us: render_query.unwrap_or_default() / 1000.0,
-        })*/
-
-        None
     }
 
     fn try_restore(&mut self, scene: &mut Scene) -> Result<bool, Error> {
@@ -477,9 +435,6 @@ impl Device {
         self.spectrum_temp2_fbo.invalidate();
         self.render_fbo.invalidate();
         self.aperture_fbo.invalidate();
-
-        self.refine_query.invalidate();
-        self.render_query.invalidate();
 
         scene.dirty_all_fields();
         self.device_lost = false;
@@ -766,18 +721,7 @@ impl WebDevice {
     }
 }
 
-/*
-#[wasm_bindgen]
-pub struct WasmRunner {
-    device: Device,
-    scene: Scene,
-
-    render_stats: Option<RenderStatistics>,
-    refine_stats: Option<RefineStatistics>,
-}
-*/
-
-const VERSION: &'static str = concat!("Equinox v", env!("CARGO_PKG_VERSION"), " (WebGL2)");
+const VERSION: &str = concat!("Equinox v", env!("CARGO_PKG_VERSION"), " (WebGL2)");
 
 #[wasm_bindgen]
 pub fn version() -> String {
