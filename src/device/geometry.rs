@@ -79,6 +79,22 @@ impl GeometryGlslGenerator {
             "#
             .to_owned(),
             Geometry::Plane { .. } => "return p.y;".to_owned(),
+            Geometry::InfiniteRepetition { f, period } => {
+                let period_x = self.lookup_parameter(&period[0], index);
+                let period_y = self.lookup_parameter(&period[1], index);
+                let period_z = self.lookup_parameter(&period[2], index);
+
+                let function = self.distance_recursive(f, index);
+
+                format!(
+                    "vec3 c = vec3({}, {}, {});
+                    return {};",
+                    period_x,
+                    period_y,
+                    period_z,
+                    function.call(format!("mod(p + 0.5 * c, c) - 0.5 * c"))
+                )
+            }
             Geometry::Union { children } => self.nary_operator(children, index, "min"),
             Geometry::Intersection { children } => self.nary_operator(children, index, "max"),
             Geometry::Subtraction { lhs, rhs } => {
@@ -269,6 +285,13 @@ fn renumber_parameters_recursive(geometry: &Geometry, parameters: &mut Vec<usize
         Geometry::Plane { width, length } => {
             add_parameter(parameters, width);
             add_parameter(parameters, length);
+        }
+        Geometry::InfiniteRepetition { f, period } => {
+            add_parameter(parameters, &period[0]);
+            add_parameter(parameters, &period[1]);
+            add_parameter(parameters, &period[2]);
+
+            renumber_parameters_recursive(f, parameters);
         }
         Geometry::Union { children } | Geometry::Intersection { children } => children
             .iter()

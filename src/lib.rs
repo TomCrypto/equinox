@@ -599,11 +599,18 @@ impl WebScene {
         });
 
         self.scene.geometries.push(Geometry::Translate {
-            f: Box::new(Geometry::UnitSphere),
+            f: Box::new(Geometry::InfiniteRepetition {
+                period: [
+                    Parameter::Constant { value: 3.0 },
+                    Parameter::Constant { value: 0.0 },
+                    Parameter::Constant { value: 3.0 },
+                ],
+                f: Box::new(Geometry::UnitSphere),
+            }),
             translation: [
-                Parameter::Symbolic { index: 0 },
+                Parameter::Constant { value: 0.0 },
                 Parameter::Constant { value: 1.01 },
-                Parameter::Symbolic { index: 1 },
+                Parameter::Constant { value: 0.0 },
             ],
         });
 
@@ -665,7 +672,13 @@ impl WebScene {
             material_values: vec![0.8, 0.8, 0.8, 0.0],
         });*/
 
-        for x in 0..6 {
+        self.scene.instances.push(Instance {
+            geometry: 1,
+            material: 2,
+            geometry_values: vec![],
+        });
+
+        /*for x in 0..6 {
             for y in 0..6 {
                 self.scene.instances.push(Instance {
                     geometry: 1,
@@ -673,7 +686,7 @@ impl WebScene {
                     geometry_values: vec![2.5 * x as f32, 2.5 * y as f32],
                 });
             }
-        }
+        }*/
 
         /*self.scene.instances.push(Instance {
             geometry: 1,

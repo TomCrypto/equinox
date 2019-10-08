@@ -30,6 +30,10 @@ pub enum Geometry {
         width: Parameter,
         length: Parameter,
     },
+    InfiniteRepetition {
+        f: Box<Geometry>,
+        period: [Parameter; 3],
+    },
     Union {
         children: Vec<Geometry>,
     },
@@ -76,6 +80,10 @@ impl Geometry {
                     max: Point3::new(width, 0.0, length),
                 })
             }
+            Self::InfiniteRepetition { .. } => Some(BoundingBox {
+                min: Point3::new(-100.0, -100.0, -100.0),
+                max: Point3::new(100.0, 100.0, 100.0),
+            }),
             // TODO: handle errors in a nicer way here??
             Self::Union { children } => Some(BoundingBox::union(
                 children

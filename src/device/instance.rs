@@ -52,8 +52,6 @@ impl Device {
             geometry_start += (instance.geometry_values.len() as u16 + 3) / 4;
         }
 
-        info!("INSTANCES = {:?}", instance_info);
-
         let node_count = HierarchyBuilder::node_count_for_leaves(instance_list.len());
 
         let mut nodes = self.allocator.allocate(node_count);
@@ -72,8 +70,6 @@ impl Device {
             .iter()
             .map(|inst| (inst.geometry_values.len() + 3) / 4)
             .sum();
-
-        info!("{:?}", geometry_parameter_count);
 
         let params: &mut [GeometryParameter] = self.allocator.allocate(geometry_parameter_count);
         let mut offset = 0;
@@ -95,8 +91,6 @@ impl Device {
                 }
             }
         }
-
-        info!("PARAMS = {:?}", params);
 
         self.geometry_buffer.write_array(&params);
     }
