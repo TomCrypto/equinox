@@ -1,7 +1,10 @@
 import Vue from "vue";
 import App from "./App.vue";
+import localforage from "localforage";
 
 Vue.config.productionTip = false;
+
+localforage.setDriver(localforage.INDEXEDDB);
 
 (async () => {
   ((equinox: typeof import("equinox")) => {

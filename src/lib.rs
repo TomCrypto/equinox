@@ -756,6 +756,14 @@ impl WebDevice {
     pub fn render(&mut self) {
         self.device.render();
     }
+
+    pub fn sample_count(&self) -> u32 {
+        self.device.state.frame
+    }
+
+    pub fn context_lost(&mut self) {
+        self.device.context_lost();
+    }
 }
 
 /*

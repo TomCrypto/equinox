@@ -10,9 +10,9 @@ Use `wasm-pack` (more info [here](https://github.com/rustwasm/wasm-pack)) to bui
 
     wasm-pack build [--release]
 
-The `viewer` project can also automatically build the module on any code change:
+The `viewer` front-end will use the built module in the `pkg` folder, it's recommended to `yarn link` it so that any `wasm-pack` builds will automatically trigger a front-end rebuild.
 
-    cd viewer && npm install && npm run serve
+    cd viewer && yarn install && yarn serve
 
 ## License
 
