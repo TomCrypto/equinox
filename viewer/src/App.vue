@@ -178,14 +178,14 @@ export default class App extends Vue {
       alert("Sorry, your browser does not appear to support WebGL2!");
     }
 
-    this.gpuTimeQueries = new WebGlTimeElapsedQuery(this.context);
+    this.gpuTimeQueries = new WebGlTimeElapsedQuery(this.context!);
 
     this.canvas.addEventListener("webglcontextlost", () => {
-      this.gpuTimeQueries.clear();
+      this.gpuTimeQueries!.clear();
       this.device.context_lost();
     });
 
-    this.device = new this.equinox.WebDevice(this.context);
+    this.device = new this.equinox.WebDevice(this.context!);
 
     this.canvas.focus();
 
@@ -248,7 +248,7 @@ export default class App extends Vue {
 
       this.device.update(this.scene);
 
-      const refineTime = this.gpuTimeQueries.timeElapsed(() => {
+      const refineTime = this.gpuTimeQueries!.timeElapsed(() => {
         this.device.refine();
         this.device.render();
       });
