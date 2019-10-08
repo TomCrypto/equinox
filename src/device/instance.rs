@@ -49,8 +49,10 @@ impl Device {
             // need to divide all starts by 4 because we use vec4 buffers...
             // (note: this is an implementation detail)
 
-            geometry_start += (instance.geometry_values.len() as u16) / 4;
+            geometry_start += (instance.geometry_values.len() as u16 + 3) / 4;
         }
+
+        info!("INSTANCES = {:?}", instance_info);
 
         let node_count = HierarchyBuilder::node_count_for_leaves(instance_list.len());
 
@@ -68,15 +70,20 @@ impl Device {
 
         let geometry_parameter_count: usize = instance_list
             .iter()
-            .map(|inst| inst.geometry_values.len())
+            .map(|inst| (inst.geometry_values.len() + 3) / 4)
             .sum();
 
-        let mut params: &mut [GeometryParameter] =
-            self.allocator.allocate(geometry_parameter_count / 4);
+        info!("{:?}", geometry_parameter_count);
+
+        let params: &mut [GeometryParameter] = self.allocator.allocate(geometry_parameter_count);
+        let mut offset = 0;
 
         for instance in instance_list {
             let indices = renumber_parameters(&geometry_list[instance.geometry]);
-            let (region, remaining_data) = params.split_at_mut((indices.len() + 3) / 4);
+            let block_count = (indices.len() + 3) / 4;
+
+            let region = &mut params[offset..offset + block_count];
+            offset += block_count;
 
             for (data, indices) in izip!(region, indices.chunks(4)) {
                 for i in 0..4 {
@@ -87,9 +94,9 @@ impl Device {
                     }
                 }
             }
-
-            params = remaining_data;
         }
+
+        info!("PARAMS = {:?}", params);
 
         self.geometry_buffer.write_array(&params);
     }

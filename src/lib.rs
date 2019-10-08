@@ -594,16 +594,16 @@ impl WebScene {
         self.scene.camera.position.z = 5.0;
 
         self.scene.geometries.push(Geometry::Plane {
-            width: Parameter::Constant { value: 2.0 },
-            length: Parameter::Constant { value: 2.0 },
+            width: Parameter::Constant { value: 30.0 },
+            length: Parameter::Constant { value: 30.0 },
         });
 
         self.scene.geometries.push(Geometry::Translate {
             f: Box::new(Geometry::UnitSphere),
             translation: [
-                Parameter::Constant { value: 0.0 },
+                Parameter::Symbolic { index: 0 },
                 Parameter::Constant { value: 1.01 },
-                Parameter::Constant { value: 0.0 },
+                Parameter::Symbolic { index: 1 },
             ],
         });
 
@@ -665,11 +665,15 @@ impl WebScene {
             material_values: vec![0.8, 0.8, 0.8, 0.0],
         });*/
 
-        self.scene.instances.push(Instance {
-            geometry: 1,
-            material: 2,
-            geometry_values: vec![],
-        });
+        for x in 0..6 {
+            for y in 0..6 {
+                self.scene.instances.push(Instance {
+                    geometry: 1,
+                    material: 2,
+                    geometry_values: vec![2.5 * x as f32, 2.5 * y as f32],
+                });
+            }
+        }
 
         /*self.scene.instances.push(Instance {
             geometry: 1,
