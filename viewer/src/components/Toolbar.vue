@@ -40,6 +40,10 @@ export default class extends Vue {
   flex-shrink: 0;
 }
 
+.toolbar button::-moz-focus-inner {
+  border: 0;
+}
+
 .toolbar button:focus {
   border: 1px solid black;
   outline: none;
