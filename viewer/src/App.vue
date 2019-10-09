@@ -13,6 +13,8 @@
       v-on:contextmenu="$event.preventDefault()"
     />
 
+    <Toolbar :on-save-screenshot="saveScreenshot" />
+
     <StatusBar
       v-if="canvas !== null"
       :sample-count="sampleCount"
@@ -38,6 +40,7 @@
 import { Component, Prop, Vue } from "vue-property-decorator";
 import StatusBar from "./components/StatusBar.vue";
 import LoadingOverlay from "./components/LoadingOverlay.vue";
+import Toolbar from "./components/Toolbar.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
 import {
@@ -50,6 +53,7 @@ import MovingWindowEstimator from "./helpers/minimum_window";
 @Component({
   components: {
     StatusBar,
+    Toolbar,
     LoadingOverlay
   }
 })
@@ -83,6 +87,8 @@ export default class App extends Vue {
 
   private isContextLost: boolean = false;
 
+  private mustSaveScreenshot: boolean = false;
+
   private loseContext() {
     if (this.extension !== null) {
       this.extension.loseContext();
@@ -101,6 +107,10 @@ export default class App extends Vue {
     }
 
     this.keys[key] = true;
+  }
+
+  private saveScreenshot() {
+    this.mustSaveScreenshot = true;
   }
 
   private releaseKey(key: string) {
@@ -194,7 +204,8 @@ export default class App extends Vue {
       depth: false,
       premultipliedAlpha: false,
       stencil: false,
-      powerPreference: "high-performance"
+      powerPreference: "high-performance",
+      preserveDrawingBuffer: false
     });
 
     this.extension = this.context!.getExtension("WEBGL_lose_context");
@@ -287,6 +298,16 @@ export default class App extends Vue {
       });
 
       this.gpuFrameTimeEstimator.addSample(refineTime);
+
+      if (this.mustSaveScreenshot) {
+        const screenshot = window.open("about:blank", "_blank")!;
+
+        this.canvas.toBlob(blob => {
+          const url = URL.createObjectURL(blob);
+          screenshot.location.href = url;
+          screenshot.focus();
+        });
+      }
     }
 
     const time = (performance.now() - start) / 1000;
@@ -298,6 +319,7 @@ export default class App extends Vue {
     this.syncInterval = this.syncIntervalEstimator.average();
 
     this.animationFrame = requestAnimationFrame(this.renderLoop);
+    this.mustSaveScreenshot = false; // avoid spurious screenshot
   }
 
   async fetch_asset_data(url: string): Promise<ArrayBuffer> {
