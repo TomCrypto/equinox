@@ -1,6 +1,6 @@
 <template>
   <div v-show="isLoading" class="loading-overlay">
-    <img src="loading-assets.svg"/>
+    <img src="@/assets/loading-assets.svg" />
     <p>{{ loadingText }}</p>
   </div>
 </template>
@@ -16,7 +16,7 @@ export default class extends Vue {
   @Prop() private downloadingCount!: number;
 
   get isLoading(): boolean {
-      return this.loadingCount != 0 || this.downloadingCount != 0
+    return this.loadingCount != 0 || this.downloadingCount != 0;
   }
 
   get loadingText(): string {
@@ -28,7 +28,7 @@ export default class extends Vue {
   }
 
   private pluralizedAsset(count: number): string {
-      return (count === 1) ? "1 asset" : `${count} assets`;
+    return count === 1 ? "1 asset" : `${count} assets`;
   }
 }
 </script>
@@ -36,10 +36,10 @@ export default class extends Vue {
 <style scoped>
 .loading-overlay {
   position: absolute;
-    top: 92%;
-    left: 50%;
+  top: 92%;
+  left: 50%;
 
-    transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
   padding: 6px 6px;
   border-radius: 8px;
   height: 24px;
@@ -53,26 +53,25 @@ export default class extends Vue {
 }
 
 .loading-overlay img {
-    width: 24px;
+  width: 24px;
 
-    margin-right: 6px;
+  margin-right: 6px;
 
-    flex-grow: 0;
-    flex-shrink: 0;
+  flex-grow: 0;
+  flex-shrink: 0;
 }
 
 .loading-overlay p {
-    color: #ffffff;
-    margin: 0;
-    padding: auto;
-    font-size: 0.8em;
-    line-height: 24px;
-    font-family: monospace;
-    font-weight: bold;
+  color: #ffffff;
+  margin: 0;
+  padding: auto;
+  font-size: 0.8em;
+  line-height: 24px;
+  font-family: monospace;
+  font-weight: bold;
 
-    flex-grow: 1;
-    flex-shrink: 1;
-    margin-right: 6px;
+  flex-grow: 1;
+  flex-shrink: 1;
+  margin-right: 6px;
 }
 </style>
-
