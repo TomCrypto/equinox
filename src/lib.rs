@@ -249,7 +249,7 @@ impl Device {
 
             // Configure the shaders with the desired resolutions...
 
-            /*self.load_convolution_buffers_shader
+            self.load_convolution_buffers_shader
                 .frag_shader()
                 .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
 
@@ -310,23 +310,27 @@ impl Device {
                 &self.bspectrum_temp2,
             ]);
 
-            self.prepare_fft_pass_data();*/
+            self.prepare_fft_pass_data();
         });
 
         self.program.rebuild()?;
         self.present_program.rebuild()?;
 
-        /*self.read_convolution_buffers_shader.rebuild()?;
+        self.read_convolution_buffers_shader.rebuild()?;
         self.fft_shader.rebuild()?;
-        self.load_convolution_buffers_shader.rebuild()?;*/
+        self.load_convolution_buffers_shader.rebuild()?;
 
-        /*invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
-            self.preprocess_filter(
-                &aperture.aperture_texels,
-                aperture.aperture_width as usize,
-                aperture.aperture_height as usize,
-            );
-        });*/
+        let assets = &scene.assets;
+
+        invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
+            if let Some(aperture) = aperture {
+                self.preprocess_filter(
+                    &assets[&aperture.aperture_texels],
+                    aperture.aperture_width as usize,
+                    aperture.aperture_height as usize,
+                );
+            }
+        });
 
         // These are post-processing settings that don't apply to the path-traced light
         // transport simulation, so we don't need to invalidate the render buffer here.
@@ -382,11 +386,18 @@ impl Device {
             return;
         }
 
-        //self.render_lens_flare();
+        if self.state.enable_lens_flare {
+            self.render_lens_flare();
+        }
 
         let command = self.present_program.begin_draw();
 
-        command.bind(&self.samples, "samples");
+        if self.state.enable_lens_flare {
+            command.bind(&self.render, "samples");
+        } else {
+            command.bind(&self.samples, "samples");
+        }
+
         command.bind(&self.display_buffer, "Display");
 
         command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
@@ -456,6 +467,8 @@ struct DeviceState {
 
     filter: RasterFilter,
 
+    enable_lens_flare: bool,
+
     frame: u32,
 }
 
@@ -465,6 +478,7 @@ impl Default for DeviceState {
             rng: ChaCha20Rng::seed_from_u64(0),
             filter_rng: Qrng::new(0),
             filter: RasterFilter::default(),
+            enable_lens_flare: false,
             frame: 0,
         }
     }
@@ -477,6 +491,8 @@ impl DeviceState {
 
     pub fn reset(&mut self, scene: &mut Scene) {
         *self = Self::new();
+
+        self.enable_lens_flare = scene.aperture.is_some();
 
         self.filter = scene.raster.filter;
     }
@@ -566,6 +582,10 @@ impl WebScene {
 
         if self.scene.instances != new_scene.instances {
             self.scene.instances = new_scene.instances;
+        }
+
+        if self.scene.aperture != new_scene.aperture {
+            self.scene.aperture = new_scene.aperture;
         }
 
         Ok(())
