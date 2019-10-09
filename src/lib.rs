@@ -195,6 +195,8 @@ impl Device {
             self.update_camera(camera);
         });
 
+        let instances = &mut scene.instances;
+
         invalidated |= Dirty::clean(&mut scene.geometries, |geometries| {
             let mut generator = GeometryGlslGenerator::new();
 
@@ -211,9 +213,9 @@ impl Device {
                 "geometry-user.glsl",
                 generator.generate(&geometry_functions),
             );
-        });
 
-        let instances = &mut scene.instances;
+            Dirty::dirty(instances);
+        });
 
         invalidated |= Dirty::clean(&mut scene.materials, |materials| {
             self.update_materials(materials);

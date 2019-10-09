@@ -78,7 +78,12 @@ impl GeometryGlslGenerator {
                 return length(max(d,0.0)) + min(max(d.x,max(d.y,d.z)),0.0);
             "#
             .to_owned(),
-            Geometry::Plane { .. } => "return p.y;".to_owned(),
+            Geometry::Plane { width, length } => {
+                let _ = self.lookup_parameter(&width, index);
+                let _ = self.lookup_parameter(&length, index);
+
+                "return p.y;".to_owned()
+            }
             Geometry::InfiniteRepetition { f, period } => {
                 let period_x = self.lookup_parameter(&period[0], index);
                 let period_y = self.lookup_parameter(&period[1], index);

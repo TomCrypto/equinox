@@ -80,6 +80,7 @@ impl Geometry {
                     max: Point3::new(width, 0.0, length),
                 })
             }
+            // TODO: this is wrong (also we should bound repetition anyway)
             Self::InfiniteRepetition { .. } => Some(BoundingBox {
                 min: Point3::new(-100.0, -100.0, -100.0),
                 max: Point3::new(100.0, 100.0, 100.0),

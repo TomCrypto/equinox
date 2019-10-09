@@ -1,10 +1,15 @@
 <template>
   <div class="editor">
     <textarea
+      ref="textarea"
       class="textbox"
       :value="json"
       v-on:input="onJsonChange($event.target)"
       v-on:keydown="onKeyDown($event)"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
     />
   </div>
 </template>
@@ -78,6 +83,14 @@ export default class extends Vue {
     };
 
     this.json = JSON.stringify(payload, null, 2);
+  }
+
+  mounted() {
+    const textArea = this.$refs.textarea as HTMLTextAreaElement;
+
+    textArea.selectionStart = 0;
+    textArea.selectionEnd = 0;
+    textArea.focus();
   }
 }
 </script>
