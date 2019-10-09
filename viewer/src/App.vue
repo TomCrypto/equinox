@@ -9,6 +9,7 @@
       v-on:mousemove="moveCamera($event)"
       v-on:keydown="pressKey($event.key)"
       v-on:keyup="releaseKey($event.key)"
+      v-on:contextmenu="$event.preventDefault()"
     />
 
     <StatusBar

@@ -255,6 +255,10 @@ void main() {
             break;
         }
 
+        if (bounce <= 1U) {
+            continue;
+        }
+
         // russian roulette
 
         vec2 rng = rand_uniform_vec2(random);

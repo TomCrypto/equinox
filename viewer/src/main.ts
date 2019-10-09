@@ -1,6 +1,7 @@
 import Vue from "vue";
 import App from "./App.vue";
 import localforage from "localforage";
+import { isMobile } from "mobile-device-detect";
 
 Vue.config.productionTip = false;
 
@@ -18,4 +19,7 @@ localforage.setDriver(localforage.INDEXEDDB);
         })
     }).$mount("#app");
   })(await import("equinox"));
-})().catch(console.error);
+})().catch(err => {
+  // mobile devices do not have any dev tools
+  isMobile ? alert(err) : console.error(err);
+});

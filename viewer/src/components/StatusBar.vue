@@ -70,6 +70,7 @@ export default class extends Vue {
 
   flex-grow: 0;
   flex-shrink: 0;
+  user-select: none;
 }
 
 .status > :not(:last-child) {
@@ -105,7 +106,6 @@ export default class extends Vue {
 }
 
 p {
-    user-select: none;
     color: #ffffff;
     margin: 0;
     padding: auto;

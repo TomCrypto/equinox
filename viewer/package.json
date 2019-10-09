@@ -27,6 +27,7 @@
     "eslint-plugin-prettier": "^3.1.0",
     "eslint-plugin-vue": "^5.0.0",
     "localforage": "^1.7.3",
+    "mobile-device-detect": "^0.3.3",
     "prettier": "^1.18.2",
     "typescript": "^3.4.3",
     "vue-template-compiler": "^2.6.10"

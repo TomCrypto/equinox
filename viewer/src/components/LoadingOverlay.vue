@@ -8,7 +8,6 @@
 <script lang="ts">
 import { Component, Prop, Vue } from "vue-property-decorator";
 
-
 @Component
 export default class extends Vue {
   // number of assets currently being loaded
@@ -17,7 +16,7 @@ export default class extends Vue {
   @Prop() private downloadingCount!: number;
 
   get isLoading(): boolean {
-      return this.loadingCount != 0  || this.downloadingCount != 0
+      return this.loadingCount != 0 || this.downloadingCount != 0
   }
 
   get loadingText(): string {
@@ -37,11 +36,10 @@ export default class extends Vue {
 <style scoped>
 .loading-overlay {
   position: absolute;
-    top: 92%;  /* position the top  edge of the element at the middle of the parent */
-    left: 50%; /* position the left edge of the element at the middle of the parent */
+    top: 92%;
+    left: 50%;
 
-    transform: translate(-50%, -50%); /* This is a shorthand of
-                                         translateX(-50%) and translateY(-50%) */
+    transform: translate(-50%, -50%);
   padding: 6px 6px;
   border-radius: 8px;
   height: 24px;
