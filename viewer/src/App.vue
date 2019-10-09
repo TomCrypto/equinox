@@ -15,7 +15,6 @@
     <StatusBar
       v-if="canvas !== null"
       :sample-count="sampleCount"
-      frame-rate=60
       :width="canvasWidth"
       :height="canvasHeight"
       :vendor="contextVendor"
@@ -39,14 +38,17 @@ import StatusBar from "./components/StatusBar.vue";
 import LoadingOverlay from "./components/LoadingOverlay.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
-import { getWebGlVendor, getWebGlRenderer, WebGlTimeElapsedQuery } from "./helpers/webgl_info"
-import MovingWindowEstimator from "./helpers/minimum_window"
-
-
+import {
+  getWebGlVendor,
+  getWebGlRenderer,
+  WebGlTimeElapsedQuery
+} from "./helpers/webgl_info";
+import MovingWindowEstimator from "./helpers/minimum_window";
 
 @Component({
   components: {
-    StatusBar, LoadingOverlay
+    StatusBar,
+    LoadingOverlay
   }
 })
 export default class App extends Vue {
@@ -121,11 +123,11 @@ export default class App extends Vue {
   }
 
   get contextVendor(): string {
-    return (this.context === null) ? "unknown" : getWebGlVendor(this.context!)
+    return this.context === null ? "unknown" : getWebGlVendor(this.context!);
   }
 
   get contextRenderer(): string {
-    return (this.context === null) ? "unknown" : getWebGlRenderer(this.context!)
+    return this.context === null ? "unknown" : getWebGlRenderer(this.context!);
   }
 
   private canvas: HTMLCanvasElement | null = null;
@@ -141,7 +143,9 @@ export default class App extends Vue {
     console.log("Fetching envmap...");
 
     (async () => {
-      let data = new Uint8Array(await this.fetch_asset_data("assets/blue_grotto_4k.raw"));
+      let data = new Uint8Array(
+        await this.fetch_asset_data("assets/blue_grotto_4k.raw")
+      );
 
       console.log("Fetched envmap data: " + data.length + " pixels");
 
@@ -160,14 +164,14 @@ export default class App extends Vue {
     this.canvas = canvas;
 
     this.context = canvas.getContext("webgl2", {
-        alpha: false,
-        antialias: false,
-        depth: false,
-        premultipliedAlpha: false,
-        stencil: false,
-        powerPreference: "high-performance",
-      })
-    
+      alpha: false,
+      antialias: false,
+      depth: false,
+      premultipliedAlpha: false,
+      stencil: false,
+      powerPreference: "high-performance"
+    });
+
     if (this.context === null) {
       alert("Sorry, your browser does not appear to support WebGL2!");
     }
@@ -197,7 +201,11 @@ export default class App extends Vue {
 
     this.lastVsync = start;
 
-    if (this.canvas !== null && this.canvas.clientWidth != 0 && this.canvas.clientHeight != 0) {
+    if (
+      this.canvas !== null &&
+      this.canvas.clientWidth != 0 &&
+      this.canvas.clientHeight != 0
+    ) {
       let forward = 0;
       let sideways = 0;
 
@@ -265,20 +273,20 @@ export default class App extends Vue {
     this.loadingCount += 1;
 
     try {
-      let data = await localforage.getItem(url) as ArrayBuffer | null;
+      let data = (await localforage.getItem(url)) as ArrayBuffer | null;
 
       if (data === null) {
         this.downloadingCount += 1;
 
         try {
-          data = await (await fetch(new Request(url))).arrayBuffer()
-          await localforage.setItem(url, data)
+          data = await (await fetch(new Request(url))).arrayBuffer();
+          await localforage.setItem(url, data);
         } finally {
           this.downloadingCount -= 1;
         }
       }
 
-      return data
+      return data;
     } finally {
       this.loadingCount -= 1;
     }

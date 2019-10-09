@@ -1,21 +1,44 @@
 {
+  "[glsl]": {
+    "editor.rulers": [100],
+    "editor.tabSize": 4
+  },
+
   "[rust]": {
     "editor.formatOnSave": true,
     "editor.rulers": [100],
     "editor.tabSize": 4
   },
 
-  "[glsl]": {
+  "[vue]": {
     "editor.rulers": [100],
     "editor.tabSize": 4
   },
 
+  "eslint.options": {
+    "extensions": [".ts", ".vue"]
+  },
+
+  "eslint.validate": [{
+    "language": "ts",
+    "autoFix": true
+  }, {
+    "language": "vue",
+    "autoFix": true
+  }],
+
+  "eslint.workingDirectories": [
+    "./viewer"
+  ],
+
   "files.exclude": {
-    ".gitignore": true,
+    "**/.gitignore": true,
     ".vscode": true,
     "Cargo.lock": true,
+    "pkg": true,
     "target": true,
-    "pkg": true
+    "viewer/dist": true,
+    "viewer/node_modules": true
   },
 
   "files.insertFinalNewline": true

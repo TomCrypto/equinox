@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "core-js": "^2.6.5",
-    "equinox": "file:../pkg",
     "vue": "^2.6.10",
     "vue-class-component": "^7.0.2",
     "vue-property-decorator": "^8.1.0"
@@ -22,15 +21,22 @@
     "@vue/cli-service": "^3.11.0",
     "@vue/eslint-config-prettier": "^5.0.0",
     "@vue/eslint-config-typescript": "^4.0.0",
-    "babel-eslint": "^10.0.1",
-    "eslint": "^5.16.0",
-    "eslint-plugin-prettier": "^3.1.0",
-    "eslint-plugin-vue": "^5.0.0",
+    "equinox": "file:../pkg",
+    "eslint": "^6.5.1",
+    "eslint-config-prettier": "^6.4.0",
+    "eslint-plugin-prettier": "^3.1.1",
+    "eslint-plugin-vue": "^5.2.3",
     "localforage": "^1.7.3",
     "mobile-device-detect": "^0.3.3",
     "prettier": "^1.18.2",
     "typescript": "^3.4.3",
+    "vue-eslint-parser": "^6.0.4",
     "vue-template-compiler": "^2.6.10"
+  },
+  "babel": {
+    "presets": [
+      "@vue/app"
+    ]
   },
   "eslintConfig": {
     "root": true,

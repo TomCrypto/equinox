@@ -1,11 +1,23 @@
 <template>
   <div class="status">
-    <div class="frame-rate"><pre><p>{{ frameRate }}</p></pre></div>
-    <div class="resolution"><pre><p>{{ width }}×{{ height }}</p></pre></div>
-    <div class="sample-count"><pre><p>{{ sampleCount }} samples</p></pre></div>
-    <div class="frame-cpu-time"><pre><p>{{ cpuFrameInfo }}</p></pre></div>
-    <div class="frame-gpu-time"><pre><p>{{ gpuFrameInfo }}</p></pre></div>
-    <div class="device-info"><pre><p>{{ renderer }} ({{ vendor }})</p></pre></div>
+    <div class="frame-rate">
+      <pre><p>{{ frameRate }}</p></pre>
+    </div>
+    <div class="resolution">
+      <pre><p>{{ width }}×{{ height }}</p></pre>
+    </div>
+    <div class="sample-count">
+      <pre><p>{{ sampleCount }} samples</p></pre>
+    </div>
+    <div class="frame-cpu-time">
+      <pre><p>{{ cpuFrameInfo }}</p></pre>
+    </div>
+    <div class="frame-gpu-time">
+      <pre><p>{{ gpuFrameInfo }}</p></pre>
+    </div>
+    <div class="device-info">
+      <pre><p>{{ renderer }} ({{ vendor }})</p></pre>
+    </div>
   </div>
 </template>
 
@@ -14,14 +26,14 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 
 function displayTime(milliseconds: number): string {
   if (milliseconds <= 0.099) {
-    return `${(milliseconds * 1000.0).toFixed(0).padStart(4, ' ')} μs`
+    return `${(milliseconds * 1000.0).toFixed(0).padStart(4, " ")} μs`;
   }
 
   if (milliseconds <= 99) {
-    return `${(milliseconds).toFixed(1).padStart(4, ' ')} ms`
+    return `${milliseconds.toFixed(1).padStart(4, " ")} ms`;
   }
 
-  return `${(milliseconds).toFixed(0).padStart(4, ' ')} ms`
+  return `${milliseconds.toFixed(0).padStart(4, " ")} ms`;
 }
 
 @Component
@@ -41,23 +53,23 @@ export default class extends Vue {
       return "-- FPS";
     }
 
-    return `${(1000 / this.syncInterval).toFixed(0)} FPS`
+    return `${(1000 / this.syncInterval).toFixed(0)} FPS`;
   }
 
   get cpuFrameInfo(): string {
     if (this.cpuFrameTime === null) {
-      return 'CPU time:   N/A  ';
+      return "CPU time:   N/A  ";
     }
 
-    return `CPU time: ${displayTime(this.cpuFrameTime * 1000)}`
+    return `CPU time: ${displayTime(this.cpuFrameTime * 1000)}`;
   }
 
   get gpuFrameInfo(): string {
     if (this.gpuFrameTime === null) {
-      return 'GPU time:   N/A  ';
+      return "GPU time:   N/A  ";
     }
 
-    return `GPU time: ${displayTime(this.gpuFrameTime * 1000)}`
+    return `GPU time: ${displayTime(this.gpuFrameTime * 1000)}`;
   }
 }
 </script>
@@ -86,15 +98,15 @@ export default class extends Vue {
 }
 
 .frame-rate {
-    width: 70px;
+  width: 70px;
 }
 
 .sample-count {
-    width: 130px;
+  width: 130px;
 }
 
 .resolution {
-    width: 80px;
+  width: 80px;
 }
 
 .frame-cpu-time {
@@ -106,17 +118,17 @@ export default class extends Vue {
 }
 
 p {
-    color: #ffffff;
-    margin: 0;
-    padding: auto;
-    font-size: 0.8em;
-    line-height: 18px;
-    font-family: monospace;
-    font-weight: bold;
+  color: #ffffff;
+  margin: 0;
+  padding: auto;
+  font-size: 0.8em;
+  line-height: 18px;
+  font-family: monospace;
+  font-weight: bold;
 }
 
 pre {
-    margin: 0;
+  margin: 0;
 }
 </style>
 
