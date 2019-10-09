@@ -26,8 +26,8 @@ bool traversal_has_hit(traversal_t traversal) {
     return traversal.hit.x != 0xffffffffU;
 }
 
-// Takes a ray segment and a bounding box and cuts the ray to be fully contained
-// inside the bounding box. Returns true if the ray intersects the bounding box.
+// Takes a ray segment and a bounding box and clips the ray to be fully contained
+// inside the bounding box. Returns true if the ray intersected the bounding box.
 bool ray_bbox(vec3 org, vec3 idir, inout vec2 range, vec3 bbmin, vec3 bbmax) {
     vec3 bot = (bbmin - org) * idir;
     vec3 top = (bbmax - org) * idir;
