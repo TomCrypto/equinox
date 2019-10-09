@@ -1,7 +1,6 @@
 import Vue from "vue";
 import App from "./App.vue";
 import localforage from "localforage";
-import { isMobile } from "mobile-device-detect";
 
 Vue.config.productionTip = false;
 

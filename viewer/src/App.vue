@@ -1,9 +1,5 @@
 <template>
   <div id="app">
-    <button v-on:click="loseContext()">Lose context</button>
-
-    <button v-on:click="restoreContext()">Restore context</button>
-
     <canvas
       ref="canvas"
       tabindex="0"
@@ -13,12 +9,14 @@
       v-on:mousemove="moveCamera($event)"
       v-on:keydown="pressKey($event.key)"
       v-on:keyup="releaseKey($event.key)"
+      v-on:keypress="onKeyPress($event)"
       v-on:contextmenu="$event.preventDefault()"
     />
 
     <StatusBar
       v-if="canvas !== null"
       :sample-count="sampleCount"
+      :is-context-lost="isContextLost"
       :width="canvasWidth"
       :height="canvasHeight"
       :vendor="contextVendor"
@@ -83,6 +81,8 @@ export default class App extends Vue {
 
   private extension: WEBGL_lose_context | null = null;
 
+  private isContextLost: boolean = false;
+
   private loseContext() {
     if (this.extension !== null) {
       this.extension.loseContext();
@@ -137,7 +137,20 @@ export default class App extends Vue {
     if (this.canvas !== null) {
       document.exitPointerLock();
       this.captured = false;
+      this.keys = {};
     }
+  }
+
+  private onKeyPress(event: KeyboardEvent) {
+    if (event.shiftKey && event.key === "K" && this.extension !== null) {
+      this.extension.loseContext();
+    }
+
+    if (event.shiftKey && event.key === "L" && this.extension !== null) {
+      this.extension.restoreContext();
+    }
+
+    // ...
   }
 
   get contextVendor(): string {
@@ -208,6 +221,8 @@ export default class App extends Vue {
   private lastVsync: number = 0;
 
   renderLoop() {
+    this.isContextLost = this.context.isContextLost();
+
     const start = performance.now();
 
     if (this.lastVsync !== 0) {

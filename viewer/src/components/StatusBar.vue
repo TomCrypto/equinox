@@ -7,7 +7,7 @@
       <pre><p>{{ width }}×{{ height }}</p></pre>
     </div>
     <div class="sample-count">
-      <pre><p>{{ sampleCount }} samples</p></pre>
+      <pre><p>{{ sampleInfo }}</p></pre>
     </div>
     <div class="frame-cpu-time">
       <pre><p>{{ cpuFrameInfo }}</p></pre>
@@ -43,10 +43,21 @@ export default class extends Vue {
   @Prop() private sampleCount!: number;
   @Prop() private vendor!: string;
   @Prop() private renderer!: string;
+  @Prop() private isContextLost!: boolean;
 
   @Prop() private cpuFrameTime!: number | null;
   @Prop() private gpuFrameTime!: number | null;
   @Prop() private syncInterval!: number | null;
+
+  get sampleInfo(): string {
+    if (this.isContextLost) {
+      return "CONTEXT LOST!";
+    } else if (this.sampleCount == 1) {
+      return `1 sample`;
+    } else {
+      return `${this.sampleCount} samples`;
+    }
+  }
 
   get frameRate(): string {
     if (this.syncInterval === null) {
