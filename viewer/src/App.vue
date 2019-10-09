@@ -1,5 +1,9 @@
 <template>
   <div id="app">
+    <button v-on:click="loseContext()">Lose context</button>
+
+    <button v-on:click="restoreContext()">Restore context</button>
+
     <canvas
       ref="canvas"
       tabindex="0"
@@ -77,6 +81,20 @@ export default class App extends Vue {
   private loadingCount: number = 0;
   private downloadingCount: number = 0;
 
+  private extension: WEBGL_lose_context | null = null;
+
+  private loseContext() {
+    if (this.extension !== null) {
+      this.extension.loseContext();
+    }
+  }
+
+  private restoreContext() {
+    if (this.extension !== null) {
+      this.extension.restoreContext();
+    }
+  }
+
   private pressKey(key: string) {
     if (!this.captured) {
       return;
@@ -140,19 +158,13 @@ export default class App extends Vue {
     this.scene = new this.equinox.WebScene();
     this.scene.setup_test_scene();
 
-    console.log("Fetching envmap...");
-
     (async () => {
       let data = new Uint8Array(
         await this.fetch_asset_data("assets/blue_grotto_4k.raw")
       );
 
-      console.log("Fetched envmap data: " + data.length + " pixels");
-
       this.scene.insert_asset("envmap", data);
       this.scene.set_envmap("envmap", 4096, 2048);
-
-      console.log("Inserted into scene!");
     })();
   }
 
@@ -172,15 +184,18 @@ export default class App extends Vue {
       powerPreference: "high-performance"
     });
 
+    this.extension = this.context.getExtension("WEBGL_lose_context");
+
     if (this.context === null) {
       alert("Sorry, your browser does not appear to support WebGL2!");
     }
 
     this.gpuTimeQueries = new WebGlTimeElapsedQuery(this.context!);
 
-    this.canvas.addEventListener("webglcontextlost", () => {
+    this.canvas.addEventListener("webglcontextlost", event => {
       this.gpuTimeQueries!.clear();
       this.device.context_lost();
+      event.preventDefault();
     });
 
     this.device = new this.equinox.WebDevice(this.context!);

@@ -141,6 +141,7 @@ impl Shader {
 
     pub fn invalidate(&mut self) {
         self.invalidated = true;
+        self.handle = None;
     }
 
     /// Rebuilds the shader with the current source.
@@ -149,8 +150,11 @@ impl Shader {
             return Ok(());
         }
 
-        self.gl.delete_program(self.handle.as_ref());
-        self.invalidated = false; // even if we fail
+        if let Some(handle) = &self.handle {
+            self.gl.delete_program(Some(handle));
+        }
+
+        self.invalidated = false;
 
         let vert = self.compile_shader(Context::VERTEX_SHADER, &self.vertex)?;
         let frag = self.compile_shader(Context::FRAGMENT_SHADER, &self.fragment)?;

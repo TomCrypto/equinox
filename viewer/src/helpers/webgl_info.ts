@@ -20,46 +20,29 @@ export function getWebGlRenderer(context: WebGL2RenderingContext): string {
   return context.getParameter(ext.UNMASKED_RENDERER_WEBGL) || fallback;
 }
 
-export function loseWebGlContext(context: WebGL2RenderingContext) {
-  const ext = context.getExtension("WEBGL_lose_context");
-
-  if (ext !== null) {
-    ext.loseContext();
-  }
-}
-
-export function restoreWebGlContext(context: WebGL2RenderingContext) {
-  const ext = context.getExtension("WEBGL_lose_context");
-
-  if (ext !== null) {
-    ext.restoreContext();
-  }
-}
-
 export class WebGlTimeElapsedQuery {
   private readonly pending: WebGLQuery[] = [];
   private readonly running: WebGLQuery[] = [];
-  private readonly extension!: any | null;
+  private extension!: any | null;
 
   public constructor(private readonly context: WebGL2RenderingContext) {
     this.extension = context.getExtension("EXT_disjoint_timer_query_webgl2");
   }
 
   public clear() {
-    for (const query in this.pending) {
-      this.context.deleteQuery(query);
-    }
-
-    for (const query in this.running) {
-      this.context.deleteQuery(query);
-    }
-
     this.pending.length = 0;
     this.running.length = 0;
+    this.extension = null;
   }
 
   public timeElapsed(operation: () => void): number | null {
-    if (this.extension === null || this.context.isContextLost()) {
+    if (this.extension === null) {
+      this.extension = this.context.getExtension(
+        "EXT_disjoint_timer_query_webgl2"
+      );
+    }
+
+    if (this.extension === null) {
       operation();
       return null;
     }

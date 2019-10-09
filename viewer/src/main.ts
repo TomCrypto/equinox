@@ -19,7 +19,4 @@ localforage.setDriver(localforage.INDEXEDDB);
         })
     }).$mount("#app");
   })(await import("equinox"));
-})().catch(err => {
-  // mobile devices do not have any dev tools
-  isMobile ? alert(err) : console.error(err);
-});
+})().catch(alert);
