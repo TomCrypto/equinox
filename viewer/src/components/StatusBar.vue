@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="status">
     <div class="frame-rate"><pre><p>{{ frameRate }}</p></pre></div>
     <div class="resolution"><pre><p>{{ width }}×{{ height }}</p></pre></div>
     <div class="sample-count"><pre><p>{{ sampleCount }} samples</p></pre></div>
@@ -25,7 +25,7 @@ function displayTime(milliseconds: number): string {
 }
 
 @Component
-export default class Viewport extends Vue {
+export default class extends Vue {
   @Prop() private width!: number;
   @Prop() private height!: number;
   @Prop() private sampleCount!: number;

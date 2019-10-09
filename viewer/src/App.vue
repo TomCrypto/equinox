@@ -13,7 +13,6 @@
 
     <StatusBar
       v-if="canvas !== null"
-      class="status"
       :sample-count="sampleCount"
       frame-rate=60
       :width="canvasWidth"
@@ -24,38 +23,29 @@
       :gpuFrameTime="gpuFrameTime"
       :syncInterval="syncInterval"
     />
+
+    <LoadingOverlay
+      :v-if="canvas !== null"
+      :loading-count="loadingCount"
+      :downloading-count="downloadingCount"
+    />
   </div>
 </template>
 
 <script lang="ts">
 import { Component, Prop, Vue } from "vue-property-decorator";
 import StatusBar from "./components/StatusBar.vue";
+import LoadingOverlay from "./components/LoadingOverlay.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
 import { getWebGlVendor, getWebGlRenderer, WebGlTimeElapsedQuery } from "./helpers/webgl_info"
 import MovingWindowEstimator from "./helpers/minimum_window"
 
-async function fetch_bytes(url: string) {
-  console.log(`>>> Fetching ${url}`)
 
-  let data = await localforage.getItem(url) as ArrayBuffer | null;
-
-  if (data === null) {
-    console.log(`>>> Cache miss`)
-
-    data = await (await fetch(new Request(url))).arrayBuffer()
-    console.log(`>>> Fetched data, length = ${data.byteLength}`)
-    await localforage.setItem(url, data)
-  } else {
-    console.log(`>>> Cache hit`)
-  }
-
-  return data
-}
 
 @Component({
   components: {
-    StatusBar
+    StatusBar, LoadingOverlay
   }
 })
 export default class App extends Vue {
@@ -80,6 +70,9 @@ export default class App extends Vue {
   private syncInterval: number | null = null;
 
   private gpuTimeQueries: WebGlTimeElapsedQuery | null = null;
+
+  private loadingCount: number = 0;
+  private downloadingCount: number = 0;
 
   private pressKey(key: string) {
     if (!this.captured) {
@@ -147,7 +140,7 @@ export default class App extends Vue {
     console.log("Fetching envmap...");
 
     (async () => {
-      let data = new Uint8Array(await fetch_bytes("assets/blue_grotto_4k.raw"));
+      let data = new Uint8Array(await this.fetch_asset_data("assets/blue_grotto_4k.raw"));
 
       console.log("Fetched envmap data: " + data.length + " pixels");
 
@@ -265,6 +258,29 @@ export default class App extends Vue {
     this.syncInterval = this.syncIntervalEstimator.average();
 
     this.animationFrame = requestAnimationFrame(this.renderLoop);
+  }
+
+  async fetch_asset_data(url: string): Promise<ArrayBuffer> {
+    this.loadingCount += 1;
+
+    try {
+      let data = await localforage.getItem(url) as ArrayBuffer | null;
+
+      if (data === null) {
+        this.downloadingCount += 1;
+
+        try {
+          data = await (await fetch(new Request(url))).arrayBuffer()
+          await localforage.setItem(url, data)
+        } finally {
+          this.downloadingCount -= 1;
+        }
+      }
+
+      return data
+    } finally {
+      this.loadingCount -= 1;
+    }
   }
 }
 </script>
