@@ -1,6 +1,11 @@
 <template>
   <div class="editor">
-    <textarea class="textbox" :value="json" v-on:input="onJsonChange($event.target)" />
+    <textarea
+      class="textbox"
+      :value="json"
+      v-on:input="onJsonChange($event.target)"
+      v-on:keydown="onKeyDown($event)"
+    />
   </div>
 </template>
 
@@ -15,8 +20,16 @@ export default class extends Vue {
     json: object,
     assets: string[]
   ) => Promise<boolean>;
+  @Prop() private onClose!: () => void;
 
   private json!: string;
+
+  private onKeyDown(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      this.onClose();
+      event.preventDefault();
+    }
+  }
 
   private validateJson(value: string): [object, string[]] | null {
     try {
@@ -96,9 +109,9 @@ export default class extends Vue {
   resize: none;
 
   font-size: 0.8em;
-  line-height: 18px;
+  line-height: normal;
   font-family: monospace;
-  font-weight: bold;
+  font-weight: normal;
 
   background-color: black;
   color: white;

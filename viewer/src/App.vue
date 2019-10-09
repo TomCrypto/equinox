@@ -13,7 +13,12 @@
       v-on:contextmenu="$event.preventDefault()"
     />
 
-    <JsonEditor v-if="isEditingJson" :scene="scene" :on-update-scene="updateScene" />
+    <JsonEditor
+      v-if="isEditingJson"
+      :scene="scene"
+      :on-update-scene="updateScene"
+      :on-close="closeEditor"
+    />
 
     <Toolbar :on-save-screenshot="saveScreenshot" :on-edit-json="editJson" />
 
@@ -117,6 +122,10 @@ export default class App extends Vue {
 
   private editJson() {
     this.isEditingJson = !this.isEditingJson;
+  }
+
+  private closeEditor() {
+    this.isEditingJson = false;
   }
 
   private saveScreenshot() {
