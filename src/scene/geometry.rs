@@ -3,7 +3,7 @@ use cgmath::Point3;
 use serde::{Deserialize, Serialize};
 
 /// Parameter
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Parameter {
     /// Fixed value across all instances.
@@ -21,7 +21,7 @@ impl Parameter {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Geometry {
     UnitSphere,

@@ -2,7 +2,7 @@ use cgmath::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, SmartDefault)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, SmartDefault)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum ApertureShape {
     #[default]
@@ -27,7 +27,7 @@ impl ApertureShape {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, SmartDefault, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, SmartDefault, Serialize)]
 pub struct Camera {
     #[default(Point3::new(0.0, 0.0, 0.0))]
     pub position: Point3<f32>,

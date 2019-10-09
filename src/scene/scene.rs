@@ -19,6 +19,7 @@ pub struct Scene {
     pub display: Dirty<Display>,
     pub aperture: Dirty<Aperture>,
 
+    #[serde(skip)]
     pub assets: HashMap<String, Vec<u8>>,
 }
 

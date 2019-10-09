@@ -5,7 +5,7 @@ pub struct Materials {
     pub list: Vec<Material>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Material {
     Lambertian {

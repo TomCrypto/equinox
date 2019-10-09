@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 // what about multiple materials? don't bother for now
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Instance {
     pub geometry: usize,
     pub material: usize,

@@ -13,7 +13,9 @@
       v-on:contextmenu="$event.preventDefault()"
     />
 
-    <Toolbar :on-save-screenshot="saveScreenshot" />
+    <JsonEditor v-if="isEditingJson" :scene="scene" :on-update-scene="updateScene" />
+
+    <Toolbar :on-save-screenshot="saveScreenshot" :on-edit-json="editJson" />
 
     <StatusBar
       v-if="canvas !== null"
@@ -41,6 +43,7 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 import StatusBar from "./components/StatusBar.vue";
 import LoadingOverlay from "./components/LoadingOverlay.vue";
 import Toolbar from "./components/Toolbar.vue";
+import JsonEditor from "./components/JsonEditor.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
 import {
@@ -54,7 +57,8 @@ import MovingWindowEstimator from "./helpers/minimum_window";
   components: {
     StatusBar,
     Toolbar,
-    LoadingOverlay
+    LoadingOverlay,
+    JsonEditor
   }
 })
 export default class App extends Vue {
@@ -83,6 +87,8 @@ export default class App extends Vue {
   private loadingCount: number = 0;
   private downloadingCount: number = 0;
 
+  private isEditingJson: boolean = false;
+
   private extension: WEBGL_lose_context | null = null;
 
   private isContextLost: boolean = false;
@@ -107,6 +113,10 @@ export default class App extends Vue {
     }
 
     this.keys[key] = true;
+  }
+
+  private editJson() {
+    this.isEditingJson = !this.isEditingJson;
   }
 
   private saveScreenshot() {
@@ -151,6 +161,34 @@ export default class App extends Vue {
     }
   }
 
+  private async updateScene(json: object, assets: string[]): Promise<boolean> {
+    const oldAssets = this.scene.assets();
+    const promises = [];
+
+    for (const asset of assets) {
+      if (oldAssets.includes(asset)) {
+        continue;
+      }
+
+      promises.push(this.load_asset(asset));
+    }
+
+    await Promise.all(promises);
+
+    for (const asset of oldAssets) {
+      if (!assets.includes(asset)) {
+        this.scene.remove_asset(asset);
+      }
+    }
+
+    try {
+      this.scene.set_json(json);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private onKeyPress(event: KeyboardEvent) {
     if (event.shiftKey && event.key === "K" && this.extension !== null) {
       this.extension.loseContext();
@@ -181,13 +219,13 @@ export default class App extends Vue {
     this.scene = new this.equinox.WebScene();
     this.scene.setup_test_scene();
 
-    (async () => {
-      let data = new Uint8Array(
-        await this.fetch_asset_data("assets/blue_grotto_4k.raw")
-      );
+    const asset = "assets/blue_grotto_4k.raw";
 
-      this.scene.insert_asset("envmap", data);
-      this.scene.set_envmap("envmap", 4096, 2048);
+    (async () => {
+      let data = new Uint8Array(await this.fetch_asset_data(asset));
+
+      this.scene.insert_asset(asset, data);
+      this.scene.set_envmap(asset, 4096, 2048);
     })();
   }
 
@@ -320,6 +358,11 @@ export default class App extends Vue {
 
     this.animationFrame = requestAnimationFrame(this.renderLoop);
     this.mustSaveScreenshot = false; // avoid spurious screenshot
+  }
+
+  async load_asset(url: string) {
+    const data = await this.fetch_asset_data(url);
+    this.scene.insert_asset(url, new Uint8Array(data));
   }
 
   async fetch_asset_data(url: string): Promise<ArrayBuffer> {

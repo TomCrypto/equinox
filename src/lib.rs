@@ -511,6 +511,7 @@ struct GlobalData {
 
 use cgmath::prelude::*;
 use cgmath::{Point3, Vector3};
+use js_sys::Array;
 use serde::{de::DeserializeOwned, Serialize};
 use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
@@ -528,6 +529,52 @@ impl WebScene {
         Ok(Self {
             scene: Scene::default(),
         })
+    }
+
+    pub fn json(&self) -> Result<JsValue, JsValue> {
+        as_json(&self.scene)
+    }
+
+    pub fn set_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
+        let new_scene: Scene = from_json(json)?;
+
+        if self.scene.camera != new_scene.camera {
+            self.scene.camera = new_scene.camera;
+        }
+
+        if self.scene.display != new_scene.display {
+            self.scene.display = new_scene.display;
+        }
+
+        if self.scene.environment != new_scene.environment {
+            self.scene.environment = new_scene.environment;
+        }
+
+        if self.scene.geometries != new_scene.geometries {
+            self.scene.geometries = new_scene.geometries;
+        }
+
+        if self.scene.materials != new_scene.materials {
+            self.scene.materials = new_scene.materials;
+        }
+
+        if self.scene.raster != new_scene.raster {
+            self.scene.raster = new_scene.raster;
+        }
+
+        if self.scene.instances != new_scene.instances {
+            self.scene.instances = new_scene.instances;
+        }
+
+        Ok(())
+    }
+
+    pub fn assets(&self) -> Array {
+        self.scene
+            .assets
+            .keys()
+            .map(|k| JsValue::from_str(k))
+            .collect()
     }
 
     pub fn set_raster_dimensions(&mut self, width: u32, height: u32) {
@@ -991,7 +1038,7 @@ impl WasmRunner {
     pub fn remove_instance(&mut self, index: usize) {
         self.scene.instances.remove(index);
     }
-}
+}*/
 
 fn as_json<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
     Ok(JsValue::from_serde(value).map_err(|err| Error::new(&err.to_string()))?)
@@ -1002,7 +1049,6 @@ fn from_json<T: DeserializeOwned>(json: &JsValue) -> Result<T, JsValue> {
         .into_serde()
         .map_err(|err| Error::new(&err.to_string()))?)
 }
-*/
 
 export![device, engine, scene];
 

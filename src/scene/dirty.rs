@@ -67,6 +67,12 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Dirty<T> {
     }
 }
 
+impl<T: PartialEq> PartialEq for Dirty<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner.eq(&other.inner)
+    }
+}
+
 impl<T: Serialize> Serialize for Dirty<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.inner.serialize(serializer)

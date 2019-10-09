@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 use std::num::NonZeroU32;
 
-#[derive(Copy, Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize, SmartDefault)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum RasterFilter {
     #[default]
@@ -56,7 +56,7 @@ impl RasterFilter {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, SmartDefault)]
 pub struct Raster {
     #[default(NonZeroU32::new(256).unwrap())]
     pub width: NonZeroU32,
