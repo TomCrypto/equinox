@@ -197,7 +197,7 @@ export default class App extends Vue {
       powerPreference: "high-performance"
     });
 
-    this.extension = this.context.getExtension("WEBGL_lose_context");
+    this.extension = this.context!.getExtension("WEBGL_lose_context");
 
     if (this.context === null) {
       alert("Sorry, your browser does not appear to support WebGL2!");
@@ -221,8 +221,6 @@ export default class App extends Vue {
   private lastVsync: number = 0;
 
   renderLoop() {
-    this.isContextLost = this.context.isContextLost();
-
     const start = performance.now();
 
     if (this.lastVsync !== 0) {
@@ -233,9 +231,12 @@ export default class App extends Vue {
 
     if (
       this.canvas !== null &&
+      this.context !== null &&
       this.canvas.clientWidth != 0 &&
       this.canvas.clientHeight != 0
     ) {
+      this.isContextLost = this.context.isContextLost();
+
       let forward = 0;
       let sideways = 0;
 
