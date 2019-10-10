@@ -92,5 +92,4 @@ version = "0.2"
 crate-type = ["cdylib"]
 
 [profile.release]
-opt-level = 'z'
 lto = true
