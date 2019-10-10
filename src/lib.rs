@@ -1,3 +1,5 @@
+//! The Equinox path tracing renderer, see the README for more information.
+
 #![deny(unsafe_code)]
 
 macro_rules! export {

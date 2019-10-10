@@ -1,3 +1,4 @@
+use crate::{Device, Scene};
 use cgmath::prelude::*;
 use cgmath::Vector3;
 use js_sys::{Array, Error};
@@ -5,8 +6,6 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
-
-use crate::{Device, Scene};
 
 use crate::{EnvironmentMap, Geometry, Instance, Material, Parameter};
 
@@ -19,10 +18,10 @@ pub struct WebScene {
 #[wasm_bindgen]
 impl WebScene {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Result<WebScene, JsValue> {
-        Ok(Self {
+    pub fn new() -> WebScene {
+        Self {
             scene: Scene::default(),
-        })
+        }
     }
 
     pub fn reset_to_default(&mut self) {
@@ -33,6 +32,10 @@ impl WebScene {
         as_json(&self.scene)
     }
 
+    /// Reconfigures the scene using the provided scene JSON data.
+    ///
+    /// This method will attempt to dirty the least amount of scene data
+    /// possible, so it won't necessarily always dirty the entire scene.
     pub fn set_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
         let new_scene: Scene = from_json(json)?;
 
@@ -104,8 +107,6 @@ impl WebScene {
             height,
         });
     }
-
-    // TODO: bunch of getters and setters for the scene, dirtying as needed
 
     pub fn move_camera(&mut self, forward: f32, sideways: f32) {
         let sideways_vector = self
@@ -214,32 +215,20 @@ impl WebScene {
             geometry_values: vec![],
         });
 
-        /*self.scene.instances.push(Instance {
-            geometry: 1,
-            material: 1,
-            geometry_values: vec![],
-            material_values: vec![0.8, 0.8, 0.8, 0.0],
-        });*/
-
         self.scene.instances.push(Instance {
             geometry: 1,
             material: 2,
             geometry_values: vec![],
         });
-
-        /*self.scene.instances.push(Instance {
-            geometry: 1,
-            material: 3,
-            geometry_values: vec![],
-            material_values: vec![0.8, 0.8, 0.8, 1.55],
-        });*/
-
-        /*self.scene.instances.push(Instance {
-            geometry: 2,
-            material: 1,
-            geometry_values: vec![],
-        });*/
     }
+}
+
+fn as_json<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
+    Ok(JsValue::from_serde(value).map_err(|e| Error::new(&e.to_string()))?)
+}
+
+fn from_json<T: DeserializeOwned>(json: &JsValue) -> Result<T, JsValue> {
+    Ok(json.into_serde().map_err(|e| Error::new(&e.to_string()))?)
 }
 
 /// WASM binding for a device.
@@ -257,6 +246,7 @@ impl WebDevice {
         })
     }
 
+    /// Updates the device with a scene, returning true if an update occurred.
     pub fn update(&mut self, scene: &mut WebScene) -> Result<bool, JsValue> {
         Ok(self.device.update(&mut scene.scene)?)
     }
@@ -273,30 +263,24 @@ impl WebDevice {
         self.device.state.frame
     }
 
+    /// Indicates to the device that its WebGL context has been lost.
     pub fn context_lost(&mut self) {
         self.device.context_lost();
     }
 }
 
-const VERSION: &str = concat!("Equinox v", env!("CARGO_PKG_VERSION"), " (WebGL2)");
-
+/// Returns a version string for the WASM module.
 #[wasm_bindgen]
 pub fn version() -> String {
-    VERSION.to_owned()
+    concat!("Equinox v", env!("CARGO_PKG_VERSION"), " (WebGL2)").to_owned()
 }
 
+/// Configures browser logging functionality.
+///
+/// This function is safe to call more than once and will do nothing should it
+/// be called more than once; this lets it co-exist nicely with hot reloaders.
 #[wasm_bindgen]
 pub fn initialize_logging() {
     console_error_panic_hook::set_once();
     let _ = console_log::init();
-}
-
-fn as_json<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
-    Ok(JsValue::from_serde(value).map_err(|err| Error::new(&err.to_string()))?)
-}
-
-fn from_json<T: DeserializeOwned>(json: &JsValue) -> Result<T, JsValue> {
-    Ok(json
-        .into_serde()
-        .map_err(|err| Error::new(&err.to_string()))?)
 }
