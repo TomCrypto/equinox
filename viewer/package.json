@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@types/jszip": "^3.1.6",
+    "@types/pako": "^1.0.1",
     "@types/webgl2": "^0.0.5",
     "@vue/cli-plugin-babel": "^3.11.0",
     "@vue/cli-plugin-eslint": "^3.11.0",
@@ -31,6 +32,7 @@
     "jszip": "^3.2.2",
     "localforage": "^1.7.3",
     "mobile-device-detect": "^0.3.3",
+    "pako": "^1.0.10",
     "prettier": "^1.18.2",
     "typescript": "^3.4.3",
     "vue-eslint-parser": "^6.0.4",

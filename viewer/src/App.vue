@@ -59,6 +59,7 @@ import DownloadOverlay from "@/components/DownloadOverlay.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
 import Zip from "jszip";
+import pako from "pako";
 import {
   getWebGlVendor,
   getWebGlRenderer,
@@ -418,7 +419,9 @@ export default class App extends Vue {
         this.downloadingCount += 1;
 
         try {
-          data = await (await fetch(new Request(url))).blob();
+          const buffer = await (await fetch(new Request(url))).arrayBuffer();
+          data = new Blob([pako.inflate(new Uint8Array(buffer)).buffer]);
+
           await localforage.setItem(url, data);
         } finally {
           this.downloadingCount -= 1;
