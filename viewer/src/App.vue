@@ -51,11 +51,11 @@
 
 <script lang="ts">
 import { Component, Prop, Vue } from "vue-property-decorator";
-import StatusBar from "./components/StatusBar.vue";
-import LoadingOverlay from "./components/LoadingOverlay.vue";
-import Toolbar from "./components/Toolbar.vue";
-import JsonEditor from "./components/JsonEditor.vue";
-import DownloadOverlay from "./components/DownloadOverlay.vue";
+import StatusBar from "@/components/StatusBar.vue";
+import LoadingOverlay from "@/components/LoadingOverlay.vue";
+import Toolbar from "@/components/Toolbar.vue";
+import JsonEditor from "@/components/JsonEditor.vue";
+import DownloadOverlay from "@/components/DownloadOverlay.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
 import Zip from "jszip";
@@ -398,7 +398,7 @@ export default class App extends Vue {
       version: this.equinox.version()
     };
 
-    zip.file("scene.json", JSON.stringify(this.scene.json(), null, 2));
+    zip.file("scene.json", JSON.stringify(this.sceneJson(), null, 2));
     zip.file("info.json", JSON.stringify(info, null, 2));
     zip.file("render.png", await render);
 

@@ -175,14 +175,7 @@ impl<'a> HierarchyBuilder<'a> {
     }
 
     pub fn node_count_for_leaves(leaves: usize) -> usize {
-        // if leaves is 0, then node count is -1, and 1 past the end is 0, it will be
-        // detected instantly
-
-        if leaves == 0 {
-            return 1;
-        }
-
-        2 * leaves - 1
+        2 * leaves.max(1) - 1
     }
 
     pub fn build(&mut self, leaves: &mut [InstanceInfo]) {
@@ -195,25 +188,12 @@ impl<'a> HierarchyBuilder<'a> {
         offset += 1; // go to next
 
         if leaves.is_empty() {
-            // if there are no leaves, set the root AABB to just be all zeroes
-            // and set the skip to the limit so we bail out instantly
-
             self.nodes[curr] = SceneInstanceNode::make_node([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0);
 
             return offset;
         }
 
         let bbox = BoundingBox::from_extents(leaves.iter().map(|i| i.bbox));
-
-        /*
-
-        algorithm to build the roped BVH is simple:
-
-            1. get bbox of all children here
-            2. set it on this node
-            3. if there's only one child, this is a LEAF node, populate the relevant fields
-
-        */
 
         if leaves.len() == 1 {
             let leaf = &leaves[0];
@@ -269,8 +249,6 @@ impl<'a> HierarchyBuilder<'a> {
 
         let lhs_offset = self.build_recursive(offset, lhs);
         let rhs_offset = self.build_recursive(lhs_offset, rhs);
-
-        // for nodes, word2 is always zero and word1 just contains the skip
 
         self.nodes[curr] = SceneInstanceNode::make_node(
             bbox.min.into(),
