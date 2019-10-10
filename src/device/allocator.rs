@@ -6,7 +6,7 @@ use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 ///
 /// This allocator is primarily designed for potentially large, short-lived
 /// allocations intended only as a staging area before uploading data up to
-/// the device. It has a watermark system to avoid holding on to memory.
+/// the device. It uses a watermark system to release memory every frame.
 #[derive(Default)]
 pub struct Allocator {
     memory: Vec<Aligned>,
