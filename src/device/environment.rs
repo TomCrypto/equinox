@@ -3,6 +3,7 @@ use log::{debug, info, warn};
 
 use crate::Device;
 use crate::Environment;
+use img2raw::{ColorSpace, DataFormat, Header};
 use std::collections::HashMap;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
@@ -52,12 +53,24 @@ impl Device {
         }
 
         if let Some(map) = &environment.map {
-            let data = &assets[&map.pixels];
+            let (header, data) =
+                LayoutVerified::<_, Header>::new_from_prefix(assets[&map.pixels].as_slice())
+                    .unwrap();
 
-            let pixels = LayoutVerified::new_slice(data.as_slice()).unwrap();
+            if (*header).data_format.as_data_format() != Some(DataFormat::RGBA16F) {
+                panic!("expected RGBA16F environment map");
+            }
 
-            self.envmap_texture
-                .upload(map.width as usize, map.height as usize, &pixels);
+            if (*header).color_space.as_color_space() != Some(ColorSpace::LinearSRGB) {
+                panic!("expected linear sRGB environment map");
+            }
+
+            let pixels = LayoutVerified::new_slice(data).unwrap();
+
+            let cols = (*header).dimensions[0] as usize;
+            let rows = (*header).dimensions[1] as usize;
+
+            self.envmap_texture.upload(cols, rows, &pixels);
 
             /*
 

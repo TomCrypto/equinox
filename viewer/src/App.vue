@@ -252,10 +252,8 @@ export default class App extends Vue {
     const asset = "assets/blue_grotto_4k.raw";
 
     (async () => {
-      let data = new Uint8Array(await this.fetch_asset_data(asset));
-
-      this.scene.insert_asset(asset, data);
-      this.scene.set_envmap(asset, 4096, 2048);
+      await this.load_asset(asset);
+      this.scene.set_envmap(asset);
     })();
   }
 
@@ -414,20 +412,20 @@ export default class App extends Vue {
     this.loadingCount += 1;
 
     try {
-      let data = (await localforage.getItem(url)) as ArrayBuffer | null;
+      let data = (await localforage.getItem(url)) as Blob | null;
 
       if (data === null) {
         this.downloadingCount += 1;
 
         try {
-          data = await (await fetch(new Request(url))).arrayBuffer();
+          data = await (await fetch(new Request(url))).blob();
           await localforage.setItem(url, data);
         } finally {
           this.downloadingCount -= 1;
         }
       }
 
-      return data;
+      return new Response(data).arrayBuffer();
     } finally {
       this.loadingCount -= 1;
     }

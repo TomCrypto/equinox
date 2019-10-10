@@ -21,6 +21,9 @@ version = "0.1"
 [dependencies.half]
 version = "1.3"
 
+[dependencies.img2raw]
+version = "0.1"
+
 [dependencies.itertools]
 version = "0.8"
 

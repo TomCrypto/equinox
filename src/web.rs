@@ -143,11 +143,9 @@ impl WebScene {
         self.scene.assets.remove(name);
     }
 
-    pub fn set_envmap(&mut self, name: &str, width: u32, height: u32) {
+    pub fn set_envmap(&mut self, name: &str) {
         self.scene.environment.map = Some(EnvironmentMap {
             pixels: name.to_owned(),
-            width,
-            height,
         });
     }
 

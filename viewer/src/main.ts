@@ -4,7 +4,10 @@ import localforage from "localforage";
 
 Vue.config.productionTip = false;
 
-localforage.setDriver(localforage.INDEXEDDB);
+localforage.config({
+  driver: localforage.INDEXEDDB,
+  name: "equinox-asset-data-v1"
+});
 
 (async () => {
   ((equinox: typeof import("equinox")) => {
