@@ -8,4 +8,5 @@ export![
     lens_flare,
     material,
     raster,
+    device,
 ];

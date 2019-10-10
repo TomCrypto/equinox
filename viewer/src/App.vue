@@ -399,7 +399,7 @@ export default class App extends Vue {
     };
 
     zip.file("scene.json", JSON.stringify(this.sceneJson(), null, 2));
-    zip.file("info.json", JSON.stringify(info, null, 2));
+    zip.file("meta.json", JSON.stringify(info, null, 2));
     zip.file("render.png", await render);
 
     this.screenshot = await zip.generateAsync({ type: "blob" });
