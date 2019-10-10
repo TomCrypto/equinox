@@ -53,20 +53,20 @@ impl WebScene {
             self.scene.environment = new_scene.environment;
         }
 
-        if self.scene.geometries != new_scene.geometries {
-            self.scene.geometries = new_scene.geometries;
+        if self.scene.geometry_list != new_scene.geometry_list {
+            self.scene.geometry_list = new_scene.geometry_list;
         }
 
-        if self.scene.materials != new_scene.materials {
-            self.scene.materials = new_scene.materials;
+        if self.scene.material_list != new_scene.material_list {
+            self.scene.material_list = new_scene.material_list;
         }
 
         if self.scene.raster != new_scene.raster {
             self.scene.raster = new_scene.raster;
         }
 
-        if self.scene.instances != new_scene.instances {
-            self.scene.instances = new_scene.instances;
+        if self.scene.instance_list != new_scene.instance_list {
+            self.scene.instance_list = new_scene.instance_list;
         }
 
         if self.scene.aperture != new_scene.aperture {
@@ -86,15 +86,15 @@ impl WebScene {
     /// Any instance using this geometry will be deleted, and any instance
     /// using a geometry after the deleted one will be adjusted as needed.
     pub fn delete_geometry(&mut self, index: usize) -> bool {
-        if self.scene.geometries.len() < index {
-            self.scene.geometries.remove(index);
+        if self.scene.geometry_list.len() < index {
+            self.scene.geometry_list.remove(index);
         } else {
             return false;
         }
 
-        self.scene.instances.retain(|i| i.geometry != index);
+        self.scene.instance_list.retain(|i| i.geometry != index);
 
-        for instance in self.scene.instances.iter_mut() {
+        for instance in self.scene.instance_list.iter_mut() {
             if instance.geometry > index {
                 instance.geometry -= 1;
             }
@@ -108,15 +108,15 @@ impl WebScene {
     /// Any instance using this material will be deleted, and any instance
     /// using a material after the deleted one will be adjusted as needed.
     pub fn delete_material(&mut self, index: usize) -> bool {
-        if self.scene.materials.len() >= index {
-            self.scene.materials.remove(index);
+        if self.scene.material_list.len() >= index {
+            self.scene.material_list.remove(index);
         } else {
             return false;
         }
 
-        self.scene.instances.retain(|i| i.material != index);
+        self.scene.instance_list.retain(|i| i.material != index);
 
-        for instance in self.scene.instances.iter_mut() {
+        for instance in self.scene.instance_list.iter_mut() {
             if instance.material > index {
                 instance.material -= 1;
             }
@@ -181,12 +181,12 @@ impl WebScene {
         self.scene.camera.position.y = 1.0;
         self.scene.camera.position.z = 1.5;
 
-        self.scene.geometries.push(Geometry::Plane {
+        self.scene.geometry_list.push(Geometry::Plane {
             width: Parameter::Constant { value: 30.0 },
             length: Parameter::Constant { value: 30.0 },
         });
 
-        self.scene.geometries.push(Geometry::Translate {
+        self.scene.geometry_list.push(Geometry::Translate {
             f: Box::new(Geometry::InfiniteRepetition {
                 period: [
                     Parameter::Constant { value: 3.0 },
@@ -202,7 +202,7 @@ impl WebScene {
             ],
         });
 
-        self.scene.geometries.push(Geometry::Union {
+        self.scene.geometry_list.push(Geometry::Union {
             children: vec![
                 Geometry::Translate {
                     f: Box::new(Geometry::Scale {
@@ -230,30 +230,30 @@ impl WebScene {
         });
 
         // white lambertian
-        self.scene.materials.push(Material::Lambertian {
+        self.scene.material_list.push(Material::Lambertian {
             albedo: [0.9, 0.9, 0.9],
         });
 
-        self.scene.materials.push(Material::Lambertian {
+        self.scene.material_list.push(Material::Lambertian {
             albedo: [0.25, 0.25, 0.75],
         });
 
-        /*self.scene.materials.push(Material::Phong {
+        /*self.scene.material_list.push(Material::Phong {
             albedo: [0.9, 0.9, 0.9],
             shininess: 1024.0,
         });*/
 
-        self.scene.materials.push(Material::IdealReflection {
+        self.scene.material_list.push(Material::IdealReflection {
             reflectance: [0.9, 0.9, 0.9],
         });
 
-        self.scene.instances.push(Instance {
+        self.scene.instance_list.push(Instance {
             geometry: 0,
             material: 0,
             geometry_values: vec![],
         });
 
-        self.scene.instances.push(Instance {
+        self.scene.instance_list.push(Instance {
             geometry: 1,
             material: 2,
             geometry_values: vec![],

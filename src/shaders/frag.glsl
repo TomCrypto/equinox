@@ -43,9 +43,6 @@ uniform sampler2D envmap_pix_tex;
 uniform sampler2D envmap_marginal_cdf;
 uniform sampler2D envmap_conditional_cdfs;
 
-#define ENVMAP_W 4096
-#define ENVMAP_H 2048
-
 // TODO: add PDFs later on (see the PBR book for correct values...)
 
 vec3 sample_envmap(vec3 direction) {

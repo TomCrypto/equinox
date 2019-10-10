@@ -12,9 +12,9 @@ use std::collections::HashMap;
 pub struct Scene {
     pub camera: Dirty<Camera>,
     pub raster: Dirty<Raster>,
-    pub instances: Dirty<Vec<Instance>>,
-    pub geometries: Dirty<Vec<Geometry>>,
-    pub materials: Dirty<Vec<Material>>,
+    pub instance_list: Dirty<Vec<Instance>>,
+    pub geometry_list: Dirty<Vec<Geometry>>,
+    pub material_list: Dirty<Vec<Material>>,
     pub environment: Dirty<Environment>,
     pub display: Dirty<Display>,
     pub aperture: Dirty<Option<Aperture>>,
@@ -31,9 +31,9 @@ impl Scene {
     pub fn dirty_all_fields(&mut self) {
         Dirty::dirty(&mut self.camera);
         Dirty::dirty(&mut self.raster);
-        Dirty::dirty(&mut self.instances);
-        Dirty::dirty(&mut self.geometries);
-        Dirty::dirty(&mut self.materials);
+        Dirty::dirty(&mut self.instance_list);
+        Dirty::dirty(&mut self.geometry_list);
+        Dirty::dirty(&mut self.material_list);
         Dirty::dirty(&mut self.environment);
         Dirty::dirty(&mut self.display);
         Dirty::dirty(&mut self.aperture);

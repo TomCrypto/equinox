@@ -183,9 +183,9 @@ impl Device {
             self.update_camera(camera);
         });
 
-        let instances = &mut scene.instances;
+        let instances = &mut scene.instance_list;
 
-        invalidated |= Dirty::clean(&mut scene.geometries, |geometries| {
+        invalidated |= Dirty::clean(&mut scene.geometry_list, |geometries| {
             let mut generator = GeometryGlslGenerator::new();
 
             let mut geometry_functions = vec![];
@@ -205,16 +205,16 @@ impl Device {
             Dirty::dirty(instances);
         });
 
-        invalidated |= Dirty::clean(&mut scene.materials, |materials| {
+        invalidated |= Dirty::clean(&mut scene.material_list, |materials| {
             self.update_materials(materials);
 
             Dirty::dirty(instances);
         });
 
-        let geometry_list = &scene.geometries;
-        let material_list = &scene.materials;
+        let geometry_list = &scene.geometry_list;
+        let material_list = &scene.material_list;
 
-        invalidated |= Dirty::clean(&mut scene.instances, |instances| {
+        invalidated |= Dirty::clean(&mut scene.instance_list, |instances| {
             self.update_instances(geometry_list, material_list, instances);
         });
 
@@ -301,13 +301,6 @@ impl Device {
             self.prepare_fft_pass_data();
         });
 
-        self.program.rebuild()?;
-        self.present_program.rebuild()?;
-
-        self.read_convolution_buffers_shader.rebuild()?;
-        self.fft_shader.rebuild()?;
-        self.load_convolution_buffers_shader.rebuild()?;
-
         let assets = &scene.assets;
 
         invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
@@ -326,6 +319,13 @@ impl Device {
         Dirty::clean(&mut scene.display, |display| {
             self.update_display(display);
         });
+
+        self.program.rebuild()?;
+        self.present_program.rebuild()?;
+
+        self.read_convolution_buffers_shader.rebuild()?;
+        self.fft_shader.rebuild()?;
+        self.load_convolution_buffers_shader.rebuild()?;
 
         if invalidated {
             self.state.reset(scene);
