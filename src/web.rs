@@ -24,6 +24,7 @@ impl WebScene {
         }
     }
 
+    /// Resets the scene to a default, empty scene.
     pub fn reset_to_default(&mut self) {
         self.scene = Scene::default();
     }
@@ -74,12 +75,53 @@ impl WebScene {
         Ok(())
     }
 
+    /// Returns the list of all assets in the scene as a JS string array.
     pub fn assets(&self) -> Array {
-        self.scene
-            .assets
-            .keys()
-            .map(|k| JsValue::from_str(k))
-            .collect()
+        self.scene.assets.keys().map(JsValue::from).collect()
+    }
+
+    /// Deletes a geometry by index safely without corrupting the scene.
+    ///
+    /// Any instance using this geometry will be deleted, and any instance
+    /// using a geometry after the deleted one will be adjusted as needed.
+    pub fn delete_geometry(&mut self, index: usize) -> bool {
+        if self.scene.geometries.len() < index {
+            self.scene.geometries.remove(index);
+        } else {
+            return false;
+        }
+
+        self.scene.instances.retain(|i| i.geometry != index);
+
+        for instance in self.scene.instances.iter_mut() {
+            if instance.geometry > index {
+                instance.geometry -= 1;
+            }
+        }
+
+        true
+    }
+
+    /// Deletes a material by index safely without corrupting the scene.
+    ///
+    /// Any instance using this material will be deleted, and any instance
+    /// using a material after the deleted one will be adjusted as needed.
+    pub fn delete_material(&mut self, index: usize) -> bool {
+        if self.scene.materials.len() >= index {
+            self.scene.materials.remove(index);
+        } else {
+            return false;
+        }
+
+        self.scene.instances.retain(|i| i.material != index);
+
+        for instance in self.scene.instances.iter_mut() {
+            if instance.material > index {
+                instance.material -= 1;
+            }
+        }
+
+        true
     }
 
     pub fn set_raster_dimensions(&mut self, width: u32, height: u32) {
