@@ -11,6 +11,7 @@ use crate::{EnvironmentMap, Geometry, Instance, Material, Parameter};
 
 /// WASM binding for a scene.
 #[wasm_bindgen]
+#[derive(Debug, Default)]
 pub struct WebScene {
     scene: Scene,
 }
@@ -270,6 +271,7 @@ fn from_json<T: DeserializeOwned>(json: &JsValue) -> Result<T, JsValue> {
 
 /// WASM binding for a device.
 #[wasm_bindgen]
+#[derive(Debug)]
 pub struct WebDevice {
     device: Device,
 }

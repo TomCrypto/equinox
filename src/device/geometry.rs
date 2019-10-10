@@ -97,7 +97,7 @@ impl GeometryGlslGenerator {
                     period_x,
                     period_y,
                     period_z,
-                    function.call(format!("mod(p + 0.5 * c, c) - 0.5 * c"))
+                    function.call("mod(p + 0.5 * c, c) - 0.5 * c")
                 )
             }
             Geometry::Union { children } => self.nary_operator(children, index, "min"),
