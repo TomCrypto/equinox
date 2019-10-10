@@ -273,7 +273,7 @@ export default class App extends Vue {
       premultipliedAlpha: false,
       stencil: false,
       powerPreference: "high-performance",
-      preserveDrawingBuffer: true // TODO: needed on firefox for screenshots
+      preserveDrawingBuffer: false
     });
 
     this.extension = this.context!.getExtension("WEBGL_lose_context");
