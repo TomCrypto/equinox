@@ -13,18 +13,6 @@ struct PdfCdf {
     pdf: f32,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn foo() {
-        let data = vec![1.0, 2.0, 3.0, 4.0];
-
-        println!("{:?}", build_normalized_pdf_cdf(&data));
-    }
-}
-
 fn build_normalized_pdf_cdf(data: &[f32]) -> (Vec<PdfCdf>, f32) {
     let n = data.len() as f32;
 
