@@ -163,7 +163,7 @@ export default class App extends Vue {
     }
 
     this.phi += -event.movementX * 0.001;
-    this.theta += -event.movementY * 0.001;
+    this.theta += event.movementY * 0.001;
 
     if (this.theta > Math.PI - 0.01) {
       this.theta = Math.PI - 0.01;
@@ -336,7 +336,7 @@ export default class App extends Vue {
       }
 
       if (forward != 0 || sideways != 0) {
-        this.scene.move_camera(-forward * 0.1, -sideways * 0.1);
+        this.scene.move_camera(forward * 0.1, 0, sideways * 0.1);
       }
 
       if (this.mouseMoved) {

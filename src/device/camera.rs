@@ -1,7 +1,7 @@
 use crate::Device;
 use crate::{ApertureShape, Camera};
 use cgmath::prelude::*;
-use cgmath::Point3;
+use cgmath::{Matrix4, Point3};
 use itertools::iproduct;
 use zerocopy::{AsBytes, FromBytes};
 
@@ -19,9 +19,12 @@ impl Device {
 
         let fov_tan = camera.film_height / (2.0 * camera.focal_length);
 
-        let mut xfm: cgmath::Matrix4<f32> = Transform::look_at(
+        // Matrix4::look_at uses a right-handed coordinate system, which is wrong for
+        // us. The easiest way to work around is to just negate the camera direction.
+
+        let mut xfm: Matrix4<f32> = Transform::look_at(
             camera.position,
-            camera.position + camera.direction,
+            camera.position - camera.direction,
             camera.up_vector,
         );
 

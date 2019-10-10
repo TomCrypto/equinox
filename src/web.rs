@@ -1,6 +1,6 @@
 use crate::{Device, Scene};
 use cgmath::prelude::*;
-use cgmath::Vector3;
+use cgmath::{Basis3, Vector3};
 use js_sys::{Array, Error};
 use serde::{de::DeserializeOwned, Serialize};
 use std::num::NonZeroU32;
@@ -150,17 +150,12 @@ impl WebScene {
         });
     }
 
-    pub fn move_camera(&mut self, forward: f32, sideways: f32) {
-        let sideways_vector = self
-            .scene
-            .camera
-            .up_vector
-            .cross(self.scene.camera.direction)
-            .normalize();
+    /// Applies a camera-space translation to the camera position.
+    pub fn move_camera(&mut self, dx: f32, dy: f32, dz: f32) {
+        let xfm =
+            Basis3::look_at(self.scene.camera.direction, self.scene.camera.up_vector).invert();
 
-        let direction = self.scene.camera.direction;
-
-        self.scene.camera.position += forward * direction + sideways_vector * sideways;
+        self.scene.camera.position += xfm.rotate_vector(Vector3::new(dx, dy, dz));
     }
 
     pub fn set_camera_direction(&mut self, x: f32, y: f32, z: f32) {
@@ -181,9 +176,9 @@ impl WebScene {
 
     // TODO: remove eventually
     pub fn setup_test_scene(&mut self) {
-        self.scene.camera.position.x = 0.0;
+        self.scene.camera.position.x = 1.5;
         self.scene.camera.position.y = 1.0;
-        self.scene.camera.position.z = 5.0;
+        self.scene.camera.position.z = 1.5;
 
         self.scene.geometries.push(Geometry::Plane {
             width: Parameter::Constant { value: 30.0 },
