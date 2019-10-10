@@ -26,6 +26,7 @@ export default class extends Vue {
     assets: string[]
   ) => Promise<boolean>;
   @Prop() private onClose!: () => void;
+  @Prop() private payload!: object;
 
   private json!: string;
 
@@ -77,12 +78,7 @@ export default class extends Vue {
   }
 
   created() {
-    const payload = {
-      json: this.scene.json(),
-      assets: this.scene.assets()
-    };
-
-    this.json = JSON.stringify(payload, null, 2);
+    this.json = JSON.stringify(this.payload, null, 2);
   }
 
   mounted() {

@@ -15,7 +15,7 @@
 
     <JsonEditor
       v-if="isEditingJson"
-      :scene="scene"
+      :payload="sceneJson()"
       :on-update-scene="updateScene"
       :on-close="closeEditor"
     />
@@ -36,9 +36,15 @@
     />
 
     <LoadingOverlay
-      :v-if="canvas !== null"
+      v-if="canvas !== null"
       :loading-count="loadingCount"
       :downloading-count="downloadingCount"
+    />
+
+    <DownloadOverlay
+      v-if="screenshot !== null"
+      :render="screenshot"
+      :on-close="downloadOverlayClosed"
     />
   </div>
 </template>
@@ -49,8 +55,10 @@ import StatusBar from "./components/StatusBar.vue";
 import LoadingOverlay from "./components/LoadingOverlay.vue";
 import Toolbar from "./components/Toolbar.vue";
 import JsonEditor from "./components/JsonEditor.vue";
+import DownloadOverlay from "./components/DownloadOverlay.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
+import Zip from "jszip";
 import {
   getWebGlVendor,
   getWebGlRenderer,
@@ -63,7 +71,8 @@ import MovingWindowEstimator from "./helpers/minimum_window";
     StatusBar,
     Toolbar,
     LoadingOverlay,
-    JsonEditor
+    JsonEditor,
+    DownloadOverlay
   }
 })
 export default class App extends Vue {
@@ -99,6 +108,7 @@ export default class App extends Vue {
   private isContextLost: boolean = false;
 
   private mustSaveScreenshot: boolean = false;
+  private screenshot: Blob | null = null;
 
   private loseContext() {
     if (this.extension !== null) {
@@ -120,12 +130,23 @@ export default class App extends Vue {
     this.keys[key] = true;
   }
 
+  private downloadOverlayClosed() {
+    this.screenshot = null;
+  }
+
   private editJson() {
     this.isEditingJson = !this.isEditingJson;
   }
 
   private closeEditor() {
     this.isEditingJson = false;
+  }
+
+  private sceneJson(): object {
+    return {
+      json: this.scene.json(),
+      assets: this.scene.assets()
+    };
   }
 
   private saveScreenshot() {
@@ -347,13 +368,7 @@ export default class App extends Vue {
       this.gpuFrameTimeEstimator.addSample(refineTime);
 
       if (this.mustSaveScreenshot) {
-        const screenshot = window.open("about:blank", "_blank")!;
-
-        this.canvas.toBlob(blob => {
-          const url = URL.createObjectURL(blob);
-          screenshot.location.href = url;
-          screenshot.focus();
-        });
+        this.generateScreenshotZip();
       }
     }
 
@@ -367,6 +382,27 @@ export default class App extends Vue {
 
     this.animationFrame = requestAnimationFrame(this.renderLoop);
     this.mustSaveScreenshot = false; // avoid spurious screenshot
+  }
+
+  private async generateScreenshotZip() {
+    const zip = new Zip();
+
+    const render = new Promise<Blob>(resolve => {
+      this.canvas!.toBlob(blob => resolve(blob!));
+    });
+
+    const info = {
+      samples: this.device.sample_count(),
+      vendor: this.contextVendor,
+      renderer: this.contextRenderer,
+      version: this.equinox.version()
+    };
+
+    zip.file("scene.json", JSON.stringify(this.scene.json(), null, 2));
+    zip.file("info.json", JSON.stringify(info, null, 2));
+    zip.file("render.png", await render);
+
+    this.screenshot = await zip.generateAsync({ type: "blob" });
   }
 
   async load_asset(url: string) {

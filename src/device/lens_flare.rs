@@ -493,8 +493,6 @@ impl Device {
             m *= 2;
         }
 
-        info!("FFT passes: {:?}", passes);
-
         self.fft_pass_data.upload(&passes);
     }
 

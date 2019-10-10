@@ -1,7 +1,15 @@
 <template>
   <div class="toolbar">
-    <button class="scene-json" title="View scene JSON representation" v-on:click="onEditJson()" />
-    <button class="save-screenshot" title="Save current render" v-on:click="onSaveScreenshot()" />
+    <button
+      class="scene-json"
+      title="View scene JSON representation"
+      v-on:click="onEditJson()"
+    />
+    <button
+      class="save-screenshot"
+      title="Save current render"
+      v-on:click="onSaveScreenshot()"
+    />
   </div>
 </template>
 
