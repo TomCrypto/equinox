@@ -181,7 +181,9 @@ impl Device {
 
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
             self.update_camera(camera);
-        });
+
+            Ok(())
+        })?;
 
         let instances = &mut scene.instance_list;
 
@@ -203,26 +205,34 @@ impl Device {
             );
 
             Dirty::dirty(instances);
-        });
+
+            Ok(())
+        })?;
 
         invalidated |= Dirty::clean(&mut scene.material_list, |materials| {
             self.update_materials(materials);
 
             Dirty::dirty(instances);
-        });
+
+            Ok(())
+        })?;
 
         let geometry_list = &scene.geometry_list;
         let material_list = &scene.material_list;
 
         invalidated |= Dirty::clean(&mut scene.instance_list, |instances| {
             self.update_instances(geometry_list, material_list, instances);
-        });
+
+            Ok(())
+        })?;
 
         let assets = &scene.assets;
 
         invalidated |= Dirty::clean(&mut scene.environment, |environment| {
             self.update_environment(assets, environment);
-        });
+
+            Ok(())
+        })?;
 
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
             self.update_raster(raster);
@@ -299,7 +309,9 @@ impl Device {
             ]);
 
             self.prepare_fft_pass_data();
-        });
+
+            Ok(())
+        })?;
 
         let assets = &scene.assets;
 
@@ -311,14 +323,18 @@ impl Device {
                     aperture.aperture_height as usize,
                 );
             }
-        });
+
+            Ok(())
+        })?;
 
         // These are post-processing settings that don't apply to the path-traced light
         // transport simulation, so we don't need to invalidate the render buffer here.
 
         Dirty::clean(&mut scene.display, |display| {
             self.update_display(display);
-        });
+
+            Ok(())
+        })?;
 
         self.program.rebuild()?;
         self.present_program.rebuild()?;

@@ -1,11 +1,12 @@
+use js_sys::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// Tracks mutable access to a value with a dirty flag.
+/// Tracks mutable access to a value using a dirty flag.
 ///
 /// The dirty flag is asserted whenever this type's `DerefMut` impl is
 /// invoked and can be reset to `false` via the `Dirty::clean` method.
 ///
-/// Values become dirty when created, cloned or deserialized.
+/// Values are initially dirty when created, cloned or deserialized.
 #[derive(Copy, Debug, Default)]
 pub struct Dirty<T> {
     is_clean: bool,
@@ -26,16 +27,22 @@ impl<T> Dirty<T> {
         this.is_clean = false;
     }
 
-    /// Marks the value as clean, invoking `handler` if it was dirty.
-    pub fn clean(this: &mut Self, handler: impl FnOnce(&T)) -> bool {
+    /// Marks the value as clean and returns whether it was dirty.
+    ///
+    /// The `update` callback is invoked if the value was dirty. If the callback
+    /// fails by returning an error, the value remains dirty to try again later.
+    pub fn clean(
+        this: &mut Self,
+        update: impl FnOnce(&T) -> Result<(), Error>,
+    ) -> Result<bool, Error> {
         if this.is_clean {
-            return false;
+            return Ok(false);
         }
 
+        update(&this.inner)?;
         this.is_clean = true;
-        handler(&this.inner);
 
-        true
+        Ok(true)
     }
 }
 
