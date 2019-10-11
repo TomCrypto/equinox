@@ -335,7 +335,7 @@ export default class App extends Vue {
       }
 
       if (forward != 0 || sideways != 0) {
-        this.scene.move_camera(sideways * 0.1, 0, forward * 0.1);
+        this.scene.move_camera(sideways * 0.015, 0, forward * 0.015);
       }
 
       if (this.mouseMoved) {
