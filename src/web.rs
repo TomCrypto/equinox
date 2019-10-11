@@ -7,7 +7,7 @@ use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
 
-use crate::{EnvironmentMap, Geometry, Instance, Material, Parameter};
+use crate::{ApertureShape, EnvironmentMap, Geometry, Instance, Material, Parameter};
 
 /// WASM binding for a scene.
 #[wasm_bindgen]
@@ -176,74 +176,66 @@ impl WebScene {
         // Set up an "interesting" default scene below. We do this here because we
         // have proper types whereas doing it in the front-end would require JSON.
 
-        self.scene.camera.position.x = 1.5;
-        self.scene.camera.position.y = 1.0;
-        self.scene.camera.position.z = 1.5;
-
         self.scene.geometry_list.push(Geometry::Plane {
-            width: Parameter::Constant { value: 30.0 },
-            length: Parameter::Constant { value: 30.0 },
+            width: Parameter::Constant { value: 1.0 },
+            length: Parameter::Constant { value: 1.0 },
         });
 
         self.scene.geometry_list.push(Geometry::Translate {
-            f: Box::new(Geometry::InfiniteRepetition {
-                period: [
-                    Parameter::Constant { value: 3.0 },
-                    Parameter::Constant { value: 0.0 },
-                    Parameter::Constant { value: 3.0 },
-                ],
-                f: Box::new(Geometry::UnitSphere),
-            }),
             translation: [
                 Parameter::Constant { value: 0.0 },
-                Parameter::Constant { value: 1.01 },
+                Parameter::Constant { value: 0.5 },
                 Parameter::Constant { value: 0.0 },
             ],
+            f: Box::new(Geometry::Scale {
+                factor: Parameter::Constant { value: 0.5 },
+                f: Box::new(Geometry::UnitSphere),
+            }),
         });
 
-        self.scene.geometry_list.push(Geometry::Union {
-            children: vec![
-                Geometry::Translate {
-                    f: Box::new(Geometry::Scale {
-                        f: Box::new(Geometry::UnitSphere),
-                        factor: Parameter::Constant { value: 0.333 },
-                    }),
-                    translation: [
-                        Parameter::Constant { value: 2.0 },
-                        Parameter::Constant { value: 0.0 },
-                        Parameter::Constant { value: 0.2 },
-                    ],
-                },
-                Geometry::Translate {
-                    f: Box::new(Geometry::Scale {
-                        f: Box::new(Geometry::UnitSphere),
-                        factor: Parameter::Constant { value: 0.333 },
-                    }),
-                    translation: [
-                        Parameter::Constant { value: 2.0 },
-                        Parameter::Constant { value: 0.0 },
-                        Parameter::Constant { value: -0.2 },
-                    ],
-                },
+        self.scene.geometry_list.push(Geometry::Translate {
+            translation: [
+                Parameter::Constant { value: 0.6 },
+                Parameter::Constant { value: 0.15 },
+                Parameter::Constant { value: 0.55 },
             ],
+            f: Box::new(Geometry::Round {
+                radius: Parameter::Constant { value: 0.05 },
+                f: Box::new(Geometry::Scale {
+                    factor: Parameter::Constant { value: 0.1 },
+                    f: Box::new(Geometry::UnitCube),
+                }),
+            }),
         });
 
-        // white lambertian
-        self.scene.material_list.push(Material::Lambertian {
-            albedo: [0.9, 0.9, 0.9],
+        self.scene.geometry_list.push(Geometry::Translate {
+            translation: [
+                Parameter::Constant { value: -0.6 },
+                Parameter::Constant { value: 0.15 },
+                Parameter::Constant { value: -0.75 },
+            ],
+            f: Box::new(Geometry::Scale {
+                factor: Parameter::Constant { value: 0.15 },
+                f: Box::new(Geometry::UnitSphere),
+            }),
         });
 
-        self.scene.material_list.push(Material::Lambertian {
-            albedo: [0.25, 0.25, 0.75],
+        self.scene.material_list.push(Material::Phong {
+            albedo: [0.75, 0.75, 0.75],
+            shininess: 900.0,
         });
-
-        /*self.scene.material_list.push(Material::Phong {
-            albedo: [0.9, 0.9, 0.9],
-            shininess: 1024.0,
-        });*/
 
         self.scene.material_list.push(Material::IdealReflection {
             reflectance: [0.9, 0.9, 0.9],
+        });
+
+        self.scene.material_list.push(Material::Lambertian {
+            albedo: [0.9, 0.1, 0.1],
+        });
+
+        self.scene.material_list.push(Material::IdealRefraction {
+            transmittance: [0.6, 0.7, 1.0],
+            refractive_index: 1.65,
         });
 
         self.scene.instance_list.push(Instance {
@@ -254,9 +246,33 @@ impl WebScene {
 
         self.scene.instance_list.push(Instance {
             geometry: 1,
+            material: 1,
+            geometry_values: vec![],
+        });
+
+        self.scene.instance_list.push(Instance {
+            geometry: 2,
             material: 2,
             geometry_values: vec![],
         });
+
+        self.scene.instance_list.push(Instance {
+            geometry: 3,
+            material: 3,
+            geometry_values: vec![],
+        });
+
+        self.scene.camera.position.x = 0.0;
+        self.scene.camera.position.y = 0.5;
+        self.scene.camera.position.z = 3.5;
+
+        self.scene.camera.direction.x = 0.0;
+        self.scene.camera.direction.y = 0.0;
+        self.scene.camera.direction.z = -1.0;
+
+        self.scene.camera.aperture = ApertureShape::Circle { radius: 0.035 };
+
+        self.scene.camera.focal_distance = 3.0;
     }
 }
 

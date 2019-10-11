@@ -84,7 +84,7 @@ export default class App extends Vue {
 
   private keys: { [x: string]: boolean } = {};
   private theta: number = Math.PI / 2;
-  private phi: number = Math.PI / 2;
+  private phi: number = -Math.PI / 2;
   private mouseMoved: boolean = false;
 
   private captured: boolean = false;
