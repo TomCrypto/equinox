@@ -250,8 +250,8 @@ impl<'a> HierarchyBuilder<'a> {
             Self::sort_by_leaf_centroid_on_axis(leaves, axis);
 
             for pos in 1..leaves.len() {
-                let mut lhs_bbox = BoundingBox::for_extend();
-                let mut rhs_bbox = BoundingBox::for_extend();
+                let mut lhs_bbox = BoundingBox::neg_infinity_bounds();
+                let mut rhs_bbox = BoundingBox::neg_infinity_bounds();
                 let mut lhs_cost = 0.0;
                 let mut rhs_cost = 0.0;
 
@@ -309,7 +309,7 @@ impl<'a> HierarchyBuilder<'a> {
             offset = 0; // final node in BVH
         }
 
-        let mut bbox = BoundingBox::for_extend();
+        let mut bbox = BoundingBox::neg_infinity_bounds();
 
         for leaf in leaves {
             bbox.extend(&leaf.bbox);

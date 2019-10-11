@@ -104,7 +104,7 @@ impl Geometry {
                 max: Point3::new(100.0, 2.0, 100.0),
             }),
             Self::Union { children } => {
-                let mut bbox = BoundingBox::for_extend();
+                let mut bbox = BoundingBox::neg_infinity_bounds();
 
                 for child in children {
                     bbox.extend(&child.bounding_box(symbolic_values)?);
@@ -113,7 +113,7 @@ impl Geometry {
                 Some(bbox)
             }
             Self::Intersection { children } => {
-                let mut bbox = BoundingBox::for_intersect();
+                let mut bbox = BoundingBox::pos_infinity_bounds();
 
                 for child in children {
                     bbox.intersect(&child.bounding_box(symbolic_values)?);
@@ -122,7 +122,7 @@ impl Geometry {
                 Some(bbox)
             }
             Self::Subtraction { lhs, rhs } => {
-                let mut bbox = BoundingBox::for_extend();
+                let mut bbox = BoundingBox::neg_infinity_bounds();
 
                 bbox.extend(&lhs.bounding_box(symbolic_values)?);
                 bbox.extend(&rhs.bounding_box(symbolic_values)?);

@@ -8,14 +8,14 @@ pub struct BoundingBox {
 }
 
 impl BoundingBox {
-    pub fn for_extend() -> Self {
+    pub fn neg_infinity_bounds() -> Self {
         Self {
             min: [std::f32::INFINITY; 3].into(),
             max: [std::f32::NEG_INFINITY; 3].into(),
         }
     }
 
-    pub fn for_intersect() -> Self {
+    pub fn pos_infinity_bounds() -> Self {
         Self {
             min: [std::f32::NEG_INFINITY; 3].into(),
             max: [std::f32::INFINITY; 3].into(),
@@ -30,7 +30,6 @@ impl BoundingBox {
         2.0 * (w + h + d)
     }
 
-    // TODO: will be used for rotation
     pub fn transform(&self, xfm: impl Transform<Point3<f32>>) -> Self {
         let vertices = [
             Point3::new(self.min.x, self.min.y, self.min.z),
@@ -43,10 +42,13 @@ impl BoundingBox {
             Point3::new(self.max.x, self.max.y, self.max.z),
         ];
 
-        Self::from_extents(vertices.iter().map(|&vertex| {
-            // find the new bounding box for all vertices
-            Self::from_point(xfm.transform_point(vertex))
-        }))
+        let mut bbox = BoundingBox::neg_infinity_bounds();
+
+        for vertex in &vertices {
+            bbox.extend(&Self::from_point(xfm.transform_point(*vertex)));
+        }
+
+        bbox
     }
 
     pub fn from_point(point: Point3<f32>) -> Self {
@@ -74,10 +76,6 @@ impl BoundingBox {
         self.max.z = self.max.z.min(other.max.z);
     }
 
-    pub fn union(boxes: impl IntoIterator<Item = Self>) -> Self {
-        Self::from_extents(boxes)
-    }
-
     pub fn intersection(boxes: impl IntoIterator<Item = Self>) -> Self {
         let max = Point3::new(std::f32::INFINITY, std::f32::INFINITY, std::f32::INFINITY);
         let min = max * -1.0; // this ensures that any min/max operation updates the bbox
@@ -97,7 +95,7 @@ impl BoundingBox {
     }
 
     pub fn from_extents(boxes: impl IntoIterator<Item = Self>) -> Self {
-        let mut extents = Self::for_extend();
+        let mut extents = Self::neg_infinity_bounds();
 
         for bbox in boxes.into_iter() {
             extents.min.x = extents.min.x.min(bbox.min.x);
