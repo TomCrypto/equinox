@@ -248,7 +248,7 @@ export default class App extends Vue {
 
   created() {
     this.scene = new this.equinox.WebScene();
-    this.scene.setup_test_scene();
+    this.scene.set_default_scene();
 
     const asset = "assets/blue_grotto_4k.raw";
 

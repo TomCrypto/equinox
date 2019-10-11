@@ -18,16 +18,12 @@ pub struct WebScene {
 
 #[wasm_bindgen]
 impl WebScene {
+    /// Creates a new empty scene.
     #[wasm_bindgen(constructor)]
     pub fn new() -> WebScene {
         Self {
             scene: Scene::default(),
         }
-    }
-
-    /// Resets the scene to a default, empty scene.
-    pub fn reset_to_default(&mut self) {
-        self.scene = Scene::default();
     }
 
     pub fn json(&self) -> Result<JsValue, JsValue> {
@@ -173,8 +169,13 @@ impl WebScene {
         self.scene.camera.direction = change.rotate_vector(self.scene.camera.direction);
     }
 
-    // TODO: remove eventually
-    pub fn setup_test_scene(&mut self) {
+    /// Sets the scene to a default scene.
+    pub fn set_default_scene(&mut self) {
+        self.scene = Scene::default();
+
+        // Set up an "interesting" default scene below. We do this here because we
+        // have proper types whereas doing it in the front-end would require JSON.
+
         self.scene.camera.position.x = 1.5;
         self.scene.camera.position.y = 1.0;
         self.scene.camera.position.z = 1.5;
