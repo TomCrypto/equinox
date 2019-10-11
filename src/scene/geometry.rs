@@ -63,6 +63,15 @@ pub enum Geometry {
 }
 
 impl Geometry {
+    /// Returns the approximate cost of evaluating the distance field, based on
+    /// the arbitrary measure that the evaluation cost of the unit sphere is 1.
+    pub fn evaluation_cost(&self) -> f32 {
+        match self {
+            Self::UnitSphere => 1.0,
+            _ => 1.0,
+        }
+    }
+
     /// Returns the estimated bounding box for an instance of this geometry, or
     /// `None` if a symbolic parameter was out of bounds of the provided array.
     pub fn bounding_box(&self, symbolic_values: &[f32]) -> Option<BoundingBox> {

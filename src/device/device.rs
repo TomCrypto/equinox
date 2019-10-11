@@ -221,7 +221,7 @@ impl Device {
         let material_list = &scene.material_list;
 
         invalidated |= Dirty::clean(&mut scene.instance_list, |instances| {
-            self.update_instances(geometry_list, material_list, instances);
+            self.update_instances(geometry_list, material_list, instances)?;
 
             Ok(())
         })?;

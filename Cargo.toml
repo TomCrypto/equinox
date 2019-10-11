@@ -44,9 +44,6 @@ version = "0.4"
 [dependencies.maplit]
 version = "1.0"
 
-[dependencies.ordered-float]
-version = "1.0"
-
 [dependencies.rand]
 version = "0.7"
 

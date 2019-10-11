@@ -270,7 +270,7 @@ impl GeometryGlslGenerator {
 
 /// Returns a vector of all symbolic parameter indices in the order they are
 /// encountered in the geometry. The returned order is always deterministic.
-pub fn renumber_parameters(geometry: &Geometry) -> Vec<usize> {
+pub(crate) fn renumber_parameters(geometry: &Geometry) -> Vec<usize> {
     let mut parameters = vec![];
 
     renumber_parameters_recursive(geometry, &mut parameters);

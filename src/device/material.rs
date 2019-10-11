@@ -9,7 +9,7 @@ use zerocopy::{AsBytes, FromBytes};
 #[derive(AsBytes, FromBytes, Debug)]
 pub struct MaterialParameter([f32; 4]);
 
-pub fn material_index(material: &Material) -> u16 {
+pub(crate) fn material_index(material: &Material) -> u16 {
     match material {
         Material::Lambertian { .. } => 0,
         Material::IdealReflection { .. } => 1,
@@ -19,7 +19,7 @@ pub fn material_index(material: &Material) -> u16 {
 }
 
 /// Returns the number of 4-float parameter blocks used by a material.
-pub fn material_parameter_block_count(material: &Material) -> usize {
+pub(crate) fn material_parameter_block_count(material: &Material) -> usize {
     match material {
         Material::Lambertian { .. } => 1,
         Material::IdealReflection { .. } => 1,

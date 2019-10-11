@@ -8,6 +8,14 @@ pub struct BoundingBox {
 }
 
 impl BoundingBox {
+    pub fn surface_area(&self) -> f32 {
+        let w = self.max.x - self.min.x;
+        let h = self.max.y - self.min.y;
+        let d = self.max.z - self.min.z;
+
+        2.0 * (w + h + d)
+    }
+
     pub fn centroid(&self) -> Point3<f32> {
         self.min + (self.max - self.min) / 2.0
     }
@@ -35,6 +43,15 @@ impl BoundingBox {
             min: point,
             max: point,
         }
+    }
+
+    pub fn extend(&mut self, other: &BoundingBox) {
+        self.min.x = self.min.x.min(other.min.x);
+        self.min.y = self.min.y.min(other.min.y);
+        self.min.z = self.min.z.min(other.min.z);
+        self.max.x = self.max.x.min(other.max.x);
+        self.max.y = self.max.y.min(other.max.y);
+        self.max.z = self.max.z.min(other.max.z);
     }
 
     pub fn union(boxes: impl IntoIterator<Item = Self>) -> Self {
@@ -74,7 +91,7 @@ impl BoundingBox {
         extents
     }
 
-    fn make_invalid_bbox() -> Self {
+    pub fn make_invalid_bbox() -> Self {
         let min = Point3::new(std::f32::INFINITY, std::f32::INFINITY, std::f32::INFINITY);
         let max = min * -1.0; // this ensures that any min/max operation updates the bbox
 

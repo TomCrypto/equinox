@@ -7,6 +7,8 @@ use crate::Device;
 use crate::{material_index, material_parameter_block_count};
 use crate::{Geometry, Instance, Material};
 use itertools::izip;
+use js_sys::Error;
+use std::cmp::Ordering;
 use zerocopy::{AsBytes, FromBytes};
 
 impl Device {
@@ -15,14 +17,14 @@ impl Device {
         geometry_list: &[Geometry],
         material_list: &[Material],
         instance_list: &[Instance],
-    ) {
+    ) -> Result<(), Error> {
         // update the instance BVH
 
-        let mut material_starts = vec![];
+        let mut material_start = vec![];
         let mut count = 0;
 
         for material in material_list {
-            material_starts.push(count);
+            material_start.push(count);
 
             count += material_parameter_block_count(material) as u16;
         }
@@ -34,20 +36,18 @@ impl Device {
             let geometry = &geometry_list[instance.geometry];
             let material = &material_list[instance.material];
 
-            // TODO: handle errors gracefully here somehow? it would indicate bad data
-            let bbox = geometry.bounding_box(&instance.geometry_values).unwrap();
+            let bbox = geometry
+                .bounding_box(&instance.geometry_values)
+                .ok_or_else(|| Error::new("bad geometry values"))?;
 
             instance_info.push(InstanceInfo {
                 bbox,
-                surface_area: 1.0, // obtain from the geometry somehow (at least an approximation)
+                cost: geometry.evaluation_cost(),
                 geometry: instance.geometry as u16,
-                material: material_index(material),
                 geo_inst: geometry_start,
-                mat_inst: material_starts[instance.material],
+                material: material_index(material),
+                mat_inst: material_start[instance.material],
             });
-
-            // need to divide all starts by 4 because we use vec4 buffers...
-            // (note: this is an implementation detail)
 
             geometry_start += (instance.geometry_values.len() as u16 + 3) / 4;
         }
@@ -93,6 +93,8 @@ impl Device {
         }
 
         self.geometry_buffer.write_array(&params);
+
+        Ok(())
     }
 }
 
@@ -104,9 +106,9 @@ pub struct GeometryParameter([f32; 4]);
 #[derive(AsBytes, FromBytes, Debug, Default)]
 pub struct SceneInstanceNode {
     min: [f32; 3],
-    word1: u32, // "skip" pointer + "parameter offset" << 16
+    word1: u32,
     max: [f32; 3],
-    word2: u32, // geometry ID + material ID << 16  == 0 if it's not a leaf
+    word2: u32,
 }
 
 impl SceneInstanceNode {
@@ -119,10 +121,8 @@ impl SceneInstanceNode {
         mat_inst: u16,
         is_last: bool,
     ) -> Self {
-        assert!(geometry < 0x8000);
-        assert!(geo_inst < 0x8000);
-        assert!(material < 0x8000);
-        assert!(mat_inst < 0x8000);
+        assert!(geometry < 0x8000 && geo_inst < 0x8000);
+        assert!(material < 0x8000 && mat_inst < 0x8000);
 
         Self {
             min,
@@ -157,11 +157,28 @@ impl SceneInstanceNode {
 #[derive(Debug)]
 pub struct InstanceInfo {
     pub bbox: BoundingBox,
-    pub surface_area: f32, // TODO: can we ever actually compute this? might be doable actually
+    pub cost: f32,
     pub geometry: u16,
-    pub material: u16,
     pub geo_inst: u16,
+    pub material: u16,
     pub mat_inst: u16,
+}
+
+#[derive(Clone, Copy)]
+struct CandidateSplit {
+    pub axis: usize,
+    pub pos: usize,
+    pub cost: f32,
+}
+
+impl CandidateSplit {
+    pub fn initial() -> Self {
+        Self {
+            axis: 0,
+            pos: 0,
+            cost: std::f32::INFINITY,
+        }
+    }
 }
 
 /// Builds an instance BVH for the scene.
@@ -179,83 +196,110 @@ impl<'a> HierarchyBuilder<'a> {
     }
 
     pub fn build(&mut self, leaves: &mut [InstanceInfo]) {
-        let total = self.build_recursive(0, leaves);
-        assert_eq!(total as usize, self.nodes.len())
+        assert_eq!(self.build_recursive(0, leaves), 0);
     }
 
-    fn build_recursive(&mut self, mut offset: u32, leaves: &mut [InstanceInfo]) -> u32 {
-        let curr = offset as usize;
-        offset += 1; // go to next
-
-        if leaves.is_empty() {
-            self.nodes[curr] = SceneInstanceNode::make_node([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0);
-
-            return offset;
+    fn build_recursive(&mut self, offset: u32, leaves: &mut [InstanceInfo]) -> u32 {
+        match leaves {
+            [] => self.build_recursive_empty(offset),
+            [leaf] => self.build_recursive_one(offset, leaf),
+            leaves => self.build_recursive_many(offset, leaves),
         }
+    }
 
-        let bbox = BoundingBox::from_extents(leaves.iter().map(|i| i.bbox));
+    fn build_recursive_empty(&mut self, offset: u32) -> u32 {
+        let is_last = offset == self.nodes.len() as u32 - 1;
 
-        if leaves.len() == 1 {
-            let leaf = &leaves[0];
+        self.nodes[offset as usize] =
+            SceneInstanceNode::make_node([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0);
 
-            self.nodes[curr] = SceneInstanceNode::make_leaf(
-                bbox.min.into(),
-                bbox.max.into(),
-                leaf.geometry,
-                leaf.geo_inst,
-                leaf.material,
-                leaf.mat_inst,
-                offset as usize == self.nodes.len(),
-            );
-
-            return offset;
+        if !is_last {
+            offset + 1
+        } else {
+            0
         }
+    }
 
-        // TODO: implement SAH heuristic here when possible (need more info from object
-        // BVHs). for now, do a median split on the largest axis
+    fn build_recursive_one(&mut self, offset: u32, leaf: &InstanceInfo) -> u32 {
+        let is_last = offset == self.nodes.len() as u32 - 1;
 
-        let split = leaves.len() / 2;
-
-        let dx = bbox.max.x - bbox.min.x;
-        let dy = bbox.max.y - bbox.min.y;
-        let dz = bbox.max.z - bbox.min.z;
-
-        let mut axis = 0;
-
-        if dx > dy && dx > dz {
-            axis = 0;
-        }
-
-        if dy > dx && dy > dz {
-            axis = 1;
-        }
-
-        if dz > dy && dz > dx {
-            axis = 2;
-        }
-
-        leaves.sort_by_key(|instance| {
-            let centroid = instance.bbox.centroid();
-
-            match axis {
-                0 => ordered_float::NotNan::new(centroid.x).unwrap(),
-                1 => ordered_float::NotNan::new(centroid.y).unwrap(),
-                2 => ordered_float::NotNan::new(centroid.z).unwrap(),
-                _ => unreachable!(),
-            }
-        });
-
-        let (lhs, rhs) = leaves.split_at_mut(split);
-
-        let lhs_offset = self.build_recursive(offset, lhs);
-        let rhs_offset = self.build_recursive(lhs_offset, rhs);
-
-        self.nodes[curr] = SceneInstanceNode::make_node(
-            bbox.min.into(),
-            bbox.max.into(),
-            (rhs_offset as u32) % (self.nodes.len() as u32),
+        self.nodes[offset as usize] = SceneInstanceNode::make_leaf(
+            leaf.bbox.min.into(),
+            leaf.bbox.max.into(),
+            leaf.geometry,
+            leaf.geo_inst,
+            leaf.material,
+            leaf.mat_inst,
+            is_last,
         );
 
-        rhs_offset
+        if !is_last {
+            offset + 1
+        } else {
+            0
+        }
+    }
+
+    fn build_recursive_many(&mut self, mut offset: u32, leaves: &mut [InstanceInfo]) -> u32 {
+        let mut best_split = CandidateSplit::initial();
+
+        for axis in 0..3 {
+            Self::sort_by_centroid_axis(leaves, axis);
+
+            for pos in 1..leaves.len() {
+                let mut lhs_bbox = BoundingBox::make_invalid_bbox();
+                let mut rhs_bbox = BoundingBox::make_invalid_bbox();
+                let mut lhs_cost = 0.0;
+                let mut rhs_cost = 0.0;
+
+                for (i, leaf) in leaves.iter().enumerate() {
+                    let weighted_cost = leaf.bbox.surface_area() * leaf.cost;
+
+                    if i < pos {
+                        lhs_bbox.extend(&leaf.bbox);
+                        lhs_cost += weighted_cost;
+                    } else {
+                        rhs_bbox.extend(&leaf.bbox);
+                        rhs_cost += weighted_cost;
+                    }
+                }
+
+                let cost = lhs_bbox.surface_area() * lhs_cost + rhs_bbox.surface_area() * rhs_cost;
+
+                if cost < best_split.cost {
+                    best_split = CandidateSplit { axis, pos, cost };
+                }
+            }
+        }
+
+        Self::sort_by_centroid_axis(leaves, best_split.axis);
+        let (lhs, rhs) = leaves.split_at_mut(best_split.pos);
+
+        let current = offset as usize;
+        offset += 1; // allocate node
+
+        offset = self.build_recursive(offset, lhs);
+        offset = self.build_recursive(offset, rhs);
+
+        if offset == self.nodes.len() as u32 {
+            offset = 0; // final node in BVH
+        }
+
+        let bbox = BoundingBox::from_extents(leaves.iter().map(|leaf| leaf.bbox));
+
+        self.nodes[current] =
+            SceneInstanceNode::make_node(bbox.min.into(), bbox.max.into(), offset);
+
+        offset
+    }
+
+    fn sort_by_centroid_axis(leaves: &mut [InstanceInfo], axis: usize) {
+        leaves.sort_unstable_by(|lhs, rhs| {
+            let lhs_centroid = lhs.bbox.max[axis] - lhs.bbox.min[axis];
+            let rhs_centroid = rhs.bbox.max[axis] - rhs.bbox.min[axis];
+
+            let ordering = lhs_centroid.partial_cmp(&rhs_centroid);
+            ordering.unwrap_or(Ordering::Less) // we assume no NaNs
+        });
     }
 }
