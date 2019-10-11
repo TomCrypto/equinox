@@ -69,7 +69,7 @@ impl ShaderBuilder {
 
     /// Finds the real position of a GLSL source line using file/line markers.
     pub fn determine_real_position(source: &str, line: u32) -> (String, u32) {
-        let pattern = Regex::new(r#"^// __POS__ ([^:]+):(\d+)$"#).unwrap();
+        let pattern = Regex::new(r#"^// __POS__ ([^:]+):([0-9]+)$"#).unwrap();
 
         let lines: Vec<&str> = source.lines().collect();
 
@@ -212,7 +212,7 @@ impl Shader {
             self.gl.compile_shader(shader);
 
             if let Some(error) = self.get_shader_build_error(shader) {
-                let pattern = Regex::new(r#"0:(\d+):"#).unwrap();
+                let pattern = Regex::new(r#"0:([0-9]+):"#).unwrap();
 
                 let error = pattern.replace_all(&error, |caps: &regex::Captures| {
                     let line: u32 = caps.get(1).unwrap().as_str().parse().unwrap();
