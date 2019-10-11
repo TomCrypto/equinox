@@ -67,8 +67,17 @@ impl Geometry {
     /// the arbitrary measure that the evaluation cost of the unit sphere is 1.
     pub fn evaluation_cost(&self) -> f32 {
         match self {
-            Self::UnitSphere => 1.0,
-            _ => 1.0,
+            Self::UnitSphere | Self::Plane { .. } => 1.0,
+            Self::UnitCube => 1.5,
+            Self::InfiniteRepetition { f, .. } => 0.5 + f.evaluation_cost(),
+            Self::Union { children } => children.iter().map(|x| 0.25 + x.evaluation_cost()).sum(),
+            Self::Intersection { children } => {
+                children.iter().map(|x| 0.5 + x.evaluation_cost()).sum()
+            }
+            Self::Subtraction { lhs, rhs } => lhs.evaluation_cost() + rhs.evaluation_cost() + 0.25,
+            Self::Scale { f, .. } => f.evaluation_cost() + 1.0,
+            Self::Translate { f, .. } => f.evaluation_cost() + 0.25,
+            Self::Round { f, .. } => f.evaluation_cost() + 0.25,
         }
     }
 
