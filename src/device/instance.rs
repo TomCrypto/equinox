@@ -9,6 +9,7 @@ use crate::{Geometry, Instance, Material};
 use itertools::izip;
 use js_sys::Error;
 use std::cmp::Ordering;
+use std::mem::swap;
 use zerocopy::{AsBytes, FromBytes};
 
 impl Device {
@@ -164,10 +165,11 @@ pub struct InstanceInfo {
     pub mat_inst: u16,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct CandidateSplit {
     pub axis: usize,
     pub pos: usize,
+    pub swap: bool,
     pub cost: f32,
 }
 
@@ -176,6 +178,7 @@ impl CandidateSplit {
         Self {
             axis: 0,
             pos: 0,
+            swap: false,
             cost: std::f32::INFINITY,
         }
     }
@@ -244,7 +247,7 @@ impl<'a> HierarchyBuilder<'a> {
         let mut best_split = CandidateSplit::initial();
 
         for axis in 0..3 {
-            Self::sort_by_centroid_axis(leaves, axis);
+            Self::sort_by_leaf_centroid_on_axis(leaves, axis);
 
             for pos in 1..leaves.len() {
                 let mut lhs_bbox = BoundingBox::for_extend();
@@ -264,16 +267,37 @@ impl<'a> HierarchyBuilder<'a> {
                     }
                 }
 
-                let cost = lhs_bbox.surface_area() * lhs_cost + rhs_bbox.surface_area() * rhs_cost;
+                let lhs_area = lhs_bbox.surface_area();
+                let rhs_area = rhs_bbox.surface_area();
+
+                lhs_cost *= lhs_area;
+                rhs_cost *= rhs_area;
+
+                let swap = lhs_area < rhs_area;
+                let cost = lhs_cost + rhs_cost;
 
                 if cost < best_split.cost {
-                    best_split = CandidateSplit { axis, pos, cost };
+                    best_split = CandidateSplit {
+                        axis,
+                        pos,
+                        swap,
+                        cost,
+                    };
                 }
             }
         }
 
-        Self::sort_by_centroid_axis(leaves, best_split.axis);
-        let (lhs, rhs) = leaves.split_at_mut(best_split.pos);
+        assert!(best_split.cost.is_finite());
+
+        Self::sort_by_leaf_centroid_on_axis(leaves, best_split.axis);
+        let (mut lhs, mut rhs) = leaves.split_at_mut(best_split.pos);
+
+        // Keep the node with the largest surface area on the left, this promotes faster
+        // traversal because the current algorithm always traverses the left node first.
+
+        if best_split.swap {
+            swap(&mut lhs, &mut rhs);
+        }
 
         let current = offset as usize;
         offset += 1; // allocate node
@@ -297,7 +321,7 @@ impl<'a> HierarchyBuilder<'a> {
         offset
     }
 
-    fn sort_by_centroid_axis(leaves: &mut [InstanceInfo], axis: usize) {
+    fn sort_by_leaf_centroid_on_axis(leaves: &mut [InstanceInfo], axis: usize) {
         leaves.sort_unstable_by(|lhs, rhs| {
             let lhs_centroid = lhs.bbox.max[axis] - lhs.bbox.min[axis];
             let rhs_centroid = rhs.bbox.max[axis] - rhs.bbox.min[axis];

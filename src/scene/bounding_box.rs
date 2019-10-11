@@ -10,15 +10,15 @@ pub struct BoundingBox {
 impl BoundingBox {
     pub fn for_extend() -> Self {
         Self {
-            min: [std::f32::NEG_INFINITY; 3].into(),
-            max: [std::f32::INFINITY; 3].into(),
+            min: [std::f32::INFINITY; 3].into(),
+            max: [std::f32::NEG_INFINITY; 3].into(),
         }
     }
 
     pub fn for_intersect() -> Self {
         Self {
-            min: [std::f32::INFINITY; 3].into(),
-            max: [std::f32::NEG_INFINITY; 3].into(),
+            min: [std::f32::NEG_INFINITY; 3].into(),
+            max: [std::f32::INFINITY; 3].into(),
         }
     }
 
@@ -60,9 +60,9 @@ impl BoundingBox {
         self.min.x = self.min.x.min(other.min.x);
         self.min.y = self.min.y.min(other.min.y);
         self.min.z = self.min.z.min(other.min.z);
-        self.max.x = self.max.x.min(other.max.x);
-        self.max.y = self.max.y.min(other.max.y);
-        self.max.z = self.max.z.min(other.max.z);
+        self.max.x = self.max.x.max(other.max.x);
+        self.max.y = self.max.y.max(other.max.y);
+        self.max.z = self.max.z.max(other.max.z);
     }
 
     pub fn intersect(&mut self, other: &BoundingBox) {
