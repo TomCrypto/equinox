@@ -91,30 +91,35 @@ impl Geometry {
             }
             // TODO: this is wrong (also we should bound repetition anyway)
             Self::InfiniteRepetition { .. } => Some(BoundingBox {
-                min: Point3::new(-100.0, -100.0, -100.0),
-                max: Point3::new(100.0, 100.0, 100.0),
+                min: Point3::new(-100.0, -2.0, -100.0),
+                max: Point3::new(100.0, 2.0, 100.0),
             }),
-            // TODO: handle errors in a nicer way here??
-            Self::Union { children } => Some(BoundingBox::union(
-                children
-                    .iter()
-                    .map(|c| c.bounding_box(symbolic_values))
-                    .collect::<Option<Vec<_>>>()?,
-            )),
-            Self::Intersection { children } => Some(BoundingBox::intersection(
-                children
-                    .iter()
-                    .map(|c| c.bounding_box(symbolic_values))
-                    .collect::<Option<Vec<_>>>()?,
-            )),
-            Self::Subtraction { lhs, rhs } => Some(BoundingBox::union(
-                [
-                    lhs.bounding_box(symbolic_values)?,
-                    rhs.bounding_box(symbolic_values)?,
-                ]
-                .iter()
-                .copied(),
-            )),
+            Self::Union { children } => {
+                let mut bbox = BoundingBox::for_extend();
+
+                for child in children {
+                    bbox.extend(&child.bounding_box(symbolic_values)?);
+                }
+
+                Some(bbox)
+            }
+            Self::Intersection { children } => {
+                let mut bbox = BoundingBox::for_intersect();
+
+                for child in children {
+                    bbox.intersect(&child.bounding_box(symbolic_values)?);
+                }
+
+                Some(bbox)
+            }
+            Self::Subtraction { lhs, rhs } => {
+                let mut bbox = BoundingBox::for_extend();
+
+                bbox.extend(&lhs.bounding_box(symbolic_values)?);
+                bbox.extend(&rhs.bounding_box(symbolic_values)?);
+
+                Some(bbox)
+            }
             Self::Scale { factor, f } => {
                 let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
 

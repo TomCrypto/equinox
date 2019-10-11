@@ -26,7 +26,7 @@ impl VertexLayout for FFTPassData {
 //  - larger radix to reduce number of iterations (not viable without compute
 //    shaders, or doing some horrible stuff with vertex shader quads)
 //  - complex-to-real/real-to-complex FFT speedups (not really worth the code
-//    complexity increase)
+//    complexity increase as it only applies to the outermost dimension)
 
 fn bilinear_interpolation(psf: &[f32], width: usize, height: usize, mut x: f32, mut y: f32) -> f32 {
     if x < 0.0 || y < 0.0 {

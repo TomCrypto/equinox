@@ -8,6 +8,20 @@ pub struct BoundingBox {
 }
 
 impl BoundingBox {
+    pub fn for_extend() -> Self {
+        Self {
+            min: [std::f32::NEG_INFINITY; 3].into(),
+            max: [std::f32::INFINITY; 3].into(),
+        }
+    }
+
+    pub fn for_intersect() -> Self {
+        Self {
+            min: [std::f32::INFINITY; 3].into(),
+            max: [std::f32::NEG_INFINITY; 3].into(),
+        }
+    }
+
     pub fn surface_area(&self) -> f32 {
         let w = self.max.x - self.min.x;
         let h = self.max.y - self.min.y;
@@ -16,10 +30,7 @@ impl BoundingBox {
         2.0 * (w + h + d)
     }
 
-    pub fn centroid(&self) -> Point3<f32> {
-        self.min + (self.max - self.min) / 2.0
-    }
-
+    // TODO: will be used for rotation
     pub fn transform(&self, xfm: impl Transform<Point3<f32>>) -> Self {
         let vertices = [
             Point3::new(self.min.x, self.min.y, self.min.z),
@@ -54,6 +65,15 @@ impl BoundingBox {
         self.max.z = self.max.z.min(other.max.z);
     }
 
+    pub fn intersect(&mut self, other: &BoundingBox) {
+        self.min.x = self.min.x.max(other.min.x);
+        self.min.y = self.min.y.max(other.min.y);
+        self.min.z = self.min.z.max(other.min.z);
+        self.max.x = self.max.x.min(other.max.x);
+        self.max.y = self.max.y.min(other.max.y);
+        self.max.z = self.max.z.min(other.max.z);
+    }
+
     pub fn union(boxes: impl IntoIterator<Item = Self>) -> Self {
         Self::from_extents(boxes)
     }
@@ -77,7 +97,7 @@ impl BoundingBox {
     }
 
     pub fn from_extents(boxes: impl IntoIterator<Item = Self>) -> Self {
-        let mut extents = Self::make_invalid_bbox();
+        let mut extents = Self::for_extend();
 
         for bbox in boxes.into_iter() {
             extents.min.x = extents.min.x.min(bbox.min.x);
@@ -89,12 +109,5 @@ impl BoundingBox {
         }
 
         extents
-    }
-
-    pub fn make_invalid_bbox() -> Self {
-        let min = Point3::new(std::f32::INFINITY, std::f32::INFINITY, std::f32::INFINITY);
-        let max = min * -1.0; // this ensures that any min/max operation updates the bbox
-
-        Self { min, max }
     }
 }

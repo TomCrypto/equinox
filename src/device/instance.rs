@@ -247,8 +247,8 @@ impl<'a> HierarchyBuilder<'a> {
             Self::sort_by_centroid_axis(leaves, axis);
 
             for pos in 1..leaves.len() {
-                let mut lhs_bbox = BoundingBox::make_invalid_bbox();
-                let mut rhs_bbox = BoundingBox::make_invalid_bbox();
+                let mut lhs_bbox = BoundingBox::for_extend();
+                let mut rhs_bbox = BoundingBox::for_extend();
                 let mut lhs_cost = 0.0;
                 let mut rhs_cost = 0.0;
 
@@ -285,7 +285,11 @@ impl<'a> HierarchyBuilder<'a> {
             offset = 0; // final node in BVH
         }
 
-        let bbox = BoundingBox::from_extents(leaves.iter().map(|leaf| leaf.bbox));
+        let mut bbox = BoundingBox::for_extend();
+
+        for leaf in leaves {
+            bbox.extend(&leaf.bbox);
+        }
 
         self.nodes[current] =
             SceneInstanceNode::make_node(bbox.min.into(), bbox.max.into(), offset);
