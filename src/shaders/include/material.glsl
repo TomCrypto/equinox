@@ -58,8 +58,16 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 
     if (dot(wo, normal) >= 0.0) {
         wi = refract(-wo, normal, 1.0 / MAT_IDEAL_REFRACTION_IOR);
+
+        if (wi == vec3(0.0)) {
+            wi = reflect(-wo, normal);
+        }
     } else {
         wi = refract(-wo, -normal, MAT_IDEAL_REFRACTION_IOR);
+
+        if (wi == vec3(0.0)) {
+            wi = reflect(-wo, -normal);
+        }
     }
 
     return MAT_IDEAL_REFRACTION_TRANSMITTANCE;
