@@ -275,5 +275,5 @@ void main() {
         }
     }
 
-    color += radiance;
+    color = radiance;
 }
