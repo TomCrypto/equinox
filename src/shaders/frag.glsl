@@ -243,7 +243,14 @@ void main() {
 
             throughput *= estimate / pdf;
 
+            if (wi == vec3(0.0)) {
+                // TODO: handle total internal reflection
+                return;
+            }
+
             ray.dir = wi;
+
+            ray.org += normal * PREC * sign(dot(ray.dir, normal));
         } else {
             // we've hit the environment map. We need to sample the environment map...
 

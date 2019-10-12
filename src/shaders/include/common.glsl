@@ -3,7 +3,7 @@ struct ray_t {
     vec3 dir;
 };
 
-#define PREC (1e-4) // general precision for interacting with the distance fields
+#define PREC (1e-3) // general precision for interacting with the distance fields
 
 #define M_PI   3.14159265359
 #define M_2PI  6.28318530718

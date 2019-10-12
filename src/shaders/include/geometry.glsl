@@ -13,9 +13,7 @@ bool ray_sdf(ray_t ray, uint geometry, uint instance, inout vec2 range) {
         // I'm not sure if this is always valid?
         float dist = abs(geometry_distance(geometry, instance, ray.org + range.x * ray.dir));
 
-        // TODO: experimental LOD optimization
-
-        if (dist < PREC * max(1.0, range.x)) {
+        if (dist < PREC * 0.1) {
             return true;
         }
 

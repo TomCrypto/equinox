@@ -184,7 +184,7 @@ impl WebScene {
         self.scene.geometry_list.push(Geometry::Translate {
             translation: [
                 Parameter::Constant { value: 0.0 },
-                Parameter::Constant { value: 0.5 },
+                Parameter::Constant { value: 0.51 },
                 Parameter::Constant { value: 0.0 },
             ],
             f: Box::new(Geometry::Scale {
@@ -196,7 +196,7 @@ impl WebScene {
         self.scene.geometry_list.push(Geometry::Translate {
             translation: [
                 Parameter::Constant { value: 0.6 },
-                Parameter::Constant { value: 0.15 },
+                Parameter::Constant { value: 0.151 },
                 Parameter::Constant { value: 0.55 },
             ],
             f: Box::new(Geometry::Round {
@@ -211,7 +211,7 @@ impl WebScene {
         self.scene.geometry_list.push(Geometry::Translate {
             translation: [
                 Parameter::Constant { value: -0.6 },
-                Parameter::Constant { value: 0.15 },
+                Parameter::Constant { value: 0.151 },
                 Parameter::Constant { value: -0.75 },
             ],
             f: Box::new(Geometry::Scale {

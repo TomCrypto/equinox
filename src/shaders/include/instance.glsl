@@ -17,8 +17,8 @@ layout (std140) uniform Instance {
 // (if not this MAY LOOP FOREVER! must be absolutely surely, provably inside the AABB)
 
 traversal_t traverse_scene(ray_t ray) {
-    traversal_t traversal = traversal_prepare(PREC * 100.0);
-    vec3 idir = vec3(1.0) / ray.dir; // precomputed inverse
+    traversal_t traversal = traversal_prepare(0.0);
+    vec3 idir = vec3(1.0) / ray.dir; // precomputed
 
     uint index = 0U;
 
@@ -62,7 +62,7 @@ bool is_ray_occluded(ray_t ray, float distance) {
         index *= uint((word1 & 0x00008000U) == 0U);
         word1 &= 0xffff7fffU; // remove cyclic bit
 
-        vec2 range = vec2(PREC * 100.0, distance);
+        vec2 range = vec2(0.0, distance);
 
         if (ray_bbox(ray.org, idir, range, node.data1.xyz, node.data2.xyz)) {
             if (word2 != 0xffffffffU && ray_sdf(ray, word1 & 0xffffU, word1 >> 16U, range)) {
