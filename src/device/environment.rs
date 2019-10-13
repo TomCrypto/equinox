@@ -57,11 +57,11 @@ impl Device {
                 LayoutVerified::<_, Header>::new_from_prefix(assets[&map.pixels].as_slice())
                     .unwrap();
 
-            if (*header).data_format.as_data_format() != Some(DataFormat::RGBA16F) {
+            if (*header).data_format.try_parse() != Some(DataFormat::RGBA16F) {
                 panic!("expected RGBA16F environment map");
             }
 
-            if (*header).color_space.as_color_space() != Some(ColorSpace::LinearSRGB) {
+            if (*header).color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
                 panic!("expected linear sRGB environment map");
             }
 
