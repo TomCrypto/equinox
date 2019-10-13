@@ -22,6 +22,7 @@ layout (std140) uniform Material {
 #define MAT_DIELECTRIC_INTERNAL_REFRACTIVE_INDEX            material_buffer.data[inst +  0U].w
 #define MAT_DIELECTRIC_EXTERNAL_EXTINCTION_COEFFICIENT      material_buffer.data[inst +  1U].xyz
 #define MAT_DIELECTRIC_EXTERNAL_REFRACTIVE_INDEX            material_buffer.data[inst +  1U].w
+#define MAT_DIELECTRIC_BASE_COLOR                           material_buffer.data[inst +  2U].xyz
 
 // Material BRDF definitions
 
@@ -143,7 +144,7 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
         wi = reflect(-wo, normal);
     }
 
-    return extinction;
+    return extinction * MAT_DIELECTRIC_BASE_COLOR;
 }
 
 // Dispatch functions

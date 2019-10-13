@@ -27,5 +27,6 @@ pub enum Material {
         external_refractive_index: f32,
         internal_extinction_coefficient: [f32; 3],
         external_extinction_coefficient: [f32; 3],
+        base_color: [f32; 3],
     },
 }

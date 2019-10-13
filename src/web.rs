@@ -243,6 +243,7 @@ impl WebScene {
             external_refractive_index: 1.0,
             internal_extinction_coefficient: [1e-7, 1e-7, 1e-7],
             external_extinction_coefficient: [0.0, 0.0, 0.0],
+            base_color: [1.0, 1.0, 1.0],
         });
 
         self.scene.instance_list.push(Instance {

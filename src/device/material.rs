@@ -26,7 +26,7 @@ pub(crate) fn material_parameter_block_count(material: &Material) -> usize {
         Material::IdealReflection { .. } => 1,
         Material::IdealRefraction { .. } => 1,
         Material::Phong { .. } => 1,
-        Material::Dielectric { .. } => 2,
+        Material::Dielectric { .. } => 3,
     }
 }
 
@@ -62,6 +62,7 @@ fn write_material_parameters(material: &Material, parameters: &mut [MaterialPara
             external_refractive_index,
             internal_extinction_coefficient,
             external_extinction_coefficient,
+            base_color,
         } => {
             parameters[0].0[0] = internal_extinction_coefficient[0];
             parameters[0].0[1] = internal_extinction_coefficient[1];
@@ -71,6 +72,9 @@ fn write_material_parameters(material: &Material, parameters: &mut [MaterialPara
             parameters[1].0[1] = external_extinction_coefficient[1];
             parameters[1].0[2] = external_extinction_coefficient[2];
             parameters[1].0[3] = *external_refractive_index;
+            parameters[2].0[0] = base_color[0];
+            parameters[2].0[1] = base_color[1];
+            parameters[2].0[2] = base_color[2];
         }
     }
 }
