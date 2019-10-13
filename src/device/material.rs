@@ -15,6 +15,7 @@ pub(crate) fn material_index(material: &Material) -> u16 {
         Material::IdealReflection { .. } => 1,
         Material::Phong { .. } => 2,
         Material::IdealRefraction { .. } => 3,
+        Material::Dielectric { .. } => 4,
     }
 }
 
@@ -25,6 +26,7 @@ pub(crate) fn material_parameter_block_count(material: &Material) -> usize {
         Material::IdealReflection { .. } => 1,
         Material::IdealRefraction { .. } => 1,
         Material::Phong { .. } => 1,
+        Material::Dielectric { .. } => 2,
     }
 }
 
@@ -54,6 +56,21 @@ fn write_material_parameters(material: &Material, parameters: &mut [MaterialPara
             parameters[0].0[1] = albedo[1];
             parameters[0].0[2] = albedo[2];
             parameters[0].0[3] = *shininess;
+        }
+        Material::Dielectric {
+            internal_refractive_index,
+            external_refractive_index,
+            internal_extinction_coefficient,
+            external_extinction_coefficient,
+        } => {
+            parameters[0].0[0] = internal_extinction_coefficient[0];
+            parameters[0].0[1] = internal_extinction_coefficient[1];
+            parameters[0].0[2] = internal_extinction_coefficient[2];
+            parameters[0].0[3] = *internal_refractive_index;
+            parameters[1].0[0] = external_extinction_coefficient[0];
+            parameters[1].0[1] = external_extinction_coefficient[1];
+            parameters[1].0[2] = external_extinction_coefficient[2];
+            parameters[1].0[3] = *external_refractive_index;
         }
     }
 }

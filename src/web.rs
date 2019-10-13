@@ -233,9 +233,16 @@ impl WebScene {
             albedo: [0.9, 0.1, 0.1],
         });
 
-        self.scene.material_list.push(Material::IdealRefraction {
+        /*self.scene.material_list.push(Material::IdealRefraction {
             transmittance: [0.6, 0.7, 1.0],
             refractive_index: 1.65,
+        });*/
+
+        self.scene.material_list.push(Material::Dielectric {
+            internal_refractive_index: 1.65,
+            external_refractive_index: 1.0,
+            internal_extinction_coefficient: [1e-7, 1e-7, 1e-7],
+            external_extinction_coefficient: [0.0, 0.0, 0.0],
         });
 
         self.scene.instance_list.push(Instance {

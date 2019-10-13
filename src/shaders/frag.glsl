@@ -239,7 +239,7 @@ void main() {
             vec3 wo = -ray.dir;
             vec3 wi;
 
-            vec3 estimate = mat_sample_brdf(material, inst, normal, wi, wo, pdf, random);
+            vec3 estimate = mat_sample_brdf(material, inst, normal, wi, wo, traversal.range.y, pdf, random);
 
             throughput *= estimate / pdf;
 

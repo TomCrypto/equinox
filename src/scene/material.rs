@@ -22,4 +22,10 @@ pub enum Material {
         albedo: [f32; 3],
         shininess: f32,
     },
+    Dielectric {
+        internal_refractive_index: f32,
+        external_refractive_index: f32,
+        internal_extinction_coefficient: [f32; 3],
+        external_extinction_coefficient: [f32; 3],
+    },
 }
