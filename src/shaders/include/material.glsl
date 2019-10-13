@@ -1,7 +1,7 @@
 #include <random.glsl>
 
 layout (std140) uniform Material {
-    vec4 data[64];
+    vec4 data[MATERIAL_DATA_COUNT];
 } material_buffer;
 
 // Material parameter packing

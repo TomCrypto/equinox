@@ -77,6 +77,10 @@ impl Device {
             start += count;
         }
 
+        assert!(parameters.len() <= self.material_buffer.max_len());
         self.material_buffer.write_array(&parameters);
+        self.program
+            .frag_shader()
+            .set_define("MATERIAL_DATA_COUNT", self.material_buffer.element_count());
     }
 }

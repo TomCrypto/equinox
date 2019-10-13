@@ -1,5 +1,5 @@
 layout (std140) uniform Geometry {
-    vec4 data[64];
+    vec4 data[GEOMETRY_DATA_COUNT];
 } geometry_buffer;
 
 float geometry_distance(uint geometry, uint inst, vec3 p);

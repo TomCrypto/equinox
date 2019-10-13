@@ -6,7 +6,7 @@ struct BvhNode {
 };
 
 layout (std140) uniform Instance {
-    BvhNode data[256];
+    BvhNode data[INSTANCE_DATA_COUNT];
 } instance_buffer;
 
 // NOTE: this algorithm now actually works whichever starting offset you use, as long as the

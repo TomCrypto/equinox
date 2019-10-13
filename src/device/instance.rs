@@ -59,9 +59,11 @@ impl Device {
 
         HierarchyBuilder::new(&mut nodes).build(&mut instance_info);
 
+        assert!(nodes.len() <= self.instance_buffer.max_len());
         self.instance_buffer.write_array(&nodes);
-
-        // update the geometry data
+        self.program
+            .frag_shader()
+            .set_define("INSTANCE_DATA_COUNT", self.instance_buffer.element_count());
 
         // This implements parameter renumbering to ensure that all memory accesses in
         // the parameter array are coherent and that all fields are nicely packed into
@@ -93,7 +95,11 @@ impl Device {
             }
         }
 
+        assert!(params.len() <= self.geometry_buffer.max_len());
         self.geometry_buffer.write_array(&params);
+        self.program
+            .frag_shader()
+            .set_define("GEOMETRY_DATA_COUNT", self.geometry_buffer.element_count());
 
         Ok(())
     }

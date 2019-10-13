@@ -163,6 +163,10 @@ export default class App extends Vue {
       return;
     }
 
+    if (event.movementX === 0 && event.movementY === 0) {
+      return;
+    }
+
     this.phi += -event.movementX * 0.001;
     this.theta += event.movementY * 0.001;
 

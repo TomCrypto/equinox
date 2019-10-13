@@ -86,7 +86,7 @@ impl Device {
             fft_shader: Shader::new(
                 gl.clone(),
                 ShaderBuilder::new(shaders::VS_FFT_PASS),
-                ShaderBuilder::new(shaders::FFT),
+                ShaderBuilder::new(shaders::FS_FFT_PASS),
                 hashmap! {
                     "r_conv_buffer" => BindingPoint::Texture(0),
                     "g_conv_buffer" => BindingPoint::Texture(1),
@@ -133,12 +133,9 @@ impl Device {
                 },
             ),
             camera_buffer: UniformBuffer::new(gl.clone()),
-            geometry_buffer: UniformBuffer::new_array(gl.clone(), 64),
-            material_buffer: UniformBuffer::new_array(gl.clone(), 256),
-            // TODO: get these from the shader?? (not really easily doable I think)
-            //  -> #define them in the shader from some shared value obtained from the WebGL
-            // context!
-            instance_buffer: UniformBuffer::new_array(gl.clone(), 256),
+            geometry_buffer: UniformBuffer::new(gl.clone()),
+            material_buffer: UniformBuffer::new(gl.clone()),
+            instance_buffer: UniformBuffer::new(gl.clone()),
             raster_buffer: UniformBuffer::new(gl.clone()),
             display_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
