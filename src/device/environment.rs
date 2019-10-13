@@ -47,9 +47,9 @@ impl Device {
         environment: &Environment,
     ) {
         if environment.map.is_some() {
-            self.program.frag_shader().set_define("HAS_ENVMAP", 1);
+            self.program.set_define("HAS_ENVMAP", 1);
         } else {
-            self.program.frag_shader().set_define("HAS_ENVMAP", 0);
+            self.program.set_define("HAS_ENVMAP", 0);
         }
 
         if let Some(map) = &environment.map {

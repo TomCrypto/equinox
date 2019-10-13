@@ -77,16 +77,21 @@ impl Device {
             fft_pass_data: VertexArray::new(gl.clone()),
             load_convolution_buffers_shader: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VS_FULLSCREEN),
-                ShaderBuilder::new(shaders::FS_LOAD_CONVOLUTION_BUFFERS),
+                shaders::VS_FULLSCREEN,
+                shaders::FS_LOAD_CONVOLUTION_BUFFERS,
                 hashmap! {
                     "image" => BindingPoint::Texture(0),
+                },
+                hashmap! {},
+                hashmap! {
+                    "CONV_DIMS" => "vec2(0.0, 0.0)",
+                    "IMAGE_DIMS" => "vec2(0.0, 0.0)",
                 },
             ),
             fft_shader: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VS_FFT_PASS),
-                ShaderBuilder::new(shaders::FS_FFT_PASS),
+                shaders::VS_FFT_PASS,
+                shaders::FS_FFT_PASS,
                 hashmap! {
                     "r_conv_buffer" => BindingPoint::Texture(0),
                     "g_conv_buffer" => BindingPoint::Texture(1),
@@ -95,22 +100,29 @@ impl Device {
                     "g_conv_filter" => BindingPoint::Texture(4),
                     "b_conv_filter" => BindingPoint::Texture(5),
                 },
+                hashmap! {},
+                hashmap! {},
             ),
             read_convolution_buffers_shader: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VS_FULLSCREEN),
-                ShaderBuilder::new(shaders::FS_READ_CONVOLUTION_BUFFERS),
+                shaders::VS_FULLSCREEN,
+                shaders::FS_READ_CONVOLUTION_BUFFERS,
                 hashmap! {
                     "r_conv_buffer" => BindingPoint::Texture(0),
                     "g_conv_buffer" => BindingPoint::Texture(1),
                     "b_conv_buffer" => BindingPoint::Texture(2),
                     "source" => BindingPoint::Texture(3),
                 },
+                hashmap! {},
+                hashmap! {
+                    "CONV_DIMS" => "vec2(0.0, 0.0)",
+                    "IMAGE_DIMS" => "vec2(0.0, 0.0)",
+                },
             ),
             program: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VS_FULLSCREEN),
-                ShaderBuilder::new(shaders::FRAG),
+                shaders::VS_FULLSCREEN,
+                shaders::FRAG,
                 hashmap! {
                     "Camera" => BindingPoint::UniformBlock(0),
                     "Instance" => BindingPoint::UniformBlock(4),
@@ -122,15 +134,26 @@ impl Device {
                     "envmap_marginal_cdf" => BindingPoint::Texture(2),
                     "envmap_conditional_cdfs" => BindingPoint::Texture(3),
                 },
+                hashmap! {
+                    "geometry-user.glsl" => "",
+                },
+                hashmap! {
+                    "HAS_ENVMAP" => "0",
+                    "INSTANCE_DATA_COUNT" => "0",
+                    "GEOMETRY_DATA_COUNT" => "0",
+                    "MATERIAL_DATA_COUNT" => "0",
+                },
             ),
             present_program: Shader::new(
                 gl.clone(),
-                ShaderBuilder::new(shaders::VS_FULLSCREEN),
-                ShaderBuilder::new(shaders::PRESENT),
+                shaders::VS_FULLSCREEN,
+                shaders::PRESENT,
                 hashmap! {
                     "samples" => BindingPoint::Texture(0),
                     "Display" => BindingPoint::UniformBlock(0),
                 },
+                hashmap! {},
+                hashmap! {},
             ),
             camera_buffer: UniformBuffer::new(gl.clone()),
             geometry_buffer: UniformBuffer::new(gl.clone()),
@@ -196,7 +219,7 @@ impl Device {
                 ));
             }
 
-            self.program.frag_shader().set_header(
+            self.program.set_header(
                 "geometry-user.glsl",
                 generator.generate(&geometry_functions),
             );
@@ -245,34 +268,28 @@ impl Device {
             // Configure the shaders with the desired resolutions...
 
             self.load_convolution_buffers_shader
-                .frag_shader()
                 .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
 
-            self.load_convolution_buffers_shader
-                .frag_shader()
-                .set_define(
-                    "IMAGE_DIMS",
-                    format!(
-                        "vec2({:+e}, {:+e})",
-                        raster.width.get() as f32,
-                        raster.height.get() as f32
-                    ),
-                );
+            self.load_convolution_buffers_shader.set_define(
+                "IMAGE_DIMS",
+                format!(
+                    "vec2({:+e}, {:+e})",
+                    raster.width.get() as f32,
+                    raster.height.get() as f32
+                ),
+            );
 
             self.read_convolution_buffers_shader
-                .frag_shader()
                 .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
 
-            self.read_convolution_buffers_shader
-                .frag_shader()
-                .set_define(
-                    "IMAGE_DIMS",
-                    format!(
-                        "vec2({:+e}, {:+e})",
-                        raster.width.get() as f32,
-                        raster.height.get() as f32
-                    ),
-                );
+            self.read_convolution_buffers_shader.set_define(
+                "IMAGE_DIMS",
+                format!(
+                    "vec2({:+e}, {:+e})",
+                    raster.width.get() as f32,
+                    raster.height.get() as f32
+                ),
+            );
 
             self.rspectrum_temp1.create(2048, 1024);
             self.gspectrum_temp1.create(2048, 1024);

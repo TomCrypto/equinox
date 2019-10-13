@@ -10,82 +10,6 @@ use web_sys::{
     WebGlVertexArrayObject,
 };
 
-#[derive(Debug)]
-pub struct ShaderBuilder {
-    headers: HashMap<&'static str, String>,
-    defines: HashMap<&'static str, String>,
-    source: &'static str,
-}
-
-impl ShaderBuilder {
-    pub fn new(source: &'static str) -> Self {
-        Self {
-            source,
-            headers: HashMap::new(),
-            defines: HashMap::new(),
-        }
-    }
-
-    pub fn set_header(&mut self, name: &'static str, header: impl ToString) {
-        self.headers.insert(name, header.to_string());
-    }
-
-    pub fn set_define(&mut self, name: &'static str, define: impl ToString) {
-        self.defines.insert(name, define.to_string());
-    }
-
-    /// Returns the final GLSL shader source.
-    pub fn generate_source(&self) -> String {
-        let pattern = Regex::new(r#"^#include <([[:graph:]]*)>$"#).unwrap();
-
-        let mut source = String::from("#version 300 es\nprecision highp float;\n");
-        source.reserve(self.source.len()); // avoid unnecessary data reallocations
-
-        for (name, value) in &self.defines {
-            source += "#define ";
-            source += name;
-            source += " (";
-            source += value;
-            source += ")\n";
-        }
-
-        for line in self.source.lines() {
-            if let Some(captures) = pattern.captures(line) {
-                let header = captures.get(1).unwrap().as_str();
-
-                if let Some(code) = self.headers.get(header) {
-                    source += code;
-                    source += "\n";
-                    continue;
-                }
-            }
-
-            source += line;
-            source += "\n";
-        }
-
-        source
-    }
-
-    /// Finds the real position of a GLSL source line using file/line markers.
-    pub fn determine_real_position(source: &str, line: u32) -> (String, u32) {
-        let pattern = Regex::new(r#"^// __POS__ ([^:]+):([0-9]+)$"#).unwrap();
-
-        let lines: Vec<&str> = source.lines().collect();
-
-        for index in (0..line).rev() {
-            if let Some(captures) = pattern.captures(lines[index as usize]) {
-                return (
-                    captures.get(1).unwrap().as_str().to_owned(),
-                    captures.get(2).unwrap().as_str().parse::<u32>().unwrap() + line - index - 1,
-                );
-            }
-        }
-
-        (String::from("<unknown>"), 0)
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub enum BindingPoint {
     Texture(u32),
@@ -97,42 +21,59 @@ pub struct Shader {
     gl: Context,
     invalidated: bool,
     handle: Option<WebGlProgram>,
-    vertex: ShaderBuilder,
-    fragment: ShaderBuilder,
+    vertex: &'static str,
+    fragment: &'static str,
 
     binds: HashMap<&'static str, BindingPoint>,
+
+    headers: HashMap<&'static str, String>,
+    defines: HashMap<&'static str, String>,
 }
 
 impl Shader {
     pub fn new(
         gl: Context,
-        vertex: ShaderBuilder,
-        fragment: ShaderBuilder,
+        vertex: &'static str,
+        fragment: &'static str,
         binds: HashMap<&'static str, BindingPoint>,
+        default_headers: HashMap<&'static str, &str>,
+        default_defines: HashMap<&'static str, &str>,
     ) -> Self {
+        let mut headers = HashMap::new();
+        let mut defines = HashMap::new();
+
+        for (k, v) in default_headers {
+            headers.insert(k, v.to_owned());
+        }
+
+        for (k, v) in default_defines {
+            defines.insert(k, v.to_owned());
+        }
+
         Self {
             gl,
             handle: None,
             vertex,
             fragment,
             binds,
+            headers,
+            defines,
             invalidated: true,
         }
     }
 
-    // as soon as you touch those, the handle is lost?
-    // we always need to rebuild the shader inside the update, otherwise we've lost
-    // the opportunity to do it unfortunately. so it has to be done inline
-    // really
+    pub fn set_header(&mut self, header: &'static str, value: impl ToString) {
+        assert!(self.headers.contains_key(header));
 
-    pub fn vert_shader(&mut self) -> &mut ShaderBuilder {
+        self.headers.insert(header, value.to_string());
         self.invalidated = true;
-        &mut self.vertex
     }
 
-    pub fn frag_shader(&mut self) -> &mut ShaderBuilder {
+    pub fn set_define(&mut self, define: &'static str, value: impl ToString) {
+        assert!(self.defines.contains_key(define));
+
+        self.defines.insert(define, value.to_string());
         self.invalidated = true;
-        &mut self.fragment
     }
 
     pub fn begin_draw(&self) -> DrawCommand {
@@ -198,15 +139,11 @@ impl Shader {
         }
     }
 
-    fn compile_shader(
-        &self,
-        kind: u32,
-        source: &ShaderBuilder,
-    ) -> Result<Option<WebGlShader>, Error> {
+    fn compile_shader(&self, kind: u32, source: &str) -> Result<Option<WebGlShader>, Error> {
         let shader = self.gl.create_shader(kind);
 
         if let Some(shader) = &shader {
-            let glsl_source = source.generate_source();
+            let glsl_source = Self::generate_source(source, &self.headers, &self.defines);
 
             self.gl.shader_source(shader, &glsl_source);
             self.gl.compile_shader(shader);
@@ -217,7 +154,7 @@ impl Shader {
                 let error = pattern.replace_all(&error, |caps: &regex::Captures| {
                     let line: u32 = caps.get(1).unwrap().as_str().parse().unwrap();
 
-                    let (file, line) = ShaderBuilder::determine_real_position(&glsl_source, line);
+                    let (file, line) = Self::determine_real_position(&glsl_source, line);
 
                     format!("{}:{}:", file, line)
                 });
@@ -288,6 +225,60 @@ impl Shader {
             Some(String::from("unknown program linking error"))
         }
     }
+
+    fn generate_source(
+        glsl_source: &str,
+        headers: &HashMap<&'static str, String>,
+        defines: &HashMap<&'static str, String>,
+    ) -> String {
+        let pattern = Regex::new(r#"^#include <([[:graph:]]*)>$"#).unwrap();
+
+        let mut source = String::from("#version 300 es\nprecision highp float;\n");
+        source.reserve(glsl_source.len()); // avoid unnecessary data reallocations
+
+        for (name, value) in defines {
+            source += "#define ";
+            source += name;
+            source += " (";
+            source += value;
+            source += ")\n";
+        }
+
+        for line in glsl_source.lines() {
+            if let Some(captures) = pattern.captures(line) {
+                let header = captures.get(1).unwrap().as_str();
+
+                if let Some(code) = headers.get(header) {
+                    source += code;
+                    source += "\n";
+                    continue;
+                }
+            }
+
+            source += line;
+            source += "\n";
+        }
+
+        source
+    }
+
+    /// Finds the position of a GLSL source line through file/line markers.
+    fn determine_real_position(source: &str, line: u32) -> (String, u32) {
+        let pattern = Regex::new(r#"^// __POS__ ([^:]+):([0-9]+)$"#).unwrap();
+
+        let lines: Vec<&str> = source.lines().collect();
+
+        for index in (0..line).rev() {
+            if let Some(captures) = pattern.captures(lines[index as usize]) {
+                return (
+                    captures.get(1).unwrap().as_str().to_owned(),
+                    captures.get(2).unwrap().as_str().parse::<u32>().unwrap() + line - index - 1,
+                );
+            }
+        }
+
+        (String::from("<unknown>"), 0)
+    }
 }
 
 #[derive(Debug)]
@@ -326,8 +317,6 @@ impl<'a> DrawCommand<'a> {
             BindTarget::Texture(handle) => self.bind_texture(handle, slot),
         }
     }
-
-    // other things
 
     pub fn set_viewport(&self, x: i32, y: i32, w: i32, h: i32) {
         self.shader.gl.viewport(x, y, w, h);

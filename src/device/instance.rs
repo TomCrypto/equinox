@@ -62,7 +62,6 @@ impl Device {
         assert!(nodes.len() <= self.instance_buffer.max_len());
         self.instance_buffer.write_array(&nodes);
         self.program
-            .frag_shader()
             .set_define("INSTANCE_DATA_COUNT", self.instance_buffer.element_count());
 
         // This implements parameter renumbering to ensure that all memory accesses in
@@ -98,7 +97,6 @@ impl Device {
         assert!(params.len() <= self.geometry_buffer.max_len());
         self.geometry_buffer.write_array(&params);
         self.program
-            .frag_shader()
             .set_define("GEOMETRY_DATA_COUNT", self.geometry_buffer.element_count());
 
         Ok(())
