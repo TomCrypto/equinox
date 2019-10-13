@@ -39,15 +39,15 @@ impl GeometryGlslGenerator {
 
         for (index, (distance, _)) in geometries.iter().enumerate() {
             code.push(format!("    case {}U:", index));
-            code.push(format!("      while (range.x <= range.y) {{"));
+            code.push("      while (range.x <= range.y) {{".to_owned());
             code.push(format!(
                 "        float dist = abs({});",
                 distance.call("ray.org + range.x * ray.dir")
             ));
-            code.push(format!("        if (dist < PREC * 0.1) {{ return true; }}"));
-            code.push(format!("        range.x += dist;"));
-            code.push(format!("      }}"));
-            code.push(format!("      break;"));
+            code.push("        if (dist < PREC * 0.1) {{ return true; }}".to_owned());
+            code.push("        range.x += dist;".to_owned());
+            code.push("      }}".to_owned());
+            code.push("      break;".to_owned());
         }
 
         code.push("    default:".to_owned());
