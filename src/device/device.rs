@@ -200,7 +200,7 @@ impl Device {
         let mut invalidated = false;
 
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
-            self.update_camera(camera);
+            self.update_camera(camera)?;
 
             Ok(())
         })?;
@@ -230,7 +230,7 @@ impl Device {
         })?;
 
         invalidated |= Dirty::clean(&mut scene.material_list, |materials| {
-            self.update_materials(materials);
+            self.update_materials(materials)?;
 
             Dirty::dirty(instances);
 
@@ -255,7 +255,7 @@ impl Device {
         })?;
 
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
-            self.update_raster(raster);
+            self.update_raster(raster)?;
 
             self.samples
                 .create(raster.width.get() as usize, raster.height.get() as usize);
@@ -345,7 +345,7 @@ impl Device {
         // transport simulation, so we don't need to invalidate the render buffer here.
 
         Dirty::clean(&mut scene.display, |display| {
-            self.update_display(display);
+            self.update_display(display)?;
 
             Ok(())
         })?;
@@ -532,7 +532,11 @@ impl DeviceState {
         data.frame_state[1] = self.rng.next_u32();
         data.frame_state[2] = self.frame;
 
-        buffer.write(&data);
+        // TODO: we can't actually handle this as it's in the render loop, but it won't
+        // fail because the global data is sufficiently small; formalize this
+        // somehow.
+
+        buffer.write(&data).unwrap();
 
         self.frame += 1;
     }

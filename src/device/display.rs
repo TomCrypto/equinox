@@ -1,5 +1,6 @@
 use crate::Device;
 use crate::Display;
+use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]
@@ -13,7 +14,7 @@ pub struct DisplayData {
 }
 
 impl Device {
-    pub(crate) fn update_display(&mut self, display: &Display) {
+    pub(crate) fn update_display(&mut self, display: &Display) -> Result<(), Error> {
         let data: &mut DisplayData = self.allocator.allocate_one();
 
         data.exposure = (2.0f32).powf(display.exposure);
@@ -31,6 +32,6 @@ impl Device {
             data.has_camera_response = 0;
         }
 
-        self.display_buffer.write(data);
+        self.display_buffer.write(data)
     }
 }

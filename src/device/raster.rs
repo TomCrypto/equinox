@@ -1,5 +1,6 @@
 use crate::Device;
 use crate::Raster;
+use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]
@@ -12,7 +13,7 @@ pub struct RasterData {
 }
 
 impl Device {
-    pub(crate) fn update_raster(&mut self, raster: &Raster) {
+    pub(crate) fn update_raster(&mut self, raster: &Raster) -> Result<(), Error> {
         let data: &mut RasterData = self.allocator.allocate_one();
 
         data.width = raster.width.get() as f32;
@@ -20,6 +21,6 @@ impl Device {
         data.inv_width = 1.0 / data.width;
         data.inv_height = 1.0 / data.height;
 
-        self.raster_buffer.write(data);
+        self.raster_buffer.write(data)
     }
 }

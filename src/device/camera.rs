@@ -3,6 +3,7 @@ use crate::{ApertureShape, Camera};
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Point3};
 use itertools::iproduct;
+use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]
@@ -14,7 +15,7 @@ pub struct CameraData {
 }
 
 impl Device {
-    pub(crate) fn update_camera(&mut self, camera: &Camera) {
+    pub(crate) fn update_camera(&mut self, camera: &Camera) -> Result<(), Error> {
         let data: &mut CameraData = self.allocator.allocate_one();
 
         let fov_tan = camera.film_height / (2.0 * camera.focal_length);
@@ -51,7 +52,7 @@ impl Device {
 
         data.aperture_settings = aperture_settings(&camera.aperture);
 
-        self.camera_buffer.write(data);
+        self.camera_buffer.write(data)
     }
 }
 
