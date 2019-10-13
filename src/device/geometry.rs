@@ -31,20 +31,32 @@ impl GeometryGlslGenerator {
             code.push(function);
         }
 
-        code.push("float geometry_distance(uint geometry, uint inst, vec3 p) {".to_owned());
+        code.push(
+            "bool geo_intersect(uint geometry, uint inst, ray_t ray, inout vec2 range) {"
+                .to_owned(),
+        );
         code.push("  switch (geometry) {".to_owned());
 
         for (index, (distance, _)) in geometries.iter().enumerate() {
             code.push(format!("    case {}U:", index));
-            code.push(format!("      return {};", distance.call("p")));
+            code.push(format!("      while (range.x <= range.y) {{"));
+            code.push(format!(
+                "        float dist = abs({});",
+                distance.call("ray.org + range.x * ray.dir")
+            ));
+            code.push(format!("        if (dist < PREC * 0.1) {{ return true; }}"));
+            code.push(format!("        range.x += dist;"));
+            code.push(format!("      }}"));
+            code.push(format!("      break;"));
         }
 
         code.push("    default:".to_owned());
-        code.push("      return 0.0;".to_owned());
+        code.push("      return false;".to_owned());
         code.push("  }".to_owned());
+        code.push("  return false;".to_owned());
         code.push("}".to_owned());
 
-        code.push("vec3 geometry_normal(uint geometry, uint inst, vec3 p) {".to_owned());
+        code.push("vec3 geo_normal(uint geometry, uint inst, vec3 p) {".to_owned());
         code.push("  switch (geometry) {".to_owned());
 
         for (index, (distance, normal)) in geometries.iter().enumerate() {
@@ -63,6 +75,8 @@ impl GeometryGlslGenerator {
         code.push("      return vec3(0.0);".to_owned());
         code.push("  }".to_owned());
         code.push("}".to_owned());
+
+        log::info!("{:?}", code);
 
         format!("{}\n", code.join("\n"))
     }
@@ -333,7 +347,7 @@ pub struct DistanceFn {
 
 impl DistanceFn {
     pub fn name(&self) -> String {
-        format!("geometry_distance_{}", self.id)
+        format!("geo_distance_{}", self.id)
     }
 
     pub fn call(&self, point: impl Display) -> String {
@@ -357,7 +371,7 @@ pub struct NormalFn {
 
 impl NormalFn {
     pub fn name(&self) -> String {
-        format!("geometry_normal_{}", self.id)
+        format!("geo_normal_{}", self.id)
     }
 
     pub fn call(&self, point: impl Display) -> String {

@@ -34,7 +34,7 @@ traversal_t traverse_scene(ray_t ray) {
         vec2 range = traversal.range;
 
         if (ray_bbox(ray.org, idir, range, node.data1.xyz, node.data2.xyz)) {
-            if (word2 != 0xffffffffU && ray_sdf(ray, word1 & 0xffffU, word1 >> 16U, range)) {
+            if (word2 != 0xffffffffU && geo_intersect(word1 & 0xffffU, word1 >> 16U, ray, range)) {
                 traversal_record_hit(traversal, range.x, uvec2(word1, word2));
             }
         } else if (word2 == 0xffffffffU) {
@@ -65,7 +65,7 @@ bool is_ray_occluded(ray_t ray, float distance) {
         vec2 range = vec2(0.0, distance);
 
         if (ray_bbox(ray.org, idir, range, node.data1.xyz, node.data2.xyz)) {
-            if (word2 != 0xffffffffU && ray_sdf(ray, word1 & 0xffffU, word1 >> 16U, range)) {
+            if (word2 != 0xffffffffU && geo_intersect(word1 & 0xffffU, word1 >> 16U, ray, range)) {
                 return true;
             }
         } else if (word2 == 0xffffffffU) {

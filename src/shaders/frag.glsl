@@ -229,7 +229,7 @@ void main() {
         if (traversal_has_hit(traversal)) {
             ray.org += ray.dir * traversal.range.y;
 
-            vec3 normal = geometry_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
+            vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
 
             uint material = traversal.hit.y & 0xffffU;
             uint inst = traversal.hit.y >> 16U;
