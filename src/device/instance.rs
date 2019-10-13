@@ -59,8 +59,7 @@ impl Device {
 
         HierarchyBuilder::new(&mut nodes).build(&mut instance_info);
 
-        assert!(nodes.len() <= self.instance_buffer.max_len());
-        self.instance_buffer.write_array(&nodes);
+        self.instance_buffer.write_array(&nodes)?;
         self.program
             .set_define("INSTANCE_DATA_COUNT", self.instance_buffer.element_count());
 
@@ -94,8 +93,7 @@ impl Device {
             }
         }
 
-        assert!(params.len() <= self.geometry_buffer.max_len());
-        self.geometry_buffer.write_array(&params);
+        self.geometry_buffer.write_array(&params)?;
         self.program
             .set_define("GEOMETRY_DATA_COUNT", self.geometry_buffer.element_count());
 

@@ -3,6 +3,7 @@ use log::{debug, info, warn};
 
 use crate::Device;
 use crate::Material;
+use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
@@ -80,7 +81,7 @@ fn write_material_parameters(material: &Material, parameters: &mut [MaterialPara
 }
 
 impl Device {
-    pub(crate) fn update_materials(&mut self, materials: &[Material]) {
+    pub(crate) fn update_materials(&mut self, materials: &[Material]) -> Result<(), Error> {
         let mut block_count = 0;
 
         for material in materials {
@@ -98,9 +99,10 @@ impl Device {
             start += count;
         }
 
-        assert!(parameters.len() <= self.material_buffer.max_len());
-        self.material_buffer.write_array(&parameters);
+        self.material_buffer.write_array(&parameters)?;
         self.program
             .set_define("MATERIAL_DATA_COUNT", self.material_buffer.element_count());
+
+        Ok(())
     }
 }

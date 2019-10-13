@@ -2,6 +2,7 @@
 use log::{debug, info, warn};
 
 use crate::{AsBindTarget, BindTarget};
+use js_sys::Error;
 use std::marker::PhantomData;
 use std::mem::size_of;
 use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer};
@@ -26,9 +27,9 @@ pub struct UniformBuffer<T: ?Sized> {
 }
 
 impl<T: AsBytes + FromBytes> UniformBuffer<[T]> {
-    pub fn write_array(&mut self, contents: &[T]) {
+    pub fn write_array(&mut self, contents: &[T]) -> Result<(), Error> {
         if self.len != contents.len() || self.handle.is_none() {
-            self.create_and_allocate(size_of::<T>() * contents.len().max(1));
+            self.create_and_allocate(size_of::<T>() * contents.len().max(1))?;
             self.len = contents.len().max(1);
         }
 
@@ -40,24 +41,15 @@ impl<T: AsBytes + FromBytes> UniformBuffer<[T]> {
             0,
             contents.as_bytes(),
         );
-    }
 
-    pub fn max_len(&self) -> usize {
-        (self
-            .gl
-            .get_parameter(Context::MAX_UNIFORM_BLOCK_SIZE)
-            .unwrap()
-            .as_f64()
-            .unwrap() as usize
-            * 4)
-            / size_of::<T>()
+        Ok(())
     }
 }
 
 impl<T: AsBytes + FromBytes> UniformBuffer<T> {
-    pub fn write(&mut self, contents: &T) {
+    pub fn write(&mut self, contents: &T) -> Result<(), Error> {
         if self.len != 1 || self.handle.is_none() {
-            self.create_and_allocate(size_of::<T>());
+            self.create_and_allocate(size_of::<T>())?;
             self.len = 1;
         }
 
@@ -69,6 +61,8 @@ impl<T: AsBytes + FromBytes> UniformBuffer<T> {
             0,
             contents.as_bytes(),
         );
+
+        Ok(())
     }
 }
 
@@ -90,7 +84,11 @@ impl<T: ?Sized> UniformBuffer<T> {
         self.len
     }
 
-    fn create_and_allocate(&mut self, size: usize) {
+    fn create_and_allocate(&mut self, size: usize) -> Result<(), Error> {
+        if size > self.maximum_size() {
+            return Err(Error::new("UBO size limit exceeded"));
+        }
+
         if let Some(buffer_handle) = &self.handle {
             self.gl.delete_buffer(Some(buffer_handle));
         }
@@ -101,6 +99,18 @@ impl<T: ?Sized> UniformBuffer<T> {
             .bind_buffer(Context::UNIFORM_BUFFER, self.handle.as_ref());
         self.gl
             .buffer_data_with_i32(Context::UNIFORM_BUFFER, size as i32, Context::STATIC_DRAW);
+
+        Ok(())
+    }
+
+    fn maximum_size(&self) -> usize {
+        (self
+            .gl
+            .get_parameter(Context::MAX_UNIFORM_BLOCK_SIZE)
+            .unwrap()
+            .as_f64()
+            .unwrap() as usize
+            * 4)
     }
 }
 
