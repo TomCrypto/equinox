@@ -265,25 +265,25 @@ impl WebScene {
         self.scene.instance_list.push(Instance {
             geometry: 0,
             material: 0,
-            geometry_values: vec![],
+            parameters: vec![],
         });
 
         self.scene.instance_list.push(Instance {
             geometry: 1,
             material: 1,
-            geometry_values: vec![],
+            parameters: vec![],
         });
 
         self.scene.instance_list.push(Instance {
             geometry: 2,
             material: 2,
-            geometry_values: vec![],
+            parameters: vec![],
         });
 
         self.scene.instance_list.push(Instance {
             geometry: 3,
             material: 3,
-            geometry_values: vec![],
+            parameters: vec![],
         });
 
         self.scene.camera.position.x = 0.0;

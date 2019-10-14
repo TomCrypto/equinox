@@ -38,8 +38,8 @@ impl Device {
             let material = &material_list[instance.material];
 
             let bbox = geometry
-                .bounding_box(&instance.geometry_values)
-                .ok_or_else(|| Error::new("bad geometry values"))?;
+                .bounding_box(&instance.parameters)
+                .ok_or_else(|| Error::new("bad instance parameters"))?;
 
             instance_info.push(InstanceInfo {
                 bbox,
@@ -50,7 +50,7 @@ impl Device {
                 mat_inst: material_start[instance.material],
             });
 
-            geometry_start += (instance.geometry_values.len() as u16 + 3) / 4;
+            geometry_start += (instance.parameters.len() as u16 + 3) / 4;
         }
 
         let node_count = HierarchyBuilder::node_count_for_leaves(instance_list.len());
@@ -75,7 +75,7 @@ impl Device {
 
         let geometry_parameter_count: usize = instance_list
             .iter()
-            .map(|inst| (inst.geometry_values.len() + 3) / 4)
+            .map(|inst| (inst.parameters.len() + 3) / 4)
             .sum();
 
         let params: &mut [GeometryParameter] = self.allocator.allocate(geometry_parameter_count);
@@ -91,9 +91,9 @@ impl Device {
             for (data, indices) in izip!(region, indices.chunks(4)) {
                 for i in 0..4 {
                     if let Some(&index) = indices.get(i) {
-                        data.0[i] = instance.geometry_values[index];
+                        data.0[i] = instance.parameters[index];
                     } else {
-                        data.0[i] = 0.0; // unused (for vec4 padding)
+                        data.0[i] = 0.0; // unused vec4 padding
                     }
                 }
             }

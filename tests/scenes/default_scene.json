@@ -35,22 +35,22 @@
       {
         "geometry": 0,
         "material": 0,
-        "geometry_values": []
+        "parameters": []
       },
       {
         "geometry": 1,
         "material": 1,
-        "geometry_values": []
+        "parameters": []
       },
       {
         "geometry": 2,
         "material": 2,
-        "geometry_values": []
+        "parameters": []
       },
       {
         "geometry": 3,
         "material": 3,
-        "geometry_values": []
+        "parameters": []
       }
     ],
     "geometry_list": [
