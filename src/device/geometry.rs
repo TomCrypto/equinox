@@ -45,7 +45,8 @@ impl GeometryGlslGenerator {
                 distance.call("ray.org + range.x * ray.dir")
             ));
             code.push("        if (dist < PREC * 0.1) {{ return true; }}".to_owned());
-            code.push("        range.x += dist * (1.0 - PREC * 0.1);".to_owned());
+            // TODO: this may need to be another knob in the "precision" settings
+            code.push("        range.x += dist * (1.0 - PREC * 10.0);".to_owned());
             code.push("      }}".to_owned());
             code.push("      break;".to_owned());
         }
