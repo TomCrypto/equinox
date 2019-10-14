@@ -14,8 +14,8 @@ struct traversal_t {
     vec2 range; // min/max of the ray distance
 };
 
-traversal_t traversal_prepare(float near) {
-    return traversal_t(uvec2(0xffffffffU), vec2(near, 1.0 / 0.0));
+traversal_t traversal_prepare() {
+    return traversal_t(uvec2(0xffffffffU), vec2(0.0, 1.0 / 0.0));
 }
 
 void traversal_record_hit(inout traversal_t traversal, float distance, uvec2 hit) {

@@ -50,8 +50,6 @@ impl GeometryGlslGenerator {
             code.push("      break;".to_owned());
         }
 
-        code.push("    default:".to_owned());
-        code.push("      return false;".to_owned());
         code.push("  }".to_owned());
         code.push("  return false;".to_owned());
         code.push("}".to_owned());

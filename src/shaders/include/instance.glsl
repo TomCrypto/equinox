@@ -17,9 +17,10 @@ layout (std140) uniform Instance {
 // (if not this MAY LOOP FOREVER! must be absolutely surely, provably inside the AABB)
 
 traversal_t traverse_scene(ray_t ray) {
-    traversal_t traversal = traversal_prepare(0.0);
-    vec3 idir = vec3(1.0) / ray.dir; // precomputed
+    traversal_t traversal = traversal_prepare();
 
+#if INSTANCE_DATA_PRESENT
+    vec3 idir = vec3(1.0) / ray.dir;
     uint index = 0U;
 
     do {
@@ -41,6 +42,7 @@ traversal_t traverse_scene(ray_t ray) {
             index = word1;
         }
     } while (index != 0U);
+#endif
 
     return traversal;
 }
@@ -49,8 +51,8 @@ traversal_t traverse_scene(ray_t ray) {
 // than finding the closest intersection and is intended for visibility testing.
 
 bool is_ray_occluded(ray_t ray, float distance) {
+#if INSTANCE_DATA_PRESENT
     vec3 idir = vec3(1.0) / ray.dir;
-
     uint index = 0U;
 
     do {
@@ -72,7 +74,7 @@ bool is_ray_occluded(ray_t ray, float distance) {
             index = word1;
         }
     } while (index != 0U);
+#endif
 
     return false;
 }
-

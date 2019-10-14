@@ -63,6 +63,12 @@ impl Device {
         self.program
             .set_define("INSTANCE_DATA_COUNT", self.instance_buffer.element_count());
 
+        if instance_info.is_empty() {
+            self.program.set_define("INSTANCE_DATA_PRESENT", 0);
+        } else {
+            self.program.set_define("INSTANCE_DATA_PRESENT", 1);
+        }
+
         // This implements parameter renumbering to ensure that all memory accesses in
         // the parameter array are coherent and that all fields are nicely packed into
         // individual vec4 elements. Out-of-bounds parameter indices are checked here.
@@ -144,6 +150,15 @@ impl SceneInstanceNode {
         }
     }
 
+    pub fn make_root() -> Self {
+        Self {
+            min: [0.0; 3],
+            max: [0.0; 3],
+            word1: 0x0000_8000,
+            word2: 0xffff_ffff,
+        }
+    }
+
     fn is_last_bit(is_last: bool) -> u32 {
         if is_last {
             0x8000
@@ -206,23 +221,15 @@ impl<'a> HierarchyBuilder<'a> {
 
     fn build_recursive(&mut self, offset: u32, leaves: &mut [InstanceInfo]) -> u32 {
         match leaves {
-            [] => self.build_recursive_empty(offset),
+            [] => self.build_recursive_empty(),
             [leaf] => self.build_recursive_one(offset, leaf),
             leaves => self.build_recursive_many(offset, leaves),
         }
     }
 
-    fn build_recursive_empty(&mut self, offset: u32) -> u32 {
-        let is_last = offset == self.nodes.len() as u32 - 1;
-
-        self.nodes[offset as usize] =
-            SceneInstanceNode::make_node([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0);
-
-        if !is_last {
-            offset + 1
-        } else {
-            0
-        }
+    fn build_recursive_empty(&mut self) -> u32 {
+        self.nodes[0] = SceneInstanceNode::make_root();
+        0 // there will be a root node on an empty BVH
     }
 
     fn build_recursive_one(&mut self, offset: u32, leaf: &InstanceInfo) -> u32 {

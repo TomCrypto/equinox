@@ -142,6 +142,7 @@ impl Device {
                     "INSTANCE_DATA_COUNT" => "0",
                     "GEOMETRY_DATA_COUNT" => "0",
                     "MATERIAL_DATA_COUNT" => "0",
+                    "INSTANCE_DATA_PRESENT" => "0"
                 },
             ),
             present_program: Shader::new(
