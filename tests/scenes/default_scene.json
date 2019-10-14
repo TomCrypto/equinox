@@ -26,7 +26,7 @@
     },
     "raster": {
       "width": 1920,
-      "height": 1008,
+      "height": 1080,
       "filter": {
         "type": "blackman-harris"
       }
