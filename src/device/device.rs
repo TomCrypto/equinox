@@ -250,7 +250,7 @@ impl Device {
         let assets = &scene.assets;
 
         invalidated |= Dirty::clean(&mut scene.environment, |environment| {
-            self.update_environment(assets, environment);
+            self.update_environment(assets, environment)?;
 
             Ok(())
         })?;

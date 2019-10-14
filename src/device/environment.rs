@@ -4,6 +4,7 @@ use log::{debug, info, warn};
 use crate::Device;
 use crate::Environment;
 use img2raw::{ColorSpace, DataFormat, Header};
+use js_sys::Error;
 use std::collections::HashMap;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
@@ -47,7 +48,7 @@ impl Device {
         &mut self,
         assets: &HashMap<String, Vec<u8>>,
         environment: &Environment,
-    ) {
+    ) -> Result<(), Error> {
         if environment.map.is_some() {
             self.program.set_define("HAS_ENVMAP", 1);
         } else {
@@ -60,11 +61,11 @@ impl Device {
                     .unwrap();
 
             if (*header).data_format.try_parse() != Some(DataFormat::RGBA16F) {
-                panic!("expected RGBA16F environment map");
+                return Err(Error::new("expected RGBA16F environment map"));
             }
 
             if (*header).color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
-                panic!("expected linear sRGB environment map");
+                return Err(Error::new("expected linear sRGB environment map"));
             }
 
             let pixels = LayoutVerified::new_slice(data).unwrap();
@@ -206,5 +207,7 @@ impl Device {
                         );
             */
         }
+
+        Ok(())
     }
 }
