@@ -88,7 +88,11 @@
             "value": 0.5
           },
           "f": {
-            "type": "unit-sphere"
+            "type": "sphere",
+            "radius": {
+              "type": "constant",
+              "value": 1.0
+            }
           }
         }
       },
@@ -121,7 +125,21 @@
               "value": 0.1
             },
             "f": {
-              "type": "unit-cube"
+              "type": "cuboid",
+              "dimensions": [
+                {
+                  "type": "constant",
+                  "value": 1.0
+                },
+                {
+                  "type": "constant",
+                  "value": 1.0
+                },
+                {
+                  "type": "constant",
+                  "value": 1.0
+                }
+              ]
             }
           }
         }
@@ -149,7 +167,11 @@
             "value": 0.15
           },
           "f": {
-            "type": "unit-sphere"
+            "type": "sphere",
+            "radius": {
+              "type": "constant",
+              "value": 1.0
+            }
           }
         }
       }

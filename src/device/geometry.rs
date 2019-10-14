@@ -82,12 +82,24 @@ impl GeometryGlslGenerator {
 
     fn distance_recursive(&mut self, geometry: &Geometry, index: &mut usize) -> DistanceFn {
         let code = match geometry {
-            Geometry::UnitSphere => "return length(p) - 1.0;".to_owned(),
-            Geometry::UnitCube => r#"
-                vec3 d = abs(p) - vec3(1.0);
+            Geometry::Sphere { radius } => {
+                let radius = self.lookup_parameter(radius, index);
+
+                format!("return length(p) - {};", radius)
+            }
+            Geometry::Cuboid { dimensions } => {
+                let dim_x = self.lookup_parameter(&dimensions[0], index);
+                let dim_y = self.lookup_parameter(&dimensions[1], index);
+                let dim_z = self.lookup_parameter(&dimensions[2], index);
+
+                format!(
+                    r#"
+                vec3 d = abs(p) - vec3({}, {}, {});
                 return length(max(d,0.0)) + min(max(d.x,max(d.y,d.z)),0.0);
-            "#
-            .to_owned(),
+            "#,
+                    dim_x, dim_y, dim_z
+                )
+            }
             Geometry::Plane { width, length } => {
                 let _ = self.lookup_parameter(&width, index);
                 let _ = self.lookup_parameter(&length, index);
@@ -158,7 +170,7 @@ impl GeometryGlslGenerator {
 
     fn normal_recursive(&mut self, geometry: &Geometry, index: &mut usize) -> Option<NormalFn> {
         let code = match geometry {
-            Geometry::UnitSphere => Some("return normalize(p);".to_owned()),
+            Geometry::Sphere { .. } => Some("return normalize(p);".to_owned()),
             Geometry::Plane { .. } => Some("return vec3(0.0, 1.0, 0.0);".to_owned()),
             Geometry::Translate { translation, f } => {
                 let tx = self.lookup_parameter(&translation[0], index);
@@ -296,7 +308,14 @@ fn add_parameter(parameters: &mut Vec<usize>, parameter: &Parameter) {
 
 fn renumber_parameters_recursive(geometry: &Geometry, parameters: &mut Vec<usize>) {
     match geometry {
-        Geometry::UnitSphere | Geometry::UnitCube => {}
+        Geometry::Sphere { radius } => {
+            add_parameter(parameters, radius);
+        }
+        Geometry::Cuboid { dimensions } => {
+            add_parameter(parameters, &dimensions[0]);
+            add_parameter(parameters, &dimensions[1]);
+            add_parameter(parameters, &dimensions[2]);
+        }
         Geometry::Plane { width, length } => {
             add_parameter(parameters, width);
             add_parameter(parameters, length);

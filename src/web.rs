@@ -195,7 +195,9 @@ impl WebScene {
             ],
             f: Box::new(Geometry::Scale {
                 factor: Parameter::Constant { value: 0.5 },
-                f: Box::new(Geometry::UnitSphere),
+                f: Box::new(Geometry::Sphere {
+                    radius: Parameter::Constant { value: 1.0 },
+                }),
             }),
         });
 
@@ -209,7 +211,13 @@ impl WebScene {
                 radius: Parameter::Constant { value: 0.05 },
                 f: Box::new(Geometry::Scale {
                     factor: Parameter::Constant { value: 0.1 },
-                    f: Box::new(Geometry::UnitCube),
+                    f: Box::new(Geometry::Cuboid {
+                        dimensions: [
+                            Parameter::Constant { value: 1.0 },
+                            Parameter::Constant { value: 1.0 },
+                            Parameter::Constant { value: 1.0 },
+                        ],
+                    }),
                 }),
             }),
         });
@@ -222,7 +230,9 @@ impl WebScene {
             ],
             f: Box::new(Geometry::Scale {
                 factor: Parameter::Constant { value: 0.15 },
-                f: Box::new(Geometry::UnitSphere),
+                f: Box::new(Geometry::Sphere {
+                    radius: Parameter::Constant { value: 1.0 },
+                }),
             }),
         });
 

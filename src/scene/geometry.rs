@@ -24,8 +24,12 @@ impl Parameter {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Geometry {
-    UnitSphere,
-    UnitCube,
+    Sphere {
+        radius: Parameter,
+    },
+    Cuboid {
+        dimensions: [Parameter; 3],
+    },
     Plane {
         width: Parameter,
         length: Parameter,
@@ -67,8 +71,8 @@ impl Geometry {
     /// the arbitrary measure that the evaluation cost of the unit sphere is 1.
     pub fn evaluation_cost(&self) -> f32 {
         match self {
-            Self::UnitSphere | Self::Plane { .. } => 1.0,
-            Self::UnitCube => 1.5,
+            Self::Sphere { .. } | Self::Plane { .. } => 1.0,
+            Self::Cuboid { .. } => 1.5,
             Self::InfiniteRepetition { f, .. } => 0.5 + f.evaluation_cost(),
             Self::Union { children } => children.iter().map(|x| 0.25 + x.evaluation_cost()).sum(),
             Self::Intersection { children } => {
@@ -85,10 +89,24 @@ impl Geometry {
     /// `None` if a symbolic parameter was out of bounds of the provided array.
     pub fn bounding_box(&self, symbolic_values: &[f32]) -> Option<BoundingBox> {
         match self {
-            Self::UnitSphere | Self::UnitCube => Some(BoundingBox {
-                min: Point3::new(-1.0, -1.0, -1.0),
-                max: Point3::new(1.0, 1.0, 1.0),
-            }),
+            Self::Sphere { radius } => {
+                let radius = radius.value(symbolic_values)?;
+
+                Some(BoundingBox {
+                    min: [-radius; 3].into(),
+                    max: [radius; 3].into(),
+                })
+            }
+            Self::Cuboid { dimensions } => {
+                let dim_x = dimensions[0].value(symbolic_values)?;
+                let dim_y = dimensions[1].value(symbolic_values)?;
+                let dim_z = dimensions[2].value(symbolic_values)?;
+
+                Some(BoundingBox {
+                    min: [-dim_x, -dim_y, -dim_z].into(),
+                    max: [dim_x, dim_y, dim_z].into(),
+                })
+            }
             Self::Plane { width, length } => {
                 let width = width.value(symbolic_values)?;
                 let length = length.value(symbolic_values)?;
