@@ -1,0 +1,189 @@
+{
+  "json": {
+    "camera": {
+      "position": {
+        "x": 0,
+        "y": 0.5,
+        "z": 3.5
+      },
+      "direction": {
+        "x": 0,
+        "y": 0,
+        "z": -1
+      },
+      "up_vector": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "aperture": {
+        "type": "ngon",
+        "radius": 0.01,
+        "sides": 5,
+        "rotation": 0
+      },
+      "focal_distance": 3,
+      "focal_length": 0.06,
+      "film_height": 0.024
+    },
+    "raster": {
+      "width": 1920,
+      "height": 1080,
+      "filter": {
+        "type": "blackman-harris"
+      }
+    },
+    "instance_list": [
+      {
+        "geometry": 0,
+        "material": 0,
+        "geometry_values": []
+      },
+      {
+        "geometry": 1,
+        "material": 1,
+        "geometry_values": []
+      },
+      {
+        "geometry": 2,
+        "material": 3,
+        "geometry_values": []
+      }
+    ],
+    "geometry_list": [
+      {
+        "type": "plane",
+        "width": {
+          "type": "constant",
+          "value": 1
+        },
+        "length": {
+          "type": "constant",
+          "value": 1
+        }
+      },
+      {
+        "type": "translate",
+        "translation": [
+          {
+            "type": "constant",
+            "value": 0
+          },
+          {
+            "type": "constant",
+            "value": 0.51
+          },
+          {
+            "type": "constant",
+            "value": 0
+          }
+        ],
+        "f": {
+          "type": "scale",
+          "factor": {
+            "type": "constant",
+            "value": 0.5
+          },
+          "f": {
+            "type": "unit-sphere"
+          }
+        }
+      },
+      {
+        "type": "translate",
+        "translation": [
+          {
+            "type": "constant",
+            "value": 0.6
+          },
+          {
+            "type": "constant",
+            "value": 0.151
+          },
+          {
+            "type": "constant",
+            "value": 0.55
+          }
+        ],
+        "f": {
+          "type": "round",
+          "radius": {
+            "type": "constant",
+            "value": 0.05
+          },
+          "f": {
+            "type": "scale",
+            "factor": {
+              "type": "constant",
+              "value": 0.1
+            },
+            "f": {
+              "type": "unit-cube"
+            }
+          }
+        }
+      },
+      {
+        "type": "translate",
+        "translation": [
+          {
+            "type": "constant",
+            "value": -0.6
+          },
+          {
+            "type": "constant",
+            "value": 0.151
+          },
+          {
+            "type": "constant",
+            "value": -0.75
+          }
+        ],
+        "f": {
+          "type": "scale",
+          "factor": {
+            "type": "constant",
+            "value": 0.15
+          },
+          "f": {
+            "type": "unit-sphere"
+          }
+        }
+      }
+    ],
+    "material_list": [
+      {
+        "type": "phong",
+        "albedo": [0.75, 0.75, 0.75],
+        "shininess": 10
+      },
+      {
+        "type": "ideal-reflection",
+        "reflectance": [0.6, 0.7, 1]
+      },
+      {
+        "type": "lambertian",
+        "albedo": [0.9, 0.1, 0.1]
+      },
+      {
+        "type": "dielectric",
+        "internal_refractive_index": 1.65,
+        "external_refractive_index": 1,
+        "internal_extinction_coefficient": [1e-9, 1e-7, 1e-9],
+        "external_extinction_coefficient": [0, 0, 0],
+        "base_color": [1, 1, 1]
+      }
+    ],
+    "environment": {
+      "map": null,
+      "multiplier": [0, 0, 0]
+    },
+    "display": {
+      "exposure": -2,
+      "saturation": 1,
+      "camera_response": null
+    },
+    "aperture": null
+  },
+  "assets": []
+}

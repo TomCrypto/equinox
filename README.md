@@ -14,6 +14,14 @@ The `viewer` front-end will use the built module in the `pkg` folder, it's recom
 
     cd viewer && yarn install && yarn serve
 
+Remember to download the assets for local use by running the Makefile in the `assets` folder.
+
+## Testing
+
+There are automated browser tests set up which can be run with `wasm-pack test`. These only test the renderer (not the front-end) and the assets must have been downloaded locally through the Makefile in the `assets` folder for certain tests to pass successfully.
+
+The tests will render some scenes at a predefined resolution to a specified number of samples and compare them with known-good reference renders. This is an exact comparison, so any observable regression will be detected. Be warned that the tests may cause graphics slowdowns while they run.
+
 ## License
 
 This software is provided under the MIT license.

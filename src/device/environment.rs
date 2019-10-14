@@ -14,6 +14,7 @@ struct PdfCdf {
     pdf: f32,
 }
 
+/*
 fn build_normalized_pdf_cdf(data: &[f32]) -> (Vec<PdfCdf>, f32) {
     let n = data.len() as f32;
 
@@ -39,6 +40,7 @@ fn build_normalized_pdf_cdf(data: &[f32]) -> (Vec<PdfCdf>, f32) {
 
     (result, integral)
 }
+*/
 
 impl Device {
     pub(crate) fn update_environment(

@@ -30,6 +30,14 @@ impl WebScene {
         as_json(&self.scene)
     }
 
+    pub fn raster_width(&self) -> u32 {
+        self.scene.raster.width.get()
+    }
+
+    pub fn raster_height(&self) -> u32 {
+        self.scene.raster.height.get()
+    }
+
     /// Reconfigures the scene using the provided scene JSON data.
     ///
     /// This method will attempt to dirty the least amount of scene data
