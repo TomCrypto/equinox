@@ -527,8 +527,8 @@ impl DeviceState {
 
         let data: &mut GlobalData = allocator.allocate_one();
 
-        data.filter_delta[0] = 2.0 * self.filter.importance_sample(x) - 1.0;
-        data.filter_delta[1] = 2.0 * self.filter.importance_sample(y) - 1.0;
+        data.filter_delta[0] = 4.0 * self.filter.importance_sample(x) - 2.0;
+        data.filter_delta[1] = 4.0 * self.filter.importance_sample(y) - 2.0;
         data.frame_state[0] = self.rng.next_u32();
         data.frame_state[1] = self.rng.next_u32();
         data.frame_state[2] = self.frame;
