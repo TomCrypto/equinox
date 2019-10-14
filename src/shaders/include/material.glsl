@@ -108,11 +108,11 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
     if (cosI > 0.0) {
         n1 = MAT_DIELECTRIC_EXTERNAL_REFRACTIVE_INDEX;
         n2 = MAT_DIELECTRIC_INTERNAL_REFRACTIVE_INDEX;
-        extinction = exp(-MAT_DIELECTRIC_EXTERNAL_EXTINCTION_COEFFICIENT * M_2PI * path_length / vec3(425e-9, 525e-9, 700e-9));
+        extinction = exp(-MAT_DIELECTRIC_EXTERNAL_EXTINCTION_COEFFICIENT * M_2PI * path_length / vec3(470e-9, 530e-9, 685e-9));
     } else {
         n1 = MAT_DIELECTRIC_INTERNAL_REFRACTIVE_INDEX;
         n2 = MAT_DIELECTRIC_EXTERNAL_REFRACTIVE_INDEX;
-        extinction = exp(-MAT_DIELECTRIC_INTERNAL_EXTINCTION_COEFFICIENT * M_2PI * path_length / vec3(425e-9, 525e-9, 700e-9));
+        extinction = exp(-MAT_DIELECTRIC_INTERNAL_EXTINCTION_COEFFICIENT * M_2PI * path_length / vec3(470e-9, 530e-9, 685e-9));
 
         normal = -normal;
         cosI = -cosI;
