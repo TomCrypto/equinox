@@ -76,8 +76,6 @@ impl GeometryGlslGenerator {
         code.push("  }".to_owned());
         code.push("}".to_owned());
 
-        log::info!("{:?}", code);
-
         format!("{}\n", code.join("\n"))
     }
 

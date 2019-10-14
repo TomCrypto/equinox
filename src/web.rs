@@ -21,9 +21,7 @@ impl WebScene {
     /// Creates a new empty scene.
     #[wasm_bindgen(constructor)]
     pub fn new() -> WebScene {
-        Self {
-            scene: Scene::default(),
-        }
+        Self::default()
     }
 
     pub fn json(&self) -> Result<JsValue, JsValue> {
