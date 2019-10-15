@@ -262,9 +262,13 @@ impl WebScene {
             base_color: [1.0, 1.0, 1.0],
         });
 
+        self.scene.material_list.push(Material::Lambertian {
+            albedo: [0.9, 0.9, 0.9],
+        });
+
         self.scene.instance_list.push(Instance {
             geometry: 0,
-            material: 0,
+            material: 4,
             parameters: vec![],
         });
 

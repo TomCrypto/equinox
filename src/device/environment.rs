@@ -3,10 +3,14 @@ use log::{debug, info, warn};
 
 use crate::Device;
 use crate::Environment;
+use half::f16;
 use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
 use std::collections::HashMap;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
+
+// TODO: pack envmap CDF data into f16 textures (might not be enough precision
+// though)
 
 #[repr(C)]
 #[derive(Debug, AsBytes, FromBytes)]
@@ -15,14 +19,11 @@ struct PdfCdf {
     pdf: f32,
 }
 
-/*
 fn build_normalized_pdf_cdf(data: &[f32]) -> (Vec<PdfCdf>, f32) {
-    let n = data.len() as f32;
-
     let mut integral = 0.0;
 
     for &value in data {
-        integral += value / n;
+        integral += value;
     }
 
     let mut result = Vec::with_capacity(data.len() + 1);
@@ -33,7 +34,7 @@ fn build_normalized_pdf_cdf(data: &[f32]) -> (Vec<PdfCdf>, f32) {
 
         result.push(PdfCdf {
             pdf: value / integral,
-            cdf: running / integral / n,
+            cdf: running / integral,
         });
     }
 
@@ -41,7 +42,6 @@ fn build_normalized_pdf_cdf(data: &[f32]) -> (Vec<PdfCdf>, f32) {
 
     (result, integral)
 }
-*/
 
 impl Device {
     pub(crate) fn update_environment(
@@ -75,137 +75,86 @@ impl Device {
 
             self.envmap_texture.upload(cols, rows, &pixels);
 
-            /*
+            // compute the CDF data and load it into our buffers...
 
-                        // compute the CDF data and load it into our buffers...
+            // STEP 1: compute the filtered data which we'll build the CDF data for
+            // use an average luminance measure here
 
-                        let tile_size = 256; // must divide the width/height
+            let mut filtered_data = vec![];
+            let mut total = 0.0;
 
-                        // STEP 1: compute the filtered data which we'll build the CDF data for
-                        // use an average luminance measure here
+            for y in 0..rows {
+                let mut row = vec![];
 
-                        let mut filtered_data = vec![];
-                        let mut total = 0.0;
-                        let mut count = 0;
+                let v = (y as f32 + 0.5) / (rows as f32);
 
-                        for y in 0..map.height / tile_size {
-                            let mut row = vec![];
+                let weight = (std::f32::consts::PI * v).sin(); // / ((cols * rows) as f32);
 
-                            for x in 0..map.width / tile_size {
-                                let mut filtered = 0.0;
+                for x in 0..cols {
+                    let r: f32 = f16::from_bits(pixels[(4 * (y * cols + x) + 0) as usize]).into();
+                    let g: f32 = f16::from_bits(pixels[(4 * (y * cols + x) + 1) as usize]).into();
+                    let b: f32 = f16::from_bits(pixels[(4 * (y * cols + x) + 2) as usize]).into();
 
-                                for ty in 0..tile_size {
-                                    let py = y * tile_size + ty;
+                    let value = (r * 0.2126 + g * 0.7152 + b * 0.0722) * weight;
+                    total += value;
 
-                                    let v = (py as f32 + 0.5) / (map.height as f32);
+                    row.push(value);
+                }
 
-                                    let weight = (std::f32::consts::PI * v).sin();
+                filtered_data.push(row);
+            }
 
-                                    for tx in 0..tile_size {
-                                        let px = x * tile_size + tx;
+            for y in 0..rows {
+                for x in 0..cols {
+                    filtered_data[y][x] /= total;
+                }
+            }
 
-                                        let r = pixels[(4 * (py * map.width + px) + 0) as usize];
-                                        let g = pixels[(4 * (py * map.width + px) + 1) as usize];
-                                        let b = pixels[(4 * (py * map.width + px) + 2) as usize];
+            // STEP 2: build the conditional CDFs for each row, as an array of
+            // CDF values ranging from 0 to 1. There will be width +
+            // 1 entries in each row. don't normalize them yet, we'll need their
+            // integral value to compute the marginal CDF
 
-                                        filtered += (r * 0.2126 + g * 0.7152 + b * 0.0722) * weight;
-                                    }
-                                }
+            let mut conditional_cdfs: Vec<Vec<PdfCdf>> = vec![];
+            let mut marginal_function: Vec<f32> = vec![];
 
-                                row.push(filtered / (tile_size as f32 * tile_size as f32));
-                                total += filtered / (tile_size as f32 * tile_size as f32);
-                                count += 1;
-                            }
+            for y in 0..rows {
+                let (row, integral) = build_normalized_pdf_cdf(&filtered_data[y as usize]);
 
-                            filtered_data.push(row);
-                        }
+                // the data is just in filtered_data...
+                conditional_cdfs.push(row);
+                marginal_function.push(integral);
+            }
 
-                        info!("Total value of filtered function = {}", total);
+            let (marginal_cdf, x) = build_normalized_pdf_cdf(&marginal_function);
 
-                        info!(
-                            "Average value of filtered function = {}",
-                            total / (count as f32)
-                        );
+            // STEP 5: upload the marginal CDF to its own texture
 
-                        // STEP 2: build the conditional CDFs for each row, as an array of
-                        // CDF values ranging from 0 to 1. There will be width +
-                        // 1 entries in each row. don't normalize them yet, we'll need their
-                        // integral value to compute the marginal CDF
+            let marginal_cdf_bytes = marginal_cdf.as_bytes();
+            let marginal_cdf_floats: LayoutVerified<_, [f32]> =
+                LayoutVerified::new_slice(marginal_cdf_bytes).unwrap();
 
-                        let mut conditional_cdfs: Vec<Vec<PdfCdf>> = vec![];
-                        let mut marginal_function: Vec<f32> = vec![];
+            self.envmap_marginal_cdf
+                .upload((rows + 1) as usize, 1, &marginal_cdf_floats);
 
-                        for y in 0..map.height / tile_size {
-                            let (row, integral) = build_normalized_pdf_cdf(&filtered_data[y as usize]);
+            // STEP 6: upload the conditional CDF to its own texture (one line
+            // per CDF)
 
-                            info!("row {} integral = {}", y, integral);
+            let mut conditional_cdf_data = vec![];
 
-                            // the data is just in filtered_data...
-                            conditional_cdfs.push(row);
-                            marginal_function.push(integral);
-                        }
+            for mut conditional_cdf in conditional_cdfs {
+                conditional_cdf_data.append(&mut conditional_cdf);
+            }
 
-                        let (marginal_cdf, x) = build_normalized_pdf_cdf(&marginal_function);
+            let conditional_cdf_bytes = conditional_cdf_data.as_bytes();
+            let conditional_cdf_floats: LayoutVerified<_, [f32]> =
+                LayoutVerified::new_slice(conditional_cdf_bytes).unwrap();
 
-                        info!("marginal integral = {}", x);
-                        info!("marginal CDF = {:#?}", marginal_cdf);
-                        info!("conditional CDFs = {:#?}", conditional_cdfs);
-
-                        info!(
-                            "w = {}, h = {}",
-                            map.width / tile_size + 1,
-                            map.height / tile_size + 1
-                        );
-
-                        // STEP 5: upload the marginal CDF to its own texture
-
-                        let marginal_cdf_bytes = marginal_cdf.as_bytes();
-                        let marginal_cdf_floats: LayoutVerified<_, [f32]> =
-                            LayoutVerified::new_slice(marginal_cdf_bytes).unwrap();
-
-                        self.envmap_marginal_cdf.upload(
-                            (map.height / tile_size + 1) as usize,
-                            1,
-                            &marginal_cdf_floats,
-                        );
-
-                        info!(
-                            "envmap_marginal_cdf ROWS = {}",
-                            self.envmap_marginal_cdf.rows()
-                        );
-                        info!(
-                            "envmap_marginal_cdf COLS = {}",
-                            self.envmap_marginal_cdf.cols()
-                        );
-
-                        // STEP 6: upload the conditional CDF to its own texture (one line
-                        // per CDF)
-
-                        let mut conditional_cdf_data = vec![];
-
-                        for mut conditional_cdf in conditional_cdfs {
-                            conditional_cdf_data.append(&mut conditional_cdf);
-                        }
-
-                        let conditional_cdf_bytes = conditional_cdf_data.as_bytes();
-                        let conditional_cdf_floats: LayoutVerified<_, [f32]> =
-                            LayoutVerified::new_slice(conditional_cdf_bytes).unwrap();
-
-                        self.envmap_conditional_cdfs.upload(
-                            (map.width / tile_size + 1) as usize,
-                            (map.height / tile_size) as usize,
-                            &conditional_cdf_floats,
-                        );
-
-                        info!(
-                            "envmap_conditional_cdfs ROWS = {}",
-                            self.envmap_conditional_cdfs.rows()
-                        );
-                        info!(
-                            "envmap_conditional_cdfs COLS = {}",
-                            self.envmap_conditional_cdfs.cols()
-                        );
-            */
+            self.envmap_conditional_cdfs.upload(
+                (cols + 1) as usize,
+                (rows) as usize,
+                &conditional_cdf_floats,
+            );
         }
 
         Ok(())

@@ -77,16 +77,6 @@ uint find_interval(sampler2D texture, int y, float u) {
     return clamp(first - 1U, 0U, size - 2U);
 }
 
-/*
-
-For now hardcode the marginal CDF (we'll put it somewhere like a uniform buffer later on...)
-
-Store the conditional data as [[normalized CDF, actual function value]]
-
-*/
-
-#if 0
-
 // returns (U, V) of the sampled environment map
 vec3 importance_sample_envmap(float u, float v, out float pdf) {
     // V DIRECTION (marginal CDF)
@@ -134,22 +124,9 @@ vec3 importance_sample_envmap(float u, float v, out float pdf) {
 
     float sampled_u = (float(u_offset) + du) / float(textureSize(envmap_conditional_cdfs, 0).x - 1);
 
-    return equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
+    // TODO: what the fuck is this +0.5?
+    return equirectangular_to_direction(vec2(fract(sampled_u + 0.5), sampled_v), 0.0);
 }
-
-float envmap_cdf_pdf(vec2 uv) {
-    ivec2 uv_int = ivec2(uv * vec2(textureSize(envmap_conditional_cdfs, 0).xy - ivec2(1)));
-
-    float cdf_value_at = texelFetch(envmap_conditional_cdfs, uv_int, 0).y;
-
-    int w = textureSize(envmap_conditional_cdfs, 0).x - 1;
-    int h = textureSize(envmap_conditional_cdfs, 0).y - 1;
-
-    return cdf_value_at / MARGINAL_INTEGRAL * float(w * h);
-}
-
-#endif
-
 
 // End envmap stuff
 
@@ -234,9 +211,24 @@ void main() {
             uint material = traversal.hit.y & 0xffffU;
             uint inst = traversal.hit.y >> 16U;
 
+            vec3 wo = -ray.dir;
+
             float pdf;
 
-            vec3 wo = -ray.dir;
+            vec2 rng = rand_uniform_vec2(random);
+
+            vec3 envmap_sample_dir = importance_sample_envmap(rng.x, rng.y, pdf);
+
+            ray_t ray2 = ray;
+            ray2.dir = envmap_sample_dir;
+            ray2.org += normal * PREC * sign(dot(envmap_sample_dir, normal));
+
+            float cosTheta = dot(envmap_sample_dir, normal);
+
+            if (cosTheta > 0.0 && !is_ray_occluded(ray2, 1.0 / 0.0)) {
+                radiance += throughput * mat_eval_brdf(material, inst, normal, envmap_sample_dir, wo) * cosTheta * sample_envmap(envmap_sample_dir) / (pdf * 4096.0 * 2048.0 * M_2PI);
+            }
+            
             vec3 wi;
 
             vec3 estimate = mat_sample_brdf(material, inst, normal, wi, wo, traversal.range.y, pdf, random);

@@ -79,7 +79,9 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 }
 
 vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo) {
-    return vec3(0.0); // not used yet
+    vec3 ideal = reflect(-wo, normal);
+
+    return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / M_2PI * pow(max(0.0, dot(ideal, wi)), MAT_PHONG_EXPONENT);
 }
 
 vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float path_length, out float pdf, inout random_t random) {

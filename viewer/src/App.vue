@@ -254,7 +254,7 @@ export default class App extends Vue {
     this.scene = new this.equinox.WebScene();
     this.scene.set_default_scene();
 
-    const asset = "assets/blue_grotto_4k.raw";
+    const asset = "assets/old_outdoor_theater_4k.raw";
 
     (async () => {
       await this.load_asset(asset);
