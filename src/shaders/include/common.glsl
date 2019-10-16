@@ -60,7 +60,7 @@ vec3 equirectangular_to_direction(vec2 uv, float rotation) {
 // rotation. If a non-zero rotation is provided, the u-coordinate returned
 // may be outside of the [0, 1] range and can be taken modulo 1 as needed.
 vec2 direction_to_equirectangular(vec3 dir, float rotation) {
-    return vec2((atan(dir.z, dir.x) - rotation) / M_2PI + 0.5, acos(dir.y) / M_PI);
+    return vec2(fract((atan(dir.z, dir.x) - rotation) / M_2PI + 1.0), acos(dir.y) / M_PI);
 }
 
 // Rotates an arbitrary vector "a" by an arbitrarily chosen rotation which

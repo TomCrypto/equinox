@@ -125,7 +125,7 @@ vec3 importance_sample_envmap(float u, float v, out float pdf) {
     float sampled_u = (float(u_offset) + du) / float(textureSize(envmap_conditional_cdfs, 0).x - 1);
 
     // TODO: what the fuck is this +0.5?
-    return equirectangular_to_direction(vec2(fract(sampled_u + 0.5), sampled_v), 0.0);
+    return equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
 }
 
 // End envmap stuff
