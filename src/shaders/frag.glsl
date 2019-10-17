@@ -43,16 +43,14 @@ uniform sampler2D envmap_pix_tex;
 uniform sampler2D envmap_marginal_cdf;
 uniform sampler2D envmap_conditional_cdfs;
 
-// TODO: add PDFs later on (see the PBR book for correct values...)
-
 vec3 sample_envmap(vec3 direction) {
-    if (HAS_ENVMAP == 1) {
-        vec2 uv = direction_to_equirectangular(direction, 0.0);
+#if HAS_ENVMAP
+    vec2 uv = direction_to_equirectangular(direction, 0.0);
 
-        return texture(envmap_pix_tex, uv).xyz;
-    } else {
-        return vec3(1.0);
-    }
+    return texture(envmap_pix_tex, uv).xyz;
+#else
+    return vec3(1.0);
+#endif
 }
 
 uint find_interval(sampler2D texture, int y, float u) {
@@ -78,6 +76,7 @@ uint find_interval(sampler2D texture, int y, float u) {
 }
 
 float envmap_pdf(vec3 point, vec3 normal, vec3 direction) {
+#if HAS_ENVMAP
     if (dot(direction, normal) <= 0.0 || is_ray_occluded(ray_t(point + normal * PREC * sign(dot(direction, normal)), direction), 1.0 / 0.0)) {
         return 0.0;
     }
@@ -93,10 +92,14 @@ float envmap_pdf(vec3 point, vec3 normal, vec3 direction) {
     pdf *= 4096.0 * 2048.0 / M_2PI; // TODO: sin(theta) factor needed here!
 
     return pdf;
+#else
+    return 1.0 / M_2PI;
+#endif
 }
 
 // returns (U, V) of the sampled environment map
 vec3 importance_sample_envmap(vec3 point, vec3 normal, float u, float v, out float pdf) {
+#if HAS_ENVMAP
     // V DIRECTION (marginal CDF)
 
     uint v_offset = find_interval(envmap_marginal_cdf, 0, u);
@@ -157,6 +160,15 @@ vec3 importance_sample_envmap(vec3 point, vec3 normal, float u, float v, out flo
     }
 
     return direction;
+#else
+    // random uniform direction in hemisphere...
+    float r = sqrt(1.0 - u * u);
+    float phi = M_2PI * v;
+
+    pdf = 1.0 / M_2PI;
+
+    return rotate(vec3(cos(phi) * r, u, sin(phi) * r), normal);
+#endif
 }
 
 // End envmap stuff
@@ -277,11 +289,6 @@ vec3 estimate_direct_lighting(vec3 point, uint material, uint inst, vec3 wo, vec
 }
 
 void main() {
-#if !HAS_ENVMAP
-    color = vec3(1.0, 0.0, 0.0);
-    return;
-#endif
-
     random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
 
     ray_t ray;
