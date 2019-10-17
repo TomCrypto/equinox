@@ -4,6 +4,7 @@
 #include <geometry.glsl>
 #include <instance.glsl>
 #include <material.glsl>
+#include <environment.glsl>
 
 out vec3 color;
 
@@ -38,10 +39,7 @@ vec2 low_discrepancy_2d(uvec2 key) {
 
 // Begin envmap stuff
 
-uniform sampler2D envmap_pix_tex;
-
-uniform sampler2D envmap_marginal_cdf;
-uniform sampler2D envmap_conditional_cdfs;
+#if 0
 
 vec3 sample_envmap(vec3 direction) {
 #if HAS_ENVMAP
@@ -171,6 +169,8 @@ vec3 importance_sample_envmap(vec3 point, vec3 normal, float u, float v, out flo
 #endif
 }
 
+#endif
+
 // End envmap stuff
 
 // Begin camera stuff
@@ -242,6 +242,7 @@ float PowerHeuristic(float fPdf, float gPdf) {
 }
 
 // TODO: factor in path_length later somehow
+// TODO: optimize the power heuristic to avoid unnecessary divisions that cancel out
 
 // call this to get an estimate of the direct lighting hitting a point
 // don't call this for specular surfaces
@@ -254,11 +255,16 @@ vec3 estimate_direct_lighting(vec3 point, uint material, uint inst, vec3 wo, vec
     vec3 f;
     vec3 directLighting;
 
-    vec2 rng = rand_uniform_vec2(random);
-    vec3 light_direction = importance_sample_envmap(point, normal, rng.x, rng.y, lightPdf);
-    vec3 Li = sample_envmap(light_direction);
+    vec3 light_direction;
+    vec3 Li = env_sample_light(light_direction, lightPdf, random);
+
+    // TODO: special logic to allow transmissive in some materials?
 
     float cosTheta = dot(light_direction, normal);
+
+    if (cosTheta <= 0.0 || is_ray_occluded(make_ray(point, light_direction, normal), 1.0 / 0.0)) {
+        lightPdf = 0.0;
+    }
 
     // Make sure the pdf isn't zero and the radiance isn't black
     if (lightPdf != 0.0 && cosTheta > 0.0) {
@@ -267,7 +273,7 @@ vec3 estimate_direct_lighting(vec3 point, uint material, uint inst, vec3 wo, vec
 
         if (scatteringPdf != 0.0) {
             float weight = PowerHeuristic(lightPdf, scatteringPdf);
-            directLighting += f * Li * weight / lightPdf;
+            directLighting += f * Li * weight;
         }
     }
 
@@ -276,11 +282,10 @@ vec3 estimate_direct_lighting(vec3 point, uint material, uint inst, vec3 wo, vec
     f = mat_sample_brdf(material, inst, normal, wi, wo, 0.0, scatteringPdf, random);
 
     if (scatteringPdf != 0.0) {
-        lightPdf = envmap_pdf(point, normal, wi);
+        vec3 Li = env_eval_light(wi, lightPdf);
 
-        if (lightPdf != 0.0) {
+        if (!is_ray_occluded(make_ray(point, wi, normal), 1.0 / 0.0)) {
             float weight = PowerHeuristic(scatteringPdf, lightPdf);
-            vec3 Li = sample_envmap(wi);
             directLighting += f * Li * weight / scatteringPdf;
         }
     }
@@ -295,7 +300,7 @@ void main() {
     evaluate_primary_ray(random, ray.org, ray.dir);
 
     vec3 radiance = vec3(0.0);
-    vec3 throughput = vec3(1.0);
+    vec3 strength = vec3(1.0);
     bool last_is_specular = true;
 
     for (uint bounce = 0U; bounce < 100U; ++bounce) {
@@ -309,33 +314,42 @@ void main() {
             uint material = traversal.hit.y & 0xffffU;
             uint inst = traversal.hit.y >> 16U;
 
+            /*
+
+            ray.dir = mat_interact(material, instance, ray.org, -ray.dir, traversal.range.y, normal, random, strength, sampled_light);
+            ray.org += normal * PREC * sign(dot(ray.dir, normal));
+
+            // on environment hit, if !sampled_light then add envmap contribution
+
+            */
+
             vec3 wo = -ray.dir;
 
-            /*bool specular = mat_is_specular(material);
+            bool specular = mat_is_specular(material);
 
             if (!specular) {
                 vec3 direct = estimate_direct_lighting(ray.org, material, inst, wo, normal, random);
 
-                radiance += throughput * direct;
+                radiance += strength * direct;
             }
 
-            last_is_specular = specular;*/
+            last_is_specular = specular;
 
             vec3 wi;
             float brdf_pdf;
 
-            vec3 brdf_path_throughput = mat_sample_brdf(material, inst, normal, wi, wo, traversal.range.y, brdf_pdf, random);
+            vec3 brdf_path_strength = mat_sample_brdf(material, inst, normal, wi, wo, traversal.range.y, brdf_pdf, random);
 
-            throughput *= brdf_path_throughput / brdf_pdf;
+            strength *= brdf_path_strength / brdf_pdf;
 
-            ray.dir = wi;
-
-            ray.org += normal * PREC * sign(dot(ray.dir, normal));
+            ray = make_ray(ray.org, wi, normal);
         } else {
             // we've hit the environment map. We need to sample the environment map...
 
+            float lightPdf;
+
             if (last_is_specular) {
-                radiance += throughput * sample_envmap(ray.dir);
+                radiance += strength * env_eval_light(ray.dir, lightPdf);
             }
 
             break;
@@ -348,10 +362,10 @@ void main() {
         // russian roulette
 
         vec2 rng = rand_uniform_vec2(random);
-        float p = min(1.0, max(throughput.x, max(throughput.y, throughput.z)));
+        float p = min(1.0, max(strength.x, max(strength.y, strength.z)));
 
         if (rng.x < p) {
-            throughput /= p;
+            strength /= p;
         } else {
             break;
         }

@@ -7,12 +7,17 @@ struct ray_t {
 
 #define M_PI   3.14159265359
 #define M_2PI  6.28318530718
+#define M_4PI  12.5663706144
 
 // Maintains closest-hit information during a traversal.
 struct traversal_t {
     uvec2 hit; // packed data for the closest SDF hit (geometry/material ID + parameter offsets)
     vec2 range; // min/max of the ray distance
 };
+
+ray_t make_ray(vec3 org, vec3 dir, vec3 normal) {
+    return ray_t(org + dir * PREC * sign(dot(dir, normal)), dir);
+}
 
 traversal_t traversal_prepare() {
     return traversal_t(uvec2(0xffffffffU), vec2(0.0, 1.0 / 0.0));
