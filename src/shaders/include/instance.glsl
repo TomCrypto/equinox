@@ -50,7 +50,7 @@ traversal_t traverse_scene(ray_t ray) {
 // Tests whether a ray intersects any geometry in the scene. This is much faster
 // than finding the closest intersection and is intended for visibility testing.
 
-bool is_ray_occluded(ray_t ray, float distance) {
+bool is_ray_occluded(ray_t ray, float limit) {
 #if INSTANCE_DATA_PRESENT
     vec3 idir = vec3(1.0) / ray.dir;
     uint index = 0U;
@@ -64,7 +64,7 @@ bool is_ray_occluded(ray_t ray, float distance) {
         index *= uint((word1 & 0x00008000U) == 0U);
         word1 &= 0xffff7fffU; // remove cyclic bit
 
-        vec2 range = vec2(0.0, distance);
+        vec2 range = vec2(0.0, limit);
 
         if (ray_bbox(ray.org, idir, range, node.data1.xyz, node.data2.xyz)) {
             if (word2 != 0xffffffffU && geo_intersect(word1 & 0xffffU, word1 >> 16U, ray, range)) {

@@ -77,8 +77,25 @@ uint find_interval(sampler2D texture, int y, float u) {
     return clamp(first - 1U, 0U, size - 2U);
 }
 
+float envmap_pdf(vec3 point, vec3 normal, vec3 direction) {
+    if (dot(direction, normal) <= 0.0 || is_ray_occluded(ray_t(point + normal * PREC * sign(dot(direction, normal)), direction), 1.0 / 0.0)) {
+        return 0.0;
+    }
+
+    vec2 uv = direction_to_equirectangular(direction, 0.0);
+
+    int py = int((uv.y + 0.5) * float(textureSize(envmap_marginal_cdf, 0).x));
+    int px = int((uv.x + 0.5) * float(textureSize(envmap_conditional_cdfs, 0).x - 1));
+
+    float pdf = texelFetch(envmap_marginal_cdf, ivec2(py, 0), 0).y;
+    pdf *= texelFetch(envmap_conditional_cdfs, ivec2(px, py), 0).y;
+    pdf *= 4096.0 * 2048.0 / M_2PI; // TODO: sin(theta) factor needed here!
+
+    return pdf;
+}
+
 // returns (U, V) of the sampled environment map
-vec3 importance_sample_envmap(float u, float v, out float pdf) {
+vec3 importance_sample_envmap(vec3 point, vec3 normal, float u, float v, out float pdf) {
     // V DIRECTION (marginal CDF)
 
     uint v_offset = find_interval(envmap_marginal_cdf, 0, u);
@@ -118,14 +135,27 @@ vec3 importance_sample_envmap(float u, float v, out float pdf) {
 
     pdf *= texelFetch(envmap_conditional_cdfs, ivec2(int(u_offset), v_offset), 0).y;
 
+    pdf *= 4096.0 * 2048.0 / M_2PI; // TODO: sin(theta) factor needed here!
+
     // pdf /= MARGINAL_INTEGRAL;
 
     // See V direction for PDF
 
     float sampled_u = (float(u_offset) + du) / float(textureSize(envmap_conditional_cdfs, 0).x - 1);
 
-    // TODO: what the fuck is this +0.5?
-    return equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
+    vec3 direction = equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
+
+    // TODO: this should never actually occur (it implies we selected a value with PDF 0)
+
+    if (isinf(du) || isinf(dv)) {
+        direction = -normal;
+    }
+
+    if ((dot(direction, normal) <= 0.0) || is_ray_occluded(ray_t(point + normal * PREC * sign(dot(direction, normal)), direction), 1.0 / 0.0)) {
+        pdf = 0.0;
+    }
+
+    return direction;
 }
 
 // End envmap stuff
@@ -191,7 +221,66 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
+float PowerHeuristic(float fPdf, float gPdf) {
+    float f = fPdf;
+    float g = gPdf;
+
+    return (f * f) / (f * f + g * g);
+}
+
+// TODO: factor in path_length later somehow
+
+// call this to get an estimate of the direct lighting hitting a point
+// don't call this for specular surfaces
+// and if this is called, do not consider the environment map on the next bounce
+// TODO: do we need to consider next bounce lighting if the PDF was zero? (not sure)
+vec3 estimate_direct_lighting(vec3 point, uint material, uint inst, vec3 wo, vec3 normal, inout random_t random) {
+    // sample lighting with multiple importance sampling
+
+    float lightPdf, scatteringPdf;
+    vec3 f;
+    vec3 directLighting;
+
+    vec2 rng = rand_uniform_vec2(random);
+    vec3 light_direction = importance_sample_envmap(point, normal, rng.x, rng.y, lightPdf);
+    vec3 Li = sample_envmap(light_direction);
+
+    float cosTheta = dot(light_direction, normal);
+
+    // Make sure the pdf isn't zero and the radiance isn't black
+    if (lightPdf != 0.0 && cosTheta > 0.0) {
+        // Calculate the brdf value
+        f = mat_eval_brdf(material, inst, normal, light_direction, wo, scatteringPdf) * cosTheta;
+
+        if (scatteringPdf != 0.0) {
+            float weight = PowerHeuristic(lightPdf, scatteringPdf);
+            directLighting += f * Li * weight / lightPdf;
+        }
+    }
+
+    // Sample brdf with multiple importance sampling
+    vec3 wi;
+    f = mat_sample_brdf(material, inst, normal, wi, wo, 0.0, scatteringPdf, random);
+
+    if (scatteringPdf != 0.0) {
+        lightPdf = envmap_pdf(point, normal, wi);
+
+        if (lightPdf != 0.0) {
+            float weight = PowerHeuristic(scatteringPdf, lightPdf);
+            vec3 Li = sample_envmap(wi);
+            directLighting += f * Li * weight / scatteringPdf;
+        }
+    }
+
+    return directLighting;
+}
+
 void main() {
+#if !HAS_ENVMAP
+    color = vec3(1.0, 0.0, 0.0);
+    return;
+#endif
+
     random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
 
     ray_t ray;
@@ -199,6 +288,7 @@ void main() {
 
     vec3 radiance = vec3(0.0);
     vec3 throughput = vec3(1.0);
+    bool last_is_specular = true;
 
     for (uint bounce = 0U; bounce < 100U; ++bounce) {
         traversal_t traversal = traverse_scene(ray);
@@ -213,27 +303,22 @@ void main() {
 
             vec3 wo = -ray.dir;
 
-            float pdf;
+            bool specular = mat_is_specular(material);
 
-            vec2 rng = rand_uniform_vec2(random);
+            if (!specular) {
+                vec3 direct = estimate_direct_lighting(ray.org, material, inst, wo, normal, random);
 
-            vec3 envmap_sample_dir = importance_sample_envmap(rng.x, rng.y, pdf);
-
-            ray_t ray2 = ray;
-            ray2.dir = envmap_sample_dir;
-            ray2.org += normal * PREC * sign(dot(envmap_sample_dir, normal));
-
-            float cosTheta = dot(envmap_sample_dir, normal);
-
-            if (cosTheta > 0.0 && !is_ray_occluded(ray2, 1.0 / 0.0)) {
-                radiance += throughput * mat_eval_brdf(material, inst, normal, envmap_sample_dir, wo) * cosTheta * sample_envmap(envmap_sample_dir) / (pdf * 4096.0 * 2048.0 * M_2PI);
+                radiance += throughput * direct;
             }
-            
+
+            last_is_specular = specular;
+
             vec3 wi;
+            float brdf_pdf;
 
-            vec3 estimate = mat_sample_brdf(material, inst, normal, wi, wo, traversal.range.y, pdf, random);
+            vec3 brdf_path_throughput = mat_sample_brdf(material, inst, normal, wi, wo, traversal.range.y, brdf_pdf, random);
 
-            throughput *= estimate / pdf;
+            throughput *= brdf_path_throughput / brdf_pdf;
 
             ray.dir = wi;
 
@@ -241,7 +326,9 @@ void main() {
         } else {
             // we've hit the environment map. We need to sample the environment map...
 
-            radiance += throughput * sample_envmap(ray.dir) * 1.0;
+            if (last_is_specular) {
+                radiance += throughput * sample_envmap(ray.dir);
+            }
 
             break;
         }

@@ -274,7 +274,7 @@ impl WebScene {
 
         self.scene.instance_list.push(Instance {
             geometry: 1,
-            material: 1,
+            material: 2,
             parameters: vec![],
         });
 
@@ -282,13 +282,13 @@ impl WebScene {
             geometry: 2,
             material: 2,
             parameters: vec![],
-        });
+        }); /*
 
-        self.scene.instance_list.push(Instance {
-            geometry: 3,
-            material: 3,
-            parameters: vec![],
-        });
+            self.scene.instance_list.push(Instance {
+                geometry: 3,
+                material: 3,
+                parameters: vec![],
+            });*/
 
         self.scene.camera.position.x = 0.0;
         self.scene.camera.position.y = 0.5;
@@ -298,7 +298,7 @@ impl WebScene {
         self.scene.camera.direction.y = 0.0;
         self.scene.camera.direction.z = -1.0;
 
-        self.scene.camera.aperture = ApertureShape::Circle { radius: 0.035 };
+        self.scene.camera.aperture = ApertureShape::Circle { radius: 0.0 };
 
         self.scene.camera.focal_distance = 3.0;
     }

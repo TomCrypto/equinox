@@ -26,7 +26,9 @@ layout (std140) uniform Material {
 
 // Material BRDF definitions
 
-vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo) {
+vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
+    pdf = max(0.0, dot(wi, normal)) / M_PI;
+
     return vec3(MAT_LAMBERTIAN_ALBEDO / M_PI);
 }
 
@@ -38,12 +40,14 @@ vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
 
     wi = rotate(vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi)), normal);
 
-    pdf = 1.0;
+    pdf = max(0.0, dot(wi, normal)) / M_PI;
 
-    return vec3(MAT_LAMBERTIAN_ALBEDO);
+    return vec3(MAT_LAMBERTIAN_ALBEDO) * pdf;
 }
 
-vec3 mat_ideal_reflection_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo) {
+vec3 mat_ideal_reflection_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
+    pdf = 0.0;
+
     return vec3(0.0);
 }
 
@@ -54,7 +58,9 @@ vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
     return MAT_IDEAL_REFLECTION_REFLECTANCE;
 }
 
-vec3 mat_ideal_refraction_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo) {
+vec3 mat_ideal_refraction_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
+    pdf = 0.0;
+
     return vec3(0.0);
 }
 
@@ -78,10 +84,14 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
     return MAT_IDEAL_REFRACTION_TRANSMITTANCE;
 }
 
-vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo) {
+vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
     vec3 ideal = reflect(-wo, normal);
 
-    return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / M_2PI * pow(max(0.0, dot(ideal, wi)), MAT_PHONG_EXPONENT);
+    float cos_alpha = pow(max(0.0, dot(ideal, wi)), MAT_PHONG_EXPONENT);
+
+    pdf = (MAT_PHONG_EXPONENT + 1.0) / M_2PI * cos_alpha;
+
+    return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / M_2PI * cos_alpha;
 }
 
 vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float path_length, out float pdf, inout random_t random) {
@@ -90,14 +100,20 @@ vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float p
     float phi = M_2PI * rng.x;
     float theta = acos(pow(rng.y, 1.0 / (MAT_PHONG_EXPONENT + 1.0)));
 
-    wi = rotate(to_spherical(phi, theta), reflect(-wo, normal));
+    vec3 ideal = reflect(-wo, normal);
 
-    pdf = 1.0;
+    wi = rotate(to_spherical(phi, theta), ideal);
 
-    return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / (MAT_PHONG_EXPONENT + 1.0);
+    float cos_alpha = pow(max(0.0, dot(ideal, wi)), MAT_PHONG_EXPONENT);
+
+    pdf = (MAT_PHONG_EXPONENT + 1.0) / M_2PI * cos_alpha;
+
+    return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / (MAT_PHONG_EXPONENT + 1.0) * pdf;
 }
 
-vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo) {
+vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
+    pdf = 0.0;
+
     return vec3(0.0);
 }
 
@@ -151,18 +167,35 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
 
 // Dispatch functions
 
-vec3 mat_eval_brdf(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo) {
+bool mat_is_specular(uint material) {
     switch (material) {
         case 0U:
-            return mat_lambertian_eval_brdf(inst, normal, wi, wo);
+            return false;
         case 1U:
-            return mat_ideal_reflection_eval_brdf(inst, normal, wi, wo);
+            return true;
         case 2U:
-            return mat_phong_eval_brdf(inst, normal, wi, wo);
+            return false;
         case 3U:
-            return mat_ideal_refraction_eval_brdf(inst, normal, wi, wo);
+            return true;
         case 4U:
-            return mat_dielectric_eval_brdf(inst, normal, wi, wo);
+            return true;
+        default:
+            return true;
+    }
+}
+
+vec3 mat_eval_brdf(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
+    switch (material) {
+        case 0U:
+            return mat_lambertian_eval_brdf(inst, normal, wi, wo, pdf);
+        case 1U:
+            return mat_ideal_reflection_eval_brdf(inst, normal, wi, wo, pdf);
+        case 2U:
+            return mat_phong_eval_brdf(inst, normal, wi, wo, pdf);
+        case 3U:
+            return mat_ideal_refraction_eval_brdf(inst, normal, wi, wo, pdf);
+        case 4U:
+            return mat_dielectric_eval_brdf(inst, normal, wi, wo, pdf);
         default:
             return vec3(0.0);
     }
