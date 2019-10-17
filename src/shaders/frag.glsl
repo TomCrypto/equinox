@@ -37,142 +37,6 @@ vec2 low_discrepancy_2d(uvec2 key) {
     return fract(vec2((key + FRAME_NUMBER) % 8192U) * vec2(0.7548776662, 0.5698402909));
 }
 
-// Begin envmap stuff
-
-#if 0
-
-vec3 sample_envmap(vec3 direction) {
-#if HAS_ENVMAP
-    vec2 uv = direction_to_equirectangular(direction, 0.0);
-
-    return texture(envmap_pix_tex, uv).xyz;
-#else
-    return vec3(1.0);
-#endif
-}
-
-uint find_interval(sampler2D texture, int y, float u) {
-    uint first = 0U;
-    uint size = uint(textureSize(texture, 0).x);
-    uint len = size;
-
-    while (len > 0U) {
-        uint _half = len >> 1U;
-        uint middle = first + _half;
-
-        float value = texelFetch(texture, ivec2(int(middle), y), 0).x;
-
-        if (value <= u) {
-            first = middle + 1U;
-            len -= _half + 1U;
-        } else {
-            len = _half;
-        }
-    }
-
-    return clamp(first - 1U, 0U, size - 2U);
-}
-
-float envmap_pdf(vec3 point, vec3 normal, vec3 direction) {
-#if HAS_ENVMAP
-    if (dot(direction, normal) <= 0.0 || is_ray_occluded(ray_t(point + normal * PREC * sign(dot(direction, normal)), direction), 1.0 / 0.0)) {
-        return 0.0;
-    }
-
-    vec2 uv = direction_to_equirectangular(direction, 0.0);
-    uv.x = fract(uv.x + 1.0);
-
-    int py = int((uv.y + 0.5) * float(textureSize(envmap_marginal_cdf, 0).x));
-    int px = int((uv.x + 0.5) * float(textureSize(envmap_conditional_cdfs, 0).x - 1));
-
-    float pdf = texelFetch(envmap_marginal_cdf, ivec2(py, 0), 0).y;
-    pdf *= texelFetch(envmap_conditional_cdfs, ivec2(px, py), 0).y;
-    pdf *= 4096.0 * 2048.0 / M_2PI; // TODO: sin(theta) factor needed here!
-
-    return pdf;
-#else
-    return 1.0 / M_2PI;
-#endif
-}
-
-// returns (U, V) of the sampled environment map
-vec3 importance_sample_envmap(vec3 point, vec3 normal, float u, float v, out float pdf) {
-#if HAS_ENVMAP
-    // V DIRECTION (marginal CDF)
-
-    uint v_offset = find_interval(envmap_marginal_cdf, 0, u);
-
-    float v_cdf_at_offset = texelFetch(envmap_marginal_cdf, ivec2(int(v_offset), 0), 0).x;
-    float v_cdf_at_offset_next = texelFetch(envmap_marginal_cdf, ivec2(int(v_offset) + 1, 0), 0).x;
-
-    // linearly interpolate between u_offset and u_offset + 1 based on position of u between cdf_at_offset and u_cdf_at_offset_next
-    float dv = (u - v_cdf_at_offset) / (v_cdf_at_offset_next - v_cdf_at_offset);
-
-    pdf = texelFetch(envmap_marginal_cdf, ivec2(int(v_offset), 0), 0).y;
-
-    /*float dv = v - v_cdf_at_offset;
-
-    if (v_cdf_at_offset_next != v_cdf_at_offset) {
-        dv /= (v_cdf_at_offset_next - v_cdf_at_offset);
-    }*/
-
-    // PDF is func[offset] / funcInt which (IIUC) is just (cdf_at_offset_next - cdf_at_offset)
-
-    float sampled_v = (float(v_offset) + dv) / float(textureSize(envmap_marginal_cdf, 0).x - 1);
-
-    // U DIRECTION (conditional CDF)
-
-    uint u_offset = find_interval(envmap_conditional_cdfs, int(v_offset), v);
-
-    float u_cdf_at_offset = texelFetch(envmap_conditional_cdfs, ivec2(int(u_offset), v_offset), 0).x;
-    float u_cdf_at_offset_next = texelFetch(envmap_conditional_cdfs, ivec2(int(u_offset) + 1, v_offset), 0).x;
-
-    /*float du = v - u_cdf_at_offset;
-
-    if (u_cdf_at_offset_next != u_cdf_at_offset) {
-        du /= (u_cdf_at_offset_next - u_cdf_at_offset);
-    }*/
-
-    float du = (v - u_cdf_at_offset) / (u_cdf_at_offset_next - u_cdf_at_offset);
-
-    pdf *= texelFetch(envmap_conditional_cdfs, ivec2(int(u_offset), v_offset), 0).y;
-
-    pdf *= 4096.0 * 2048.0 / M_2PI; // TODO: sin(theta) factor needed here!
-
-    // pdf /= MARGINAL_INTEGRAL;
-
-    // See V direction for PDF
-
-    float sampled_u = (float(u_offset) + du) / float(textureSize(envmap_conditional_cdfs, 0).x - 1);
-
-    vec3 direction = equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
-
-    // TODO: this should never actually occur (it implies we selected a value with PDF 0)
-
-    if (isinf(du) || isinf(dv)) {
-        direction = -normal;
-    }
-
-    if ((dot(direction, normal) <= 0.0) || is_ray_occluded(ray_t(point + normal * PREC * sign(dot(direction, normal)), direction), 1.0 / 0.0)) {
-        pdf = 0.0;
-    }
-
-    return direction;
-#else
-    // random uniform direction in hemisphere...
-    float r = sqrt(1.0 - u * u);
-    float phi = M_2PI * v;
-
-    pdf = 1.0 / M_2PI;
-
-    return rotate(vec3(cos(phi) * r, u, sin(phi) * r), normal);
-#endif
-}
-
-#endif
-
-// End envmap stuff
-
 // Begin camera stuff
 
 vec2 evaluate_circular_aperture_uv(inout random_t random) {
@@ -262,14 +126,14 @@ vec3 estimate_direct_lighting(vec3 point, uint material, uint inst, vec3 wo, vec
 
     float cosTheta = dot(light_direction, normal);
 
-    if (cosTheta <= 0.0 || is_ray_occluded(make_ray(point, light_direction, normal), 1.0 / 0.0)) {
+    if (lightPdf != 0.0 && (cosTheta <= 0.0 || is_ray_occluded(make_ray(point, light_direction, normal), 1.0 / 0.0))) {
         lightPdf = 0.0;
     }
 
     // Make sure the pdf isn't zero and the radiance isn't black
-    if (lightPdf != 0.0 && cosTheta > 0.0) {
+    if (lightPdf != 0.0) {
         // Calculate the brdf value
-        f = mat_eval_brdf(material, inst, normal, light_direction, wo, scatteringPdf) * cosTheta;
+        f = mat_eval_brdf(material, inst, normal, light_direction, wo, scatteringPdf) * abs(cosTheta);
 
         if (scatteringPdf != 0.0) {
             float weight = PowerHeuristic(lightPdf, scatteringPdf);
@@ -282,9 +146,9 @@ vec3 estimate_direct_lighting(vec3 point, uint material, uint inst, vec3 wo, vec
     f = mat_sample_brdf(material, inst, normal, wi, wo, 0.0, scatteringPdf, random);
 
     if (scatteringPdf != 0.0) {
-        vec3 Li = env_eval_light(wi, lightPdf);
-
         if (!is_ray_occluded(make_ray(point, wi, normal), 1.0 / 0.0)) {
+            vec3 Li = env_eval_light(wi, lightPdf);
+
             float weight = PowerHeuristic(scatteringPdf, lightPdf);
             directLighting += f * Li * weight / scatteringPdf;
         }

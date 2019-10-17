@@ -16,7 +16,7 @@ struct traversal_t {
 };
 
 ray_t make_ray(vec3 org, vec3 dir, vec3 normal) {
-    return ray_t(org + dir * PREC * sign(dot(dir, normal)), dir);
+    return ray_t(org + normal * PREC * sign(dot(dir, normal)), dir);
 }
 
 traversal_t traversal_prepare() {

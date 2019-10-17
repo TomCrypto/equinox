@@ -105,8 +105,8 @@ vec3 env_eval_light_image(vec3 wi, out float pdf) {
 
     uv.x = fract(uv.x + 1.0);
 
-    int py = int((uv.y + 0.5) * float(textureSize(envmap_marginal_cdf, 0).x));
-    int px = int((uv.x + 0.5) * float(textureSize(envmap_conditional_cdfs, 0).x - 1));
+    int py = int(uv.y * float(textureSize(envmap_marginal_cdf, 0).x) + 0.5);
+    int px = int(uv.x * float(textureSize(envmap_conditional_cdfs, 0).x - 1) + 0.5);
 
     pdf = texelFetch(envmap_marginal_cdf, ivec2(py, 0), 0).y;
     pdf *= texelFetch(envmap_conditional_cdfs, ivec2(px, py), 0).y;
