@@ -83,7 +83,7 @@ float envmap_pdf(vec3 point, vec3 normal, vec3 direction) {
     }
 
     vec2 uv = direction_to_equirectangular(direction, 0.0);
-    uv.x = fract(uv.x);
+    uv.x = fract(uv.x + 1.0);
 
     int py = int((uv.y + 0.5) * float(textureSize(envmap_marginal_cdf, 0).x));
     int px = int((uv.x + 0.5) * float(textureSize(envmap_conditional_cdfs, 0).x - 1));
@@ -304,7 +304,7 @@ void main() {
 
             vec3 wo = -ray.dir;
 
-            bool specular = mat_is_specular(material);
+            /*bool specular = mat_is_specular(material);
 
             if (!specular) {
                 vec3 direct = estimate_direct_lighting(ray.org, material, inst, wo, normal, random);
@@ -312,7 +312,7 @@ void main() {
                 radiance += throughput * direct;
             }
 
-            last_is_specular = specular;
+            last_is_specular = specular;*/
 
             vec3 wi;
             float brdf_pdf;
