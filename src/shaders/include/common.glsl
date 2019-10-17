@@ -57,14 +57,13 @@ vec3 equirectangular_to_direction(vec2 uv, float rotation) {
 }
 
 // Transforms a unit vector into equirectangular coordinates with a custom
-// rotation. If a non-zero rotation is provided, the u-coordinate returned
-// may be outside of the [0, 1] range and can be taken modulo 1 as needed.
+// rotation. The u-coordinate returned may be outside of the [0, 1] range.
 vec2 direction_to_equirectangular(vec3 dir, float rotation) {
-    return vec2(fract((atan(dir.z, dir.x) - rotation) / M_2PI + 1.0), acos(dir.y) / M_PI);
+    return vec2((atan(dir.z, dir.x) - rotation) / M_2PI, acos(dir.y) / M_PI);
 }
 
 // Rotates an arbitrary vector "a" by an arbitrarily chosen rotation which
-// takes the (0, 1, 0) vector to the "n" vector which MUST be unit length.
+// takes the (0, 1, 0) vector to the "n" vector ("n" must be unit length).
 vec3 rotate(vec3 a, vec3 n) {
     float dir = (n.y > 0.0) ? 1.0 : -1.0;
     n.y += dir; // avoids extra register

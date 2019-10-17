@@ -83,6 +83,7 @@ float envmap_pdf(vec3 point, vec3 normal, vec3 direction) {
     }
 
     vec2 uv = direction_to_equirectangular(direction, 0.0);
+    uv.x = fract(uv.x);
 
     int py = int((uv.y + 0.5) * float(textureSize(envmap_marginal_cdf, 0).x));
     int px = int((uv.x + 0.5) * float(textureSize(envmap_conditional_cdfs, 0).x - 1));
