@@ -27,6 +27,8 @@ r = 4
 int find_interval(sampler2D texture, int y, float u, out vec2 value) {
     // find the largest index x such that texture[y][x] <= u
 
+    // value = texelFetch(texture, ivec2(0, y), 0).xy;
+
     int l = 0, r = textureSize(texture, 0).x - 1;
 
     while (l < r) {
@@ -53,10 +55,10 @@ vec3 importance_sample_envmap(float u, float v) {
     int v_offset = find_interval(envmap_marginal_cdf, 0, u, value);
 
     float v_cdf_at_offset = value.x; // texelFetch(envmap_marginal_cdf, ivec2(v_offset, 0), 0).x;
-    float v_cdf_at_offset_next = texelFetch(envmap_marginal_cdf, ivec2(v_offset + 1, 0), 0).x;
+    float v_cdf_at_offset_next = value.y; // texelFetch(envmap_marginal_cdf, ivec2(v_offset + 1, 0), 0).x;
 
     // linearly interpolate between u_offset and u_offset + 1 based on position of u between cdf_at_offset and u_cdf_at_offset_next
-    float dv = (u - v_cdf_at_offset) / (v_cdf_at_offset_next - v_cdf_at_offset);
+    float dv = (u - v_cdf_at_offset) / value.y; // (v_cdf_at_offset_next - v_cdf_at_offset);
 
     float sampled_v = (float(v_offset) + dv) / float(textureSize(envmap_marginal_cdf, 0).x - 1);
 
@@ -65,15 +67,15 @@ vec3 importance_sample_envmap(float u, float v) {
     int u_offset = find_interval(envmap_conditional_cdfs, v_offset, v, value);
 
     float u_cdf_at_offset = value.x; // texelFetch(envmap_conditional_cdfs, ivec2(u_offset, v_offset), 0).x;
-    float u_cdf_at_offset_next = texelFetch(envmap_conditional_cdfs, ivec2(u_offset + 1, v_offset), 0).x;
+    float u_cdf_at_offset_next = value.y; // texelFetch(envmap_conditional_cdfs, ivec2(u_offset + 1, v_offset), 0).x;
 
-    float du = (v - u_cdf_at_offset) / (u_cdf_at_offset_next - u_cdf_at_offset);
+    float du = (v - u_cdf_at_offset) / value.y; // (u_cdf_at_offset_next - u_cdf_at_offset);
 
     float sampled_u = (float(u_offset) + du) / float(textureSize(envmap_conditional_cdfs, 0).x - 1);
 
     vec3 direction = equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
 
-    /*if (isinf(du)) {
+    /*if (isinf(du) || isinf(dv)) {
         return vec3(0.0);
     }*/
 

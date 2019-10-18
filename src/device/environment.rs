@@ -29,6 +29,8 @@ fn build_normalized_pdf_cdf(data: &[f32]) -> (Vec<PdfCdf>, f32) {
     let mut result = Vec::with_capacity(data.len() + 1);
     let mut running = 0.0;
 
+    result.push(PdfCdf { pdf: 0.0, cdf: 0.0 });
+
     for &value in data {
         running += value;
 
@@ -37,8 +39,6 @@ fn build_normalized_pdf_cdf(data: &[f32]) -> (Vec<PdfCdf>, f32) {
             cdf: running / integral,
         });
     }
-
-    result.push(PdfCdf { pdf: 0.0, cdf: 1.0 });
 
     (result, integral)
 }
@@ -117,12 +117,10 @@ impl Device {
             let mut marginal_function: Vec<f32> = vec![];
 
             for y in 0..rows {
-                let (row, integral) = build_normalized_pdf_cdf(&filtered_data[y as usize]);
+                let (mut row, integral) = build_normalized_pdf_cdf(&filtered_data[y as usize]);
 
-                for x in 0..(cols - 1) {
-                    if row[x].cdf == row[x + 1].cdf {
-                        info!("ZERO CDF DETECTED (conditionals)!");
-                    }
+                for i in 0..cols {
+                    row[i].pdf = row[i + 1].cdf - row[i].cdf;
                 }
 
                 // the data is just in filtered_data...
@@ -130,12 +128,10 @@ impl Device {
                 marginal_function.push(integral);
             }
 
-            let (marginal_cdf, x) = build_normalized_pdf_cdf(&marginal_function);
+            let (mut marginal_cdf, x) = build_normalized_pdf_cdf(&marginal_function);
 
-            for x in 0..(rows - 1) {
-                if marginal_cdf[x].cdf == marginal_cdf[x + 1].cdf {
-                    info!("ZERO CDF DETECTED (marginals)!");
-                }
+            for i in 0..rows {
+                marginal_cdf[i].pdf = marginal_cdf[i + 1].cdf - marginal_cdf[i].cdf;
             }
 
             for y in 0..rows {
