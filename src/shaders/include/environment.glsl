@@ -6,7 +6,25 @@ uniform sampler2D envmap_pix_tex;
 uniform sampler2D envmap_marginal_cdf;
 uniform sampler2D envmap_conditional_cdfs;
 
-int find_interval_v2(sampler2D texture, int y, float u) {
+/*
+
+Rework this:
+
+ * store CDF + delta to next CDF in the texture
+ * return the two from find_interval
+ * this avoids 4 extra unnecessary texelFetch
+
+If l < r, and r = (l + r) / 2, can l >= r??
+
+
+l = 3
+r = 4
+
+(3 + 4) / 2 = 3
+
+*/
+
+int find_interval(sampler2D texture, int y, float u, out vec2 value) {
     // find the largest index x such that texture[y][x] <= u
 
     int l = 0, r = textureSize(texture, 0).x - 1;
@@ -14,10 +32,13 @@ int find_interval_v2(sampler2D texture, int y, float u) {
     while (l < r) {
         int m = (l + r) / 2;
 
-        if (texelFetch(texture, ivec2(m, y), 0).x > u) {
+        vec2 data = texelFetch(texture, ivec2(m, y), 0).xy;
+
+        if (data.x > u) {
             r = m;
         } else {
             l = m + 1;
+            value = data;
         }
     }
 
@@ -27,9 +48,11 @@ int find_interval_v2(sampler2D texture, int y, float u) {
 vec3 importance_sample_envmap(float u, float v) {
     // V DIRECTION (marginal CDF)
 
-    int v_offset = find_interval_v2(envmap_marginal_cdf, 0, u);
+    vec2 value;
 
-    float v_cdf_at_offset = texelFetch(envmap_marginal_cdf, ivec2(v_offset, 0), 0).x;
+    int v_offset = find_interval(envmap_marginal_cdf, 0, u, value);
+
+    float v_cdf_at_offset = value.x; // texelFetch(envmap_marginal_cdf, ivec2(v_offset, 0), 0).x;
     float v_cdf_at_offset_next = texelFetch(envmap_marginal_cdf, ivec2(v_offset + 1, 0), 0).x;
 
     // linearly interpolate between u_offset and u_offset + 1 based on position of u between cdf_at_offset and u_cdf_at_offset_next
@@ -39,9 +62,9 @@ vec3 importance_sample_envmap(float u, float v) {
 
     // U DIRECTION (conditional CDF)
 
-    int u_offset = find_interval_v2(envmap_conditional_cdfs, v_offset, v);
+    int u_offset = find_interval(envmap_conditional_cdfs, v_offset, v, value);
 
-    float u_cdf_at_offset = texelFetch(envmap_conditional_cdfs, ivec2(u_offset, v_offset), 0).x;
+    float u_cdf_at_offset = value.x; // texelFetch(envmap_conditional_cdfs, ivec2(u_offset, v_offset), 0).x;
     float u_cdf_at_offset_next = texelFetch(envmap_conditional_cdfs, ivec2(u_offset + 1, v_offset), 0).x;
 
     float du = (v - u_cdf_at_offset) / (u_cdf_at_offset_next - u_cdf_at_offset);
