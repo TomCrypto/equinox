@@ -154,7 +154,7 @@ impl Device {
                 marginal_cdf_floats[y] = f16::from_f32(marginal_cdf[y].cdf).to_bits();
             }
 
-            self.envmap_marginal_cdf
+            self.envmap_marg_cdf
                 .upload(rows as usize, 1, marginal_cdf_floats);
 
             // STEP 6: upload the conditional CDF to its own texture (one line
@@ -169,11 +169,8 @@ impl Device {
                 }
             }
 
-            self.envmap_conditional_cdfs.upload(
-                cols as usize,
-                rows as usize,
-                conditional_cdf_floats,
-            );
+            self.envmap_cond_cdf
+                .upload(cols as usize, rows as usize, conditional_cdf_floats);
         }
 
         Ok(())

@@ -3,8 +3,8 @@
 
 uniform sampler2D envmap_pix_tex;
 
-uniform sampler2D envmap_marginal_cdf;
-uniform sampler2D envmap_conditional_cdfs;
+uniform sampler2D envmap_marg_cdf;
+uniform sampler2D envmap_cond_cdf;
 
 float inverse_transform(sampler2D texture, int y, float u, int size, out int index) {
     int low = 0, high = size;
@@ -40,8 +40,8 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
 
     int index;
 
-    float sampled_v = inverse_transform(envmap_marginal_cdf, 0, rng.x, ENVMAP_ROWS, index);
-    float sampled_u = inverse_transform(envmap_conditional_cdfs, index, rng.y, ENVMAP_COLS, index);
+    float sampled_v = inverse_transform(envmap_marg_cdf,     0, rng.x, ENVMAP_ROWS, index);
+    float sampled_u = inverse_transform(envmap_cond_cdf, index, rng.y, ENVMAP_COLS, index);
 
     wi = equirectangular_to_direction(vec2(sampled_u, sampled_v), ENVMAP_ROTATION);
 

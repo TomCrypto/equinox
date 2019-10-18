@@ -26,8 +26,8 @@ pub struct Device {
 
     pub(crate) display_buffer: UniformBuffer<DisplayData>,
 
-    pub(crate) envmap_marginal_cdf: Texture<R16F>,
-    pub(crate) envmap_conditional_cdfs: Texture<R16F>,
+    pub(crate) envmap_marg_cdf: Texture<R16F>,
+    pub(crate) envmap_cond_cdf: Texture<R16F>,
 
     pub(crate) envmap_texture: Texture<RGBA16F>,
 
@@ -131,8 +131,8 @@ impl Device {
                     "Globals" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
                     "envmap_pix_tex" => BindingPoint::Texture(1),
-                    "envmap_marginal_cdf" => BindingPoint::Texture(2),
-                    "envmap_conditional_cdfs" => BindingPoint::Texture(3),
+                    "envmap_marg_cdf" => BindingPoint::Texture(2),
+                    "envmap_cond_cdf" => BindingPoint::Texture(3),
                 },
                 hashmap! {
                     "geometry-user.glsl" => "",
@@ -167,8 +167,8 @@ impl Device {
             display_buffer: UniformBuffer::new(gl.clone()),
             globals_buffer: UniformBuffer::new(gl.clone()),
             envmap_texture: Texture::new(gl.clone()),
-            envmap_marginal_cdf: Texture::new(gl.clone()),
-            envmap_conditional_cdfs: Texture::new(gl.clone()),
+            envmap_marg_cdf: Texture::new(gl.clone()),
+            envmap_cond_cdf: Texture::new(gl.clone()),
             samples_fbo: Framebuffer::new(gl.clone()),
             rspectrum_temp1: Texture::new(gl.clone()),
             gspectrum_temp1: Texture::new(gl.clone()),
@@ -390,8 +390,8 @@ impl Device {
         command.bind(&self.globals_buffer, "Globals");
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.envmap_texture, "envmap_pix_tex");
-        command.bind(&self.envmap_marginal_cdf, "envmap_marginal_cdf");
-        command.bind(&self.envmap_conditional_cdfs, "envmap_conditional_cdfs");
+        command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
+        command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
 
         let weight = (self.state.frame as f32 - 1.0) / (self.state.frame as f32);
 
@@ -445,8 +445,8 @@ impl Device {
         self.material_buffer.invalidate();
         self.instance_buffer.invalidate();
         self.display_buffer.invalidate();
-        self.envmap_marginal_cdf.invalidate();
-        self.envmap_conditional_cdfs.invalidate();
+        self.envmap_marg_cdf.invalidate();
+        self.envmap_cond_cdf.invalidate();
         self.envmap_texture.invalidate();
         self.globals_buffer.invalidate();
         self.raster_buffer.invalidate();

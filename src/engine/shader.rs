@@ -269,8 +269,6 @@ impl Shader {
         let lines: Vec<&str> = source.lines().collect();
 
         for index in (0..line).rev() {
-            info!("checking line {} = {}", index, lines[index as usize]);
-
             if let Some(captures) = pattern.captures(lines[index as usize]) {
                 return (
                     captures.get(1).unwrap().as_str().to_owned(),
