@@ -1,8 +1,7 @@
 #include <common.glsl>
 #include <random.glsl>
 
-uniform sampler2D envmap_pix_tex;
-
+uniform sampler2D envmap_texture;
 uniform sampler2D envmap_marg_cdf;
 uniform sampler2D envmap_cond_cdf;
 
@@ -45,7 +44,7 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
 
     wi = equirectangular_to_direction(vec2(sampled_u, sampled_v), ENVMAP_ROTATION);
 
-    vec4 value = texture(envmap_pix_tex, vec2(sampled_u, sampled_v));
+    vec4 value = texture(envmap_texture, vec2(sampled_u, sampled_v));
 
     pdf = value.w;
 
@@ -53,7 +52,7 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
 }
 
 vec3 env_eval_light_image(vec3 wi, out float pdf) {
-    vec4 value = texture(envmap_pix_tex, direction_to_equirectangular(wi, ENVMAP_ROTATION));
+    vec4 value = texture(envmap_texture, direction_to_equirectangular(wi, ENVMAP_ROTATION));
 
     pdf = value.w;
 

@@ -130,7 +130,7 @@ impl Device {
                     "Material" => BindingPoint::UniformBlock(8),
                     "Globals" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
-                    "envmap_pix_tex" => BindingPoint::Texture(1),
+                    "envmap_texture" => BindingPoint::Texture(1),
                     "envmap_marg_cdf" => BindingPoint::Texture(2),
                     "envmap_cond_cdf" => BindingPoint::Texture(3),
                 },
@@ -389,7 +389,7 @@ impl Device {
         command.bind(&self.instance_buffer, "Instance");
         command.bind(&self.globals_buffer, "Globals");
         command.bind(&self.raster_buffer, "Raster");
-        command.bind(&self.envmap_texture, "envmap_pix_tex");
+        command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
 
