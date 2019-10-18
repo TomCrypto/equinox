@@ -4,7 +4,7 @@ ASSETS := blue_grotto_4k.raw \
 		  green_point_park_8k.raw \
 		  old_outdoor_theater_4k.raw \
 		  paul_lobe_haus_4k.raw \
-		  aperture.bin
+		  aperture.raw
 
 download-assets: $(ASSETS)
 
