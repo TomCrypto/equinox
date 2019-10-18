@@ -95,7 +95,7 @@ fn preprocess(
 
     expanding.push(name.to_owned());
 
-    let mut shader = format!("// __POS__ {}:0\n", name);
+    let mut shader = format!("// __POS__ {}:1\n", name);
 
     if placeholder {
         shader += text;
@@ -110,7 +110,8 @@ fn preprocess(
             let header = captures.get(1).unwrap().as_str();
 
             if vec_contains(processed, &header) {
-                continue; // previously included
+                write!(shader, "\n").unwrap();
+                continue; // already included
             }
 
             if vec_contains(expanding, &header) {
@@ -140,7 +141,7 @@ fn preprocess(
                 placeholder,
             )?;
 
-            write!(shader, "{}\n// __POS__ {}:{}\n", included, name, index + 1).unwrap();
+            write!(shader, "{}\n// __POS__ {}:{}\n", included, name, index + 2).unwrap();
         } else {
             write!(shader, "{}\n", line).unwrap();
         }

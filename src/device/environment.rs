@@ -80,11 +80,6 @@ impl Device {
             // STEP 1: compute the filtered data which we'll build the CDF data for
             // use an average luminance measure here
 
-            let mut min_cdf: f32 = 1000000.0;
-            let mut min_delta: f32 = 10000000.0;
-            let mut max_cdf: f32 = 0.0;
-            let mut max_delta: f32 = 0.0;
-
             let mut filtered_data = vec![];
             let mut total = 0.0;
 
@@ -135,11 +130,6 @@ impl Device {
 
                 for i in 0..cols {
                     row[i].pdf = (row[i + 1].cdf - row[i].cdf) * (cols as f32);
-
-                    min_cdf = min_cdf.min(row[i].cdf);
-                    min_delta = min_delta.min(row[i].pdf);
-                    max_cdf = max_cdf.max(row[i].cdf);
-                    max_delta = max_delta.max(row[i].pdf);
                 }
 
                 // the data is just in filtered_data...
@@ -152,17 +142,7 @@ impl Device {
             for i in 0..rows {
                 marginal_cdf[i].pdf =
                     (marginal_cdf[i + 1].cdf - marginal_cdf[i].cdf) * (rows as f32);
-
-                min_cdf = min_cdf.min(marginal_cdf[i].cdf);
-                min_delta = min_delta.min(marginal_cdf[i].pdf);
-                max_cdf = max_cdf.max(marginal_cdf[i].cdf);
-                max_delta = max_delta.max(marginal_cdf[i].pdf);
             }
-
-            info!("min_cdf = {:?}", min_cdf);
-            info!("min_delta = {:?}", min_delta);
-            info!("max_cdf = {:?}", max_cdf);
-            info!("max_delta = {:?}", max_delta);
 
             self.envmap_texture.upload(cols, rows, &pixels);
 
