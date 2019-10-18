@@ -64,6 +64,9 @@ pub enum Geometry {
         radius: Parameter,
         f: Box<Geometry>,
     },
+    ForceNumericalNormals {
+        f: Box<Geometry>,
+    },
 }
 
 impl Geometry {
@@ -82,6 +85,7 @@ impl Geometry {
             Self::Scale { f, .. } => f.evaluation_cost() + 1.0,
             Self::Translate { f, .. } => f.evaluation_cost() + 0.25,
             Self::Round { f, .. } => f.evaluation_cost() + 0.25,
+            Self::ForceNumericalNormals { f } => f.evaluation_cost(),
         }
     }
 
@@ -174,6 +178,7 @@ impl Geometry {
 
                 Some(BoundingBox { min, max })
             }
+            Self::ForceNumericalNormals { f } => f.bounding_box(symbolic_values),
         }
     }
 }

@@ -164,6 +164,9 @@ impl GeometryGlslGenerator {
 
                 format!("return {} - {};", function.call("p"), radius)
             }
+            Geometry::ForceNumericalNormals { f } => {
+                format!("return {};", self.distance_recursive(f, index).call("p"))
+            }
         };
 
         self.register_distance_function(code.trim())
@@ -350,6 +353,9 @@ fn renumber_parameters_recursive(geometry: &Geometry, parameters: &mut Vec<usize
         Geometry::Round { f, radius } => {
             add_parameter(parameters, radius);
 
+            renumber_parameters_recursive(f, parameters);
+        }
+        Geometry::ForceNumericalNormals { f } => {
             renumber_parameters_recursive(f, parameters);
         }
     }
