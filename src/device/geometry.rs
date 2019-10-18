@@ -135,6 +135,13 @@ impl GeometryGlslGenerator {
                     rhs_function.call("p")
                 )
             }
+            Geometry::Onion { thickness, f } => {
+                let thickness = self.lookup_parameter(thickness, index);
+
+                let function = self.distance_recursive(f, index);
+
+                format!("return abs({}) - {};", function.call("p"), thickness,)
+            }
             Geometry::Scale { factor, f } => {
                 let factor = self.lookup_parameter(factor, index);
 
@@ -337,6 +344,11 @@ fn renumber_parameters_recursive(geometry: &Geometry, parameters: &mut Vec<usize
         Geometry::Subtraction { lhs, rhs } => {
             renumber_parameters_recursive(lhs, parameters);
             renumber_parameters_recursive(rhs, parameters);
+        }
+        Geometry::Onion { thickness, f } => {
+            add_parameter(parameters, thickness);
+
+            renumber_parameters_recursive(f, parameters);
         }
         Geometry::Scale { factor, f } => {
             add_parameter(parameters, factor);

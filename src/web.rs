@@ -202,22 +202,25 @@ impl WebScene {
             }),
         });
 
-        self.scene.geometry_list.push(Geometry::Translate {
-            translation: [
-                Parameter::Constant { value: 0.6 },
-                Parameter::Constant { value: 0.151 },
-                Parameter::Constant { value: 0.55 },
-            ],
-            f: Box::new(Geometry::Round {
-                radius: Parameter::Constant { value: 0.05 },
-                f: Box::new(Geometry::Scale {
-                    factor: Parameter::Constant { value: 0.1 },
-                    f: Box::new(Geometry::Cuboid {
-                        dimensions: [
-                            Parameter::Constant { value: 1.0 },
-                            Parameter::Constant { value: 1.0 },
-                            Parameter::Constant { value: 1.0 },
-                        ],
+        self.scene.geometry_list.push(Geometry::Onion {
+            thickness: Parameter::Constant { value: 0.1 },
+            f: Box::new(Geometry::Translate {
+                translation: [
+                    Parameter::Constant { value: 0.6 },
+                    Parameter::Constant { value: 0.151 },
+                    Parameter::Constant { value: 0.55 },
+                ],
+                f: Box::new(Geometry::Round {
+                    radius: Parameter::Constant { value: 0.05 },
+                    f: Box::new(Geometry::Scale {
+                        factor: Parameter::Constant { value: 0.1 },
+                        f: Box::new(Geometry::Cuboid {
+                            dimensions: [
+                                Parameter::Constant { value: 1.0 },
+                                Parameter::Constant { value: 1.0 },
+                                Parameter::Constant { value: 1.0 },
+                            ],
+                        }),
                     }),
                 }),
             }),

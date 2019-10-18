@@ -48,6 +48,10 @@ pub enum Geometry {
         lhs: Box<Geometry>,
         rhs: Box<Geometry>,
     },
+    Onion {
+        thickness: Parameter,
+        f: Box<Geometry>,
+    },
     Scale {
         factor: Parameter,
         f: Box<Geometry>,
@@ -82,6 +86,7 @@ impl Geometry {
                 children.iter().map(|x| 0.5 + x.evaluation_cost()).sum()
             }
             Self::Subtraction { lhs, rhs } => lhs.evaluation_cost() + rhs.evaluation_cost() + 0.25,
+            Self::Onion { f, .. } => f.evaluation_cost() + 0.25,
             Self::Scale { f, .. } => f.evaluation_cost() + 1.0,
             Self::Translate { f, .. } => f.evaluation_cost() + 0.25,
             Self::Round { f, .. } => f.evaluation_cost() + 0.25,
@@ -144,6 +149,21 @@ impl Geometry {
                 Some(bbox)
             }
             Self::Subtraction { lhs, .. } => lhs.bounding_box(symbolic_values),
+            Self::Onion { thickness, f } => {
+                // TODO: should be possible to do better here
+                let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
+
+                let thickness = thickness.value(symbolic_values)?;
+
+                min.x -= thickness;
+                min.y -= thickness;
+                min.z -= thickness;
+                max.x += thickness;
+                max.y += thickness;
+                max.z += thickness;
+
+                Some(BoundingBox { min, max })
+            }
             Self::Scale { factor, f } => {
                 let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
 
