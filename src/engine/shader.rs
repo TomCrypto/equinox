@@ -345,7 +345,7 @@ impl<'a> DrawCommand<'a> {
         }
     }
 
-    pub fn unset_blending_mode(&self) {
+    pub fn unset_blend_mode(&self) {
         self.shader.gl.disable(Context::BLEND);
     }
 
