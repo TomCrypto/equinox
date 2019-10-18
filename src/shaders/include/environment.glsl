@@ -8,54 +8,26 @@ uniform sampler2D envmap_conditional_cdfs;
 
 float inverse_transform(sampler2D texture, int y, float u, out int index) {
     int l = 0, r = textureSize(texture, 0).x - 1;
-    vec2 value;
+    float this_cdf, next_cdf;
 
     while (l < r) {
         int m = (l + r) / 2;
 
-        vec2 data = texelFetch(texture, ivec2(m, y), 0).xy;
+        float cdf = texelFetch(texture, ivec2(m, y), 0).x;
 
-        if (data.x > u) {
+        if (cdf > u) {
             r = m;
         } else {
             l = m + 1;
-            value = data;
+            this_cdf = cdf;
         }
     }
+
+    next_cdf = texelFetch(texture, ivec2(l, y), 0).x;
 
     index = l - 1;
 
-    return (float(index)) / float(textureSize(texture, 0).x - 1) + (u - value.x) / value.y;
-}
-
-int find_interval(sampler2D texture, int y, float u, out vec2 value) {
-    // find the largest index x such that texture[y][x] <= u
-
-    int l = 0, r = textureSize(texture, 0).x - 1;
-
-    while (l < r) {
-        int m = (l + r) / 2;
-
-        vec2 data = texelFetch(texture, ivec2(m, y), 0).xy;
-
-        if (data.x > u) {
-            r = m;
-        } else {
-            l = m + 1;
-            value = data;
-        }
-    }
-
-    return l - 1;
-}
-
-vec3 importance_sample_envmap(float u, float v) {
-    int index;
-
-    float sampled_v = inverse_transform(envmap_marginal_cdf, 0, u, index);
-    float sampled_u = inverse_transform(envmap_conditional_cdfs, index, v, index);
-
-    return equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
+    return (float(index) + (u - this_cdf) / (next_cdf - this_cdf)) / float(textureSize(texture, 0).x - 1);
 }
 
 // returns (wi, pdf) for the environment map as well as the light contribution from that direction
@@ -64,15 +36,16 @@ vec3 importance_sample_envmap(float u, float v) {
 vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
     vec2 rng = rand_uniform_vec2(random);
 
-    wi = importance_sample_envmap(rng.x, rng.y);
+    int index;
+
+    float sampled_v = inverse_transform(envmap_marginal_cdf, 0, rng.x, index);
+    float sampled_u = inverse_transform(envmap_conditional_cdfs, index, rng.y, index);
+
+    wi = equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
 
     vec4 value = texture(envmap_pix_tex, direction_to_equirectangular(wi, 0.0));
 
-    if (wi != vec3(0.0)) {
-        pdf = value.w;
-    } else {
-        pdf = 0.0;
-    }
+    pdf = value.w;
 
     return value.rgb / pdf;
 }

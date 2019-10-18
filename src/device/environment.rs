@@ -78,6 +78,11 @@ impl Device {
             // STEP 1: compute the filtered data which we'll build the CDF data for
             // use an average luminance measure here
 
+            let mut min_cdf: f32 = 1000000.0;
+            let mut min_delta: f32 = 10000000.0;
+            let mut max_cdf: f32 = 0.0;
+            let mut max_delta: f32 = 0.0;
+
             let mut filtered_data = vec![];
             let mut total = 0.0;
 
@@ -86,7 +91,7 @@ impl Device {
 
                 let v = (y as f32 + 0.5) / (rows as f32);
 
-                let weight = (std::f32::consts::PI * v).sin(); // / ((cols * rows) as f32);
+                let weight = (std::f32::consts::PI * v).sin();
 
                 for x in 0..cols {
                     let r: f32 = f16::from_bits(pixels[(4 * (y * cols + x) + 0) as usize]).into();
@@ -121,6 +126,11 @@ impl Device {
 
                 for i in 0..cols {
                     row[i].pdf = (row[i + 1].cdf - row[i].cdf) * (cols as f32);
+
+                    min_cdf = min_cdf.min(row[i].cdf);
+                    min_delta = min_delta.min(row[i].pdf);
+                    max_cdf = max_cdf.max(row[i].cdf);
+                    max_delta = max_delta.max(row[i].pdf);
                 }
 
                 // the data is just in filtered_data...
@@ -133,7 +143,17 @@ impl Device {
             for i in 0..rows {
                 marginal_cdf[i].pdf =
                     (marginal_cdf[i + 1].cdf - marginal_cdf[i].cdf) * (rows as f32);
+
+                min_cdf = min_cdf.min(marginal_cdf[i].cdf);
+                min_delta = min_delta.min(marginal_cdf[i].pdf);
+                max_cdf = max_cdf.max(marginal_cdf[i].cdf);
+                max_delta = max_delta.max(marginal_cdf[i].pdf);
             }
+
+            info!("min_cdf = {:?}", min_cdf);
+            info!("min_delta = {:?}", min_delta);
+            info!("max_cdf = {:?}", max_cdf);
+            info!("max_delta = {:?}", max_delta);
 
             for y in 0..rows {
                 for x in 0..cols {
@@ -164,17 +184,26 @@ impl Device {
 
             // STEP 5: upload the marginal CDF to its own texture
 
-            let marginal_cdf_bytes = marginal_cdf.as_bytes();
+            /*let marginal_cdf_bytes = marginal_cdf.as_bytes();
             let marginal_cdf_floats: LayoutVerified<_, [f32]> =
                 LayoutVerified::new_slice(marginal_cdf_bytes).unwrap();
 
             self.envmap_marginal_cdf
-                .upload((rows + 1) as usize, 1, &marginal_cdf_floats);
+                .upload((rows + 1) as usize, 1, &marginal_cdf_floats);*/
+
+            let marginal_cdf_floats: &mut [u16] = self.allocator.allocate(rows);
+
+            for y in 0..rows {
+                marginal_cdf_floats[y] = f16::from_f32(marginal_cdf[y].cdf).to_bits();
+            }
+
+            self.envmap_marginal_cdf
+                .upload(rows as usize, 1, marginal_cdf_floats);
 
             // STEP 6: upload the conditional CDF to its own texture (one line
             // per CDF)
 
-            let mut conditional_cdf_data = vec![];
+            /*let mut conditional_cdf_data = vec![];
 
             for mut conditional_cdf in conditional_cdfs {
                 conditional_cdf_data.append(&mut conditional_cdf);
@@ -188,6 +217,21 @@ impl Device {
                 (cols + 1) as usize,
                 (rows) as usize,
                 &conditional_cdf_floats,
+            );*/
+
+            let conditional_cdf_floats: &mut [u16] = self.allocator.allocate(cols * rows);
+
+            for y in 0..rows {
+                for x in 0..cols {
+                    conditional_cdf_floats[y * cols + x] =
+                        f16::from_f32(conditional_cdfs[y][x].cdf).to_bits();
+                }
+            }
+
+            self.envmap_conditional_cdfs.upload(
+                cols as usize,
+                rows as usize,
+                conditional_cdf_floats,
             );
         }
 
