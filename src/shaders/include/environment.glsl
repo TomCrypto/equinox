@@ -1,90 +1,58 @@
 #include <common.glsl>
 #include <random.glsl>
 
-#include <instance.glsl>
-
 uniform sampler2D envmap_pix_tex;
 
 uniform sampler2D envmap_marginal_cdf;
 uniform sampler2D envmap_conditional_cdfs;
 
-uint find_interval(sampler2D texture, int y, float u) {
-    uint first = 0U;
-    uint size = uint(textureSize(texture, 0).x);
-    uint len = size;
+int find_interval_v2(sampler2D texture, int y, float u) {
+    // find the largest index x such that texture[y][x] <= u
 
-    while (len > 0U) {
-        uint _half = len >> 1U;
-        uint middle = first + _half;
+    int l = 0, r = textureSize(texture, 0).x - 1;
 
-        float value = texelFetch(texture, ivec2(int(middle), y), 0).x;
+    while (l < r) {
+        int m = (l + r) / 2;
 
-        if (value <= u) {
-            first = middle + 1U;
-            len -= _half + 1U;
+        if (texelFetch(texture, ivec2(m, y), 0).x > u) {
+            r = m;
         } else {
-            len = _half;
+            l = m + 1;
         }
     }
 
-    return clamp(first - 1U, 0U, size - 2U);
+    return l - 1;
 }
 
-vec3 importance_sample_envmap(float u, float v, out float pdf) {
+vec3 importance_sample_envmap(float u, float v) {
     // V DIRECTION (marginal CDF)
 
-    uint v_offset = find_interval(envmap_marginal_cdf, 0, u);
+    int v_offset = find_interval_v2(envmap_marginal_cdf, 0, u);
 
-    float v_cdf_at_offset = texelFetch(envmap_marginal_cdf, ivec2(int(v_offset), 0), 0).x;
-    float v_cdf_at_offset_next = texelFetch(envmap_marginal_cdf, ivec2(int(v_offset) + 1, 0), 0).x;
+    float v_cdf_at_offset = texelFetch(envmap_marginal_cdf, ivec2(v_offset, 0), 0).x;
+    float v_cdf_at_offset_next = texelFetch(envmap_marginal_cdf, ivec2(v_offset + 1, 0), 0).x;
 
     // linearly interpolate between u_offset and u_offset + 1 based on position of u between cdf_at_offset and u_cdf_at_offset_next
     float dv = (u - v_cdf_at_offset) / (v_cdf_at_offset_next - v_cdf_at_offset);
-
-    pdf = texelFetch(envmap_marginal_cdf, ivec2(int(v_offset), 0), 0).y;
-
-    /*float dv = v - v_cdf_at_offset;
-
-    if (v_cdf_at_offset_next != v_cdf_at_offset) {
-        dv /= (v_cdf_at_offset_next - v_cdf_at_offset);
-    }*/
-
-    // PDF is func[offset] / funcInt which (IIUC) is just (cdf_at_offset_next - cdf_at_offset)
 
     float sampled_v = (float(v_offset) + dv) / float(textureSize(envmap_marginal_cdf, 0).x - 1);
 
     // U DIRECTION (conditional CDF)
 
-    uint u_offset = find_interval(envmap_conditional_cdfs, int(v_offset), v);
+    int u_offset = find_interval_v2(envmap_conditional_cdfs, v_offset, v);
 
-    float u_cdf_at_offset = texelFetch(envmap_conditional_cdfs, ivec2(int(u_offset), v_offset), 0).x;
-    float u_cdf_at_offset_next = texelFetch(envmap_conditional_cdfs, ivec2(int(u_offset) + 1, v_offset), 0).x;
-
-    /*float du = v - u_cdf_at_offset;
-
-    if (u_cdf_at_offset_next != u_cdf_at_offset) {
-        du /= (u_cdf_at_offset_next - u_cdf_at_offset);
-    }*/
+    float u_cdf_at_offset = texelFetch(envmap_conditional_cdfs, ivec2(u_offset, v_offset), 0).x;
+    float u_cdf_at_offset_next = texelFetch(envmap_conditional_cdfs, ivec2(u_offset + 1, v_offset), 0).x;
 
     float du = (v - u_cdf_at_offset) / (u_cdf_at_offset_next - u_cdf_at_offset);
-
-    pdf *= texelFetch(envmap_conditional_cdfs, ivec2(int(u_offset), v_offset), 0).y;
-
-    pdf *= 4096.0 * 2048.0 / M_2PI; // TODO: sin(theta) factor needed here!
-
-    // pdf /= MARGINAL_INTEGRAL;
-
-    // See V direction for PDF
 
     float sampled_u = (float(u_offset) + du) / float(textureSize(envmap_conditional_cdfs, 0).x - 1);
 
     vec3 direction = equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
 
-    // TODO: this should never actually occur (it implies we selected a value with PDF 0)
-
-    if (isinf(du) || isinf(dv)) {
-        pdf = 0.0;
-    }
+    /*if (isinf(du)) {
+        return vec3(0.0);
+    }*/
 
     return direction;
 }
@@ -95,24 +63,25 @@ vec3 importance_sample_envmap(float u, float v, out float pdf) {
 vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
     vec2 rng = rand_uniform_vec2(random);
 
-    wi = importance_sample_envmap(rng.x, rng.y, pdf);
+    wi = importance_sample_envmap(rng.x, rng.y);
 
-    return texture(envmap_pix_tex, direction_to_equirectangular(wi, 0.0)).xyz / pdf;
+    vec4 value = texture(envmap_pix_tex, direction_to_equirectangular(wi, 0.0));
+
+    if (wi != vec3(0.0)) {
+        pdf = value.w;
+    } else {
+        pdf = 0.0;
+    }
+
+    return value.rgb / pdf;
 }
 
 vec3 env_eval_light_image(vec3 wi, out float pdf) {
-    vec2 uv = direction_to_equirectangular(wi, 0.0);
+    vec4 value = texture(envmap_pix_tex, direction_to_equirectangular(wi, 0.0));
 
-    uv.x = fract(uv.x + 1.0);
+    pdf = value.w;
 
-    int py = int(uv.y * float(textureSize(envmap_marginal_cdf, 0).x) + 0.5);
-    int px = int(uv.x * float(textureSize(envmap_conditional_cdfs, 0).x - 1) + 0.5);
-
-    pdf = texelFetch(envmap_marginal_cdf, ivec2(py, 0), 0).y;
-    pdf *= texelFetch(envmap_conditional_cdfs, ivec2(px, py), 0).y;
-    pdf *= 4096.0 * 2048.0 / M_2PI; // TODO: sin(theta) factor needed here!
-
-    return texture(envmap_pix_tex, uv).xyz;
+    return value.rgb;
 }
 
 vec3 env_sample_light_solid(out vec3 wi, out float pdf, inout random_t random) {

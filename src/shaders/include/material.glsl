@@ -87,7 +87,7 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
     vec3 ideal = reflect(-wo, normal);
 
-    float cos_alpha = pow(max(0.0, dot(ideal, wi)), MAT_PHONG_EXPONENT);
+    float cos_alpha = max(1e-6, pow(max(0.0, dot(ideal, wi)), MAT_PHONG_EXPONENT));
 
     pdf = (MAT_PHONG_EXPONENT + 1.0) / M_2PI * cos_alpha;
 
@@ -104,7 +104,7 @@ vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float p
 
     wi = rotate(to_spherical(phi, theta), ideal);
 
-    float cos_alpha = pow(max(0.0, dot(ideal, wi)), MAT_PHONG_EXPONENT);
+    float cos_alpha = max(1e-6, pow(max(0.0, dot(ideal, wi)), MAT_PHONG_EXPONENT));
 
     pdf = (MAT_PHONG_EXPONENT + 1.0) / M_2PI * cos_alpha;
 

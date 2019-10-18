@@ -68,12 +68,10 @@ impl Device {
                 return Err(Error::new("expected linear sRGB environment map"));
             }
 
-            let pixels = LayoutVerified::new_slice(data).unwrap();
+            let mut pixels = LayoutVerified::new_slice(data).unwrap().to_vec();
 
             let cols = (*header).dimensions[0] as usize;
             let rows = (*header).dimensions[1] as usize;
-
-            self.envmap_texture.upload(cols, rows, &pixels);
 
             // compute the CDF data and load it into our buffers...
 
@@ -121,12 +119,51 @@ impl Device {
             for y in 0..rows {
                 let (row, integral) = build_normalized_pdf_cdf(&filtered_data[y as usize]);
 
+                for x in 0..(cols - 1) {
+                    if row[x].cdf == row[x + 1].cdf {
+                        info!("ZERO CDF DETECTED (conditionals)!");
+                    }
+                }
+
                 // the data is just in filtered_data...
                 conditional_cdfs.push(row);
                 marginal_function.push(integral);
             }
 
             let (marginal_cdf, x) = build_normalized_pdf_cdf(&marginal_function);
+
+            for x in 0..(rows - 1) {
+                if marginal_cdf[x].cdf == marginal_cdf[x + 1].cdf {
+                    info!("ZERO CDF DETECTED (marginals)!");
+                }
+            }
+
+            for y in 0..rows {
+                for x in 0..cols {
+                    let offset = 4 * (y * cols + x) + 3;
+
+                    // TODO: should there be a sin(theta) factor here? not sure...
+                    // do some comparisons with and without envmap sampling to check
+
+                    let pdf = conditional_cdfs[y][x].pdf
+                        * marginal_cdf[y].pdf
+                        * (rows as f32)
+                        * (cols as f32)
+                        / (2.0 * std::f32::consts::PI);
+
+                    if pdf < 1e-5 {
+                        info!("PDF too small! {}", pdf);
+                    }
+
+                    if pdf > 40000.0 {
+                        info!("PDF too large! {}", pdf);
+                    }
+
+                    pixels[offset] = f16::from_f32(pdf).to_bits();
+                }
+            }
+
+            self.envmap_texture.upload(cols, rows, &pixels);
 
             // STEP 5: upload the marginal CDF to its own texture
 
