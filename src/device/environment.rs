@@ -120,7 +120,7 @@ impl Device {
                 let (mut row, integral) = build_normalized_pdf_cdf(&filtered_data[y as usize]);
 
                 for i in 0..cols {
-                    row[i].pdf = row[i + 1].cdf - row[i].cdf;
+                    row[i].pdf = (row[i + 1].cdf - row[i].cdf) * (cols as f32);
                 }
 
                 // the data is just in filtered_data...
@@ -131,7 +131,8 @@ impl Device {
             let (mut marginal_cdf, x) = build_normalized_pdf_cdf(&marginal_function);
 
             for i in 0..rows {
-                marginal_cdf[i].pdf = marginal_cdf[i + 1].cdf - marginal_cdf[i].cdf;
+                marginal_cdf[i].pdf =
+                    (marginal_cdf[i + 1].cdf - marginal_cdf[i].cdf) * (rows as f32);
             }
 
             for y in 0..rows {
@@ -143,8 +144,8 @@ impl Device {
 
                     let pdf = conditional_cdfs[y][x].pdf
                         * marginal_cdf[y].pdf
-                        * (rows as f32)
-                        * (cols as f32)
+                        // * (rows as f32)
+                        // * (cols as f32)
                         / (2.0 * std::f32::consts::PI);
 
                     if pdf < 1e-5 {
