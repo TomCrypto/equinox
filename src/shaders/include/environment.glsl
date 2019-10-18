@@ -7,7 +7,7 @@ uniform sampler2D envmap_marginal_cdf;
 uniform sampler2D envmap_conditional_cdfs;
 
 float inverse_transform(sampler2D texture, int y, float u, out int index) {
-    int l = 0, r = textureSize(texture, 0).x - 1;
+    int l = 0, r = textureSize(texture, 0).x;
     float this_cdf, next_cdf;
 
     while (l < r) {
@@ -27,7 +27,7 @@ float inverse_transform(sampler2D texture, int y, float u, out int index) {
 
     index = l - 1;
 
-    return (float(index) + (u - this_cdf) / (next_cdf - this_cdf)) / float(textureSize(texture, 0).x - 1);
+    return (float(index) + (u - this_cdf) / (next_cdf - this_cdf)) / float(textureSize(texture, 0).x);
 }
 
 // returns (wi, pdf) for the environment map as well as the light contribution from that direction

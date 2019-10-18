@@ -139,11 +139,7 @@ impl Geometry {
 
                 Some(bbox)
             }
-            Self::Subtraction { lhs, .. } => {
-                // TODO: we might be able to do better here, can we do AABB subtraction?
-
-                lhs.bounding_box(symbolic_values)
-            }
+            Self::Subtraction { lhs, .. } => lhs.bounding_box(symbolic_values),
             Self::Scale { factor, f } => {
                 let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
 

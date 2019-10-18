@@ -9,9 +9,6 @@ use js_sys::Error;
 use std::collections::HashMap;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
-// TODO: pack envmap CDF data into f16 textures (might not be enough precision
-// though)
-
 #[repr(C)]
 #[derive(Debug, AsBytes, FromBytes)]
 struct PdfCdf {
@@ -110,6 +107,13 @@ impl Device {
             for y in 0..rows {
                 for x in 0..cols {
                     filtered_data[y][x] /= total;
+
+                    pixels[4 * (y * cols + x) + 3] = f16::from_f32(
+                        filtered_data[y][x] / (2.0 * std::f32::consts::PI)
+                            * (rows as f32)
+                            * (cols as f32),
+                    )
+                    .to_bits();
                 }
             }
 
@@ -155,41 +159,9 @@ impl Device {
             info!("max_cdf = {:?}", max_cdf);
             info!("max_delta = {:?}", max_delta);
 
-            for y in 0..rows {
-                for x in 0..cols {
-                    let offset = 4 * (y * cols + x) + 3;
-
-                    // TODO: should there be a sin(theta) factor here? not sure...
-                    // do some comparisons with and without envmap sampling to check
-
-                    let pdf = conditional_cdfs[y][x].pdf
-                        * marginal_cdf[y].pdf
-                        // * (rows as f32)
-                        // * (cols as f32)
-                        / (2.0 * std::f32::consts::PI);
-
-                    if pdf < 1e-5 {
-                        info!("PDF too small! {}", pdf);
-                    }
-
-                    if pdf > 40000.0 {
-                        info!("PDF too large! {}", pdf);
-                    }
-
-                    pixels[offset] = f16::from_f32(pdf).to_bits();
-                }
-            }
-
             self.envmap_texture.upload(cols, rows, &pixels);
 
             // STEP 5: upload the marginal CDF to its own texture
-
-            /*let marginal_cdf_bytes = marginal_cdf.as_bytes();
-            let marginal_cdf_floats: LayoutVerified<_, [f32]> =
-                LayoutVerified::new_slice(marginal_cdf_bytes).unwrap();
-
-            self.envmap_marginal_cdf
-                .upload((rows + 1) as usize, 1, &marginal_cdf_floats);*/
 
             let marginal_cdf_floats: &mut [u16] = self.allocator.allocate(rows);
 
@@ -202,22 +174,6 @@ impl Device {
 
             // STEP 6: upload the conditional CDF to its own texture (one line
             // per CDF)
-
-            /*let mut conditional_cdf_data = vec![];
-
-            for mut conditional_cdf in conditional_cdfs {
-                conditional_cdf_data.append(&mut conditional_cdf);
-            }
-
-            let conditional_cdf_bytes = conditional_cdf_data.as_bytes();
-            let conditional_cdf_floats: LayoutVerified<_, [f32]> =
-                LayoutVerified::new_slice(conditional_cdf_bytes).unwrap();
-
-            self.envmap_conditional_cdfs.upload(
-                (cols + 1) as usize,
-                (rows) as usize,
-                &conditional_cdf_floats,
-            );*/
 
             let conditional_cdf_floats: &mut [u16] = self.allocator.allocate(cols * rows);
 

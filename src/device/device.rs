@@ -26,7 +26,6 @@ pub struct Device {
 
     pub(crate) display_buffer: UniformBuffer<DisplayData>,
 
-    // TODO: change to R32F (and maybe even R16F) later
     pub(crate) envmap_marginal_cdf: Texture<R16F>,
     pub(crate) envmap_conditional_cdfs: Texture<R16F>,
 
