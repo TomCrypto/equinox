@@ -147,7 +147,7 @@ impl Device {
                 marginal_function.push(integral);
             }
 
-            let (mut marginal_cdf, x) = build_normalized_pdf_cdf(&marginal_function);
+            let (mut marginal_cdf, _) = build_normalized_pdf_cdf(&marginal_function);
 
             for i in 0..rows {
                 marginal_cdf[i].pdf =

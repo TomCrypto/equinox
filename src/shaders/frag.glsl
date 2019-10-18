@@ -166,6 +166,7 @@ void main() {
     vec3 radiance = vec3(0.0);
     vec3 strength = vec3(1.0);
     bool last_is_specular = true;
+    bool is_caustic = true;
 
     for (uint bounce = 0U; bounce < 100U; ++bounce) {
         traversal_t traversal = traverse_scene(ray);
@@ -190,6 +191,11 @@ void main() {
             vec3 wo = -ray.dir;
 
             bool specular = mat_is_specular(material);
+
+            // if the last hit was not specular, and we are specular, this is a caustic
+            if (!last_is_specular && specular) {
+                break;
+            }
 
             if (!specular) {
                 vec3 direct = estimate_direct_lighting(ray.org, material, inst, wo, normal, random);
