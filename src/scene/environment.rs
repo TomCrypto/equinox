@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct EnvironmentMap {
     pub pixels: String,
+    pub rotation: f32,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]

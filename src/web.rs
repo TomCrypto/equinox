@@ -148,6 +148,7 @@ impl WebScene {
     pub fn set_envmap(&mut self, name: &str) {
         self.scene.environment.map = Some(EnvironmentMap {
             pixels: name.to_owned(),
+            rotation: 0.0,
         });
     }
 

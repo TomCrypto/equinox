@@ -141,6 +141,7 @@ impl Device {
                     "HAS_ENVMAP" => "0",
                     "ENVMAP_COLS" => "0",
                     "ENVMAP_ROWS" => "0",
+                    "ENVMAP_ROTATION" => "0.0",
                     "INSTANCE_DATA_COUNT" => "0",
                     "GEOMETRY_DATA_COUNT" => "0",
                     "MATERIAL_DATA_COUNT" => "0",

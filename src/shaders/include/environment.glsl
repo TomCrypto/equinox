@@ -43,9 +43,9 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
     float sampled_v = inverse_transform(envmap_marginal_cdf, 0, rng.x, ENVMAP_ROWS, index);
     float sampled_u = inverse_transform(envmap_conditional_cdfs, index, rng.y, ENVMAP_COLS, index);
 
-    wi = equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
+    wi = equirectangular_to_direction(vec2(sampled_u, sampled_v), ENVMAP_ROTATION);
 
-    vec4 value = texture(envmap_pix_tex, direction_to_equirectangular(wi, 0.0));
+    vec4 value = texture(envmap_pix_tex, vec2(sampled_u, sampled_v));
 
     pdf = value.w;
 
@@ -53,7 +53,7 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
 }
 
 vec3 env_eval_light_image(vec3 wi, out float pdf) {
-    vec4 value = texture(envmap_pix_tex, direction_to_equirectangular(wi, 0.0));
+    vec4 value = texture(envmap_pix_tex, direction_to_equirectangular(wi, ENVMAP_ROTATION));
 
     pdf = value.w;
 

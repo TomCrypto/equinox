@@ -72,6 +72,8 @@ impl Device {
 
             self.program.set_define("ENVMAP_COLS", cols);
             self.program.set_define("ENVMAP_ROWS", rows);
+            self.program
+                .set_define("ENVMAP_ROTATION", format!("{:+e}", map.rotation));
 
             // compute the CDF data and load it into our buffers...
 
