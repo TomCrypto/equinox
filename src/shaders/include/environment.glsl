@@ -6,28 +6,30 @@ uniform sampler2D envmap_pix_tex;
 uniform sampler2D envmap_marginal_cdf;
 uniform sampler2D envmap_conditional_cdfs;
 
-float inverse_transform(sampler2D texture, int y, float u, out int index) {
-    int l = 0, r = textureSize(texture, 0).x;
+float inverse_transform(sampler2D texture, int y, float u, int size, out int index) {
+    int low = 0, high = size;
     float this_cdf, next_cdf;
 
-    while (l < r) {
-        int m = (l + r) / 2;
+    // TODO: is the while(true) formula here faster?
 
-        float cdf = texelFetch(texture, ivec2(m, y), 0).x;
+    while (low < high) {
+        int mid = (low + high) / 2;
 
-        if (cdf > u) {
-            r = m;
+        float Fx = texelFetch(texture, ivec2(mid, y), 0).x;
+
+        if (Fx > u) {
+            high = mid;
         } else {
-            l = m + 1;
-            this_cdf = cdf;
+            low = mid + 1;
+            this_cdf = Fx;
         }
     }
 
-    next_cdf = texelFetch(texture, ivec2(l, y), 0).x;
+    next_cdf = texelFetch(texture, ivec2(low, y), 0).x;
 
-    index = l - 1;
+    index = low - 1;
 
-    return (float(index) + (u - this_cdf) / (next_cdf - this_cdf)) / float(textureSize(texture, 0).x);
+    return (float(index) + (u - this_cdf) / (next_cdf - this_cdf)) / float(size);
 }
 
 // returns (wi, pdf) for the environment map as well as the light contribution from that direction
@@ -38,8 +40,8 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
 
     int index;
 
-    float sampled_v = inverse_transform(envmap_marginal_cdf, 0, rng.x, index);
-    float sampled_u = inverse_transform(envmap_conditional_cdfs, index, rng.y, index);
+    float sampled_v = inverse_transform(envmap_marginal_cdf, 0, rng.x, ENVMAP_ROWS, index);
+    float sampled_u = inverse_transform(envmap_conditional_cdfs, index, rng.y, ENVMAP_COLS, index);
 
     wi = equirectangular_to_direction(vec2(sampled_u, sampled_v), 0.0);
 

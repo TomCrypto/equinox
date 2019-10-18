@@ -70,6 +70,9 @@ impl Device {
             let cols = (*header).dimensions[0] as usize;
             let rows = (*header).dimensions[1] as usize;
 
+            self.program.set_define("ENVMAP_COLS", cols);
+            self.program.set_define("ENVMAP_ROWS", rows);
+
             // compute the CDF data and load it into our buffers...
 
             // STEP 1: compute the filtered data which we'll build the CDF data for
