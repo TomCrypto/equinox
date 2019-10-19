@@ -166,7 +166,6 @@ void main() {
     vec3 radiance = vec3(0.0);
     vec3 strength = vec3(1.0);
     bool last_is_specular = true;
-    bool is_caustic = true;
 
     for (uint bounce = 0U; bounce < 100U; ++bounce) {
         traversal_t traversal = traverse_scene(ray);
@@ -209,6 +208,12 @@ void main() {
             float brdf_pdf;
 
             vec3 brdf_path_strength = mat_sample_brdf(material, inst, normal, wi, wo, traversal.range.y, brdf_pdf, random);
+
+            // TODO: better way to represent this?
+
+            if (brdf_pdf == 0.0) {
+                break;
+            }
 
             strength *= brdf_path_strength / brdf_pdf;
 
