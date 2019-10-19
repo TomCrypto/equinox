@@ -58,13 +58,13 @@ vec3 to_spherical(float phi, float theta) {
 // an optional custom rotation. The V = 0.5 line corresponds to a direction
 // on the XZ plane, and (0.0, 0.5) will correspond to (1, 0, 0) by default.
 vec3 equirectangular_to_direction(vec2 uv, float rotation) {
-    return to_spherical(uv.x * M_2PI + rotation, uv.y * M_PI);
+    return to_spherical(rotation - uv.x * M_2PI, uv.y * M_PI);
 }
 
 // Transforms a unit vector into equirectangular coordinates with a custom
 // rotation. The u-coordinate returned may be outside of the [0, 1] range.
 vec2 direction_to_equirectangular(vec3 dir, float rotation) {
-    return vec2((atan(dir.z, dir.x) - rotation) / M_2PI, acos(dir.y) / M_PI);
+    return vec2((rotation - atan(dir.z, dir.x)) / M_2PI, acos(dir.y) / M_PI);
 }
 
 // Rotates an arbitrary vector "a" by an arbitrarily chosen rotation which
