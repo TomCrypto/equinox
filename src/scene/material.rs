@@ -29,4 +29,8 @@ pub enum Material {
         external_extinction_coefficient: [f32; 3],
         base_color: [f32; 3],
     },
+    OrenNayar {
+        albedo: [f32; 3],
+        roughness: f32,
+    },
 }

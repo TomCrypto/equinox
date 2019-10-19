@@ -17,6 +17,7 @@ pub(crate) fn material_index(material: &Material) -> u16 {
         Material::Phong { .. } => 2,
         Material::IdealRefraction { .. } => 3,
         Material::Dielectric { .. } => 4,
+        Material::OrenNayar { .. } => 5,
     }
 }
 
@@ -28,6 +29,7 @@ pub(crate) fn material_parameter_block_count(material: &Material) -> usize {
         Material::IdealRefraction { .. } => 1,
         Material::Phong { .. } => 1,
         Material::Dielectric { .. } => 3,
+        Material::OrenNayar { .. } => 2,
     }
 }
 
@@ -76,6 +78,18 @@ fn write_material_parameters(material: &Material, parameters: &mut [MaterialPara
             parameters[2].0[0] = base_color[0];
             parameters[2].0[1] = base_color[1];
             parameters[2].0[2] = base_color[2];
+        }
+        Material::OrenNayar { albedo, roughness } => {
+            let roughness2 = roughness.max(0.0).min(1.0).powi(2);
+
+            let coeff_a = 1.0 - 0.5 * roughness2 / (roughness2 + 0.33);
+            let coeff_b = 0.45 * roughness2 / (roughness2 + 0.09);
+
+            parameters[0].0[0] = albedo[0];
+            parameters[0].0[1] = albedo[1];
+            parameters[0].0[2] = albedo[2];
+            parameters[1].0[0] = coeff_a;
+            parameters[1].0[1] = coeff_b;
         }
     }
 }

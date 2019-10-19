@@ -249,8 +249,9 @@ impl WebScene {
             reflectance: [0.9, 0.9, 0.9],
         });
 
-        self.scene.material_list.push(Material::Lambertian {
+        self.scene.material_list.push(Material::OrenNayar {
             albedo: [0.9, 0.1, 0.1],
+            roughness: 0.0,
         });
 
         /*self.scene.material_list.push(Material::IdealRefraction {

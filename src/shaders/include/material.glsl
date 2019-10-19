@@ -23,6 +23,10 @@ layout (std140) uniform Material {
 #define MAT_DIELECTRIC_EXTERNAL_EXTINCTION_COEFFICIENT      material_buffer.data[inst +  1U].xyz
 #define MAT_DIELECTRIC_EXTERNAL_REFRACTIVE_INDEX            material_buffer.data[inst +  1U].w
 #define MAT_DIELECTRIC_BASE_COLOR                           material_buffer.data[inst +  2U].xyz
+// == OREN-NAYAR =================================================================================
+#define MAT_OREN_NAYAR_ALBEDO                               material_buffer.data[inst +  0U].xyz
+#define MAT_OREN_NAYAR_COEFF_A                              material_buffer.data[inst +  1U].x
+#define MAT_OREN_NAYAR_COEFF_B                              material_buffer.data[inst +  1U].y
 
 // Material BRDF definitions
 
@@ -165,6 +169,38 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
     return extinction * MAT_DIELECTRIC_BASE_COLOR;
 }
 
+float oren_nayar_term(float wi_n, float wo_n, vec3 wi, vec3 wo, vec3 normal, float a, float b) {
+    vec3 wi_proj = normalize(wi - normal * wi_n);
+    vec3 wo_proj = normalize(wo - normal * wo_n);
+
+    float theta_i = acos(wi_n);
+    float theta_o = acos(wo_n);
+
+    return a + b * max(0.0, dot(wi_proj, wo_proj)) * sin(max(theta_i, theta_o))
+                                                   * tan(min(theta_i, theta_o));
+}
+
+vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
+    float wi_n = max(0.0, dot(wi, normal));
+    pdf = wi_n / M_PI;
+
+    return vec3(MAT_OREN_NAYAR_ALBEDO / M_PI) * oren_nayar_term(wi_n, max(0.0, dot(wo, normal)), wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
+}
+
+vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float path_length, out float pdf, inout random_t random) {
+    vec2 rng = rand_uniform_vec2(random);
+
+    float r = sqrt(rng.x);
+    float phi = M_2PI * rng.y;
+
+    wi = rotate(vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi)), normal);
+
+    float wi_n = max(0.0, dot(wi, normal));
+    pdf = wi_n / M_PI;
+
+    return vec3(MAT_OREN_NAYAR_ALBEDO) * pdf * oren_nayar_term(wi_n, max(0.0, dot(wo, normal)), wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
+}
+
 // Dispatch functions
 
 bool mat_is_specular(uint material) {
@@ -179,6 +215,8 @@ bool mat_is_specular(uint material) {
             return true;
         case 4U:
             return true;
+        case 5U:
+            return false;
         default:
             return true;
     }
@@ -196,6 +234,8 @@ vec3 mat_eval_brdf(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo, out 
             return mat_ideal_refraction_eval_brdf(inst, normal, wi, wo, pdf);
         case 4U:
             return mat_dielectric_eval_brdf(inst, normal, wi, wo, pdf);
+        case 5U:
+            return mat_oren_nayar_eval_brdf(inst, normal, wi, wo, pdf);
         default:
             return vec3(0.0);
     }
@@ -213,6 +253,8 @@ vec3 mat_sample_brdf(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo
             return mat_ideal_refraction_sample_brdf(inst, normal, wi, wo, path_length, pdf, random);
         case 4U:
             return mat_dielectric_sample_brdf(inst, normal, wi, wo, path_length, pdf, random);
+        case 5U:
+            return mat_oren_nayar_sample_brdf(inst, normal, wi, wo, path_length, pdf, random);
         default:
             return vec3(0.0);
     }
