@@ -13,7 +13,8 @@ uniform sampler2D source;
 // const vec3 WEIGHT = vec3(0.3158, 0.2706, 0.2174);
 // const vec3 WEIGHT = vec3(0.1397, 0.1171, 0.0978);
 // const vec3 WEIGHT = vec3(0.2769, 0.2376, 0.2036);
-const vec3 WEIGHT = vec3(0.3154949, 0.27033883, 0.23277324);
+// const vec3 WEIGHT = vec3(0.3154949, 0.27033883, 0.23277324);
+const vec3 WEIGHT = vec3(0.35067707, 0.3021619, 0.26073822);
 
 const float NORMALIZATION = 1.0 / (CONV_DIMS.x * CONV_DIMS.y);
 
