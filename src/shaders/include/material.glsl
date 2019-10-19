@@ -267,3 +267,16 @@ vec3 mat_sample_brdf(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo
             return vec3(0.0);
     }
 }
+
+#define MAT_FLAG_ALLOW_MIS    1 << 0 // multiple importance sampling permitted for this call
+#define MAT_FLAG_MIS_USED     1 << 1 // multiple importance sampling was used
+
+// returns the throughput and returns a good next ray. uses randomness. may use MIS, in which case
+// it will set the MIS boolean
+
+// #define MAT_INTERACT_TEMPLATE(eval_brdf, sample_brdf) \
+
+
+// vec3 mat_interact(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo, vec3 point, float length, inout uint flags, inout random_t random) {
+
+// }

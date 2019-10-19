@@ -166,9 +166,11 @@ void main() {
     vec3 radiance = vec3(0.0);
     vec3 strength = vec3(1.0);
     bool last_is_specular = true;
+    bool caustic_path = false;
+    uint index = 0U;
 
     for (uint bounce = 0U; bounce < 100U; ++bounce) {
-        traversal_t traversal = traverse_scene(ray);
+        traversal_t traversal = traverse_scene(ray, index);
 
         if (traversal_has_hit(traversal)) {
             ray.org += ray.dir * traversal.range.y;
@@ -193,7 +195,7 @@ void main() {
 
             // if the last hit was not specular, and we are specular, this is a caustic
             if (!last_is_specular && specular) {
-                break;
+                caustic_path = true;
             }
 
             if (!specular) {
@@ -217,7 +219,20 @@ void main() {
 
             strength *= brdf_path_strength / brdf_pdf;
 
+            bool outside = dot(ray.dir, normal) <= 0.0;
+
             ray = make_ray(ray.org, wi, normal);
+
+            // normal always points OUTWARDS, so we are only refracting if:
+            //  - we were going towards the normal before
+            //  - we are going the same direction after
+
+            if (outside && (dot(ray.dir, normal) <= 0.0)) {
+                // we are refracting
+                index = traversal.hit.z;
+            } else {
+                index = 0U; // restart from the root
+            }
         } else {
             // we've hit the environment map. We need to sample the environment map...
 
@@ -246,5 +261,9 @@ void main() {
         }
     }
 
-    color = radiance;
+    //if (caustic_path) {
+        color = radiance;
+    /*} else {
+        color = vec3(0.0);
+    }*/
 }

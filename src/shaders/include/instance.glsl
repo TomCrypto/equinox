@@ -16,12 +16,12 @@ layout (std140) uniform Instance {
 // (to within the specified precision, i.e. it must be othervise visited during traversal)
 // (if not this MAY LOOP FOREVER! must be absolutely surely, provably inside the AABB)
 
-traversal_t traverse_scene(ray_t ray) {
+traversal_t traverse_scene(ray_t ray, uint start) {
     traversal_t traversal = traversal_prepare();
 
 #if INSTANCE_DATA_PRESENT
     vec3 idir = vec3(1.0) / ray.dir;
-    uint index = 0U;
+    uint index = start;
 
     do {
         BvhNode node = instance_buffer.data[index++];
@@ -36,12 +36,12 @@ traversal_t traverse_scene(ray_t ray) {
 
         if (ray_bbox(ray.org, idir, range, node.data1.xyz, node.data2.xyz)) {
             if (word2 != 0xffffffffU && geo_intersect(word1 & 0xffffU, word1 >> 16U, ray, range)) {
-                traversal_record_hit(traversal, range.x, uvec2(word1, word2));
+                traversal_record_hit(traversal, range.x, uvec2(word1, word2), index);
             }
         } else if (word2 == 0xffffffffU) {
             index = word1;
         }
-    } while (index != 0U);
+    } while (index != start);
 #endif
 
     return traversal;

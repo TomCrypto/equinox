@@ -72,6 +72,18 @@ vec3 camera_response(uint curve, vec3 x) {
 void main() {
     vec4 value = texelFetch(samples, ivec2(gl_FragCoord.xy - 0.5), 0);
 
+    // For debugging purposes only
+
+    if (any(isnan(value.xyz))) {
+        color = vec4(1.0, 0.0, 1.0, 1.0);
+        return;
+    }
+
+    if (any(isinf(value.xyz))) {
+        color = vec4(0.0, 0.0, 1.0, 1.0);
+        return;
+    }
+
     vec3 tone_mapped = ACESFitted(value.rgb * display.exposure);
 
     if (display.has_camera_response != 0U) {
