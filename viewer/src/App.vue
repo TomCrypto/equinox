@@ -254,12 +254,12 @@ export default class App extends Vue {
     this.scene = new this.equinox.WebScene();
     this.scene.set_default_scene();
 
-    const asset = "assets/paul_lobe_haus_4k.raw";
+    /*const asset = "assets/paul_lobe_haus_4k.raw";
 
     (async () => {
       await this.load_asset(asset);
       this.scene.set_envmap(asset);
-    })();
+    })();*/
   }
 
   private animationFrame: number | null = null;

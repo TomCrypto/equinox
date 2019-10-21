@@ -62,6 +62,7 @@ vec3 env_eval_light_image(vec3 wi, out float pdf) {
 
     float sin_theta = sin(direction_to_equirectangular(wi, ENVMAP_ROTATION).y * M_PI);
 
+    // TODO: can we avoid isnan here?
     if (sin_theta == 0.0 || isnan(sin_theta)) {
         pdf = 0.0;
     } else {
@@ -81,13 +82,13 @@ vec3 env_sample_light_solid(out vec3 wi, out float pdf, inout random_t random) {
 
     wi = vec3(cos(phi) * r, rng.x, sin(phi) * r);
 
-    pdf = 1.0 / (2.0 * M_PI * M_PI);
+    pdf = 1.0 / (4.0 * M_PI);
 
-    return vec3(1.0) * 2.0 * M_PI * M_PI;
+    return vec3(1.0) * 4.0 * M_PI;
 }
 
 vec3 env_eval_light_solid(vec3 wi, out float pdf) {
-    pdf = 1.0 / (2.0 * M_PI * M_PI);
+    pdf = 1.0 / (4.0 * M_PI);
 
     return vec3(1.0);
 }

@@ -293,6 +293,7 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 // == HIGH-LEVEL MATERIAL INTERACTION ============================================================
 
 // TOOD: for MIS, should we continue tracing using the sampled ray or select a new BRDF ray? try both and see
+//  -> seems to make no difference, but try with some more complex materials
 
 #define MAT_INTERACT(absorption, eval_brdf, sample_brdf, props) {                                 \
     float cosI = dot(wo, normal);                                                                 \
@@ -307,7 +308,7 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
         return ray_t(point, normal);                                                              \
     }                                                                                             \
                                                                                                   \
-    if (((props) & MAT_PROP_DELTA_BSDF) == 0U && false/* && (flags & MAT_IFLAG_ALLOW_MIS) != 0U*/) {             \
+    if (((props) & MAT_PROP_DELTA_BSDF) == 0U/* && (flags & MAT_IFLAG_ALLOW_MIS) != 0U*/) {             \
         vec3 light_direction;\
         vec3 Li = env_sample_light(light_direction, light_pdf, random);\
  \
@@ -332,11 +333,9 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
             radiance += throughput * f * Li * weight;\
             }\
     }\
-        throughput *= f;\
         flags |= MAT_OFLAG_ENVMAP_SAMPLED;                                                        \
-    } else {\
-    throughput *= sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);                  \
     }\
+    throughput *= sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);                  \
                                                                                                   \
     flags = (flags & ~MAT_IFLAG_MASK) | props; /* keep properties */                              \
     return ray_t(point + PREC * sign(dot(wi, normal)) * normal, wi);                              \
