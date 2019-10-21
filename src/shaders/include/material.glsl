@@ -307,34 +307,31 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
         return ray_t(point, normal);                                                              \
     }                                                                                             \
                                                                                                   \
-    if (((props) & MAT_PROP_DELTA_BSDF) == 0U/* && (flags & MAT_IFLAG_ALLOW_MIS) != 0U*/) {             \
+    if (((props) & MAT_PROP_DELTA_BSDF) == 0U && false/* && (flags & MAT_IFLAG_ALLOW_MIS) != 0U*/) {             \
         vec3 light_direction;\
         vec3 Li = env_sample_light(light_direction, light_pdf, random);\
  \
         float cosTheta = dot(light_direction, normal);\
-        vec3 f; \
- \
-        if (((props) & MAT_PROP_OPAQUE_BSDF) != 0U) {\
-            cosTheta = max(0.0, cosTheta);\
-        }\
+        vec3 f;\
     \
-    if (light_pdf != 0.0 && cosTheta != 0.0 && !is_ray_occluded(make_ray(point, light_direction, normal), 1.0 / 0.0)) {\
+    if (light_pdf != 0.0) {\
         f = eval_brdf(inst, normal, light_direction, wo, scatter_pdf) * abs(cosTheta);\
     \
-        if (scatter_pdf != 0.0) {\
+        if (scatter_pdf != 0.0 && !is_ray_occluded(make_ray(point, light_direction, normal), 1.0 / 0.0)) {\
             float weight = power_heuristic(light_pdf, scatter_pdf);\
             radiance += throughput * f * Li * weight;\
         }\
     }\
     \
     f = sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);\
-    \
-        if (!is_ray_occluded(make_ray(point, wi, normal), 1.0 / 0.0)) {\
+        if (scatter_pdf != 0.0 && !is_ray_occluded(make_ray(point, wi, normal), 1.0 / 0.0)) {\
             vec3 Li = env_eval_light(wi, light_pdf);\
-    \
+            \
+            if (light_pdf != 0.0) {\
             float weight = power_heuristic(scatter_pdf, light_pdf);\
             radiance += throughput * f * Li * weight;\
-        }\
+            }\
+    }\
         throughput *= f;\
         flags |= MAT_OFLAG_ENVMAP_SAMPLED;                                                        \
     } else {\
@@ -344,18 +341,6 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
     flags = (flags & ~MAT_IFLAG_MASK) | props; /* keep properties */                              \
     return ray_t(point + PREC * sign(dot(wi, normal)) * normal, wi);                              \
 }
-
-            /*
-            bool specular = mat_is_specular(material);
-
-            if (!specular) {
-                vec3 direct = estimate_direct_lighting(ray.org, material, inst, wo, normal, random);
-
-                radiance += strength * direct;
-            }
-
-            last_is_specular = specular;
-            */
 
 ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, float path_length,
                    inout vec3 throughput, inout vec3 radiance, out uint flags, inout random_t random) {

@@ -61,6 +61,9 @@ vec3 equirectangular_to_direction(vec2 uv, float rotation) {
     return to_spherical(rotation - uv.x * M_2PI, uv.y * M_PI);
 }
 
+// TODO: this breaks horribly if dir.x == 0, can we have a special check for that??
+// surely there is a way to handle this eventuality sanely
+
 // Transforms a unit vector into equirectangular coordinates with a custom
 // rotation. The u-coordinate returned may be outside of the [0, 1] range.
 vec2 direction_to_equirectangular(vec3 dir, float rotation) {
