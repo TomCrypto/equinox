@@ -1,8 +1,14 @@
 #include <geometry.glsl>
 
 struct BvhNode {
-    vec4 data1;
-    vec4 data2;
+    float bbmin_x;
+    float bbmin_y;
+    float bbmin_z;
+    uint word1;
+    float bbmax_x;
+    float bbmax_y;
+    float bbmax_z;
+    uint word2;
 };
 
 layout (std140) uniform Instance {
@@ -26,15 +32,18 @@ traversal_t traverse_scene(ray_t ray, uint start) {
     do {
         BvhNode node = instance_buffer.data[index++];
 
-        uint word1 = floatBitsToUint(node.data1.w);
-        uint word2 = floatBitsToUint(node.data2.w);
+        vec3 bbmin = vec3(node.bbmin_x, node.bbmin_y, node.bbmin_z);
+        vec3 bbmax = vec3(node.bbmax_x, node.bbmax_y, node.bbmax_z);
+
+        uint word1 = node.word1;
+        uint word2 = node.word2;
 
         index *= uint((word1 & 0x00008000U) == 0U);
         word1 &= 0xffff7fffU; // remove cyclic bit
 
         vec2 range = traversal.range;
 
-        if (ray_bbox(ray.org, idir, range, node.data1.xyz, node.data2.xyz)) {
+        if (ray_bbox(ray.org, idir, range, bbmin, bbmax)) {
             if (word2 != 0xffffffffU && geo_intersect(word1 & 0xffffU, word1 >> 16U, ray, range)) {
                 traversal_record_hit(traversal, range.x, uvec2(word1, word2), index);
             }
@@ -58,15 +67,18 @@ bool is_ray_occluded(ray_t ray, float limit) {
     do {
         BvhNode node = instance_buffer.data[index++];
 
-        uint word1 = floatBitsToUint(node.data1.w);
-        uint word2 = floatBitsToUint(node.data2.w);
+        vec3 bbmin = vec3(node.bbmin_x, node.bbmin_y, node.bbmin_z);
+        vec3 bbmax = vec3(node.bbmax_x, node.bbmax_y, node.bbmax_z);
+
+        uint word1 = node.word1;
+        uint word2 = node.word2;
 
         index *= uint((word1 & 0x00008000U) == 0U);
         word1 &= 0xffff7fffU; // remove cyclic bit
 
         vec2 range = vec2(0.0, limit);
 
-        if (ray_bbox(ray.org, idir, range, node.data1.xyz, node.data2.xyz)) {
+        if (ray_bbox(ray.org, idir, range, bbmin, bbmax)) {
             if (word2 != 0xffffffffU && geo_intersect(word1 & 0xffffU, word1 >> 16U, ray, range)) {
                 return true;
             }
