@@ -287,13 +287,14 @@ impl WebScene {
             geometry: 2,
             material: 2,
             parameters: vec![],
-        }); /*
+        });
+        /*
 
-            self.scene.instance_list.push(Instance {
-                geometry: 3,
-                material: 3,
-                parameters: vec![],
-            });*/
+        self.scene.instance_list.push(Instance {
+            geometry: 3,
+            material: 3,
+            parameters: vec![],
+        });*/
 
         self.scene.camera.position.x = 0.0;
         self.scene.camera.position.y = 0.5;

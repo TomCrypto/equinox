@@ -98,13 +98,6 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-float PowerHeuristic(float fPdf, float gPdf) {
-    float f = fPdf;
-    float g = gPdf;
-
-    return (f * f) / (f * f + g * g);
-}
-
 #if 0
 // TODO: factor in path_length later somehow
 // TODO: optimize the power heuristic to avoid unnecessary divisions that cancel out
@@ -167,6 +160,7 @@ void main() {
 
     vec3 throughput = vec3(1.0);
     uint traversal_start = 0U;
+    uint flags;
     float unused_pdf;
 
     for (uint bounce = 0U; bounce < 100U; ++bounce) {
@@ -179,7 +173,6 @@ void main() {
 
             uint material = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
-            uint flags;
 
             ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
 
@@ -193,9 +186,9 @@ void main() {
                 traversal_start = 0U;
             }
         } else {
-            // if (last_is_specular) {
+            if ((flags & MAT_OFLAG_ENVMAP_SAMPLED) == 0U) {
                 radiance += throughput * env_eval_light(ray.dir, unused_pdf);
-            // }
+            }
 
             break;
         }

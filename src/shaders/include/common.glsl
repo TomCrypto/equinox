@@ -75,3 +75,10 @@ vec3 rotate(vec3 a, vec3 n) {
 
     return n * (dot(a, n) / n.y) - a * dir;
 }
+
+float power_heuristic(float f, float g) {
+    f *= f;
+    g *= g;
+
+    return f / (f + g);
+}

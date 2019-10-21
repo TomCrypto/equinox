@@ -1,6 +1,7 @@
 #include <common.glsl>
 #include <random.glsl>
 
+#include <environment.glsl>
 #include <instance.glsl>
 
 layout (std140) uniform Material {
@@ -13,11 +14,13 @@ layout (std140) uniform Material {
 #define MAT_OFLAG_OUTSIDE          1U // (1U << 0U) // the ray originates from inside this material
 #define MAT_OFLAG_TRANSMIT          (1U << 1U) // the ray is following a transmissive path
 #define MAT_OFLAG_EXTINCT         (1U << 2U) // the path is fully extinct and need not be traced
+#define MAT_OFLAG_ENVMAP_SAMPLED  (1U << 3U)
 #define MAT_OFLAG_MASK            0x00ffU
 
 #define MAT_PROP_DIFFUSE_BSDF     (1U << 8U)
 #define MAT_PROP_GLOSSY_BSDF      (1U << 9U)
 #define MAT_PROP_DELTA_BSDF       (1U << 10U)
+#define MAT_PROP_OPAQUE_BSDF      (1U << 11U)
 
 // == LAMBERTIAN =================================================================================
 #define MAT_LAMBERTIAN_ALBEDO                               material_buffer.data[inst +  0U].xyz
@@ -289,12 +292,11 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 
 // == HIGH-LEVEL MATERIAL INTERACTION ============================================================
 
-// TODO: add MIS support here eventually
-// TODO: split PDF into its own method...
+// TOOD: for MIS, should we continue tracing using the sampled ray or select a new BRDF ray? try both and see
 
 #define MAT_INTERACT(absorption, eval_brdf, sample_brdf, props) {                                 \
     float cosI = dot(wo, normal);                                                                 \
-    float pdf;                                                                                    \
+    float light_pdf, scatter_pdf;                                                                 \
     vec3 wi;                                                                                      \
                                                                                                   \
     flags |= MAT_OFLAG_OUTSIDE * uint(cosI > 0.0);                                                \
@@ -305,7 +307,39 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
         return ray_t(point, normal);                                                              \
     }                                                                                             \
                                                                                                   \
-    throughput *= sample_brdf(inst, normal/*, cosI*/, wi, wo, unused, flags, random);             \
+    if (((props) & MAT_PROP_DELTA_BSDF) == 0U/* && (flags & MAT_IFLAG_ALLOW_MIS) != 0U*/) {             \
+        vec3 light_direction;\
+        vec3 Li = env_sample_light(light_direction, light_pdf, random);\
+ \
+        float cosTheta = dot(light_direction, normal);\
+        vec3 f; \
+ \
+        if (((props) & MAT_PROP_OPAQUE_BSDF) != 0U) {\
+            cosTheta = max(0.0, cosTheta);\
+        }\
+    \
+    if (light_pdf != 0.0 && cosTheta != 0.0 && !is_ray_occluded(make_ray(point, light_direction, normal), 1.0 / 0.0)) {\
+        f = eval_brdf(inst, normal, light_direction, wo, scatter_pdf) * abs(cosTheta);\
+    \
+        if (scatter_pdf != 0.0) {\
+            float weight = power_heuristic(light_pdf, scatter_pdf);\
+            radiance += throughput * f * Li * weight;\
+        }\
+    }\
+    \
+    f = sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);\
+    \
+        if (!is_ray_occluded(make_ray(point, wi, normal), 1.0 / 0.0)) {\
+            vec3 Li = env_eval_light(wi, light_pdf);\
+    \
+            float weight = power_heuristic(scatter_pdf, light_pdf);\
+            radiance += throughput * f * Li * weight;\
+        }\
+        throughput *= f;\
+        flags |= MAT_OFLAG_ENVMAP_SAMPLED;                                                        \
+    } else {\
+    throughput *= sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);                  \
+    }\
                                                                                                   \
     flags = (flags & ~MAT_IFLAG_MASK) | props; /* keep properties */                              \
     return ray_t(point + PREC * sign(dot(wi, normal)) * normal, wi);                              \
@@ -323,18 +357,6 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
             last_is_specular = specular;
             */
 
-/*
-
-without MIS to begin with:
-
-1. account for absorption first, and figure out if we're inside or outside
-2. sample BRDF, ignoring the PDF (it is PREDIVIDED and is never zero)
-3. return thi ray
-
-with MIS, insert a direct light sampling step somewhere
-
-*/
-
 ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, float path_length,
                    inout vec3 throughput, inout vec3 radiance, out uint flags, inout random_t random) {
     flags = material & MAT_IFLAG_MASK;
@@ -344,17 +366,17 @@ ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, f
             MAT_INTERACT(mat_lambertian_absorption,
                          mat_lambertian_eval_brdf,
                          mat_lambertian_sample_brdf,
-                         MAT_PROP_DIFFUSE_BSDF)
+                         MAT_PROP_DIFFUSE_BSDF | MAT_PROP_OPAQUE_BSDF)
         case 1U:
             MAT_INTERACT(mat_ideal_reflection_absorption,
                          mat_ideal_reflection_eval_brdf,
                          mat_ideal_reflection_sample_brdf,
-                         MAT_PROP_DELTA_BSDF)
+                         MAT_PROP_DELTA_BSDF | MAT_PROP_OPAQUE_BSDF)
         case 2U:
             MAT_INTERACT(mat_phong_absorption,
                          mat_phong_eval_brdf,
                          mat_phong_sample_brdf,
-                         MAT_PROP_GLOSSY_BSDF)
+                         MAT_PROP_GLOSSY_BSDF | MAT_PROP_OPAQUE_BSDF)
         case 3U:
             MAT_INTERACT(mat_ideal_refraction_absorption,
                          mat_ideal_refraction_eval_brdf,
@@ -369,7 +391,7 @@ ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, f
             MAT_INTERACT(mat_oren_nayar_absorption,
                          mat_oren_nayar_eval_brdf,
                          mat_oren_nayar_sample_brdf,
-                         MAT_PROP_DIFFUSE_BSDF)
+                         MAT_PROP_DIFFUSE_BSDF | MAT_PROP_OPAQUE_BSDF)
         default:
             flags |= MAT_OFLAG_EXTINCT;
             return ray_t(point, normal);

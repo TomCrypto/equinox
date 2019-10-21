@@ -109,7 +109,7 @@ impl Device {
                     filtered_data[y][x] /= total;
 
                     pixels[4 * (y * cols + x) + 3] = f16::from_f32(
-                        filtered_data[y][x] / (4.0 * std::f32::consts::PI)
+                        filtered_data[y][x] / (2.0 * std::f32::consts::PI * std::f32::consts::PI)
                             * (rows as f32)
                             * (cols as f32),
                     )
