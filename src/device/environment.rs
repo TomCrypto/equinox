@@ -126,23 +126,13 @@ impl Device {
             let mut marginal_function: Vec<f32> = vec![];
 
             for y in 0..rows {
-                let (mut row, integral) = build_normalized_pdf_cdf(&filtered_data[y as usize]);
+                let (row, integral) = build_normalized_pdf_cdf(&filtered_data[y as usize]);
 
-                for i in 0..cols {
-                    row[i].pdf = (row[i + 1].cdf - row[i].cdf) * (cols as f32);
-                }
-
-                // the data is just in filtered_data...
                 conditional_cdfs.push(row);
                 marginal_function.push(integral);
             }
 
-            let (mut marginal_cdf, _) = build_normalized_pdf_cdf(&marginal_function);
-
-            for i in 0..rows {
-                marginal_cdf[i].pdf =
-                    (marginal_cdf[i + 1].cdf - marginal_cdf[i].cdf) * (rows as f32);
-            }
+            let (marginal_cdf, _) = build_normalized_pdf_cdf(&marginal_function);
 
             self.envmap_texture.upload(cols, rows, &pixels);
 
