@@ -6,7 +6,7 @@
 #include <material.glsl>
 #include <environment.glsl>
 
-out vec3 color;
+out vec3 radiance;
 
 layout (std140) uniform Camera {
     vec4 origin_plane[4];
@@ -105,6 +105,7 @@ float PowerHeuristic(float fPdf, float gPdf) {
     return (f * f) / (f * f + g * g);
 }
 
+#if 0
 // TODO: factor in path_length later somehow
 // TODO: optimize the power heuristic to avoid unnecessary divisions that cancel out
 
@@ -156,6 +157,7 @@ vec3 estimate_direct_lighting(vec3 point, uint material, uint inst, vec3 wo, vec
 
     return directLighting;
 }
+#endif
 
 void main() {
     random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
@@ -163,14 +165,12 @@ void main() {
     ray_t ray;
     evaluate_primary_ray(random, ray.org, ray.dir);
 
-    vec3 radiance = vec3(0.0);
-    vec3 strength = vec3(1.0);
-    bool last_is_specular = true;
-    bool caustic_path = false;
-    uint index = 0U;
+    vec3 throughput = vec3(1.0);
+    uint traversal_start = 0U;
+    float unused_pdf;
 
     for (uint bounce = 0U; bounce < 100U; ++bounce) {
-        traversal_t traversal = traverse_scene(ray, index);
+        traversal_t traversal = traverse_scene(ray, traversal_start);
 
         if (traversal_has_hit(traversal)) {
             ray.org += ray.dir * traversal.range.y;
@@ -178,69 +178,24 @@ void main() {
             vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
 
             uint material = traversal.hit.y & 0xffffU;
-            uint inst = traversal.hit.y >> 16U;
+            uint mat_inst = traversal.hit.y >> 16U;
+            uint flags;
 
-            /*
+            ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
 
-            ray.dir = mat_interact(material, instance, ray.org, -ray.dir, traversal.range.y, normal, random, strength, sampled_light);
-            ray.org += normal * PREC * sign(dot(ray.dir, normal));
-
-            // on environment hit, if !sampled_light then add envmap contribution
-
-            */
-
-            vec3 wo = -ray.dir;
-
-            bool specular = mat_is_specular(material);
-
-            // if the last hit was not specular, and we are specular, this is a caustic
-            if (!last_is_specular && specular) {
-                caustic_path = true;
+            if ((flags & MAT_OFLAG_EXTINCT) != 0U) {
+                break; // no need to trace further
             }
 
-            if (!specular) {
-                vec3 direct = estimate_direct_lighting(ray.org, material, inst, wo, normal, random);
-
-                radiance += strength * direct;
-            }
-
-            last_is_specular = specular;
-
-            vec3 wi;
-            float brdf_pdf;
-
-            vec3 brdf_path_strength = mat_sample_brdf(material, inst, normal, wi, wo, traversal.range.y, brdf_pdf, random);
-
-            // TODO: better way to represent this?
-
-            if (brdf_pdf == 0.0) {
-                break;
-            }
-
-            strength *= brdf_path_strength / brdf_pdf;
-
-            bool outside = dot(ray.dir, normal) <= 0.0;
-
-            ray = make_ray(ray.org, wi, normal);
-
-            // normal always points OUTWARDS, so we are only refracting if:
-            //  - we were going towards the normal before
-            //  - we are going the same direction after
-
-            if (outside && (dot(ray.dir, normal) <= 0.0)) {
-                // we are refracting
-                index = traversal.hit.z;
+            if (((~flags) & (MAT_OFLAG_OUTSIDE | MAT_OFLAG_TRANSMIT)) == 0U) {
+                traversal_start = traversal.hit.z;
             } else {
-                index = 0U; // restart from the root
+                traversal_start = 0U;
             }
         } else {
-            // we've hit the environment map. We need to sample the environment map...
-
-            float lightPdf;
-
-            if (last_is_specular) {
-                radiance += strength * env_eval_light(ray.dir, lightPdf);
-            }
+            // if (last_is_specular) {
+                radiance += throughput * env_eval_light(ray.dir, unused_pdf);
+            // }
 
             break;
         }
@@ -252,18 +207,12 @@ void main() {
         // russian roulette
 
         vec2 rng = rand_uniform_vec2(random);
-        float p = min(1.0, max(strength.x, max(strength.y, strength.z)));
+        float p = min(1.0, max(throughput.x, max(throughput.y, throughput.z)));
 
         if (rng.x < p) {
-            strength /= p;
+            throughput /= p;
         } else {
             break;
         }
     }
-
-    //if (caustic_path) {
-        color = radiance;
-    /*} else {
-        color = vec3(0.0);
-    }*/
 }

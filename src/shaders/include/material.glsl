@@ -1,11 +1,23 @@
 #include <common.glsl>
 #include <random.glsl>
 
+#include <instance.glsl>
+
 layout (std140) uniform Material {
     vec4 data[MATERIAL_DATA_COUNT];
 } material_buffer;
 
-// Material parameter packing
+#define MAT_IFLAG_ALLOW_MIS   (1U << 8U) // multiple importance sampling permitted for this call
+#define MAT_IFLAG_MASK        0xff00U
+
+#define MAT_OFLAG_OUTSIDE          1U // (1U << 0U) // the ray originates from inside this material
+#define MAT_OFLAG_TRANSMIT          (1U << 1U) // the ray is following a transmissive path
+#define MAT_OFLAG_EXTINCT         (1U << 2U) // the path is fully extinct and need not be traced
+#define MAT_OFLAG_MASK            0x00ffU
+
+#define MAT_PROP_DIFFUSE_BSDF     (1U << 8U)
+#define MAT_PROP_GLOSSY_BSDF      (1U << 9U)
+#define MAT_PROP_DELTA_BSDF       (1U << 10U)
 
 // == LAMBERTIAN =================================================================================
 #define MAT_LAMBERTIAN_ALBEDO                               material_buffer.data[inst +  0U].xyz
@@ -28,7 +40,16 @@ layout (std140) uniform Material {
 #define MAT_OREN_NAYAR_COEFF_A                              material_buffer.data[inst +  1U].x
 #define MAT_OREN_NAYAR_COEFF_B                              material_buffer.data[inst +  1U].y
 
-// Material BRDF definitions
+// == LAMBERTIAN BSDF ============================================================================
+
+vec3 mat_lambertian_absorption(uint inst, float path_length, inout uint flags) {
+    if ((flags & MAT_OFLAG_OUTSIDE) == 0U) {
+        flags |= MAT_OFLAG_EXTINCT;
+        return vec3(0.0); // opaque
+    }
+
+    return vec3(1.0); // TODO: add external extinction coefficients
+}
 
 vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
     pdf = max(0.0, dot(wi, normal)) / M_PI;
@@ -36,7 +57,7 @@ vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out floa
     return vec3(MAT_LAMBERTIAN_ALBEDO / M_PI);
 }
 
-vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float path_length, out float pdf, inout random_t random) {
+vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
     vec2 rng = rand_uniform_vec2(random);
 
     float r = sqrt(rng.x);
@@ -46,7 +67,18 @@ vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
 
     pdf = max(0.0, dot(wi, normal)) / M_PI;
 
-    return vec3(MAT_LAMBERTIAN_ALBEDO) * pdf;
+    return vec3(MAT_LAMBERTIAN_ALBEDO);
+}
+
+// == IDEAL REFLECTION BSDF ======================================================================
+
+vec3 mat_ideal_reflection_absorption(uint inst, float path_length, inout uint flags) {
+    if ((flags & MAT_OFLAG_OUTSIDE) == 0U) {
+        flags |= MAT_OFLAG_EXTINCT;
+        return vec3(0.0); // opaque
+    }
+
+    return vec3(1.0); // TODO: add external extinction coefficients
 }
 
 vec3 mat_ideal_reflection_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
@@ -55,11 +87,17 @@ vec3 mat_ideal_reflection_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, ou
     return vec3(0.0);
 }
 
-vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float path_length, out float pdf, inout random_t random) {
+vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
     pdf = 1.0;
     wi = reflect(-wo, normal);
 
     return MAT_IDEAL_REFLECTION_REFLECTANCE;
+}
+
+// == IDEAL REFRACTION BSDF ======================================================================
+
+vec3 mat_ideal_refraction_absorption(uint inst, float path_length, inout uint flags) {
+    return vec3(1.0); // TODO: add external extinction coefficients
 }
 
 vec3 mat_ideal_refraction_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
@@ -68,7 +106,7 @@ vec3 mat_ideal_refraction_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, ou
     return vec3(0.0);
 }
 
-vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float path_length, out float pdf, inout random_t random) {
+vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
     pdf = 1.0;
 
     if (dot(wo, normal) >= 0.0) {
@@ -76,16 +114,31 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 
         if (wi == vec3(0.0)) {
             wi = reflect(-wo, normal);
+        } else {
+            flags |= MAT_OFLAG_TRANSMIT;
         }
     } else {
         wi = refract(-wo, -normal, MAT_IDEAL_REFRACTION_IOR);
 
         if (wi == vec3(0.0)) {
             wi = reflect(-wo, -normal);
+        } else {
+            flags |= MAT_OFLAG_TRANSMIT;
         }
     }
 
     return MAT_IDEAL_REFRACTION_TRANSMITTANCE;
+}
+
+// == PHONG BSDF =================================================================================
+
+vec3 mat_phong_absorption(uint inst, float path_length, inout uint flags) {
+    if ((flags & MAT_OFLAG_OUTSIDE) == 0U) {
+        flags |= MAT_OFLAG_EXTINCT;
+        return vec3(0.0); // opaque
+    }
+
+    return vec3(1.0); // TODO: add external extinction coefficients
 }
 
 vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
@@ -102,7 +155,7 @@ vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf
     return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / M_2PI * cos_alpha;
 }
 
-vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float path_length, out float pdf, inout random_t random) {
+vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
     vec2 rng = rand_uniform_vec2(random);
 
     float phi = M_2PI * rng.x;
@@ -120,7 +173,23 @@ vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float p
         pdf = cos_alpha * (MAT_PHONG_EXPONENT + 1.0) / M_2PI;
     }
 
-    return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / (MAT_PHONG_EXPONENT + 1.0) * pdf;
+    return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / (MAT_PHONG_EXPONENT + 1.0);
+}
+
+// == DIELECTRIC BSDF ============================================================================
+
+vec3 mat_dielectric_absorption(uint inst, float path_length, inout uint flags) {
+    vec3 extinction;
+
+    if ((flags & MAT_OFLAG_OUTSIDE) == 0U) {
+        extinction = MAT_DIELECTRIC_INTERNAL_EXTINCTION_COEFFICIENT
+                   * MAT_DIELECTRIC_INTERNAL_REFRACTIVE_INDEX;
+    } else {
+        extinction = MAT_DIELECTRIC_EXTERNAL_EXTINCTION_COEFFICIENT
+                   * MAT_DIELECTRIC_EXTERNAL_REFRACTIVE_INDEX;
+    }
+
+    return exp(-extinction * M_2PI * path_length / vec3(685e-9, 530e-9, 470e-9));
 }
 
 vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
@@ -129,20 +198,17 @@ vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out floa
     return vec3(0.0);
 }
 
-vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float path_length, out float pdf, inout random_t random) {
+vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
     pdf = 1.0;
 
     float n1, n2, cosI = dot(wo, normal);
-    vec3 extinction;
 
     if (cosI > 0.0) {
         n1 = MAT_DIELECTRIC_EXTERNAL_REFRACTIVE_INDEX;
         n2 = MAT_DIELECTRIC_INTERNAL_REFRACTIVE_INDEX;
-        extinction = exp(-MAT_DIELECTRIC_EXTERNAL_EXTINCTION_COEFFICIENT * M_2PI * n1 * path_length / vec3(685e-9, 530e-9, 470e-9));
     } else {
         n1 = MAT_DIELECTRIC_INTERNAL_REFRACTIVE_INDEX;
         n2 = MAT_DIELECTRIC_EXTERNAL_REFRACTIVE_INDEX;
-        extinction = exp(-MAT_DIELECTRIC_INTERNAL_EXTINCTION_COEFFICIENT * M_2PI * n1 * path_length / vec3(685e-9, 530e-9, 470e-9));
 
         normal = -normal;
         cosI = -cosI;
@@ -163,18 +229,30 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
             wi = reflect(-wo, normal);
         } else {
             wi = (eta * cosI - cosT) * normal - eta * wo;
+            flags |= MAT_OFLAG_TRANSMIT;
 
             // Account for change in beam area and wave velocity; the change in wave
             // velocity is only important if a light source exists inside the medium
             // as otherwise the factor is cancelled out as the ray exits the medium.
 
-            extinction *= cosT / (cosI * eta);
+            return MAT_DIELECTRIC_BASE_COLOR * cosT / (cosI * eta);
         }
     } else {
         wi = reflect(-wo, normal);
     }
 
-    return extinction * MAT_DIELECTRIC_BASE_COLOR;
+    return MAT_DIELECTRIC_BASE_COLOR;
+}
+
+// == OREN-NAYAR BSDF ============================================================================
+
+vec3 mat_oren_nayar_absorption(uint inst, float path_length, inout uint flags) {
+    if ((flags & MAT_OFLAG_OUTSIDE) == 0U) {
+        flags |= MAT_OFLAG_EXTINCT;
+        return vec3(0.0); // opaque
+    }
+
+    return vec3(1.0); // TODO: add external extinction coefficients
 }
 
 float oren_nayar_term(float wi_n, float wo_n, vec3 wi, vec3 wo, vec3 normal, float a, float b) {
@@ -195,7 +273,7 @@ vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out floa
     return vec3(MAT_OREN_NAYAR_ALBEDO / M_PI) * oren_nayar_term(wi_n, max(0.0, dot(wo, normal)), wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
 }
 
-vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float path_length, out float pdf, inout random_t random) {
+vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
     vec2 rng = rand_uniform_vec2(random);
 
     float r = sqrt(rng.x);
@@ -206,77 +284,96 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
     float wi_n = max(0.0, dot(wi, normal));
     pdf = wi_n / M_PI;
 
-    return vec3(MAT_OREN_NAYAR_ALBEDO) * pdf * oren_nayar_term(wi_n, max(0.0, dot(wo, normal)), wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
+    return vec3(MAT_OREN_NAYAR_ALBEDO) * oren_nayar_term(wi_n, max(0.0, dot(wo, normal)), wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
 }
 
-// Dispatch functions
+// == HIGH-LEVEL MATERIAL INTERACTION ============================================================
 
-bool mat_is_specular(uint material) {
-    switch (material) {
+// TODO: add MIS support here eventually
+// TODO: split PDF into its own method...
+
+#define MAT_INTERACT(absorption, eval_brdf, sample_brdf, props) {                                 \
+    float cosI = dot(wo, normal);                                                                 \
+    float pdf;                                                                                    \
+    vec3 wi;                                                                                      \
+                                                                                                  \
+    flags |= MAT_OFLAG_OUTSIDE * uint(cosI > 0.0);                                                \
+                                                                                                  \
+    throughput *= absorption(inst, path_length, flags);                                           \
+                                                                                                  \
+    if ((flags & MAT_OFLAG_EXTINCT) != 0U) {                                                      \
+        return ray_t(point, normal);                                                              \
+    }                                                                                             \
+                                                                                                  \
+    throughput *= sample_brdf(inst, normal/*, cosI*/, wi, wo, unused, flags, random);             \
+                                                                                                  \
+    flags = (flags & ~MAT_IFLAG_MASK) | props; /* keep properties */                              \
+    return ray_t(point + PREC * sign(dot(wi, normal)) * normal, wi);                              \
+}
+
+            /*
+            bool specular = mat_is_specular(material);
+
+            if (!specular) {
+                vec3 direct = estimate_direct_lighting(ray.org, material, inst, wo, normal, random);
+
+                radiance += strength * direct;
+            }
+
+            last_is_specular = specular;
+            */
+
+/*
+
+without MIS to begin with:
+
+1. account for absorption first, and figure out if we're inside or outside
+2. sample BRDF, ignoring the PDF (it is PREDIVIDED and is never zero)
+3. return thi ray
+
+with MIS, insert a direct light sampling step somewhere
+
+*/
+
+ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, float path_length,
+                   inout vec3 throughput, inout vec3 radiance, out uint flags, inout random_t random) {
+    flags = material & MAT_IFLAG_MASK;
+
+    switch (material & ~MAT_IFLAG_MASK) {
         case 0U:
-            return false;
+            MAT_INTERACT(mat_lambertian_absorption,
+                         mat_lambertian_eval_brdf,
+                         mat_lambertian_sample_brdf,
+                         MAT_PROP_DIFFUSE_BSDF)
         case 1U:
-            return true;
+            MAT_INTERACT(mat_ideal_reflection_absorption,
+                         mat_ideal_reflection_eval_brdf,
+                         mat_ideal_reflection_sample_brdf,
+                         MAT_PROP_DELTA_BSDF)
         case 2U:
-            return false;
+            MAT_INTERACT(mat_phong_absorption,
+                         mat_phong_eval_brdf,
+                         mat_phong_sample_brdf,
+                         MAT_PROP_GLOSSY_BSDF)
         case 3U:
-            return true;
+            MAT_INTERACT(mat_ideal_refraction_absorption,
+                         mat_ideal_refraction_eval_brdf,
+                         mat_ideal_refraction_sample_brdf,
+                         MAT_PROP_DELTA_BSDF)
         case 4U:
-            return true;
+            MAT_INTERACT(mat_dielectric_absorption,
+                         mat_dielectric_eval_brdf,
+                         mat_dielectric_sample_brdf,
+                         MAT_PROP_DELTA_BSDF)
         case 5U:
-            return false;
+            MAT_INTERACT(mat_oren_nayar_absorption,
+                         mat_oren_nayar_eval_brdf,
+                         mat_oren_nayar_sample_brdf,
+                         MAT_PROP_DIFFUSE_BSDF)
         default:
-            return true;
+            flags |= MAT_OFLAG_EXTINCT;
+            return ray_t(point, normal);
     }
 }
 
-vec3 mat_eval_brdf(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
-    switch (material) {
-        case 0U:
-            return mat_lambertian_eval_brdf(inst, normal, wi, wo, pdf);
-        case 1U:
-            return mat_ideal_reflection_eval_brdf(inst, normal, wi, wo, pdf);
-        case 2U:
-            return mat_phong_eval_brdf(inst, normal, wi, wo, pdf);
-        case 3U:
-            return mat_ideal_refraction_eval_brdf(inst, normal, wi, wo, pdf);
-        case 4U:
-            return mat_dielectric_eval_brdf(inst, normal, wi, wo, pdf);
-        case 5U:
-            return mat_oren_nayar_eval_brdf(inst, normal, wi, wo, pdf);
-        default:
-            return vec3(0.0);
-    }
-}
-
-vec3 mat_sample_brdf(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo, float path_length, out float pdf, inout random_t random) {
-    switch (material) {
-        case 0U:
-            return mat_lambertian_sample_brdf(inst, normal, wi, wo, path_length, pdf, random);
-        case 1U:
-            return mat_ideal_reflection_sample_brdf(inst, normal, wi, wo, path_length, pdf, random);
-        case 2U:
-            return mat_phong_sample_brdf(inst, normal, wi, wo, path_length, pdf, random);
-        case 3U:
-            return mat_ideal_refraction_sample_brdf(inst, normal, wi, wo, path_length, pdf, random);
-        case 4U:
-            return mat_dielectric_sample_brdf(inst, normal, wi, wo, path_length, pdf, random);
-        case 5U:
-            return mat_oren_nayar_sample_brdf(inst, normal, wi, wo, path_length, pdf, random);
-        default:
-            return vec3(0.0);
-    }
-}
-
-#define MAT_FLAG_ALLOW_MIS    1 << 0 // multiple importance sampling permitted for this call
-#define MAT_FLAG_MIS_USED     1 << 1 // multiple importance sampling was used
-
-// returns the throughput and returns a good next ray. uses randomness. may use MIS, in which case
-// it will set the MIS boolean
-
-// #define MAT_INTERACT_TEMPLATE(eval_brdf, sample_brdf) \
-
-
-// vec3 mat_interact(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo, vec3 point, float length, inout uint flags, inout random_t random) {
-
-// }
+#undef MAT_INTERACT

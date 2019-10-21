@@ -1,13 +1,13 @@
 #include <geometry.glsl>
 
 struct BvhNode {
-    float bbmin_x;
-    float bbmin_y;
-    float bbmin_z;
+    float minx;
+    float miny;
+    float minz;
     uint word1;
-    float bbmax_x;
-    float bbmax_y;
-    float bbmax_z;
+    float maxx;
+    float maxy;
+    float maxz;
     uint word2;
 };
 
@@ -32,11 +32,9 @@ traversal_t traverse_scene(ray_t ray, uint start) {
     do {
         BvhNode node = instance_buffer.data[index++];
 
-        vec3 bbmin = vec3(node.bbmin_x, node.bbmin_y, node.bbmin_z);
-        vec3 bbmax = vec3(node.bbmax_x, node.bbmax_y, node.bbmax_z);
-
-        uint word1 = node.word1;
-        uint word2 = node.word2;
+        vec3 bbmin = vec3(node.minx, node.miny, node.minz);
+        vec3 bbmax = vec3(node.maxx, node.maxy, node.maxz);
+        uint word1 = node.word1, word2 = node.word2;
 
         index *= uint((word1 & 0x00008000U) == 0U);
         word1 &= 0xffff7fffU; // remove cyclic bit
@@ -67,11 +65,9 @@ bool is_ray_occluded(ray_t ray, float limit) {
     do {
         BvhNode node = instance_buffer.data[index++];
 
-        vec3 bbmin = vec3(node.bbmin_x, node.bbmin_y, node.bbmin_z);
-        vec3 bbmax = vec3(node.bbmax_x, node.bbmax_y, node.bbmax_z);
-
-        uint word1 = node.word1;
-        uint word2 = node.word2;
+        vec3 bbmin = vec3(node.minx, node.miny, node.minz);
+        vec3 bbmax = vec3(node.maxx, node.maxy, node.maxz);
+        uint word1 = node.word1, word2 = node.word2;
 
         index *= uint((word1 & 0x00008000U) == 0U);
         word1 &= 0xffff7fffU; // remove cyclic bit
