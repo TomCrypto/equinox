@@ -193,7 +193,7 @@ void main() {
             break;
         }
 
-        if (bounce <= 1U) {
+        /*if (bounce <= 1U) {
             continue;
         }
 
@@ -206,6 +206,6 @@ void main() {
             throughput /= p;
         } else {
             break;
-        }
+        }*/
     }
 }

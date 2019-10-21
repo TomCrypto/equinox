@@ -51,22 +51,22 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
     if (sin_theta == 0.0) {
         pdf = 0.0;
     } else {
-        pdf = value.w / sin_theta;
+        pdf = value.w / sin_theta / (M_2PI * M_PI);
     }
 
-    return value.rgb * sin_theta / value.w;
+    return value.rgb / pdf; // * sin_theta * (M_2PI * M_PI) / value.w / M_4PI;
 }
 
 vec3 env_eval_light_image(vec3 wi, out float pdf) {
     vec4 value = texture(envmap_texture, direction_to_equirectangular(wi, ENVMAP_ROTATION));
 
-    float sin_theta = sin(direction_to_equirectangular(wi, ENVMAP_ROTATION).y * M_PI);
+    float sin_theta = sqrt(1.0 - wi.y * wi.y);
 
     // TODO: can we avoid isnan here?
     if (sin_theta == 0.0 || isnan(sin_theta)) {
         pdf = 0.0;
     } else {
-        pdf = value.w / sin_theta;
+        pdf = value.w / sin_theta / (M_2PI * M_PI);
     }
 
     return value.rgb;
