@@ -310,11 +310,10 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 // == HIGH-LEVEL MATERIAL INTERACTION ============================================================
 
 #define MAT_INTERACT(absorption, eval_brdf, sample_brdf, props) {                                 \
-    float cosI = dot(wo, normal);                                                                 \
     float light_pdf, scatter_pdf;                                                                 \
     vec3 wi;                                                                                      \
                                                                                                   \
-    flags |= RAY_FLAG_OUTSIDE * uint(cosI > 0.0);                                                 \
+    flags |= RAY_FLAG_OUTSIDE * uint(dot(wo, normal) > 0.0);                                      \
                                                                                                   \
     throughput *= absorption(inst, path_length, flags);                                           \
                                                                                                   \
