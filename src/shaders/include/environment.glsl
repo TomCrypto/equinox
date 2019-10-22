@@ -24,11 +24,17 @@ float inverse_transform(sampler2D texture, int y, float u, int size, out int ind
         }
     }
 
-    index = max(low - 1, 0);
+    index = clamp(low - 1, 0, size - 2);
+
+    float du = u - this_cdf;
 
     next_cdf = texelFetch(texture, ivec2(index + 1, y), 0).x;
 
-    return (float(index) + 0.5 + (u - this_cdf) / (next_cdf - this_cdf)) / float(size);
+    if (next_cdf - this_cdf > 0.0) {
+        du /= (next_cdf - this_cdf);
+    }
+
+    return (float(index) + du) / float(size);
 }
 
 // returns (wi, pdf) for the environment map as well as the light contribution from that direction
@@ -49,10 +55,10 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
     float sin_theta = sin(sampled_v * M_PI);
 
     if (sin_theta == 0.0) {
-        pdf = 0.0;
-    } else {
-        pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI * 1e-3);
+        return pdf = 0.0, vec3(0.0);
     }
+
+    pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI * 1e-3);
 
     return value.rgb * (sin_theta * 2.0 * M_PI * M_PI * 1e-3) / value.w;
 }
@@ -63,10 +69,10 @@ vec3 env_eval_light_image(vec3 wi, out float pdf) {
     float sin_theta = sqrt(max(0.0, 1.0 - wi.y * wi.y));
 
     if (sin_theta == 0.0) {
-        pdf = 0.0;
-    } else {
-        pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI * 1e-3);
+        return pdf = 0.0, vec3(0.0);
     }
+
+    pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI * 1e-3);
 
     return value.rgb;
 }
