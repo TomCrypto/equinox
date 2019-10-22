@@ -20,13 +20,12 @@ float inverse_transform(sampler2D texture, int y, float u, int size, out int ind
             high = mid;
         } else {
             low = mid + 1;
-            // this_cdf = Fx;
+            this_cdf = Fx;
         }
     }
 
     index = max(low - 1, 0);
 
-    this_cdf = texelFetch(texture, ivec2(index, y), 0).x;
     next_cdf = texelFetch(texture, ivec2(index + 1, y), 0).x;
 
     return (float(index) + 0.5 + (u - this_cdf) / (next_cdf - this_cdf)) / float(size);

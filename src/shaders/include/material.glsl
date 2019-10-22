@@ -47,14 +47,20 @@ layout (std140) uniform Material {
 vec3 mat_lambertian_absorption(uint inst, float path_length, inout uint flags) {
     if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
         flags |= RAY_FLAG_EXTINCT;
-        return vec3(0.0); // opaque
+        return vec3(0.0);
     }
 
     return vec3(1.0); // TODO: add external extinction coefficients
 }
 
 vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
-    pdf = max(0.0, dot(wi, normal)) / M_PI;
+    float wi_n = dot(wi, normal);
+
+    if (wi_n <= 0.0 || dot(wo, normal) <= 0.0) {
+        return pdf = 0.0, vec3(0.0);
+    }
+
+    pdf = wi_n / M_PI;
 
     return vec3(MAT_LAMBERTIAN_ALBEDO / M_PI);
 }
@@ -67,7 +73,13 @@ vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 
     wi = rotate(vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi)), normal);
 
-    pdf = max(0.0, dot(wi, normal)) / M_PI;
+    float wi_n = dot(wi, normal);
+
+    if (wi_n <= 0.0 || dot(wo, normal) <= 0.0) {
+        return pdf = 0.0, vec3(0.0);
+    }
+
+    pdf = wi_n / M_PI;
 
     return vec3(MAT_LAMBERTIAN_ALBEDO);
 }
@@ -77,16 +89,14 @@ vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 vec3 mat_ideal_reflection_absorption(uint inst, float path_length, inout uint flags) {
     if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
         flags |= RAY_FLAG_EXTINCT;
-        return vec3(0.0); // opaque
+        return vec3(0.0);
     }
 
     return vec3(1.0); // TODO: add external extinction coefficients
 }
 
 vec3 mat_ideal_reflection_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
-    pdf = 0.0;
-
-    return vec3(0.0);
+    return pdf = 0.0, vec3(0.0);
 }
 
 vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
@@ -137,22 +147,20 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 vec3 mat_phong_absorption(uint inst, float path_length, inout uint flags) {
     if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
         flags |= RAY_FLAG_EXTINCT;
-        return vec3(0.0); // opaque
+        return vec3(0.0);
     }
 
     return vec3(1.0); // TODO: add external extinction coefficients
 }
 
 vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
-    vec3 ideal = reflect(-wo, normal);
-
-    float cos_alpha = pow(max(0.0, dot(ideal, wi)), MAT_PHONG_EXPONENT);
-
-    if (dot(wi, normal) <= 0.0) {
-        pdf = 0.0;
-    } else {
-        pdf = cos_alpha * (MAT_PHONG_EXPONENT + 1.0) / M_2PI;
+    if (dot(wi, normal) <= 0.0 || dot(wo, normal) <= 0.0) {
+        return pdf = 0.0, vec3(0.0);
     }
+
+    float cos_alpha = pow(max(0.0, dot(reflect(-wo, normal), wi)), MAT_PHONG_EXPONENT);
+
+    pdf = cos_alpha * (MAT_PHONG_EXPONENT + 1.0) / M_2PI;
 
     return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / M_2PI * cos_alpha;
 }
@@ -167,13 +175,13 @@ vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out flo
 
     wi = rotate(to_spherical(phi, theta), ideal);
 
+    if (dot(wi, normal) <= 0.0 || dot(wo, normal) <= 0.0) {
+        return pdf = 0.0, vec3(0.0);
+    }
+
     float cos_alpha = pow(max(0.0, dot(ideal, wi)), MAT_PHONG_EXPONENT);
 
-    if (dot(wi, normal) <= 0.0) {
-        pdf = 0.0;
-    } else {
-        pdf = cos_alpha * (MAT_PHONG_EXPONENT + 1.0) / M_2PI;
-    }
+    pdf = cos_alpha * (MAT_PHONG_EXPONENT + 1.0) / M_2PI;
 
     return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / (MAT_PHONG_EXPONENT + 1.0);
 }
@@ -195,9 +203,7 @@ vec3 mat_dielectric_absorption(uint inst, float path_length, inout uint flags) {
 }
 
 vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
-    pdf = 0.0;
-
-    return vec3(0.0);
+    return pdf = 0.0, vec3(0.0);
 }
 
 vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
@@ -251,7 +257,7 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 vec3 mat_oren_nayar_absorption(uint inst, float path_length, inout uint flags) {
     if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
         flags |= RAY_FLAG_EXTINCT;
-        return vec3(0.0); // opaque
+        return vec3(0.0);
     }
 
     return vec3(1.0); // TODO: add external extinction coefficients
@@ -269,10 +275,16 @@ float oren_nayar_term(float wi_n, float wo_n, vec3 wi, vec3 wo, vec3 normal, flo
 }
 
 vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
-    float wi_n = max(0.0, dot(wi, normal));
+    float wi_n = dot(wi, normal);
+    float wo_n = dot(wo, normal);
+
+    if (wi_n <= 0.0 || wo_n <= 0.0) {
+        return pdf = 0.0, vec3(0.0);
+    }
+
     pdf = wi_n / M_PI;
 
-    return vec3(MAT_OREN_NAYAR_ALBEDO / M_PI) * oren_nayar_term(wi_n, max(0.0, dot(wo, normal)), wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
+    return vec3(MAT_OREN_NAYAR_ALBEDO / M_PI) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
 }
 
 vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
@@ -283,16 +295,19 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 
     wi = rotate(vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi)), normal);
 
-    float wi_n = max(0.0, dot(wi, normal));
+    float wi_n = dot(wi, normal);
+    float wo_n = dot(wo, normal);
+
+    if (wi_n <= 0.0 || wo_n <= 0.0) {
+        return pdf = 0.0, vec3(0.0);
+    }
+
     pdf = wi_n / M_PI;
 
-    return vec3(MAT_OREN_NAYAR_ALBEDO) * oren_nayar_term(wi_n, max(0.0, dot(wo, normal)), wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
+    return vec3(MAT_OREN_NAYAR_ALBEDO) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
 }
 
 // == HIGH-LEVEL MATERIAL INTERACTION ============================================================
-
-// TOOD: for MIS, should we continue tracing using the sampled ray or select a new BRDF ray? try both and see
-//  -> seems to make no difference, but try with some more complex materials
 
 #define MAT_INTERACT(absorption, eval_brdf, sample_brdf, props) {                                 \
     float cosI = dot(wo, normal);                                                                 \
@@ -330,7 +345,7 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
                                                                                                   \
         flags |= RAY_FLAG_ENVMAP_SAMPLED;                                                         \
     } else {                                                                                      \
-    throughput *= sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);                  \
+        throughput *= sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);              \
     }                                                                                             \
                                                                                                   \
     flags = (flags & ~MAT_FLAG_MASK) | props; /* store properties */                              \

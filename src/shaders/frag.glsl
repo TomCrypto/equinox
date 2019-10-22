@@ -98,60 +98,6 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-#if 0
-// TODO: factor in path_length later somehow
-// TODO: optimize the power heuristic to avoid unnecessary divisions that cancel out
-
-// call this to get an estimate of the direct lighting hitting a point
-// don't call this for specular surfaces
-// and if this is called, do not consider the environment map on the next bounce
-// TODO: do we need to consider next bounce lighting if the PDF was zero? (not sure)
-vec3 estimate_direct_lighting(vec3 point, uint material, uint inst, vec3 wo, vec3 normal, inout random_t random) {
-    // sample lighting with multiple importance sampling
-
-    float lightPdf, scatteringPdf;
-    vec3 f;
-    vec3 directLighting;
-
-    vec3 light_direction;
-    vec3 Li = env_sample_light(light_direction, lightPdf, random);
-
-    // TODO: special logic to allow transmissive in some materials?
-
-    float cosTheta = dot(light_direction, normal);
-
-    if (lightPdf != 0.0 && (cosTheta <= 0.0 || is_ray_occluded(make_ray(point, light_direction, normal), 1.0 / 0.0))) {
-        lightPdf = 0.0;
-    }
-
-    // Make sure the pdf isn't zero and the radiance isn't black
-    if (lightPdf != 0.0) {
-        // Calculate the brdf value
-        f = mat_eval_brdf(material, inst, normal, light_direction, wo, scatteringPdf) * abs(cosTheta);
-
-        if (scatteringPdf != 0.0) {
-            float weight = PowerHeuristic(lightPdf, scatteringPdf);
-            directLighting += f * Li * weight;
-        }
-    }
-
-    // Sample brdf with multiple importance sampling
-    vec3 wi;
-    f = mat_sample_brdf(material, inst, normal, wi, wo, 0.0, scatteringPdf, random);
-
-    if (scatteringPdf != 0.0) {
-        if (!is_ray_occluded(make_ray(point, wi, normal), 1.0 / 0.0)) {
-            vec3 Li = env_eval_light(wi, lightPdf);
-
-            float weight = PowerHeuristic(scatteringPdf, lightPdf);
-            directLighting += f * Li * weight / scatteringPdf;
-        }
-    }
-
-    return directLighting;
-}
-#endif
-
 void main() {
     random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
 
