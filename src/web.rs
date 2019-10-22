@@ -249,9 +249,9 @@ impl WebScene {
             reflectance: [0.9, 0.9, 0.9],
         });
 
-        self.scene.material_list.push(Material::Lambertian {
+        self.scene.material_list.push(Material::OrenNayar {
             albedo: [0.1, 0.7, 0.7],
-            // roughness: 0.0,
+            roughness: 0.4,
         });
 
         /*self.scene.material_list.push(Material::IdealRefraction {
@@ -273,11 +273,11 @@ impl WebScene {
 
         self.scene.instance_list.push(Instance {
             geometry: 0,
-            material: 2,
+            material: 0,
             parameters: vec![],
         });
 
-        /*self.scene.instance_list.push(Instance {
+        self.scene.instance_list.push(Instance {
             geometry: 1,
             material: 2,
             parameters: vec![],
@@ -287,7 +287,7 @@ impl WebScene {
             geometry: 2,
             material: 2,
             parameters: vec![],
-        });*/
+        });
         /*
 
         self.scene.instance_list.push(Instance {

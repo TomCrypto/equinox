@@ -13,28 +13,24 @@ use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 #[derive(Debug, AsBytes, FromBytes)]
 struct PdfCdf {
     cdf: f32,
-    pdf: f32,
 }
 
 fn build_normalized_pdf_cdf(data: &[f32]) -> (Vec<PdfCdf>, f32) {
-    let mut integral = 0.0;
-
-    for &value in data {
-        integral += value;
-    }
-
     let mut result = Vec::with_capacity(data.len() + 1);
     let mut running = 0.0;
 
-    result.push(PdfCdf { pdf: 0.0, cdf: 0.0 });
+    result.push(PdfCdf { cdf: 0.0 });
 
     for &value in data {
         running += value;
 
-        result.push(PdfCdf {
-            pdf: value / integral,
-            cdf: running / integral,
-        });
+        result.push(PdfCdf { cdf: running });
+    }
+
+    let integral = result.last().unwrap().cdf;
+
+    for value in &mut result {
+        value.cdf /= integral;
     }
 
     (result, integral)

@@ -20,15 +20,16 @@ float inverse_transform(sampler2D texture, int y, float u, int size, out int ind
             high = mid;
         } else {
             low = mid + 1;
-            this_cdf = Fx;
+            // this_cdf = Fx;
         }
     }
 
-    next_cdf = texelFetch(texture, ivec2(low, y), 0).x;
+    index = max(low - 1, 0);
 
-    index = low - 1;
+    this_cdf = texelFetch(texture, ivec2(index, y), 0).x;
+    next_cdf = texelFetch(texture, ivec2(index + 1, y), 0).x;
 
-    return (float(index) + (u - this_cdf) / (next_cdf - this_cdf)) / float(size);
+    return (float(index) + 0.5 + (u - this_cdf) / (next_cdf - this_cdf)) / float(size);
 }
 
 // returns (wi, pdf) for the environment map as well as the light contribution from that direction
@@ -51,22 +52,21 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
     if (sin_theta == 0.0) {
         pdf = 0.0;
     } else {
-        pdf = value.w / sin_theta / (M_2PI * M_PI);
+        pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI);
     }
 
-    return value.rgb / pdf; // * sin_theta * (M_2PI * M_PI) / value.w / M_4PI;
+    return value.rgb * (sin_theta * 2.0 * M_PI * M_PI) / value.w;
 }
 
 vec3 env_eval_light_image(vec3 wi, out float pdf) {
     vec4 value = texture(envmap_texture, direction_to_equirectangular(wi, ENVMAP_ROTATION));
 
-    float sin_theta = sqrt(1.0 - wi.y * wi.y);
+    float sin_theta = sqrt(max(0.0, 1.0 - wi.y * wi.y));
 
-    // TODO: can we avoid isnan here?
-    if (sin_theta == 0.0 || isnan(sin_theta)) {
+    if (sin_theta == 0.0) {
         pdf = 0.0;
     } else {
-        pdf = value.w / sin_theta / (M_2PI * M_PI);
+        pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI);
     }
 
     return value.rgb;
@@ -82,13 +82,13 @@ vec3 env_sample_light_solid(out vec3 wi, out float pdf, inout random_t random) {
 
     wi = vec3(cos(phi) * r, rng.x, sin(phi) * r);
 
-    pdf = 1.0 / (4.0 * M_PI);
+    pdf = 1.0 / M_4PI;
 
-    return vec3(1.0) * 4.0 * M_PI;
+    return vec3(1.0) * M_4PI;
 }
 
 vec3 env_eval_light_solid(vec3 wi, out float pdf) {
-    pdf = 1.0 / (4.0 * M_PI);
+    pdf = 1.0 / M_4PI;
 
     return vec3(1.0);
 }

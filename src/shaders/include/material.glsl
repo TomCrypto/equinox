@@ -20,7 +20,6 @@ layout (std140) uniform Material {
 #define MAT_PROP_DIFFUSE_BSDF     (1U << 8U)
 #define MAT_PROP_GLOSSY_BSDF      (1U << 9U)
 #define MAT_PROP_DELTA_BSDF       (1U << 10U)
-#define MAT_PROP_OPAQUE_BSDF      (1U << 11U)
 
 // == LAMBERTIAN =================================================================================
 #define MAT_LAMBERTIAN_ALBEDO                               material_buffer.data[inst +  0U].xyz
@@ -333,9 +332,11 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
             radiance += throughput * f * Li * weight;\
             }\
     }\
+        throughput *= f;\
         flags |= MAT_OFLAG_ENVMAP_SAMPLED;                                                        \
-    }\
+    } else {\
     throughput *= sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);                  \
+    }\
                                                                                                   \
     flags = (flags & ~MAT_IFLAG_MASK) | props; /* keep properties */                              \
     return ray_t(point + PREC * sign(dot(wi, normal)) * normal, wi);                              \
@@ -350,17 +351,17 @@ ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, f
             MAT_INTERACT(mat_lambertian_absorption,
                          mat_lambertian_eval_brdf,
                          mat_lambertian_sample_brdf,
-                         MAT_PROP_DIFFUSE_BSDF | MAT_PROP_OPAQUE_BSDF)
+                         MAT_PROP_DIFFUSE_BSDF)
         case 1U:
             MAT_INTERACT(mat_ideal_reflection_absorption,
                          mat_ideal_reflection_eval_brdf,
                          mat_ideal_reflection_sample_brdf,
-                         MAT_PROP_DELTA_BSDF | MAT_PROP_OPAQUE_BSDF)
+                         MAT_PROP_DELTA_BSDF)
         case 2U:
             MAT_INTERACT(mat_phong_absorption,
                          mat_phong_eval_brdf,
                          mat_phong_sample_brdf,
-                         MAT_PROP_GLOSSY_BSDF | MAT_PROP_OPAQUE_BSDF)
+                         MAT_PROP_GLOSSY_BSDF)
         case 3U:
             MAT_INTERACT(mat_ideal_refraction_absorption,
                          mat_ideal_refraction_eval_brdf,
@@ -375,7 +376,7 @@ ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, f
             MAT_INTERACT(mat_oren_nayar_absorption,
                          mat_oren_nayar_eval_brdf,
                          mat_oren_nayar_sample_brdf,
-                         MAT_PROP_DIFFUSE_BSDF | MAT_PROP_OPAQUE_BSDF)
+                         MAT_PROP_DIFFUSE_BSDF)
         default:
             flags |= MAT_OFLAG_EXTINCT;
             return ray_t(point, normal);
