@@ -275,18 +275,21 @@ impl WebScene {
             geometry: 0,
             material: 0,
             parameters: vec![],
+            allow_mis: true,
         });
 
         self.scene.instance_list.push(Instance {
             geometry: 1,
             material: 2,
             parameters: vec![],
+            allow_mis: true,
         });
 
         self.scene.instance_list.push(Instance {
             geometry: 2,
             material: 2,
             parameters: vec![],
+            allow_mis: true,
         });
         /*
 

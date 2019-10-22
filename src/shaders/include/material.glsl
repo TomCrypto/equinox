@@ -8,18 +8,18 @@ layout (std140) uniform Material {
     vec4 data[MATERIAL_DATA_COUNT];
 } material_buffer;
 
-#define MAT_IFLAG_ALLOW_MIS   (1U << 8U) // multiple importance sampling permitted for this call
-#define MAT_IFLAG_MASK        0xff00U
+#define MAT_FLAG_ALLOW_MIS                                                           (1U << 15U)
+#define MAT_FLAG_MASK                                                                    0xff00U
 
-#define MAT_OFLAG_OUTSIDE          1U // (1U << 0U) // the ray originates from inside this material
-#define MAT_OFLAG_TRANSMIT          (1U << 1U) // the ray is following a transmissive path
-#define MAT_OFLAG_EXTINCT         (1U << 2U) // the path is fully extinct and need not be traced
-#define MAT_OFLAG_ENVMAP_SAMPLED  (1U << 3U)
-#define MAT_OFLAG_MASK            0x00ffU
+#define RAY_FLAG_OUTSIDE                                                             (1U <<  0U)
+#define RAY_FLAG_TRANSMIT                                                            (1U <<  1U)
+#define RAY_FLAG_EXTINCT                                                             (1U <<  2U)
+#define RAY_FLAG_ENVMAP_SAMPLED                                                      (1U <<  3U)
+#define RAY_FLAG_MASK                                                                    0x00ffU
 
-#define MAT_PROP_DIFFUSE_BSDF     (1U << 8U)
-#define MAT_PROP_GLOSSY_BSDF      (1U << 9U)
-#define MAT_PROP_DELTA_BSDF       (1U << 10U)
+#define MAT_PROP_DIFFUSE_BSDF                                                        (1U <<  8U)
+#define MAT_PROP_GLOSSY_BSDF                                                         (1U <<  9U)
+#define MAT_PROP_DELTA_BSDF                                                          (1U << 10U)
 
 // == LAMBERTIAN =================================================================================
 #define MAT_LAMBERTIAN_ALBEDO                               material_buffer.data[inst +  0U].xyz
@@ -45,8 +45,8 @@ layout (std140) uniform Material {
 // == LAMBERTIAN BSDF ============================================================================
 
 vec3 mat_lambertian_absorption(uint inst, float path_length, inout uint flags) {
-    if ((flags & MAT_OFLAG_OUTSIDE) == 0U) {
-        flags |= MAT_OFLAG_EXTINCT;
+    if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
+        flags |= RAY_FLAG_EXTINCT;
         return vec3(0.0); // opaque
     }
 
@@ -75,8 +75,8 @@ vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 // == IDEAL REFLECTION BSDF ======================================================================
 
 vec3 mat_ideal_reflection_absorption(uint inst, float path_length, inout uint flags) {
-    if ((flags & MAT_OFLAG_OUTSIDE) == 0U) {
-        flags |= MAT_OFLAG_EXTINCT;
+    if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
+        flags |= RAY_FLAG_EXTINCT;
         return vec3(0.0); // opaque
     }
 
@@ -117,7 +117,7 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
         if (wi == vec3(0.0)) {
             wi = reflect(-wo, normal);
         } else {
-            flags |= MAT_OFLAG_TRANSMIT;
+            flags |= RAY_FLAG_TRANSMIT;
         }
     } else {
         wi = refract(-wo, -normal, MAT_IDEAL_REFRACTION_IOR);
@@ -125,7 +125,7 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
         if (wi == vec3(0.0)) {
             wi = reflect(-wo, -normal);
         } else {
-            flags |= MAT_OFLAG_TRANSMIT;
+            flags |= RAY_FLAG_TRANSMIT;
         }
     }
 
@@ -135,8 +135,8 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 // == PHONG BSDF =================================================================================
 
 vec3 mat_phong_absorption(uint inst, float path_length, inout uint flags) {
-    if ((flags & MAT_OFLAG_OUTSIDE) == 0U) {
-        flags |= MAT_OFLAG_EXTINCT;
+    if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
+        flags |= RAY_FLAG_EXTINCT;
         return vec3(0.0); // opaque
     }
 
@@ -183,7 +183,7 @@ vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out flo
 vec3 mat_dielectric_absorption(uint inst, float path_length, inout uint flags) {
     vec3 extinction;
 
-    if ((flags & MAT_OFLAG_OUTSIDE) == 0U) {
+    if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
         extinction = MAT_DIELECTRIC_INTERNAL_EXTINCTION_COEFFICIENT
                    * MAT_DIELECTRIC_INTERNAL_REFRACTIVE_INDEX;
     } else {
@@ -231,7 +231,7 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
             wi = reflect(-wo, normal);
         } else {
             wi = (eta * cosI - cosT) * normal - eta * wo;
-            flags |= MAT_OFLAG_TRANSMIT;
+            flags |= RAY_FLAG_TRANSMIT;
 
             // Account for change in beam area and wave velocity; the change in wave
             // velocity is only important if a light source exists inside the medium
@@ -249,8 +249,8 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 // == OREN-NAYAR BSDF ============================================================================
 
 vec3 mat_oren_nayar_absorption(uint inst, float path_length, inout uint flags) {
-    if ((flags & MAT_OFLAG_OUTSIDE) == 0U) {
-        flags |= MAT_OFLAG_EXTINCT;
+    if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
+        flags |= RAY_FLAG_EXTINCT;
         return vec3(0.0); // opaque
     }
 
@@ -299,54 +299,49 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
     float light_pdf, scatter_pdf;                                                                 \
     vec3 wi;                                                                                      \
                                                                                                   \
-    flags |= MAT_OFLAG_OUTSIDE * uint(cosI > 0.0);                                                \
+    flags |= RAY_FLAG_OUTSIDE * uint(cosI > 0.0);                                                 \
                                                                                                   \
     throughput *= absorption(inst, path_length, flags);                                           \
                                                                                                   \
-    if ((flags & MAT_OFLAG_EXTINCT) != 0U) {                                                      \
+    if ((flags & RAY_FLAG_EXTINCT) != 0U) {                                                       \
         return ray_t(point, normal);                                                              \
     }                                                                                             \
                                                                                                   \
-    if (((props) & MAT_PROP_DELTA_BSDF) == 0U/* && (flags & MAT_IFLAG_ALLOW_MIS) != 0U*/) {             \
-        vec3 light_direction;\
-        vec3 Li = env_sample_light(light_direction, light_pdf, random);\
- \
-        float cosTheta = dot(light_direction, normal);\
-        vec3 f;\
-    \
-    if (light_pdf != 0.0) {\
-        f = eval_brdf(inst, normal, light_direction, wo, scatter_pdf) * abs(cosTheta);\
-    \
-        if (scatter_pdf != 0.0 && !is_ray_occluded(make_ray(point, light_direction, normal), 1.0 / 0.0)) {\
-            float weight = power_heuristic(light_pdf, scatter_pdf);\
-            radiance += throughput * f * Li * weight;\
-        }\
-    }\
-    \
-    f = sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);\
-        if (scatter_pdf != 0.0 && !is_ray_occluded(make_ray(point, wi, normal), 1.0 / 0.0)) {\
-            vec3 Li = env_eval_light(wi, light_pdf);\
-            \
-            if (light_pdf != 0.0) {\
-            float weight = power_heuristic(scatter_pdf, light_pdf);\
-            radiance += throughput * f * Li * weight;\
-            }\
-    }\
-        throughput *= f;\
-        flags |= MAT_OFLAG_ENVMAP_SAMPLED;                                                        \
-    } else {\
-    throughput *= sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);                  \
-    }\
+    if ((props & MAT_PROP_DELTA_BSDF) == 0U && (flags & MAT_FLAG_ALLOW_MIS) != 0U) {              \
+        vec3 Li = env_sample_light(wi, light_pdf, random), f;                                     \
                                                                                                   \
-    flags = (flags & ~MAT_IFLAG_MASK) | props; /* keep properties */                              \
+        if (light_pdf != 0.0) {                                                                   \
+            f = eval_brdf(inst, normal, wi, wo, scatter_pdf) * abs(dot(wi, normal));              \
+                                                                                                  \
+            if (scatter_pdf != 0.0 && !is_ray_occluded(make_ray(point, wi, normal), 1.0 / 0.0)) { \
+                radiance += throughput * f * Li * power_heuristic(light_pdf, scatter_pdf);        \
+            }                                                                                     \
+        }                                                                                         \
+                                                                                                  \
+        throughput *= sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);              \
+                                                                                                  \
+        if (scatter_pdf != 0.0 && !is_ray_occluded(make_ray(point, wi, normal), 1.0 / 0.0)) {     \
+            Li = env_eval_light(wi, light_pdf);                                                   \
+                                                                                                  \
+            if (light_pdf != 0.0) {                                                               \
+                radiance += throughput * Li * power_heuristic(scatter_pdf, light_pdf);            \
+            }                                                                                     \
+        }                                                                                         \
+                                                                                                  \
+        flags |= RAY_FLAG_ENVMAP_SAMPLED;                                                         \
+    } else {                                                                                      \
+    throughput *= sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);                  \
+    }                                                                                             \
+                                                                                                  \
+    flags = (flags & ~MAT_FLAG_MASK) | props; /* store properties */                              \
     return ray_t(point + PREC * sign(dot(wi, normal)) * normal, wi);                              \
 }
 
 ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, float path_length,
                    inout vec3 throughput, inout vec3 radiance, out uint flags, inout random_t random) {
-    flags = material & MAT_IFLAG_MASK;
+    flags = material & MAT_FLAG_MASK;
 
-    switch (material & ~MAT_IFLAG_MASK) {
+    switch (material & ~MAT_FLAG_MASK) {
         case 0U:
             MAT_INTERACT(mat_lambertian_absorption,
                          mat_lambertian_eval_brdf,
@@ -378,7 +373,7 @@ ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, f
                          mat_oren_nayar_sample_brdf,
                          MAT_PROP_DIFFUSE_BSDF)
         default:
-            flags |= MAT_OFLAG_EXTINCT;
+            flags |= RAY_FLAG_EXTINCT;
             return ray_t(point, normal);
     }
 }

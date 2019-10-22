@@ -52,10 +52,10 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
     if (sin_theta == 0.0) {
         pdf = 0.0;
     } else {
-        pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI);
+        pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI * 1e-3);
     }
 
-    return value.rgb * (sin_theta * 2.0 * M_PI * M_PI) / value.w;
+    return value.rgb * (sin_theta * 2.0 * M_PI * M_PI * 1e-3) / value.w;
 }
 
 vec3 env_eval_light_image(vec3 wi, out float pdf) {
@@ -66,7 +66,7 @@ vec3 env_eval_light_image(vec3 wi, out float pdf) {
     if (sin_theta == 0.0) {
         pdf = 0.0;
     } else {
-        pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI);
+        pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI * 1e-3);
     }
 
     return value.rgb;

@@ -176,17 +176,17 @@ void main() {
 
             ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
 
-            if ((flags & MAT_OFLAG_EXTINCT) != 0U) {
+            if ((flags & RAY_FLAG_EXTINCT) != 0U) {
                 break; // no need to trace further
             }
 
-            if (((~flags) & (MAT_OFLAG_OUTSIDE | MAT_OFLAG_TRANSMIT)) == 0U) {
+            if (((~flags) & (RAY_FLAG_OUTSIDE | RAY_FLAG_TRANSMIT)) == 0U) {
                 traversal_start = traversal.hit.z;
             } else {
                 traversal_start = 0U;
             }
         } else {
-            if ((flags & MAT_OFLAG_ENVMAP_SAMPLED) == 0U) {
+            if ((flags & RAY_FLAG_ENVMAP_SAMPLED) == 0U) {
                 radiance += throughput * env_eval_light(ray.dir, unused_pdf);
             }
 

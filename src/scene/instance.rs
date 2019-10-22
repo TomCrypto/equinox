@@ -7,5 +7,8 @@ use serde::{Deserialize, Serialize};
 pub struct Instance {
     pub geometry: usize,
     pub material: usize,
+    #[serde(default)]
     pub parameters: Vec<f32>,
+    #[serde(default)]
+    pub allow_mis: bool,
 }
