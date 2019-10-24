@@ -7,34 +7,7 @@ use half::f16;
 use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
 use std::collections::HashMap;
-use zerocopy::{AsBytes, FromBytes, LayoutVerified};
-
-#[repr(C)]
-#[derive(Debug, AsBytes, FromBytes)]
-struct PdfCdf {
-    cdf: f32,
-}
-
-fn build_normalized_pdf_cdf(data: &[f32]) -> (Vec<PdfCdf>, f32) {
-    let mut result = Vec::with_capacity(data.len() + 1);
-    let mut running = 0.0;
-
-    result.push(PdfCdf { cdf: 0.0 });
-
-    for &value in data {
-        running += value;
-
-        result.push(PdfCdf { cdf: running });
-    }
-
-    let integral = result.last().unwrap().cdf;
-
-    for value in &mut result {
-        value.cdf /= integral;
-    }
-
-    (result, integral)
-}
+use zerocopy::LayoutVerified;
 
 impl Device {
     pub(crate) fn update_environment(
@@ -53,121 +26,119 @@ impl Device {
                 LayoutVerified::<_, Header>::new_from_prefix(assets[&map.pixels].as_slice())
                     .unwrap();
 
-            if (*header).data_format.try_parse() != Some(DataFormat::RGBA16F) {
+            if header.data_format.try_parse() != Some(DataFormat::RGBA16F) {
                 return Err(Error::new("expected RGBA16F environment map"));
             }
 
-            if (*header).color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
+            if header.color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
                 return Err(Error::new("expected linear sRGB environment map"));
             }
 
-            let mut pixels = LayoutVerified::new_slice(data).unwrap().to_vec();
+            if header.dimensions[0] % 2 != 0 || header.dimensions[1] % 2 != 0 {
+                return Err(Error::new("environment map must have even dimensions"));
+            }
 
-            let cols = (*header).dimensions[0] as usize;
-            let rows = (*header).dimensions[1] as usize;
+            let pixels = LayoutVerified::new_slice(data).unwrap();
+
+            let cols = header.dimensions[0] as usize;
+            let rows = header.dimensions[1] as usize;
 
             self.program.set_define("ENVMAP_COLS", cols);
             self.program.set_define("ENVMAP_ROWS", rows);
             self.program
                 .set_define("ENVMAP_ROTATION", format!("{:+e}", map.rotation));
 
-            // compute the CDF data and load it into our buffers...
+            let mut luminance = vec![0.0f32; cols * rows];
 
-            // STEP 1: compute the filtered data which we'll build the CDF data for
-            // use an average luminance measure here
+            compute_envmap_luminance(&pixels, &mut luminance, cols, rows);
 
-            let mut filtered_data = vec![];
-            let mut total = 0.0;
+            let mut marg_cdf = Vec::with_capacity(rows);
 
             for y in 0..rows {
-                let mut row = vec![];
-
-                let v = (y as f32 + 0.5) / (rows as f32);
-
-                let weight = (std::f32::consts::PI * v).sin();
-
-                for x in 0..cols {
-                    let r: f32 = f16::from_bits(pixels[(4 * (y * cols + x) + 0) as usize]).into();
-                    let g: f32 = f16::from_bits(pixels[(4 * (y * cols + x) + 1) as usize]).into();
-                    let b: f32 = f16::from_bits(pixels[(4 * (y * cols + x) + 2) as usize]).into();
-
-                    let value = (r * 0.2126 + g * 0.7152 + b * 0.0722) * weight;
-                    total += value;
-
-                    row.push(value);
-                }
-
-                filtered_data.push(row);
+                marg_cdf.push(pdf_to_cdf(&mut luminance[y * cols..(y + 1) * cols]));
             }
 
-            for y in 0..rows {
-                for x in 0..cols {
-                    filtered_data[y][x] /= total;
-                }
+            let half_data: &mut [u16] = self.allocator.allocate(cols * rows);
+
+            for (fp16, &fp32) in half_data.iter_mut().zip(&luminance) {
+                *fp16 = f16::from_f32(fp32).to_bits();
             }
 
-            // STEP 2: build the conditional CDFs for each row, as an array of
-            // CDF values ranging from 0 to 1. There will be width +
-            // 1 entries in each row. don't normalize them yet, we'll need their
-            // integral value to compute the marginal CDF
+            self.envmap_cond_cdf.upload(cols, rows, half_data);
 
-            let mut conditional_cdfs: Vec<Vec<PdfCdf>> = vec![];
-            let mut marginal_function: Vec<f32> = vec![];
+            pdf_to_cdf(&mut marg_cdf);
 
-            for y in 0..rows {
-                let (row, integral) = build_normalized_pdf_cdf(&filtered_data[y as usize]);
-
-                conditional_cdfs.push(row);
-                marginal_function.push(integral);
+            for (fp16, &fp32) in half_data[..rows].iter_mut().zip(&marg_cdf) {
+                *fp16 = f16::from_f32(fp32).to_bits();
             }
 
-            let (marginal_cdf, _) = build_normalized_pdf_cdf(&marginal_function);
-
-            // self.envmap_texture.upload(cols, rows, &pixels);
-
-            // STEP 5: upload the marginal CDF to its own texture
-
-            let marginal_cdf_floats: &mut [u16] = self.allocator.allocate(rows);
-
-            for y in 0..rows {
-                marginal_cdf_floats[y] = f16::from_f32(marginal_cdf[y].cdf).to_bits();
-            }
-
-            self.envmap_marg_cdf.upload(rows, 1, marginal_cdf_floats);
-
-            // STEP 6: upload the conditional CDF to its own texture (one line
-            // per CDF)
-
-            let conditional_cdf_floats: &mut [u16] = self.allocator.allocate(cols * rows);
-
-            for y in 0..rows {
-                for x in 0..cols {
-                    conditional_cdf_floats[y * cols + x] =
-                        f16::from_f32(conditional_cdfs[y][x].cdf).to_bits();
-                }
-            }
-
-            self.envmap_cond_cdf
-                .upload(cols, rows, conditional_cdf_floats);
+            self.envmap_marg_cdf.upload(rows, 1, &half_data[..rows]);
 
             // Pack the per-pixel PDF into the alpha channel of the envmap pixel data. To
             // avoid getting clipped by the FP16 limit, use a 1e-3 multiplier on the PDF.
 
+            let mut envmap_pixels = pixels.to_vec();
+
             for y in 0..rows {
-                let marg_pdf = marginal_cdf[y + 1].cdf - marginal_cdf[y].cdf;
+                let marg_pdf = if y < rows - 1 {
+                    marg_cdf[y + 1] - marg_cdf[y]
+                } else {
+                    1.0 - marg_cdf[y]
+                };
 
                 for x in 0..cols {
-                    let cond_pdf = conditional_cdfs[y][x + 1].cdf - conditional_cdfs[y][x].cdf;
+                    let cond_pdf = if x < cols - 1 {
+                        luminance[y * cols + x + 1] - luminance[y * cols + x]
+                    } else {
+                        1.0 - luminance[y * cols + x]
+                    };
 
                     let pdf = marg_pdf * cond_pdf * 1e-3 * (rows as f32) * (cols as f32);
-
-                    pixels[4 * (y * cols + x) + 3] = f16::from_f32(pdf).to_bits();
+                    envmap_pixels[4 * (y * cols + x) + 3] = f16::from_f32(pdf).to_bits();
                 }
             }
 
-            self.envmap_texture.upload(cols, rows, &pixels);
+            self.envmap_texture.upload(cols, rows, &envmap_pixels);
         }
 
         Ok(())
+    }
+}
+
+fn pdf_to_cdf(data: &mut [f32]) -> f32 {
+    let mut integral = 0.0;
+
+    for value in data.iter_mut() {
+        let temp = *value;
+        *value = integral;
+        integral += temp;
+    }
+
+    for value in data.iter_mut() {
+        *value /= integral;
+    }
+
+    integral
+}
+
+fn compute_envmap_luminance(pixels: &[u16], luminance: &mut [f32], cols: usize, rows: usize) {
+    let mut integral = 0.0;
+
+    for y in 0..rows {
+        let weight = ((y as f32 + 0.5) / (rows as f32) * std::f32::consts::PI).sin();
+
+        for x in 0..cols {
+            let r = f16::from_bits(pixels[4 * (y * cols + x)]).to_f32();
+            let g = f16::from_bits(pixels[4 * (y * cols + x) + 1]).to_f32();
+            let b = f16::from_bits(pixels[4 * (y * cols + x) + 2]).to_f32();
+
+            let value = r.mul_add(0.2126, g.mul_add(0.7152, b * 0.0722)) * weight;
+            luminance[y * cols + x] = value;
+            integral += value;
+        }
+    }
+
+    for value in luminance {
+        *value /= integral;
     }
 }

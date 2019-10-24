@@ -184,91 +184,50 @@ impl WebScene {
         // have proper types whereas doing it in the front-end would require JSON.
 
         self.scene.geometry_list.push(Geometry::Plane {
-            width: Parameter::Constant { value: 1.0 },
-            length: Parameter::Constant { value: 1.0 },
+            width: Parameter::Constant { value: 10.0 },
+            length: Parameter::Constant { value: 10.0 },
         });
 
         self.scene.geometry_list.push(Geometry::Translate {
             translation: [
-                Parameter::Constant { value: 0.0 },
-                Parameter::Constant { value: 0.51 },
-                Parameter::Constant { value: 0.0 },
+                Parameter::Symbolic { index: 0 },
+                Parameter::Symbolic { index: 1 },
+                Parameter::Symbolic { index: 2 },
             ],
-            f: Box::new(Geometry::Scale {
-                factor: Parameter::Constant { value: 0.5 },
-                f: Box::new(Geometry::Sphere {
-                    radius: Parameter::Constant { value: 1.0 },
-                }),
-            }),
-        });
-
-        self.scene.geometry_list.push(Geometry::Onion {
-            thickness: Parameter::Constant { value: 0.1 },
-            f: Box::new(Geometry::Translate {
-                translation: [
-                    Parameter::Constant { value: 0.6 },
-                    Parameter::Constant { value: 0.151 },
-                    Parameter::Constant { value: 0.55 },
-                ],
-                f: Box::new(Geometry::Round {
-                    radius: Parameter::Constant { value: 0.05 },
-                    f: Box::new(Geometry::Scale {
-                        factor: Parameter::Constant { value: 0.1 },
-                        f: Box::new(Geometry::Cuboid {
-                            dimensions: [
-                                Parameter::Constant { value: 1.0 },
-                                Parameter::Constant { value: 1.0 },
-                                Parameter::Constant { value: 1.0 },
-                            ],
-                        }),
-                    }),
-                }),
-            }),
-        });
-
-        self.scene.geometry_list.push(Geometry::Translate {
-            translation: [
-                Parameter::Constant { value: -0.6 },
-                Parameter::Constant { value: 0.151 },
-                Parameter::Constant { value: -0.75 },
-            ],
-            f: Box::new(Geometry::Scale {
-                factor: Parameter::Constant { value: 0.15 },
-                f: Box::new(Geometry::Sphere {
-                    radius: Parameter::Constant { value: 1.0 },
-                }),
+            f: Box::new(Geometry::Sphere {
+                radius: Parameter::Constant { value: 0.799 },
             }),
         });
 
         self.scene.material_list.push(Material::Phong {
-            albedo: [0.75, 0.75, 0.75],
-            shininess: 900.0,
+            albedo: [0.9, 0.9, 0.9],
+            shininess: 20.0,
         });
 
-        self.scene.material_list.push(Material::IdealReflection {
-            reflectance: [0.9, 0.9, 0.9],
+        self.scene.material_list.push(Material::Lambertian {
+            albedo: [0.9, 0.6, 0.2],
         });
 
         self.scene.material_list.push(Material::OrenNayar {
             albedo: [0.1, 0.7, 0.7],
-            roughness: 0.4,
+            roughness: 1.0,
         });
 
-        /*self.scene.material_list.push(Material::IdealRefraction {
-            transmittance: [0.6, 0.7, 1.0],
-            refractive_index: 1.65,
-        });*/
+        self.scene.material_list.push(Material::Phong {
+            albedo: [0.3, 0.9, 0.7],
+            shininess: 700.0,
+        });
 
         self.scene.material_list.push(Material::Dielectric {
-            internal_refractive_index: 1.65,
+            internal_refractive_index: 2.2,
             external_refractive_index: 1.0,
-            internal_extinction_coefficient: [1e-7, 1e-7, 1e-7],
+            internal_extinction_coefficient: [1.0, 1.0, 1.0],
             external_extinction_coefficient: [0.0, 0.0, 0.0],
-            base_color: [1.0, 1.0, 1.0],
+            base_color: [0.560, 0.570, 0.580],
         });
 
-        self.scene.material_list.push(Material::Lambertian {
-            albedo: [0.9, 0.9, 0.9],
+        self.scene.material_list.push(Material::IdealReflection {
+            reflectance: [0.955, 0.637, 0.538],
         });
 
         self.scene.instance_list.push(Instance {
@@ -280,36 +239,85 @@ impl WebScene {
 
         self.scene.instance_list.push(Instance {
             geometry: 1,
-            material: 2,
-            parameters: vec![],
+            material: 1,
+            parameters: vec![0.0, 0.8, 0.0],
             allow_mis: true,
         });
 
         self.scene.instance_list.push(Instance {
-            geometry: 2,
+            geometry: 1,
             material: 2,
-            parameters: vec![],
+            parameters: vec![-2.0, 0.8, 0.0],
             allow_mis: true,
         });
-        /*
 
         self.scene.instance_list.push(Instance {
-            geometry: 3,
+            geometry: 1,
             material: 3,
-            parameters: vec![],
-        });*/
+            parameters: vec![2.0, 0.8, 0.0],
+            allow_mis: true,
+        });
+
+        self.scene.instance_list.push(Instance {
+            geometry: 1,
+            material: 4,
+            parameters: vec![-4.0, 0.8, 0.0],
+            allow_mis: true,
+        });
+
+        self.scene.instance_list.push(Instance {
+            geometry: 1,
+            material: 5,
+            parameters: vec![4.0, 0.8, 0.0],
+            allow_mis: true,
+        });
+
+        self.scene.instance_list.push(Instance {
+            geometry: 1,
+            material: 1,
+            parameters: vec![0.0, 0.8, 4.0],
+            allow_mis: false,
+        });
+
+        self.scene.instance_list.push(Instance {
+            geometry: 1,
+            material: 2,
+            parameters: vec![-2.0, 0.8, 4.0],
+            allow_mis: false,
+        });
+
+        self.scene.instance_list.push(Instance {
+            geometry: 1,
+            material: 3,
+            parameters: vec![2.0, 0.8, 4.0],
+            allow_mis: false,
+        });
+
+        self.scene.instance_list.push(Instance {
+            geometry: 1,
+            material: 4,
+            parameters: vec![-4.0, 0.8, 4.0],
+            allow_mis: false,
+        });
+
+        self.scene.instance_list.push(Instance {
+            geometry: 1,
+            material: 5,
+            parameters: vec![4.0, 0.8, 4.0],
+            allow_mis: false,
+        });
 
         self.scene.camera.position.x = 0.0;
-        self.scene.camera.position.y = 0.5;
-        self.scene.camera.position.z = 3.5;
+        self.scene.camera.position.y = 7.5;
+        self.scene.camera.position.z = 14.2;
 
         self.scene.camera.direction.x = 0.0;
-        self.scene.camera.direction.y = 0.0;
-        self.scene.camera.direction.z = -1.0;
+        self.scene.camera.direction.y = -0.5;
+        self.scene.camera.direction.z = -0.85;
 
         self.scene.camera.aperture = ApertureShape::Circle { radius: 0.0 };
 
-        self.scene.camera.focal_distance = 3.0;
+        self.scene.camera.focal_distance = 15.44;
     }
 }
 

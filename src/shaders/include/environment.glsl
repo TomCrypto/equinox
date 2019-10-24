@@ -37,9 +37,6 @@ float inverse_transform(sampler2D texture, int y, float u, int size, out int ind
     return (float(index) + du) / float(size);
 }
 
-// returns (wi, pdf) for the environment map as well as the light contribution from that direction
-// the returned light contribution is PREDIVIDED by the PDF
-
 vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
     vec2 rng = rand_uniform_vec2(random);
 

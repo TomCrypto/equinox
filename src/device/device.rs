@@ -536,11 +536,7 @@ impl DeviceState {
         data.frame_state[1] = self.rng.next_u32();
         data.frame_state[2] = self.frame;
 
-        // TODO: we can't actually handle this as it's in the render loop, but it won't
-        // fail because the global data is sufficiently small; formalize this
-        // somehow.
-
-        buffer.write(&data).unwrap();
+        buffer.write(&data).expect("internal WebGL error");
 
         self.frame += 1;
     }
