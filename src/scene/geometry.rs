@@ -150,7 +150,6 @@ impl Geometry {
             }
             Self::Subtraction { lhs, .. } => lhs.bounding_box(symbolic_values),
             Self::Onion { thickness, f } => {
-                // TODO: should be possible to do better here
                 let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
 
                 let thickness = thickness.value(symbolic_values)?;

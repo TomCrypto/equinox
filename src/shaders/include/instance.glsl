@@ -1,8 +1,14 @@
 #include <geometry.glsl>
 
 struct BvhNode {
-    vec4 data1;
-    vec4 data2;
+    float minx;
+    float miny;
+    float minz;
+    uint word1;
+    float maxx;
+    float maxy;
+    float maxz;
+    uint word2;
 };
 
 layout (std140) uniform Instance {
@@ -16,32 +22,33 @@ layout (std140) uniform Instance {
 // (to within the specified precision, i.e. it must be othervise visited during traversal)
 // (if not this MAY LOOP FOREVER! must be absolutely surely, provably inside the AABB)
 
-traversal_t traverse_scene(ray_t ray) {
+traversal_t traverse_scene(ray_t ray, uint start) {
     traversal_t traversal = traversal_prepare();
 
 #if INSTANCE_DATA_PRESENT
     vec3 idir = vec3(1.0) / ray.dir;
-    uint index = 0U;
+    uint index = start;
 
     do {
         BvhNode node = instance_buffer.data[index++];
 
-        uint word1 = floatBitsToUint(node.data1.w);
-        uint word2 = floatBitsToUint(node.data2.w);
+        vec3 bbmin = vec3(node.minx, node.miny, node.minz);
+        vec3 bbmax = vec3(node.maxx, node.maxy, node.maxz);
+        uint word1 = node.word1, word2 = node.word2;
 
         index *= uint((word1 & 0x00008000U) == 0U);
         word1 &= 0xffff7fffU; // remove cyclic bit
 
         vec2 range = traversal.range;
 
-        if (ray_bbox(ray.org, idir, range, node.data1.xyz, node.data2.xyz)) {
+        if (ray_bbox(ray.org, idir, range, bbmin, bbmax)) {
             if (word2 != 0xffffffffU && geo_intersect(word1 & 0xffffU, word1 >> 16U, ray, range)) {
-                traversal_record_hit(traversal, range.x, uvec2(word1, word2));
+                traversal_record_hit(traversal, range.x, uvec2(word1, word2), index);
             }
         } else if (word2 == 0xffffffffU) {
             index = word1;
         }
-    } while (index != 0U);
+    } while (index != start);
 #endif
 
     return traversal;
@@ -58,15 +65,16 @@ bool is_ray_occluded(ray_t ray, float limit) {
     do {
         BvhNode node = instance_buffer.data[index++];
 
-        uint word1 = floatBitsToUint(node.data1.w);
-        uint word2 = floatBitsToUint(node.data2.w);
+        vec3 bbmin = vec3(node.minx, node.miny, node.minz);
+        vec3 bbmax = vec3(node.maxx, node.maxy, node.maxz);
+        uint word1 = node.word1, word2 = node.word2;
 
         index *= uint((word1 & 0x00008000U) == 0U);
         word1 &= 0xffff7fffU; // remove cyclic bit
 
         vec2 range = vec2(0.0, limit);
 
-        if (ray_bbox(ray.org, idir, range, node.data1.xyz, node.data2.xyz)) {
+        if (ray_bbox(ray.org, idir, range, bbmin, bbmax)) {
             if (word2 != 0xffffffffU && geo_intersect(word1 & 0xffffU, word1 >> 16U, ray, range)) {
                 return true;
             }

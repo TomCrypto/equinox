@@ -6,7 +6,7 @@
 #include <material.glsl>
 #include <environment.glsl>
 
-out vec3 color;
+out vec3 radiance;
 
 layout (std140) uniform Camera {
     vec4 origin_plane[4];
@@ -98,77 +98,19 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-float PowerHeuristic(float fPdf, float gPdf) {
-    float f = fPdf;
-    float g = gPdf;
-
-    return (f * f) / (f * f + g * g);
-}
-
-// TODO: factor in path_length later somehow
-// TODO: optimize the power heuristic to avoid unnecessary divisions that cancel out
-
-// call this to get an estimate of the direct lighting hitting a point
-// don't call this for specular surfaces
-// and if this is called, do not consider the environment map on the next bounce
-// TODO: do we need to consider next bounce lighting if the PDF was zero? (not sure)
-vec3 estimate_direct_lighting(vec3 point, uint material, uint inst, vec3 wo, vec3 normal, inout random_t random) {
-    // sample lighting with multiple importance sampling
-
-    float lightPdf, scatteringPdf;
-    vec3 f;
-    vec3 directLighting;
-
-    vec3 light_direction;
-    vec3 Li = env_sample_light(light_direction, lightPdf, random);
-
-    // TODO: special logic to allow transmissive in some materials?
-
-    float cosTheta = dot(light_direction, normal);
-
-    if (lightPdf != 0.0 && (cosTheta <= 0.0 || is_ray_occluded(make_ray(point, light_direction, normal), 1.0 / 0.0))) {
-        lightPdf = 0.0;
-    }
-
-    // Make sure the pdf isn't zero and the radiance isn't black
-    if (lightPdf != 0.0) {
-        // Calculate the brdf value
-        f = mat_eval_brdf(material, inst, normal, light_direction, wo, scatteringPdf) * abs(cosTheta);
-
-        if (scatteringPdf != 0.0) {
-            float weight = PowerHeuristic(lightPdf, scatteringPdf);
-            directLighting += f * Li * weight;
-        }
-    }
-
-    // Sample brdf with multiple importance sampling
-    vec3 wi;
-    f = mat_sample_brdf(material, inst, normal, wi, wo, 0.0, scatteringPdf, random);
-
-    if (scatteringPdf != 0.0) {
-        if (!is_ray_occluded(make_ray(point, wi, normal), 1.0 / 0.0)) {
-            vec3 Li = env_eval_light(wi, lightPdf);
-
-            float weight = PowerHeuristic(scatteringPdf, lightPdf);
-            directLighting += f * Li * weight / scatteringPdf;
-        }
-    }
-
-    return directLighting;
-}
-
 void main() {
     random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
 
     ray_t ray;
     evaluate_primary_ray(random, ray.org, ray.dir);
 
-    vec3 radiance = vec3(0.0);
-    vec3 strength = vec3(1.0);
-    bool last_is_specular = true;
+    vec3 throughput = vec3(1.0);
+    uint traversal_start = 0U;
+    uint flags;
+    float unused_pdf;
 
     for (uint bounce = 0U; bounce < 100U; ++bounce) {
-        traversal_t traversal = traverse_scene(ray);
+        traversal_t traversal = traverse_scene(ray, traversal_start);
 
         if (traversal_has_hit(traversal)) {
             ray.org += ray.dir * traversal.range.y;
@@ -176,75 +118,40 @@ void main() {
             vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
 
             uint material = traversal.hit.y & 0xffffU;
-            uint inst = traversal.hit.y >> 16U;
+            uint mat_inst = traversal.hit.y >> 16U;
 
-            /*
+            ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
 
-            ray.dir = mat_interact(material, instance, ray.org, -ray.dir, traversal.range.y, normal, random, strength, sampled_light);
-            ray.org += normal * PREC * sign(dot(ray.dir, normal));
-
-            // on environment hit, if !sampled_light then add envmap contribution
-
-            */
-
-            vec3 wo = -ray.dir;
-
-            bool specular = mat_is_specular(material);
-
-            // if the last hit was not specular, and we are specular, this is a caustic
-            if (!last_is_specular && specular) {
-                break;
+            if ((flags & RAY_FLAG_EXTINCT) != 0U) {
+                break; // no need to trace further
             }
 
-            if (!specular) {
-                vec3 direct = estimate_direct_lighting(ray.org, material, inst, wo, normal, random);
-
-                radiance += strength * direct;
+            if (((~flags) & (RAY_FLAG_OUTSIDE | RAY_FLAG_TRANSMIT)) == 0U) {
+                traversal_start = traversal.hit.z;
+            } else {
+                traversal_start = 0U;
             }
-
-            last_is_specular = specular;
-
-            vec3 wi;
-            float brdf_pdf;
-
-            vec3 brdf_path_strength = mat_sample_brdf(material, inst, normal, wi, wo, traversal.range.y, brdf_pdf, random);
-
-            // TODO: better way to represent this?
-
-            if (brdf_pdf == 0.0) {
-                break;
-            }
-
-            strength *= brdf_path_strength / brdf_pdf;
-
-            ray = make_ray(ray.org, wi, normal);
         } else {
-            // we've hit the environment map. We need to sample the environment map...
-
-            float lightPdf;
-
-            if (last_is_specular) {
-                radiance += strength * env_eval_light(ray.dir, lightPdf);
+            if ((flags & RAY_FLAG_ENVMAP_SAMPLED) == 0U) {
+                radiance += throughput * env_eval_light(ray.dir, unused_pdf);
             }
 
             break;
         }
 
-        if (bounce <= 1U) {
+        if (bounce <= 2U) {
             continue;
         }
 
         // russian roulette
 
         vec2 rng = rand_uniform_vec2(random);
-        float p = min(1.0, max(strength.x, max(strength.y, strength.z)));
+        float p = min(1.0, max(throughput.x, max(throughput.y, throughput.z)));
 
         if (rng.x < p) {
-            strength /= p;
+            throughput /= p;
         } else {
             break;
         }
     }
-
-    color = radiance;
 }
