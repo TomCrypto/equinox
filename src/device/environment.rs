@@ -103,10 +103,6 @@ impl Device {
             for y in 0..rows {
                 for x in 0..cols {
                     filtered_data[y][x] /= total;
-
-                    pixels[4 * (y * cols + x) + 3] =
-                        f16::from_f32(filtered_data[y][x] * (rows as f32) * (cols as f32) * 1e-3)
-                            .to_bits();
                 }
             }
 
@@ -127,7 +123,7 @@ impl Device {
 
             let (marginal_cdf, _) = build_normalized_pdf_cdf(&marginal_function);
 
-            self.envmap_texture.upload(cols, rows, &pixels);
+            // self.envmap_texture.upload(cols, rows, &pixels);
 
             // STEP 5: upload the marginal CDF to its own texture
 
@@ -153,6 +149,23 @@ impl Device {
 
             self.envmap_cond_cdf
                 .upload(cols, rows, conditional_cdf_floats);
+
+            // Pack the per-pixel PDF into the alpha channel of the envmap pixel data. To
+            // avoid getting clipped by the FP16 limit, use a 1e-3 multiplier on the PDF.
+
+            for y in 0..rows {
+                let marg_pdf = marginal_cdf[y + 1].cdf - marginal_cdf[y].cdf;
+
+                for x in 0..cols {
+                    let cond_pdf = conditional_cdfs[y][x + 1].cdf - conditional_cdfs[y][x].cdf;
+
+                    let pdf = marg_pdf * cond_pdf * 1e-3 * (rows as f32) * (cols as f32);
+
+                    pixels[4 * (y * cols + x) + 3] = f16::from_f32(pdf).to_bits();
+                }
+            }
+
+            self.envmap_texture.upload(cols, rows, &pixels);
         }
 
         Ok(())
