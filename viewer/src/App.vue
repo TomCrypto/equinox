@@ -20,7 +20,11 @@
       :on-close="closeEditor"
     />
 
-    <Toolbar :on-save-screenshot="saveScreenshot" :on-edit-json="editJson" />
+    <Toolbar
+      :on-save-screenshot="saveScreenshot"
+      :on-edit-json="editJson"
+      :on-edit-environment="editEnvironment"
+    />
 
     <StatusBar
       v-if="canvas !== null"
@@ -46,6 +50,8 @@
       :render="screenshot"
       :on-close="downloadOverlayClosed"
     />
+
+    <EnvironmentEditor v-if="showEnvironmentEditor" :scene="scene" :load-asset="load_asset" />
   </div>
 </template>
 
@@ -56,6 +62,7 @@ import LoadingOverlay from "@/components/LoadingOverlay.vue";
 import Toolbar from "@/components/Toolbar.vue";
 import JsonEditor from "@/components/JsonEditor.vue";
 import DownloadOverlay from "@/components/DownloadOverlay.vue";
+import EnvironmentEditor from "@/components/EnvironmentEditor.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
 import Zip from "jszip";
@@ -73,7 +80,8 @@ import MovingWindowEstimator from "./helpers/minimum_window";
     Toolbar,
     LoadingOverlay,
     JsonEditor,
-    DownloadOverlay
+    DownloadOverlay,
+    EnvironmentEditor
   }
 })
 export default class App extends Vue {
@@ -105,6 +113,7 @@ export default class App extends Vue {
   private isEditingJson: boolean = false;
 
   private extension: WEBGL_lose_context | null = null;
+  private showEnvironmentEditor: boolean = false;
 
   private isContextLost: boolean = false;
 
@@ -137,6 +146,10 @@ export default class App extends Vue {
 
   private editJson() {
     this.isEditingJson = !this.isEditingJson;
+  }
+
+  private editEnvironment() {
+    this.showEnvironmentEditor = !this.showEnvironmentEditor;
   }
 
   private closeEditor() {
@@ -321,6 +334,7 @@ export default class App extends Vue {
 
       let forward = 0;
       let sideways = 0;
+      let upwards = 0;
 
       if (this.keys["w"]) {
         forward += 1.0;
@@ -338,8 +352,20 @@ export default class App extends Vue {
         sideways += 1.0;
       }
 
-      if (forward != 0 || sideways != 0) {
-        this.scene.move_camera(sideways * 0.015, 0, forward * 0.015);
+      if (this.keys["q"]) {
+        upwards += 1.0;
+      }
+
+      if (this.keys["z"]) {
+        upwards -= 1.0;
+      }
+
+      if (forward != 0 || upwards != 0 || sideways != 0) {
+        this.scene.move_camera(
+          sideways * 0.015,
+          upwards * 0.015,
+          forward * 0.015
+        );
       }
 
       if (this.mouseMoved) {

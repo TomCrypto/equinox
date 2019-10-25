@@ -36,6 +36,7 @@
     "prettier": "^1.18.2",
     "typescript": "^3.4.3",
     "vue-eslint-parser": "^6.0.4",
+    "vue-multiselect": "^2.1.6",
     "vue-template-compiler": "^2.6.10"
   },
   "babel": {

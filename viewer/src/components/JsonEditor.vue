@@ -20,7 +20,6 @@ import { WebScene } from "equinox";
 
 @Component
 export default class extends Vue {
-  @Prop() private scene!: WebScene;
   @Prop() private onUpdateScene!: (
     json: object,
     assets: string[]

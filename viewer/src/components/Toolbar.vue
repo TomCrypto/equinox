@@ -1,15 +1,8 @@
 <template>
   <div class="toolbar">
-    <button
-      class="scene-json"
-      title="View scene JSON representation"
-      v-on:click="onEditJson()"
-    />
-    <button
-      class="save-screenshot"
-      title="Save current render"
-      v-on:click="onSaveScreenshot()"
-    />
+    <button class="environment-editor" title="Environment editor" v-on:click="onEditEnvironment()" />
+    <button class="scene-json" title="View scene JSON representation" v-on:click="onEditJson()" />
+    <button class="save-screenshot" title="Save current render" v-on:click="onSaveScreenshot()" />
   </div>
 </template>
 
@@ -20,6 +13,7 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 export default class extends Vue {
   @Prop() private onSaveScreenshot!: () => void;
   @Prop() private onEditJson!: () => void;
+  @Prop() private onEditEnvironment!: () => void;
 }
 </script>
 

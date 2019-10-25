@@ -1,6 +1,9 @@
 import Vue from "vue";
 import App from "@/App.vue";
 import localforage from "localforage";
+import Multiselect from "vue-multiselect";
+
+Vue.component("multiselect", Multiselect);
 
 Vue.config.productionTip = false;
 
