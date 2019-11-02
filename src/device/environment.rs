@@ -17,8 +17,10 @@ impl Device {
     ) -> Result<(), Error> {
         if environment.map.is_some() {
             self.program.set_define("HAS_ENVMAP", 1);
+            self.test_shader.set_define("HAS_ENVMAP", 1);
         } else {
             self.program.set_define("HAS_ENVMAP", 0);
+            self.test_shader.set_define("HAS_ENVMAP", 0);
         }
 
         if let Some(map) = &environment.map {
@@ -46,6 +48,10 @@ impl Device {
             self.program.set_define("ENVMAP_COLS", cols);
             self.program.set_define("ENVMAP_ROWS", rows);
             self.program
+                .set_define("ENVMAP_ROTATION", format!("{:+e}", map.rotation));
+            self.test_shader.set_define("ENVMAP_COLS", cols);
+            self.test_shader.set_define("ENVMAP_ROWS", rows);
+            self.test_shader
                 .set_define("ENVMAP_ROTATION", format!("{:+e}", map.rotation));
 
             let mut luminance = vec![0.0f32; cols * rows];

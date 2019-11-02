@@ -15,6 +15,15 @@ layout (std140) uniform Instance {
     BvhNode data[INSTANCE_DATA_COUNT];
 } instance_buffer;
 
+void get_scene_bbox(out vec3 bbmin, out vec3 bbmax) {
+    bbmin = vec3(instance_buffer.data[0].minx,
+                 instance_buffer.data[0].miny,
+                 instance_buffer.data[0].minz);
+    bbmax = vec3(instance_buffer.data[0].maxx,
+                 instance_buffer.data[0].maxy,
+                 instance_buffer.data[0].maxz);
+}
+
 // NOTE: this algorithm now actually works whichever starting offset you use, as long as the
 // termination condition is adjusted to stop as soon as you encounter the starting offset
 // again.

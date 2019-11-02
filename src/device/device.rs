@@ -8,6 +8,43 @@ use zerocopy::{AsBytes, FromBytes};
 
 use crate::*;
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Default, AsBytes, FromBytes)]
+pub(crate) struct PhotonData {
+    hit_position: [f32; 3],
+    padding1: f32,
+    incident_direction: [f32; 3],
+    padding2: f32,
+    outgoing_direction: [f32; 3],
+    padding3: f32,
+    incident_throughput: [f32; 3],
+    padding4: f32,
+    outgoing_throughput: [f32; 3],
+    padding5: f32,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Default, AsBytes, FromBytes)]
+pub(crate) struct PhotonTreeNode {
+    hit_position: [f32; 3],
+    left_index: u32,
+    incident_direction: [f32; 3],
+    right_index: u32,
+    incident_throughput: [f32; 3],
+    axis: u32, // TODO: store material info here? if needed?
+    more_padding: [u32; 4],
+}
+
+impl VertexLayout for PhotonData {
+    const VERTEX_LAYOUT: &'static [VertexAttribute] = &[
+        VertexAttribute::new(0, 0, VertexAttributeKind::Float4), // position
+        VertexAttribute::new(1, 16, VertexAttributeKind::Float4), // incident direction
+        VertexAttribute::new(2, 32, VertexAttributeKind::Float4), // outgoing direction
+        VertexAttribute::new(3, 48, VertexAttributeKind::Float4), // incident throughput
+        VertexAttribute::new(4, 64, VertexAttributeKind::Float4), // outgoing throughput
+    ];
+}
+
 #[derive(Debug)]
 pub struct Device {
     pub(crate) gl: Context,
@@ -61,6 +98,40 @@ pub struct Device {
 
     pub(crate) load_convolution_buffers_shader: Shader,
 
+    // transform buffer for the photon data
+    pub(crate) photon_hits: VertexArray<[PhotonData]>,
+
+    // textures for the photon data and kd-tree
+    pub(crate) photon_table_tex: Texture<RGBA32UI>,
+    pub(crate) photon_fbo: Framebuffer,
+
+    pub(crate) test_shader: Shader,
+
+    // ping-pong buffers for the visible point data
+    pub(crate) visible_point_count_a: Texture<R32F>,
+    pub(crate) visible_point_count_b: Texture<R32F>,
+    pub(crate) visible_point_data_a: Texture<RGBA16F>,
+    pub(crate) visible_point_data_b: Texture<RGBA16F>,
+
+    // buffer to store the visible point path information
+    pub(crate) visible_point_path: Texture<RGBA32F>,
+
+    // buffer to store the visible point properties for this pass (photon contributions + photon
+    // count)
+    pub(crate) visible_point_pass_data: Texture<RGBA32F>,
+
+    // FBO to write into each set of visible point data
+    pub(crate) visible_point_a_fbo: Framebuffer,
+    pub(crate) visible_point_b_fbo: Framebuffer,
+
+    // FBO to write into the path information texture
+    pub(crate) visible_point_path_fbo: Framebuffer,
+
+    // FBO to write into the pass data texture
+    pub(crate) visible_point_pass_data_fbo: Framebuffer,
+
+    pub(crate) visible_point_update_pixels_shader: Shader,
+
     pub(crate) allocator: Allocator,
 
     device_lost: bool,
@@ -74,7 +145,55 @@ impl Device {
         Ok(Self {
             allocator: Allocator::new(),
             gl: gl.clone(),
+            visible_point_update_pixels_shader: Shader::new(
+                gl.clone(),
+                shaders::VS_FULLSCREEN,
+                shaders::FS_UPDATE_PIXELS,
+                hashmap! {
+                    "old_photon_count_tex" => BindingPoint::Texture(0),
+                    "old_photon_data_tex" => BindingPoint::Texture(1),
+                    "new_photon_data_tex" => BindingPoint::Texture(2),
+                },
+                &[],
+                hashmap! {},
+                hashmap! {},
+            ),
+            photon_table_tex: Texture::new(gl.clone()),
+            photon_hits: VertexArray::new(gl.clone()),
             fft_pass_data: VertexArray::new(gl.clone()),
+            test_shader: Shader::new(
+                gl.clone(),
+                shaders::VS_TRANSFORM_FEEDBACK_TEST,
+                shaders::FS_DUMMY,
+                hashmap! {
+                    "Instance" => BindingPoint::UniformBlock(4),
+                    "Geometry" => BindingPoint::UniformBlock(7),
+                    "Material" => BindingPoint::UniformBlock(8),
+                    "Globals" => BindingPoint::UniformBlock(2),
+                    "Raster" => BindingPoint::UniformBlock(3),
+                    "envmap_texture" => BindingPoint::Texture(1),
+                    "envmap_marg_cdf" => BindingPoint::Texture(2),
+                    "envmap_cond_cdf" => BindingPoint::Texture(3),
+                },
+                &[
+                    "out_position",
+                    "out_outgoing_direction",
+                    "out_outgoing_throughput",
+                ],
+                hashmap! {
+                    "geometry-user.glsl" => "",
+                },
+                hashmap! {
+                    "HAS_ENVMAP" => "0",
+                    "ENVMAP_COLS" => "0",
+                    "ENVMAP_ROWS" => "0",
+                    "ENVMAP_ROTATION" => "0.0",
+                    "INSTANCE_DATA_COUNT" => "0",
+                    "GEOMETRY_DATA_COUNT" => "0",
+                    "MATERIAL_DATA_COUNT" => "0",
+                    "INSTANCE_DATA_PRESENT" => "0"
+                },
+            ),
             load_convolution_buffers_shader: Shader::new(
                 gl.clone(),
                 shaders::VS_FULLSCREEN,
@@ -82,6 +201,7 @@ impl Device {
                 hashmap! {
                     "image" => BindingPoint::Texture(0),
                 },
+                &[],
                 hashmap! {},
                 hashmap! {
                     "CONV_DIMS" => "vec2(0.0, 0.0)",
@@ -100,6 +220,7 @@ impl Device {
                     "g_conv_filter" => BindingPoint::Texture(4),
                     "b_conv_filter" => BindingPoint::Texture(5),
                 },
+                &[],
                 hashmap! {},
                 hashmap! {},
             ),
@@ -113,6 +234,7 @@ impl Device {
                     "b_conv_buffer" => BindingPoint::Texture(2),
                     "source" => BindingPoint::Texture(3),
                 },
+                &[],
                 hashmap! {},
                 hashmap! {
                     "CONV_DIMS" => "vec2(0.0, 0.0)",
@@ -133,7 +255,10 @@ impl Device {
                     "envmap_texture" => BindingPoint::Texture(1),
                     "envmap_marg_cdf" => BindingPoint::Texture(2),
                     "envmap_cond_cdf" => BindingPoint::Texture(3),
+                    "photon_table" => BindingPoint::Texture(4),
+                    "photon_radius_tex" => BindingPoint::Texture(5),
                 },
+                &[],
                 hashmap! {
                     "geometry-user.glsl" => "",
                 },
@@ -156,6 +281,7 @@ impl Device {
                     "samples" => BindingPoint::Texture(0),
                     "Display" => BindingPoint::UniformBlock(0),
                 },
+                &[],
                 hashmap! {},
                 hashmap! {},
             ),
@@ -184,7 +310,18 @@ impl Device {
             aperture_fbo: Framebuffer::new(gl.clone()),
             spectrum_temp1_fbo: Framebuffer::new(gl.clone()),
             spectrum_temp2_fbo: Framebuffer::new(gl.clone()),
+            photon_fbo: Framebuffer::new(gl.clone()),
             samples: Texture::new(gl.clone()),
+            visible_point_count_a: Texture::new(gl.clone()),
+            visible_point_count_b: Texture::new(gl.clone()),
+            visible_point_data_a: Texture::new(gl.clone()),
+            visible_point_data_b: Texture::new(gl.clone()),
+            visible_point_path: Texture::new(gl.clone()),
+            visible_point_pass_data: Texture::new(gl.clone()),
+            visible_point_a_fbo: Framebuffer::new(gl.clone()),
+            visible_point_b_fbo: Framebuffer::new(gl.clone()),
+            visible_point_path_fbo: Framebuffer::new(gl.clone()),
+            visible_point_pass_data_fbo: Framebuffer::new(gl.clone()),
             device_lost: true,
             state: DeviceState::new(),
         })
@@ -223,10 +360,10 @@ impl Device {
                 ));
             }
 
-            self.program.set_header(
-                "geometry-user.glsl",
-                generator.generate(&geometry_functions),
-            );
+            let code = generator.generate(&geometry_functions);
+
+            self.program.set_header("geometry-user.glsl", &code);
+            self.test_shader.set_header("geometry-user.glsl", &code);
 
             Dirty::dirty(instances);
 
@@ -307,6 +444,34 @@ impl Device {
             self.g_aperture_spectrum.create(2048, 1024);
             self.b_aperture_spectrum.create(2048, 1024);
 
+            self.visible_point_count_a
+                .create(raster.width.get() as usize, raster.height.get() as usize);
+            self.visible_point_count_b
+                .create(raster.width.get() as usize, raster.height.get() as usize);
+            self.visible_point_data_a
+                .create(raster.width.get() as usize, raster.height.get() as usize);
+            self.visible_point_data_b
+                .create(raster.width.get() as usize, raster.height.get() as usize);
+            self.visible_point_path
+                .create(raster.width.get() as usize, raster.height.get() as usize);
+            self.visible_point_pass_data
+                .create(raster.width.get() as usize, raster.height.get() as usize);
+
+            self.visible_point_a_fbo.rebuild(&[
+                &self.visible_point_count_a,
+                &self.visible_point_data_a,
+                &self.samples,
+            ]);
+            self.visible_point_b_fbo.rebuild(&[
+                &self.visible_point_count_b,
+                &self.visible_point_data_b,
+                &self.samples,
+            ]);
+            self.visible_point_path_fbo
+                .rebuild(&[&self.visible_point_path]);
+            self.visible_point_pass_data_fbo
+                .rebuild(&[&self.visible_point_pass_data]);
+
             self.render_fbo.rebuild(&[&self.render]);
             self.aperture_fbo.rebuild(&[
                 &self.r_aperture_spectrum,
@@ -354,12 +519,19 @@ impl Device {
             Ok(())
         })?;
 
+        // temporarily hardcoded
+        self.photon_table_tex.create(4096, 4096);
+        self.photon_hits.create(200_000);
+        self.photon_fbo.rebuild(&[&self.photon_table_tex]);
+
         self.program.rebuild()?;
         self.present_program.rebuild()?;
 
         self.read_convolution_buffers_shader.rebuild()?;
         self.fft_shader.rebuild()?;
         self.load_convolution_buffers_shader.rebuild()?;
+        self.test_shader.rebuild()?;
+        self.visible_point_update_pixels_shader.rebuild()?;
 
         if invalidated {
             self.state.reset(scene);
@@ -381,6 +553,113 @@ impl Device {
         self.state
             .update(&mut self.allocator, &mut self.globals_buffer);
 
+        let iteration = self.state.frame - 1;
+
+        const ITERATIONS_PER_PASS: u32 = 50;
+
+        if iteration % ITERATIONS_PER_PASS == 0 {
+            // this is a new pass; reset all the per-pass data
+
+            // TODO: populate visible_point_path with new random paths to each hit point
+
+            if iteration != 0 {
+                // there is a previous pass; update the per-pixel state
+
+                let which = (iteration / ITERATIONS_PER_PASS) % 2 != 0;
+
+                if which {
+                    // old data is in "a", we want to write in "b"
+                    log::info!("pass complete, reading from A and writing to B");
+
+                    let command = self.visible_point_update_pixels_shader.begin_draw();
+
+                    command.set_viewport(
+                        0,
+                        0,
+                        self.samples.cols() as i32,
+                        self.samples.rows() as i32,
+                    );
+
+                    command.bind(&self.visible_point_count_a, "old_photon_count_tex");
+                    command.bind(&self.visible_point_data_a, "old_photon_data_tex");
+                    command.bind(&self.visible_point_pass_data, "new_photon_data_tex");
+
+                    command.set_framebuffer(&self.visible_point_b_fbo);
+
+                    command.unset_vertex_array();
+                    command.draw_triangles(0, 1);
+                } else {
+                    // old data is in "b", we want to write in "a"
+                    log::info!("pass complete, reading from B and writing to A");
+
+                    let command = self.visible_point_update_pixels_shader.begin_draw();
+
+                    command.set_viewport(
+                        0,
+                        0,
+                        self.samples.cols() as i32,
+                        self.samples.rows() as i32,
+                    );
+
+                    command.bind(&self.visible_point_count_b, "old_photon_count_tex");
+                    command.bind(&self.visible_point_data_b, "old_photon_data_tex");
+                    command.bind(&self.visible_point_pass_data, "new_photon_data_tex");
+
+                    command.set_framebuffer(&self.visible_point_a_fbo);
+
+                    command.unset_vertex_array();
+                    command.draw_triangles(0, 1);
+                }
+            } else {
+                // clear the count
+                self.visible_point_a_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
+
+                // initialize the search radius to some value, and the radiance to zero
+                log::info!("writing some initial data to visible_point_data A");
+                self.visible_point_a_fbo.clear(1, [0.0, 0.0, 0.0, 0.01]);
+            }
+
+            self.visible_point_pass_data_fbo
+                .clear(0, [0.0, 0.0, 0.0, 0.0]);
+        }
+
+        let command = self.test_shader.begin_draw();
+
+        command.unset_vertex_array();
+
+        command.bind(&self.geometry_buffer, "Geometry");
+        command.bind(&self.material_buffer, "Material");
+        command.bind(&self.instance_buffer, "Instance");
+        command.bind(&self.globals_buffer, "Globals");
+        command.bind(&self.raster_buffer, "Raster");
+        command.bind(&self.envmap_texture, "envmap_texture");
+        command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
+        command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
+
+        self.gl.bind_buffer(Context::ARRAY_BUFFER, None);
+
+        self.gl.bind_buffer_range_with_i32_and_i32(
+            Context::TRANSFORM_FEEDBACK_BUFFER,
+            0,
+            self.photon_hits.buf_handle.as_ref(),
+            0,
+            (200_000 * std::mem::size_of::<PhotonData>()) as i32,
+        );
+
+        command.set_viewport(0, 0, 4096, 4096);
+        command.set_framebuffer(&self.photon_fbo);
+        self.photon_fbo.clear_ui(0, [0, 0, 0, 0]);
+
+        self.gl.begin_transform_feedback(Context::POINTS);
+        command.draw_points(0, 200_000);
+        self.gl.end_transform_feedback();
+
+        self.gl
+            .bind_buffer_base(Context::TRANSFORM_FEEDBACK_BUFFER, 0, None);
+
+        // at this point we've drawn a bunch of photons into our photon hash table
+        // it's time to render and try to gather these photons at visible points...
+
         let command = self.program.begin_draw();
 
         command.bind(&self.camera_buffer, "Camera");
@@ -392,12 +671,22 @@ impl Device {
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
+        command.bind(&self.photon_table_tex, "photon_table");
 
-        let weight = (self.state.frame as f32 - 1.0) / (self.state.frame as f32);
+        if (iteration / ITERATIONS_PER_PASS) % 2 == 0 {
+            log::info!("accumulating photons using radius in A");
+            command.bind(&self.visible_point_data_a, "photon_radius_tex");
+        } else {
+            log::info!("accumulating photons using radius in B");
+            command.bind(&self.visible_point_data_b, "photon_radius_tex");
+        }
+
+        // let weight = (self.state.frame as f32 - 1.0) / (self.state.frame as f32);
+        // command.set_blend_mode(BlendMode::Accumulate { weight });
+        command.set_blend_mode(BlendMode::Add);
 
         command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
-        command.set_blend_mode(BlendMode::Accumulate { weight });
-        command.set_framebuffer(&self.samples_fbo);
+        command.set_framebuffer(&self.visible_point_pass_data_fbo);
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
@@ -440,6 +729,8 @@ impl Device {
         self.read_convolution_buffers_shader.invalidate();
         self.fft_shader.invalidate();
         self.load_convolution_buffers_shader.invalidate();
+        self.test_shader.invalidate();
+        self.visible_point_update_pixels_shader.invalidate();
         self.camera_buffer.invalidate();
         self.geometry_buffer.invalidate();
         self.material_buffer.invalidate();
@@ -469,7 +760,20 @@ impl Device {
         self.spectrum_temp1_fbo.invalidate();
         self.spectrum_temp2_fbo.invalidate();
         self.render_fbo.invalidate();
+        self.photon_fbo.invalidate();
         self.aperture_fbo.invalidate();
+
+        self.visible_point_count_a.invalidate();
+        self.visible_point_count_b.invalidate();
+        self.visible_point_data_a.invalidate();
+        self.visible_point_data_b.invalidate();
+        self.visible_point_path.invalidate();
+        self.visible_point_pass_data.invalidate();
+
+        self.visible_point_a_fbo.invalidate();
+        self.visible_point_b_fbo.invalidate();
+        self.visible_point_path_fbo.invalidate();
+        self.visible_point_pass_data_fbo.invalidate();
 
         scene.dirty_all_fields();
         self.device_lost = false;

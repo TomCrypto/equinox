@@ -10,7 +10,7 @@ use zerocopy::{AsBytes, FromBytes};
 #[derive(Debug)]
 pub struct VertexArray<T: ?Sized> {
     gl: Context,
-    buf_handle: Option<WebGlBuffer>,
+    pub(crate) buf_handle: Option<WebGlBuffer>, // TODO: fix
     vao_handle: Option<WebGlVertexArrayObject>,
     vertex_count: usize,
     phantom: PhantomData<T>,
@@ -29,6 +29,31 @@ impl<T: ?Sized> VertexArray<T> {
 }
 
 impl<T: VertexLayout> VertexArray<[T]> {
+    pub fn create(&mut self, vertex_count: usize) {
+        assert!(vertex_count != 0);
+
+        if vertex_count != self.vertex_count || self.buf_handle.is_none() {
+            self.create_buffer(vertex_count);
+        }
+
+        if self.vao_handle.is_none() {
+            self.create_vertex_array();
+        }
+    }
+
+    pub fn read(&mut self, data: &mut [T]) {
+        assert!(data.len() == self.vertex_count);
+
+        self.gl
+            .bind_buffer(Context::ARRAY_BUFFER, self.buf_handle.as_ref());
+
+        self.gl.get_buffer_sub_data_with_i32_and_u8_array(
+            Context::ARRAY_BUFFER,
+            0,
+            data.as_bytes_mut(),
+        );
+    }
+
     pub fn upload(&mut self, vertices: &[T]) {
         assert!(!vertices.is_empty());
 
@@ -84,6 +109,16 @@ impl<T: VertexLayout> VertexArray<[T]> {
                         attribute.offset as i32,
                     );
                 }
+                VertexAttributeKind::Float4 => {
+                    self.gl.vertex_attrib_pointer_with_i32(
+                        attribute.index as u32,
+                        4,
+                        Context::FLOAT,
+                        false,
+                        size_of::<T>() as i32,
+                        attribute.offset as i32,
+                    );
+                }
             }
 
             self.gl
@@ -106,7 +141,7 @@ impl<T: VertexLayout> VertexArray<[T]> {
         self.gl.buffer_data_with_i32(
             Context::ARRAY_BUFFER,
             (vertex_count * size_of::<T>()) as i32,
-            Context::STATIC_DRAW,
+            Context::DYNAMIC_DRAW,
         );
 
         self.vertex_count = vertex_count;
@@ -139,6 +174,7 @@ pub trait VertexLayout: AsBytes + FromBytes {
 pub enum VertexAttributeKind {
     UShort4,
     Uint,
+    Float4,
 }
 
 #[derive(Clone, Copy, Debug)]

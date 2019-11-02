@@ -307,6 +307,44 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
     return vec3(MAT_OREN_NAYAR_ALBEDO) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
 }
 
+bool mat_is_diffuse(uint material) {
+    switch (material) {
+        case 0U:
+            return true;
+        case 1U:
+            return false;
+        case 2U:
+            return false;
+        case 3U:
+            return false;
+        case 4U:
+            return false;
+        case 5U:
+            return true;
+        default:
+            return false;
+    }
+}
+
+vec3 mat_eval_brdf(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
+    switch (material) {
+        case 0U:
+            return mat_lambertian_eval_brdf(inst, normal, wi, wo, pdf);
+        case 1U:
+            return mat_ideal_reflection_eval_brdf(inst, normal, wi, wo, pdf);
+        case 2U:
+            return mat_phong_eval_brdf(inst, normal, wi, wo, pdf);
+        case 3U:
+            return mat_ideal_refraction_eval_brdf(inst, normal, wi, wo, pdf);
+        case 4U:
+            return mat_dielectric_eval_brdf(inst, normal, wi, wo, pdf);
+        case 5U:
+            return mat_oren_nayar_eval_brdf(inst, normal, wi, wo, pdf);
+        default:
+            return vec3(0.0);
+    }
+}
+
 // == HIGH-LEVEL MATERIAL INTERACTION ============================================================
 
 #define MAT_INTERACT(absorption, eval_brdf, sample_brdf, props) {                                 \

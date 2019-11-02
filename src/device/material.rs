@@ -116,6 +116,8 @@ impl Device {
         self.material_buffer.write_array(&parameters)?;
         self.program
             .set_define("MATERIAL_DATA_COUNT", self.material_buffer.element_count());
+        self.test_shader
+            .set_define("MATERIAL_DATA_COUNT", self.material_buffer.element_count());
 
         Ok(())
     }

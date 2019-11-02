@@ -6,7 +6,7 @@
 #include <material.glsl>
 #include <environment.glsl>
 
-out vec3 radiance;
+out vec4 result;
 
 layout (std140) uniform Camera {
     vec4 origin_plane[4];
@@ -26,6 +26,82 @@ layout (std140) uniform Globals {
 layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
+
+uniform highp usampler2D photon_table;
+uniform sampler2D photon_radius_tex;
+
+#define CELL_SIZE 0.04
+
+uvec3 get_cell_for_pos(vec3 pos) {
+    uint cell_x = uint(1000.0 + floor(pos.x / CELL_SIZE));
+    uint cell_y = uint(1000.0 + floor(pos.y / CELL_SIZE));
+    uint cell_z = uint(1000.0 + floor(pos.z / CELL_SIZE));
+
+    return uvec3(cell_x, cell_y, cell_z);
+}
+
+ivec2 position_for_cell(uvec3 cell) {
+    uint coords = (cell.x * 1325290093U + cell.y * 2682811433U + cell.z * 765270841U) % (4096U * 4096U);
+    // uint coords = shuffle(cell) % (4096U * 4096U);
+
+    int coord_x = int(coords % 4096U);
+    int coord_y = int(coords / 4096U);
+
+    return ivec2(coord_x, coord_y);
+}
+
+vec3 get_photon(uvec3 cell, vec3 point, float radius, uint material, uint inst, vec3 normal, vec3 wo, inout int count) {
+    ivec2 coords = position_for_cell(cell);
+
+    uvec4 photon_data = texelFetch(photon_table, coords, 0);
+
+    vec2 data1 = unpackHalf2x16(photon_data.r);
+    vec2 data2 = unpackHalf2x16(photon_data.g);
+    vec2 data3 = unpackHalf2x16(photon_data.b);
+    vec2 data4 = unpackHalf2x16(photon_data.a);
+
+    vec3 photon_position = vec3(data1.xy, data2.x) * 1000.0;
+    vec3 photon_throughput = vec3(data3.y, data4.xy);
+    
+    // vec3 photon_position = vec3(cell) * CELL_SIZE + photon_relative_position;
+
+    float sgn = (photon_throughput.b < 0.0) ? -1.0 : 1.0;
+
+    vec3 photon_direction = vec3(data2.y, data3.x, sqrt(1.0 - data2.y * data2.y - data3.x * data3.x) * sgn);
+
+    photon_throughput.b *= sgn;
+
+    if (distance(point, photon_position) <= radius) {
+        float pdf;
+        count += 1;
+        return max(0.0, dot(-photon_direction, normal)) * photon_throughput * mat_eval_brdf(material, inst, normal, -photon_direction, wo, pdf);
+    } else {
+        return vec3(0.0);
+    }
+}
+
+int accumulate_photons(uint material, uint inst, vec3 normal, inout vec3 radiance, vec3 throughput, vec3 point, vec3 wo) {
+    float radius = min(texelFetch(photon_radius_tex, ivec2(gl_FragCoord.xy - 0.5), 0).w, CELL_SIZE * 2.0);
+    int count = 0;
+
+    vec3 accumulation = vec3(0.0);
+
+    // try all surrounding cells, looking for a photon within
+    uvec3 center = get_cell_for_pos(point);
+
+    // there's 27 possible points (for now!)
+    for (int dx = -1; dx <= 1; ++dx) {
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dz = -1; dz <= 1; ++dz) {
+                accumulation += get_photon(uvec3(ivec3(center) + ivec3(dx, dy, dz)), point, radius, material, inst, normal, wo, count);
+            }
+        }
+    }
+
+    radiance += throughput * accumulation / (1e6 * M_PI * radius * radius);
+
+    return count;
+}
 
 // Low-discrepancy sequence generator.
 //
@@ -99,6 +175,9 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 // End camera stuff
 
 void main() {
+    vec3 radiance = vec3(0.0);
+    int count = 0;
+
     random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
 
     ray_t ray;
@@ -120,17 +199,27 @@ void main() {
             uint material = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
 
-            ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
-
-            if ((flags & RAY_FLAG_EXTINCT) != 0U) {
-                break; // no need to trace further
-            }
-
-            if (((~flags) & (RAY_FLAG_OUTSIDE | RAY_FLAG_TRANSMIT)) == 0U) {
-                traversal_start = traversal.hit.z;
+            // if (mat_is_diffuse(material)) {
+            if (true) {
+                // DIFFUSE SURFACE: query the photon map to accumulate incident photons
+                // TODO: this doesn't account properly for absorption up to this point...
+                count = accumulate_photons(material, mat_inst, normal, radiance, throughput, ray.org, -ray.dir);
+                //radiance += vec3(0.0, 3.0, 0.0);
+                break;
             } else {
-                traversal_start = 0U;
-            }
+                // NOT DIFFUSE: just keep tracing as usual...
+                ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
+
+                if ((flags & RAY_FLAG_EXTINCT) != 0U) {
+                    break; // no need to trace further
+                }
+
+                if (((~flags) & (RAY_FLAG_OUTSIDE | RAY_FLAG_TRANSMIT)) == 0U) {
+                    traversal_start = traversal.hit.z;
+                } else {
+                    traversal_start = 0U;
+                }
+            }            
         } else {
             if ((flags & RAY_FLAG_ENVMAP_SAMPLED) == 0U) {
                 radiance += throughput * env_eval_light(ray.dir, unused_pdf);
@@ -154,4 +243,6 @@ void main() {
             break;
         }
     }
+
+    result = vec4(radiance, float(count));
 }

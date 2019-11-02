@@ -78,6 +78,14 @@ impl Framebuffer {
         self.gl
             .clear_bufferfv_with_f32_array(Context::COLOR, attachment as i32, &color);
     }
+
+    pub fn clear_ui(&self, attachment: usize, value: [u32; 4]) {
+        self.gl
+            .bind_framebuffer(Context::DRAW_FRAMEBUFFER, self.handle.as_ref());
+
+        self.gl
+            .clear_bufferuiv_with_u32_array(Context::COLOR, attachment as i32, &value);
+    }
 }
 
 impl Drop for Framebuffer {

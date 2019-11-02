@@ -1,6 +1,7 @@
 //! The Equinox path tracing renderer, see the README for more information.
 
 #![deny(unsafe_code)]
+#![feature(slice_partition_at_index)]
 
 macro_rules! export {
     [$( $module:ident ),+ $(,)?] => {

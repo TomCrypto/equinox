@@ -3,6 +3,16 @@
 void _rand_mix_full(inout random_t random);
 void _rand_mix_mini(inout random_t random);
 
+uint shuffle(uvec3 data) {
+    uvec2 state1 = data.xy;
+    uvec2 state2 = data.xz;
+
+    _rand_mix_full(state1);
+    _rand_mix_full(state2);
+
+    return state1.x | state2.x;
+}
+
 // Initializes the random generator with a seed.
 random_t rand_initialize_from_seed(uvec2 seed) {
     _rand_mix_full(seed);

@@ -184,8 +184,8 @@ impl WebScene {
         // have proper types whereas doing it in the front-end would require JSON.
 
         self.scene.geometry_list.push(Geometry::Plane {
-            width: Parameter::Constant { value: 10.0 },
-            length: Parameter::Constant { value: 10.0 },
+            width: Parameter::Constant { value: 3.0 },
+            length: Parameter::Constant { value: 3.0 },
         });
 
         self.scene.geometry_list.push(Geometry::Translate {
@@ -232,80 +232,80 @@ impl WebScene {
 
         self.scene.instance_list.push(Instance {
             geometry: 0,
-            material: 0,
+            material: 1,
             parameters: vec![],
-            allow_mis: true,
+            allow_mis: false,
         });
 
         self.scene.instance_list.push(Instance {
             geometry: 1,
             material: 1,
             parameters: vec![0.0, 0.8, 0.0],
-            allow_mis: true,
+            allow_mis: false,
         });
 
         self.scene.instance_list.push(Instance {
             geometry: 1,
             material: 2,
             parameters: vec![-2.0, 0.8, 0.0],
-            allow_mis: true,
-        });
-
-        self.scene.instance_list.push(Instance {
-            geometry: 1,
-            material: 3,
-            parameters: vec![2.0, 0.8, 0.0],
-            allow_mis: true,
-        });
-
-        self.scene.instance_list.push(Instance {
-            geometry: 1,
-            material: 4,
-            parameters: vec![-4.0, 0.8, 0.0],
-            allow_mis: true,
-        });
-
-        self.scene.instance_list.push(Instance {
-            geometry: 1,
-            material: 5,
-            parameters: vec![4.0, 0.8, 0.0],
-            allow_mis: true,
-        });
-
-        self.scene.instance_list.push(Instance {
-            geometry: 1,
-            material: 1,
-            parameters: vec![0.0, 0.8, 4.0],
             allow_mis: false,
-        });
+        }); /*
 
-        self.scene.instance_list.push(Instance {
-            geometry: 1,
-            material: 2,
-            parameters: vec![-2.0, 0.8, 4.0],
-            allow_mis: false,
-        });
+            self.scene.instance_list.push(Instance {
+                geometry: 1,
+                material: 3,
+                parameters: vec![2.0, 0.8, 0.0],
+                allow_mis: true,
+            });
 
-        self.scene.instance_list.push(Instance {
-            geometry: 1,
-            material: 3,
-            parameters: vec![2.0, 0.8, 4.0],
-            allow_mis: false,
-        });
+            self.scene.instance_list.push(Instance {
+                geometry: 1,
+                material: 4,
+                parameters: vec![-4.0, 0.8, 0.0],
+                allow_mis: true,
+            });
 
-        self.scene.instance_list.push(Instance {
-            geometry: 1,
-            material: 4,
-            parameters: vec![-4.0, 0.8, 4.0],
-            allow_mis: false,
-        });
+            self.scene.instance_list.push(Instance {
+                geometry: 1,
+                material: 5,
+                parameters: vec![4.0, 0.8, 0.0],
+                allow_mis: true,
+            });
 
-        self.scene.instance_list.push(Instance {
-            geometry: 1,
-            material: 5,
-            parameters: vec![4.0, 0.8, 4.0],
-            allow_mis: false,
-        });
+            self.scene.instance_list.push(Instance {
+                geometry: 1,
+                material: 1,
+                parameters: vec![0.0, 0.8, 4.0],
+                allow_mis: false,
+            });
+
+            self.scene.instance_list.push(Instance {
+                geometry: 1,
+                material: 2,
+                parameters: vec![-2.0, 0.8, 4.0],
+                allow_mis: false,
+            });
+
+            self.scene.instance_list.push(Instance {
+                geometry: 1,
+                material: 3,
+                parameters: vec![2.0, 0.8, 4.0],
+                allow_mis: false,
+            });
+
+            self.scene.instance_list.push(Instance {
+                geometry: 1,
+                material: 4,
+                parameters: vec![-4.0, 0.8, 4.0],
+                allow_mis: false,
+            });
+
+            self.scene.instance_list.push(Instance {
+                geometry: 1,
+                material: 5,
+                parameters: vec![4.0, 0.8, 4.0],
+                allow_mis: false,
+            });*/
 
         self.scene.camera.position.x = 0.0;
         self.scene.camera.position.y = 7.5;

@@ -25,6 +25,7 @@ pub struct Shader {
     fragment: &'static str,
 
     binds: HashMap<&'static str, BindingPoint>,
+    transform_feedback: &'static [&'static str],
 
     headers: HashMap<&'static str, String>,
     defines: HashMap<&'static str, String>,
@@ -36,6 +37,7 @@ impl Shader {
         vertex: &'static str,
         fragment: &'static str,
         binds: HashMap<&'static str, BindingPoint>,
+        transform_feedback: &'static [&'static str],
         default_headers: HashMap<&'static str, &str>,
         default_defines: HashMap<&'static str, &str>,
     ) -> Self {
@@ -58,6 +60,7 @@ impl Shader {
             binds,
             headers,
             defines,
+            transform_feedback,
             invalidated: true,
         }
     }
@@ -177,6 +180,16 @@ impl Shader {
         if let Some(program) = &program {
             self.gl.attach_shader(program, vert);
             self.gl.attach_shader(program, frag);
+
+            let varyings = js_sys::Array::new();
+
+            for &varying in self.transform_feedback {
+                varyings.push(&varying.into());
+            }
+
+            self.gl
+                .transform_feedback_varyings(program, &varyings, Context::INTERLEAVED_ATTRIBS);
+
             self.gl.link_program(program);
 
             if let Some(error) = self.get_program_link_error(program) {
@@ -342,6 +355,10 @@ impl<'a> DrawCommand<'a> {
                     .blend_func(Context::CONSTANT_ALPHA, Context::ONE_MINUS_CONSTANT_ALPHA);
                 self.shader.gl.blend_color(0.0, 0.0, 0.0, 1.0 - weight);
             }
+            BlendMode::Add => {
+                self.shader.gl.blend_equation(Context::FUNC_ADD);
+                self.shader.gl.blend_func(Context::ONE, Context::ONE);
+            }
         }
     }
 
@@ -375,6 +392,12 @@ impl<'a> DrawCommand<'a> {
             .draw_arrays(Context::TRIANGLES, 3 * index as i32, 3 * triangles as i32);
     }
 
+    pub fn draw_points(&self, index: usize, points: usize) {
+        self.shader
+            .gl
+            .draw_arrays(Context::POINTS, index as i32, points as i32);
+    }
+
     fn bind_uniform_buffer(&self, handle: Option<&WebGlBuffer>, slot: &str) {
         if let Some(&BindingPoint::UniformBlock(slot)) = self.shader.binds.get(slot) {
             self.shader
@@ -397,4 +420,5 @@ impl<'a> DrawCommand<'a> {
 
 pub enum BlendMode {
     Accumulate { weight: f32 },
+    Add,
 }

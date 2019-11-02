@@ -281,6 +281,8 @@ pub struct RGBA32F;
 #[derive(Debug)]
 pub struct R32F;
 #[derive(Debug)]
+pub struct R32UI;
+#[derive(Debug)]
 pub struct RG32F;
 #[derive(Debug)]
 pub struct RGBA8;
@@ -294,7 +296,7 @@ impl TextureFormat for RGBA32UI {
 
     type Compressed = False;
     type Filterable = False;
-    type Renderable = False;
+    type Renderable = True;
 
     const GL_INTERNAL_FORMAT: u32 = Context::RGBA32UI;
     const GL_FORMAT: u32 = Context::RGBA_INTEGER;
@@ -381,6 +383,40 @@ impl TextureFormat for R32F {
             let (level_data, remaining) = data.split_at(level_size);
 
             views.push(unsafe_helpers::f32_slice_to_float32_array(level_data).into());
+
+            data = remaining;
+        }
+
+        assert!(data.is_empty());
+
+        views
+    }
+}
+
+impl TextureFormat for R32UI {
+    type Data = u32;
+
+    type Compressed = False;
+    type Filterable = False;
+    type Renderable = True;
+
+    const GL_INTERNAL_FORMAT: u32 = Context::R32UI;
+    const GL_FORMAT: u32 = Context::RED;
+    const GL_TYPE: u32 = Context::UNSIGNED_INT;
+
+    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
+        let mut views = Vec::with_capacity(levels);
+
+        for level in 0..levels {
+            let level_cols = (cols / (1 << level)).max(1);
+            let level_rows = (rows / (1 << level)).max(1);
+            let level_size = level_cols * level_rows;
+
+            assert!(data.len() >= level_size);
+
+            let (level_data, remaining) = data.split_at(level_size);
+
+            views.push(unsafe_helpers::u32_slice_to_uint32_array(level_data).into());
 
             data = remaining;
         }

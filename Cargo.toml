@@ -96,6 +96,7 @@ features = [
   'WebGlProgram',
   'WebGlShader',
   'WebGlTexture',
+  'WebGlTransformFeedback',
   'WebGlUniformLocation',
   'WebGlVertexArrayObject',
   'Window',
