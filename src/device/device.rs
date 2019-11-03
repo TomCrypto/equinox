@@ -153,6 +153,7 @@ impl Device {
                     "old_photon_count_tex" => BindingPoint::Texture(0),
                     "old_photon_data_tex" => BindingPoint::Texture(1),
                     "new_photon_data_tex" => BindingPoint::Texture(2),
+                    "Globals" => BindingPoint::UniformBlock(2),
                 },
                 &[],
                 hashmap! {},
@@ -521,7 +522,7 @@ impl Device {
 
         // temporarily hardcoded
         self.photon_table_tex.create(4096, 4096);
-        self.photon_hits.create(200_000);
+        self.photon_hits.create(50_000);
         self.photon_fbo.rebuild(&[&self.photon_table_tex]);
 
         self.program.rebuild()?;
@@ -555,7 +556,7 @@ impl Device {
 
         let iteration = self.state.frame - 1;
 
-        const ITERATIONS_PER_PASS: u32 = 50;
+        const ITERATIONS_PER_PASS: u32 = 60;
 
         if iteration % ITERATIONS_PER_PASS == 0 {
             // this is a new pass; reset all the per-pass data
@@ -616,7 +617,7 @@ impl Device {
 
                 // initialize the search radius to some value, and the radiance to zero
                 log::info!("writing some initial data to visible_point_data A");
-                self.visible_point_a_fbo.clear(1, [0.0, 0.0, 0.0, 0.01]);
+                self.visible_point_a_fbo.clear(1, [0.0, 0.0, 0.0, 0.03]);
             }
 
             self.visible_point_pass_data_fbo
@@ -643,7 +644,7 @@ impl Device {
             0,
             self.photon_hits.buf_handle.as_ref(),
             0,
-            (200_000 * std::mem::size_of::<PhotonData>()) as i32,
+            (50_000 * std::mem::size_of::<PhotonData>()) as i32,
         );
 
         command.set_viewport(0, 0, 4096, 4096);
@@ -651,7 +652,7 @@ impl Device {
         self.photon_fbo.clear_ui(0, [0, 0, 0, 0]);
 
         self.gl.begin_transform_feedback(Context::POINTS);
-        command.draw_points(0, 200_000);
+        command.draw_points(0, 50_000);
         self.gl.end_transform_feedback();
 
         self.gl
@@ -839,6 +840,7 @@ impl DeviceState {
         data.frame_state[0] = self.rng.next_u32();
         data.frame_state[1] = self.rng.next_u32();
         data.frame_state[2] = self.frame;
+        data.pass_count = (self.frame / 60) as f32;
 
         buffer.write(&data).expect("internal WebGL error");
 
@@ -851,4 +853,6 @@ impl DeviceState {
 pub(crate) struct GlobalData {
     filter_delta: [f32; 4],
     frame_state: [u32; 4],
+    pass_count: f32,
+    padding: [f32; 3],
 }

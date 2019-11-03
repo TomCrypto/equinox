@@ -226,8 +226,9 @@ impl WebScene {
             base_color: [0.560, 0.570, 0.580],
         });
 
-        self.scene.material_list.push(Material::IdealReflection {
-            reflectance: [0.955, 0.637, 0.538],
+        self.scene.material_list.push(Material::IdealRefraction {
+            transmittance: [0.0, 1.0, 0.0],
+            refractive_index: 1.3,
         });
 
         self.scene.instance_list.push(Instance {
@@ -239,7 +240,7 @@ impl WebScene {
 
         self.scene.instance_list.push(Instance {
             geometry: 1,
-            material: 1,
+            material: 5,
             parameters: vec![0.0, 0.8, 0.0],
             allow_mis: false,
         });

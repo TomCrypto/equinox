@@ -1,0 +1,6 @@
+1. fix the aliasing artifacts of the grid, really not sure where they are coming from...
+    -> seems to be bias introduced by the one-photon limit per cell, not entirely sure why yet though;
+       -> may be a hardware thing? it will draw point fragments in a specific order? should still be random though, needs to be investigated
+
+2. precompute the visible point paths instead of recomputing them every single photon batch, this will give a huge speedup
+3. try out some caustic paths on some complex scenes

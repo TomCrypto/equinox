@@ -31,16 +31,16 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-#define CELL_SIZE 0.04
+#define CELL_SIZE 0.03
 
 ivec2 hash_position(vec3 pos) {
-    uint cell_x = uint(1000.0 + floor(pos.x / CELL_SIZE));
-    uint cell_y = uint(1000.0 + floor(pos.y / CELL_SIZE));
-    uint cell_z = uint(1000.0 + floor(pos.z / CELL_SIZE));
+    uint cell_x = uint(100 + int(floor(pos.x / CELL_SIZE)));
+    uint cell_y = uint(100 + int(floor(pos.y / CELL_SIZE)));
+    uint cell_z = uint(100 + int(floor(pos.z / CELL_SIZE)));
 
     // int coords = ((cell_x * 395 + cell_y * 119 + cell_z * 1193) % (4096 * 4096) + 4096 * 4096) % (4096 * 4096);
-    uint coords = (cell_x * 1325290093U + cell_y * 2682811433U + cell_z * 765270841U) % (4096U * 4096U);
-    // uint coords = shuffle(uvec3(cell_x, cell_y, cell_z)) % (4096U * 4096U);
+    // uint coords = (cell_x * 1325290093U + cell_y * 2682811433U + cell_z * 765270841U) % (4096U * 4096U);
+    uint coords = shuffle(uvec3(cell_x, cell_y, cell_z)) % (4096U * 4096U);
 
     int coord_x = int(coords % 4096U);
     int coord_y = int(coords / 4096U);
@@ -75,7 +75,7 @@ void main() {
     float radius = max(bbmax.x - bbmin.x, max(bbmax.y - bbmin.y, bbmax.z - bbmin.z)) / 2.0 * sqrt(2.0);
 
     // adjust PDF
-    throughput *= M_2PI * radius * radius;
+    throughput *= M_PI * radius * radius;
 
     // generate a random "upwards" vector in the unit disk
     vec2 rng1 = rand_uniform_vec2(random);
@@ -96,6 +96,7 @@ void main() {
 
     // now fire the ray at the world, hoping for an intersection
     uint flags;
+    int diffuse_bounces = 0;
 
     for (uint bounce = 0U; bounce < 100U; ++bounce) {
         traversal_t traversal = traverse_scene(ray, 0U);
@@ -122,33 +123,37 @@ void main() {
             }
 
             // if this is a DIFFUSE material, we are done; save out the photon
-            // if ((flags & MAT_PROP_DIFFUSE_BSDF) != 0U) {
-            if (true) {
-                // resolution is 4096 x 4096... assume a grid resolution of 0.5cm for now
+            if ((flags & MAT_PROP_DIFFUSE_BSDF) != 0U) {
+                if (diffuse_bounces == 0) {
+                    // resolution is 4096 x 4096... assume a grid resolution of 0.5cm for now
 
-                ivec2 coords = hash_position(ray.org);
+                    ivec2 coords = hash_position(ray.org);
 
-                gl_PointSize = 1.0;
-                gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / vec2(4096.0) - 1.0, 0.0, 1.0);
+                    gl_PointSize = 1.0;
+                    gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / vec2(4096.0) - 1.0, 0.0, 1.0);
 
-                float sgn = (ray.dir.z < 0.0) ? -1.0 : 1.0;
+                    float sgn = (ray.dir.z < 0.0) ? -1.0 : 1.0;
 
-                vec3 relative_position = ray.org * 0.001; // get_relative_pos_in_cell(ray.org);
+                    vec3 cell_pos = floor(ray.org / CELL_SIZE) * CELL_SIZE;
+                    vec3 relative_position = ray.org; // - cell_pos;
 
-                table_data.r = packHalf2x16(relative_position.xy);
-                table_data.g = packHalf2x16(vec2(relative_position.z, ray.dir.x));
-                table_data.b = packHalf2x16(vec2(ray.dir.y, last_throughput.r));
-                table_data.a = packHalf2x16(vec2(last_throughput.g, last_throughput.b * sgn));
+                    table_data.r = packHalf2x16(relative_position.xy);
+                    table_data.g = packHalf2x16(vec2(relative_position.z, ray.dir.x));
+                    table_data.b = packHalf2x16(vec2(ray.dir.y, last_throughput.r));
+                    table_data.a = packHalf2x16(vec2(last_throughput.g, last_throughput.b * sgn));
 
-                /*table_data.r = floatBitsToUint(ray.org.x);
-                table_data.g = floatBitsToUint(ray.org.y);
-                table_data.b = floatBitsToUint(ray.org.z);
-                table_data.a = 1U;*/
+                    /*table_data.r = floatBitsToUint(ray.org.x);
+                    table_data.g = floatBitsToUint(ray.org.y);
+                    table_data.b = floatBitsToUint(ray.org.z);
+                    table_data.a = 1U;*/
 
-                out_position = vec4(ray.org, 1.0);
-                out_outgoing_direction = vec4(new_ray.dir, 0.0);
-                out_outgoing_throughput = vec4(throughput, 0.0);
-                return;
+                    out_position = vec4(ray.org, 1.0);
+                    out_outgoing_direction = vec4(new_ray.dir, 0.0);
+                    out_outgoing_throughput = vec4(throughput, 0.0);
+                    return;
+                } else {
+                    diffuse_bounces++;
+                }
             }
 
             ray = new_ray;
