@@ -6,7 +6,9 @@
 #include <material.glsl>
 #include <environment.glsl>
 
-out vec4 visible_point_data;
+layout(location = 0) out vec4 visible_point_buf1;
+layout(location = 1) out vec4 visible_point_buf2;
+layout(location = 2) out vec4 visible_point_buf3;
 
 layout (std140) uniform Camera {
     vec4 origin_plane[4];
@@ -126,7 +128,7 @@ void main() {
             if (mat_is_diffuse(material)) {
                 // we found our diffuse surface, record the hit...
 
-                visible_point_data = 
+                pack_visible_point(ray.org, ray.dir, normal, throughput, material, mat_inst, visible_point_buf1, visible_point_buf2, visible_point_buf3);
 
                 return;
             } else {
@@ -151,7 +153,7 @@ void main() {
             break;
         }
 
-        if (bounce <= 2U) {
+        /*if (bounce <= 2U) {
             continue;
         }
 
@@ -164,11 +166,14 @@ void main() {
             throughput /= p;
         } else {
             break;
-        }
+        }*/
     }
 
     // if we hit nothing or eventually hit a light with no diffuse bounces, record the
     // throughput normally and set a special flag indicating this
+    
+    // store the position + packed direction in an RGBA32F texture
+    // store the throughput + flags in an RGBA16F texture
 
-    visible_point_data =
+    pack_invalid_visible_point(radiance, visible_point_buf1, visible_point_buf2, visible_point_buf3);
 }

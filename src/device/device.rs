@@ -45,6 +45,31 @@ impl VertexLayout for PhotonData {
     ];
 }
 
+/*
+
+Buf1 (RGBA32F):
+
+    RGB => visible point position
+    A => material index + instance
+
+Buf2 (RGBA16F):
+
+    RGB => visible point throughput
+    A => {0, 1, 2, 3, 4}
+
+        0 => not a valid visible point, treat throughput as radiance
+        1 => direction.z is positive, normal.z is positive
+        2 => direction.z is positive, normal.z is negative
+        3 => direction.z is negative, normal.z is positive
+        4 => direction.z is negative, normal.z is negative
+
+Buf3 (RGBA16F):
+
+    RG => visible point path direction, packed
+    BA => visible point path surface normal, packed
+
+*/
+
 #[derive(Debug)]
 pub struct Device {
     pub(crate) gl: Context,
@@ -114,7 +139,9 @@ pub struct Device {
     pub(crate) visible_point_data_b: Texture<RGBA16F>,
 
     // buffer to store the visible point path information
-    pub(crate) visible_point_path: Texture<RGBA32F>,
+    pub(crate) visible_point_path1: Texture<RGBA32F>,
+    pub(crate) visible_point_path2: Texture<RGBA32F>,
+    pub(crate) visible_point_path3: Texture<RGBA32F>,
 
     // buffer to store the visible point properties for this pass (photon contributions + photon
     // count)
@@ -131,6 +158,7 @@ pub struct Device {
     pub(crate) visible_point_pass_data_fbo: Framebuffer,
 
     pub(crate) visible_point_update_pixels_shader: Shader,
+    pub(crate) visible_point_gen_shader: Shader,
 
     pub(crate) allocator: Allocator,
 
@@ -145,6 +173,36 @@ impl Device {
         Ok(Self {
             allocator: Allocator::new(),
             gl: gl.clone(),
+            visible_point_gen_shader: Shader::new(
+                gl.clone(),
+                shaders::VS_FULLSCREEN,
+                shaders::FS_GEN_VISIBLE_POINTS,
+                hashmap! {
+                    "Camera" => BindingPoint::UniformBlock(0),
+                    "Instance" => BindingPoint::UniformBlock(4),
+                    "Geometry" => BindingPoint::UniformBlock(7),
+                    "Material" => BindingPoint::UniformBlock(8),
+                    "Globals" => BindingPoint::UniformBlock(2),
+                    "Raster" => BindingPoint::UniformBlock(3),
+                    "envmap_texture" => BindingPoint::Texture(1),
+                    "envmap_marg_cdf" => BindingPoint::Texture(2),
+                    "envmap_cond_cdf" => BindingPoint::Texture(3),
+                },
+                &[],
+                hashmap! {
+                    "geometry-user.glsl" => "",
+                },
+                hashmap! {
+                    "HAS_ENVMAP" => "0",
+                    "ENVMAP_COLS" => "0",
+                    "ENVMAP_ROWS" => "0",
+                    "ENVMAP_ROTATION" => "0.0",
+                    "INSTANCE_DATA_COUNT" => "0",
+                    "GEOMETRY_DATA_COUNT" => "0",
+                    "MATERIAL_DATA_COUNT" => "0",
+                    "INSTANCE_DATA_PRESENT" => "0"
+                },
+            ),
             visible_point_update_pixels_shader: Shader::new(
                 gl.clone(),
                 shaders::VS_FULLSCREEN,
@@ -247,31 +305,17 @@ impl Device {
                 shaders::VS_FULLSCREEN,
                 shaders::FRAG,
                 hashmap! {
-                    "Camera" => BindingPoint::UniformBlock(0),
-                    "Instance" => BindingPoint::UniformBlock(4),
-                    "Geometry" => BindingPoint::UniformBlock(7),
                     "Material" => BindingPoint::UniformBlock(8),
-                    "Globals" => BindingPoint::UniformBlock(2),
-                    "Raster" => BindingPoint::UniformBlock(3),
-                    "envmap_texture" => BindingPoint::Texture(1),
-                    "envmap_marg_cdf" => BindingPoint::Texture(2),
-                    "envmap_cond_cdf" => BindingPoint::Texture(3),
                     "photon_table" => BindingPoint::Texture(4),
                     "photon_radius_tex" => BindingPoint::Texture(5),
+                    "visible_point_path_buf1" => BindingPoint::Texture(0),
+                    "visible_point_path_buf2" => BindingPoint::Texture(1),
+                    "visible_point_path_buf3" => BindingPoint::Texture(2),
                 },
                 &[],
+                hashmap! {},
                 hashmap! {
-                    "geometry-user.glsl" => "",
-                },
-                hashmap! {
-                    "HAS_ENVMAP" => "0",
-                    "ENVMAP_COLS" => "0",
-                    "ENVMAP_ROWS" => "0",
-                    "ENVMAP_ROTATION" => "0.0",
-                    "INSTANCE_DATA_COUNT" => "0",
-                    "GEOMETRY_DATA_COUNT" => "0",
                     "MATERIAL_DATA_COUNT" => "0",
-                    "INSTANCE_DATA_PRESENT" => "0"
                 },
             ),
             present_program: Shader::new(
@@ -317,7 +361,9 @@ impl Device {
             visible_point_count_b: Texture::new(gl.clone()),
             visible_point_data_a: Texture::new(gl.clone()),
             visible_point_data_b: Texture::new(gl.clone()),
-            visible_point_path: Texture::new(gl.clone()),
+            visible_point_path1: Texture::new(gl.clone()),
+            visible_point_path2: Texture::new(gl.clone()),
+            visible_point_path3: Texture::new(gl.clone()),
             visible_point_pass_data: Texture::new(gl.clone()),
             visible_point_a_fbo: Framebuffer::new(gl.clone()),
             visible_point_b_fbo: Framebuffer::new(gl.clone()),
@@ -363,7 +409,8 @@ impl Device {
 
             let code = generator.generate(&geometry_functions);
 
-            self.program.set_header("geometry-user.glsl", &code);
+            self.visible_point_gen_shader
+                .set_header("geometry-user.glsl", &code);
             self.test_shader.set_header("geometry-user.glsl", &code);
 
             Dirty::dirty(instances);
@@ -453,7 +500,11 @@ impl Device {
                 .create(raster.width.get() as usize, raster.height.get() as usize);
             self.visible_point_data_b
                 .create(raster.width.get() as usize, raster.height.get() as usize);
-            self.visible_point_path
+            self.visible_point_path1
+                .create(raster.width.get() as usize, raster.height.get() as usize);
+            self.visible_point_path2
+                .create(raster.width.get() as usize, raster.height.get() as usize);
+            self.visible_point_path3
                 .create(raster.width.get() as usize, raster.height.get() as usize);
             self.visible_point_pass_data
                 .create(raster.width.get() as usize, raster.height.get() as usize);
@@ -468,8 +519,11 @@ impl Device {
                 &self.visible_point_data_b,
                 &self.samples,
             ]);
-            self.visible_point_path_fbo
-                .rebuild(&[&self.visible_point_path]);
+            self.visible_point_path_fbo.rebuild(&[
+                &self.visible_point_path1,
+                &self.visible_point_path2,
+                &self.visible_point_path3,
+            ]);
             self.visible_point_pass_data_fbo
                 .rebuild(&[&self.visible_point_pass_data]);
 
@@ -533,6 +587,7 @@ impl Device {
         self.load_convolution_buffers_shader.rebuild()?;
         self.test_shader.rebuild()?;
         self.visible_point_update_pixels_shader.rebuild()?;
+        self.visible_point_gen_shader.rebuild()?;
 
         if invalidated {
             self.state.reset(scene);
@@ -561,7 +616,23 @@ impl Device {
         if iteration % ITERATIONS_PER_PASS == 0 {
             // this is a new pass; reset all the per-pass data
 
-            // TODO: populate visible_point_path with new random paths to each hit point
+            let command = self.visible_point_gen_shader.begin_draw();
+
+            command.bind(&self.camera_buffer, "Camera");
+            command.bind(&self.geometry_buffer, "Geometry");
+            command.bind(&self.material_buffer, "Material");
+            command.bind(&self.instance_buffer, "Instance");
+            command.bind(&self.globals_buffer, "Globals");
+            command.bind(&self.raster_buffer, "Raster");
+            command.bind(&self.envmap_texture, "envmap_texture");
+            command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
+            command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
+
+            command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
+            command.set_framebuffer(&self.visible_point_path_fbo);
+
+            command.unset_vertex_array();
+            command.draw_triangles(0, 1);
 
             if iteration != 0 {
                 // there is a previous pass; update the per-pixel state
@@ -663,16 +734,11 @@ impl Device {
 
         let command = self.program.begin_draw();
 
-        command.bind(&self.camera_buffer, "Camera");
-        command.bind(&self.geometry_buffer, "Geometry");
         command.bind(&self.material_buffer, "Material");
-        command.bind(&self.instance_buffer, "Instance");
-        command.bind(&self.globals_buffer, "Globals");
-        command.bind(&self.raster_buffer, "Raster");
-        command.bind(&self.envmap_texture, "envmap_texture");
-        command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
-        command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
         command.bind(&self.photon_table_tex, "photon_table");
+        command.bind(&self.visible_point_path1, "visible_point_path_buf1");
+        command.bind(&self.visible_point_path2, "visible_point_path_buf2");
+        command.bind(&self.visible_point_path3, "visible_point_path_buf3");
 
         if (iteration / ITERATIONS_PER_PASS) % 2 == 0 {
             log::info!("accumulating photons using radius in A");
@@ -732,6 +798,7 @@ impl Device {
         self.load_convolution_buffers_shader.invalidate();
         self.test_shader.invalidate();
         self.visible_point_update_pixels_shader.invalidate();
+        self.visible_point_gen_shader.invalidate();
         self.camera_buffer.invalidate();
         self.geometry_buffer.invalidate();
         self.material_buffer.invalidate();
@@ -768,7 +835,9 @@ impl Device {
         self.visible_point_count_b.invalidate();
         self.visible_point_data_a.invalidate();
         self.visible_point_data_b.invalidate();
-        self.visible_point_path.invalidate();
+        self.visible_point_path1.invalidate();
+        self.visible_point_path2.invalidate();
+        self.visible_point_path3.invalidate();
         self.visible_point_pass_data.invalidate();
 
         self.visible_point_a_fbo.invalidate();

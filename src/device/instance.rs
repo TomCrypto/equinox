@@ -61,16 +61,18 @@ impl Device {
         HierarchyBuilder::new(&mut nodes).build(&mut instance_info);
 
         self.instance_buffer.write_array(&nodes)?;
-        self.program
+        self.visible_point_gen_shader
             .set_define("INSTANCE_DATA_COUNT", self.instance_buffer.element_count());
         self.test_shader
             .set_define("INSTANCE_DATA_COUNT", self.instance_buffer.element_count());
 
         if instance_info.is_empty() {
-            self.program.set_define("INSTANCE_DATA_PRESENT", 0);
+            self.visible_point_gen_shader
+                .set_define("INSTANCE_DATA_PRESENT", 0);
             self.test_shader.set_define("INSTANCE_DATA_PRESENT", 0);
         } else {
-            self.program.set_define("INSTANCE_DATA_PRESENT", 1);
+            self.visible_point_gen_shader
+                .set_define("INSTANCE_DATA_PRESENT", 1);
             self.test_shader.set_define("INSTANCE_DATA_PRESENT", 1);
         }
 
@@ -105,7 +107,7 @@ impl Device {
         }
 
         self.geometry_buffer.write_array(&params)?;
-        self.program
+        self.visible_point_gen_shader
             .set_define("GEOMETRY_DATA_COUNT", self.geometry_buffer.element_count());
         self.test_shader
             .set_define("GEOMETRY_DATA_COUNT", self.geometry_buffer.element_count());

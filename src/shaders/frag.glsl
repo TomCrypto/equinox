@@ -1,32 +1,12 @@
 #include <common.glsl>
-#include <random.glsl>
 
-#include <geometry.glsl>
-#include <instance.glsl>
-#include <material.glsl>
-#include <environment.glsl>
+#include <material_basic.glsl>
+
+uniform sampler2D visible_point_path_buf1;
+uniform sampler2D visible_point_path_buf2;
+uniform sampler2D visible_point_path_buf3;
 
 out vec4 result;
-
-layout (std140) uniform Camera {
-    vec4 origin_plane[4];
-    vec4 target_plane[4];
-    vec4 aperture_settings;
-} camera;
-
-layout (std140) uniform Globals {
-    vec2 filter_delta;
-    uvec4 frame_state;
-    float pass_count;
-} globals;
-
-#define FILTER_DELTA (globals.filter_delta)
-#define FRAME_RANDOM (globals.frame_state.xy)
-#define FRAME_NUMBER (globals.frame_state.z)
-
-layout (std140) uniform Raster {
-    vec4 dimensions;
-} raster;
 
 uniform highp usampler2D photon_table;
 uniform sampler2D photon_radius_tex;
@@ -87,170 +67,40 @@ vec3 get_photon(vec3 cell_pos, uvec3 cell, vec3 point, float radius, uint materi
     }
 }
 
-int accumulate_photons(uint material, uint inst, vec3 normal, inout vec3 radiance, vec3 throughput, vec3 point, vec3 wo) {
-    float radius = texelFetch(photon_radius_tex, ivec2(gl_FragCoord.xy - 0.5), 0).w;
-    int count = 0;
-
-    vec3 accumulation = vec3(0.0);
-
-    // try all surrounding cells, looking for a photon within
-    uvec3 center = get_cell_for_pos(point);
-
-    // there's 27 possible points (for now!)
-    for (int dx = -1; dx <= 1; ++dx) {
-        for (int dy = -1; dy <= 1; ++dy) {
-            for (int dz = -1; dz <= 1; ++dz) {
-                vec3 cell_pos = floor(point / CELL_SIZE) * CELL_SIZE + vec3(float(dx), float(dy), float(dz)) * CELL_SIZE;
-
-                accumulation += get_photon(cell_pos, uvec3(ivec3(center) + ivec3(dx, dy, dz)), point, radius, material, inst, normal, wo, count);
-            }
-        }
-    }
-
-    radiance += throughput * accumulation / (50000.0 * 60.0 * M_PI * radius * radius);
-
-    return count;
-}
-
-// Low-discrepancy sequence generator.
-//
-// Given a fixed, unchanging key, this will produce a low-discrepancy sequence of 2D points
-// as a function of frame number, e.g. on the next frame for the same key the next point in
-// the sequence will be produced.
-
-vec2 low_discrepancy_2d(uvec2 key) {
-    return fract(vec2((key + FRAME_NUMBER) % 8192U) * vec2(0.7548776662, 0.5698402909));
-}
-
-// Begin camera stuff
-
-vec2 evaluate_circular_aperture_uv(inout random_t random) {
-    vec2 uv = rand_uniform_vec2(random);
-
-    float a = uv.s * M_2PI;
-
-    return sqrt(uv.t) * vec2(cos(a), sin(a));
-}
-
-vec2 evaluate_polygon_aperture_uv(inout random_t random) {
-    vec2 uv = rand_uniform_vec2(random); // low_discrepancy_2d(pixel_state);
-
-    float corner = floor(uv.s * camera.aperture_settings.y);
-
-    float u = 1.0 - sqrt(uv.s * camera.aperture_settings.y - corner);
-    float v = uv.t * (1.0 - u);
-
-    float a = M_PI * camera.aperture_settings.w;
-
-    float rotation = camera.aperture_settings.z + corner * 2.0 * a;
-
-    float c = cos(rotation);
-    float s = sin(rotation);
-
-    vec2 p = vec2((u + v) * cos(a), (u - v) * sin(a));
-    return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
-}
-
-vec2 evaluate_aperture_uv(inout random_t random) {
-    switch (int(camera.aperture_settings.x)) {
-        case 0: return evaluate_circular_aperture_uv(random);
-        case 1: return evaluate_polygon_aperture_uv(random);       
-    }
-
-    return vec2(0.0);
-}
-
-vec3 bilinear(vec4 p[4], vec2 uv) {
-    return mix(mix(p[0].xyz, p[1].xyz, uv.x), mix(p[2].xyz, p[3].xyz, uv.x), uv.y);
-}
-
-void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
-    vec2 raster_uv = (gl_FragCoord.xy + FILTER_DELTA) * raster.dimensions.w;
-    raster_uv.x -= (raster.dimensions.x * raster.dimensions.w - 1.0) * 0.5;
-
-    vec3 origin = bilinear(camera.origin_plane, evaluate_aperture_uv(random) * 0.5 + 0.5);
-
-    // TODO: this isn't quite right; this generates a flat focal plane but it should be curved
-    // (to be equidistant to the lens)
-    // maybe just generate this directly in the shader, pass in the camera kind/parameters
-    // but it will do for now, we can extend it later when it's needed
-
-    vec3 target = bilinear(camera.target_plane, raster_uv);
-
-    pos = origin;
-    dir = normalize(target - origin);
-}
-
-// End camera stuff
-
 void main() {
-    vec3 radiance = vec3(0.0);
-    int count = 0;
+    vec4 data1 = texelFetch(visible_point_path_buf1, ivec2(gl_FragCoord.xy - 0.5), 0);
+    vec4 data2 = texelFetch(visible_point_path_buf2, ivec2(gl_FragCoord.xy - 0.5), 0);
+    vec4 data3 = texelFetch(visible_point_path_buf3, ivec2(gl_FragCoord.xy - 0.5), 0);
 
-    random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
+    vec3 position, direction, throughput, normal;
+    uint material, inst;
 
-    ray_t ray;
-    evaluate_primary_ray(random, ray.org, ray.dir);
+    if (!unpack_visible_point(data1, data2, data3, position, direction, normal, throughput, material, inst)) {
+        // no visible point, don't do anything
+        result = vec4(throughput, 1.0); // TODO: not sure what count to use here?
+    } else {
+        // at this point, just accumulate all nearby photons
+        float radius = texelFetch(photon_radius_tex, ivec2(gl_FragCoord.xy - 0.5), 0).w;
+        int count = 0;
 
-    vec3 throughput = vec3(1.0);
-    uint traversal_start = 0U;
-    uint flags;
-    float unused_pdf;
+        vec3 accumulation = vec3(0.0);
 
-    for (uint bounce = 0U; bounce < 100U; ++bounce) {
-        traversal_t traversal = traverse_scene(ray, traversal_start);
+        // try all surrounding cells, looking for a photon within
+        uvec3 center = get_cell_for_pos(position);
 
-        if (traversal_has_hit(traversal)) {
-            ray.org += ray.dir * traversal.range.y;
+        // there's 27 possible points (for now!)
+        for (int dx = -1; dx <= 1; ++dx) {
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dz = -1; dz <= 1; ++dz) {
+                    vec3 cell_pos = floor(position / CELL_SIZE) * CELL_SIZE + vec3(float(dx), float(dy), float(dz)) * CELL_SIZE;
 
-            vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
-
-            uint material = traversal.hit.y & 0xffffU;
-            uint mat_inst = traversal.hit.y >> 16U;
-
-            if (mat_is_diffuse(material)) {
-                // DIFFUSE SURFACE: query the photon map to accumulate incident photons
-                // TODO: this doesn't account properly for absorption up to this point...
-                count = accumulate_photons(material, mat_inst, normal, radiance, throughput, ray.org, -ray.dir);
-                //radiance += vec3(0.0, 3.0, 0.0);
-                break;
-            } else {
-                // NOT DIFFUSE: just keep tracing as usual...
-                ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
-
-                if ((flags & RAY_FLAG_EXTINCT) != 0U) {
-                    break; // no need to trace further
+                    accumulation += get_photon(cell_pos, uvec3(ivec3(center) + ivec3(dx, dy, dz)), position, radius, material, inst, normal, -direction, count);
                 }
-
-                if (((~flags) & (RAY_FLAG_OUTSIDE | RAY_FLAG_TRANSMIT)) == 0U) {
-                    traversal_start = traversal.hit.z;
-                } else {
-                    traversal_start = 0U;
-                }
-            }            
-        } else {
-            if ((flags & RAY_FLAG_ENVMAP_SAMPLED) == 0U) {
-                radiance += throughput * env_eval_light(ray.dir, unused_pdf);
             }
-
-            break;
         }
 
-        if (bounce <= 2U) {
-            continue;
-        }
+        vec3 radiance = throughput * accumulation / (50000.0 * M_PI * radius * radius);
 
-        // russian roulette
-
-        vec2 rng = rand_uniform_vec2(random);
-        float p = min(1.0, max(throughput.x, max(throughput.y, throughput.z)));
-
-        if (rng.x < p) {
-            throughput /= p;
-        } else {
-            break;
-        }
+        result = vec4(radiance, count);
     }
-
-    result = vec4(radiance, float(count));
 }

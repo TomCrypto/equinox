@@ -16,10 +16,10 @@ impl Device {
         environment: &Environment,
     ) -> Result<(), Error> {
         if environment.map.is_some() {
-            self.program.set_define("HAS_ENVMAP", 1);
+            self.visible_point_gen_shader.set_define("HAS_ENVMAP", 1);
             self.test_shader.set_define("HAS_ENVMAP", 1);
         } else {
-            self.program.set_define("HAS_ENVMAP", 0);
+            self.visible_point_gen_shader.set_define("HAS_ENVMAP", 0);
             self.test_shader.set_define("HAS_ENVMAP", 0);
         }
 
@@ -45,9 +45,11 @@ impl Device {
             let cols = header.dimensions[0] as usize;
             let rows = header.dimensions[1] as usize;
 
-            self.program.set_define("ENVMAP_COLS", cols);
-            self.program.set_define("ENVMAP_ROWS", rows);
-            self.program
+            self.visible_point_gen_shader
+                .set_define("ENVMAP_COLS", cols);
+            self.visible_point_gen_shader
+                .set_define("ENVMAP_ROWS", rows);
+            self.visible_point_gen_shader
                 .set_define("ENVMAP_ROTATION", format!("{:+e}", map.rotation));
             self.test_shader.set_define("ENVMAP_COLS", cols);
             self.test_shader.set_define("ENVMAP_ROWS", rows);

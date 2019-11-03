@@ -30,5 +30,5 @@ void main() {
         photon_data.rgb = (old_photon_data.rgb + new_photon_data.rgb) * photon_count / (old_photon_count + new_photon_data.w);
     }
 
-    photon_radiance = photon_data.rgb / globals.pass_count;
+    photon_radiance = photon_data.rgb / (60.0 * globals.pass_count);
 }
