@@ -3,4 +3,18 @@
        -> may be a hardware thing? it will draw point fragments in a specific order? should still be random though, needs to be investigated
 
 2. precompute the visible point paths instead of recomputing them every single photon batch, this will give a huge speedup
+  -> this has been done
 3. try out some caustic paths on some complex scenes
+4. store the squared radius per-pixel instead of the radius, this simplifies some logic and avoids a sqrt...
+5. implement more bounces for photons to include additional light paths
+
+How can we handle exponential growth of visible points correctly with interfaces? Should we do a 50/50 split? At the moment the reflected
+visible point is used 4% of the time or so
+ -> I tried this and it does seem to lead to more consistent results but still not ideal, see if PBR book has something to say about that
+
+Need to implement some kind of heuristic to handle duplicate photons. Maybe we can just update a stencil buffer to count how many photons land in
+a given grid, and multiply the photon throughput by that count for any photon inside the corresponding cell; this approximates multiple photons
+landing n the same spot.
+
+There's a bug where the image is quite far converged, eventually some pixels start producing NaNs. This seems to happen towards the end of the
+process and never at the beginning which suggests something going wrong when the radius is too small? This needs to be investigated...

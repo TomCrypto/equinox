@@ -34,9 +34,9 @@ layout (std140) uniform Raster {
 #define CELL_SIZE 0.03
 
 ivec2 hash_position(vec3 pos) {
-    uint cell_x = uint(100 + int(floor(pos.x / CELL_SIZE)));
-    uint cell_y = uint(100 + int(floor(pos.y / CELL_SIZE)));
-    uint cell_z = uint(100 + int(floor(pos.z / CELL_SIZE)));
+    uint cell_x = floatBitsToUint(floor(pos.x / CELL_SIZE));
+    uint cell_y = floatBitsToUint(floor(pos.y / CELL_SIZE));
+    uint cell_z = floatBitsToUint(floor(pos.z / CELL_SIZE));
 
     // int coords = ((cell_x * 395 + cell_y * 119 + cell_z * 1193) % (4096 * 4096) + 4096 * 4096) % (4096 * 4096);
     // uint coords = (cell_x * 1325290093U + cell_y * 2682811433U + cell_z * 765270841U) % (4096U * 4096U);
@@ -97,6 +97,7 @@ void main() {
     // now fire the ray at the world, hoping for an intersection
     uint flags;
     int diffuse_bounces = 0;
+    bool got_specular = false;
 
     for (uint bounce = 0U; bounce < 100U; ++bounce) {
         traversal_t traversal = traverse_scene(ray, 0U);
@@ -125,6 +126,12 @@ void main() {
             // if this is a DIFFUSE material, we are done; save out the photon
             if ((flags & MAT_PROP_DIFFUSE_BSDF) != 0U) {
                 if (diffuse_bounces == 0) {
+                /*vec2 rng = rand_uniform_vec2(random);
+
+                throughput /= 0.5;
+                last_throughput /= 0.5;
+
+                if (rng.x < 0.5) {*/
                     // resolution is 4096 x 4096... assume a grid resolution of 0.5cm for now
 
                     ivec2 coords = hash_position(ray.org);
@@ -154,6 +161,8 @@ void main() {
                 } else {
                     diffuse_bounces++;
                 }
+            } else {
+                got_specular = true;
             }
 
             ray = new_ray;

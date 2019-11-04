@@ -576,7 +576,7 @@ impl Device {
 
         // temporarily hardcoded
         self.photon_table_tex.create(4096, 4096);
-        self.photon_hits.create(50_000);
+        self.photon_hits.create(100_000);
         self.photon_fbo.rebuild(&[&self.photon_table_tex]);
 
         self.program.rebuild()?;
@@ -611,7 +611,7 @@ impl Device {
 
         let iteration = self.state.frame - 1;
 
-        const ITERATIONS_PER_PASS: u32 = 60;
+        const ITERATIONS_PER_PASS: u32 = 1;
 
         if iteration % ITERATIONS_PER_PASS == 0 {
             // this is a new pass; reset all the per-pass data
@@ -708,26 +708,26 @@ impl Device {
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
 
-        self.gl.bind_buffer(Context::ARRAY_BUFFER, None);
+        /*self.gl.bind_buffer(Context::ARRAY_BUFFER, None);
 
         self.gl.bind_buffer_range_with_i32_and_i32(
             Context::TRANSFORM_FEEDBACK_BUFFER,
             0,
             self.photon_hits.buf_handle.as_ref(),
             0,
-            (50_000 * std::mem::size_of::<PhotonData>()) as i32,
-        );
+            (200_000 * std::mem::size_of::<PhotonData>()) as i32,
+        );*/
 
         command.set_viewport(0, 0, 4096, 4096);
         command.set_framebuffer(&self.photon_fbo);
         self.photon_fbo.clear_ui(0, [0, 0, 0, 0]);
 
-        self.gl.begin_transform_feedback(Context::POINTS);
-        command.draw_points(0, 50_000);
-        self.gl.end_transform_feedback();
+        //self.gl.begin_transform_feedback(Context::POINTS);
+        command.draw_points(0, 100_000);
+        //self.gl.end_transform_feedback();
 
-        self.gl
-            .bind_buffer_base(Context::TRANSFORM_FEEDBACK_BUFFER, 0, None);
+        /*self.gl
+        .bind_buffer_base(Context::TRANSFORM_FEEDBACK_BUFFER, 0, None);*/
 
         // at this point we've drawn a bunch of photons into our photon hash table
         // it's time to render and try to gather these photons at visible points...
@@ -909,7 +909,7 @@ impl DeviceState {
         data.frame_state[0] = self.rng.next_u32();
         data.frame_state[1] = self.rng.next_u32();
         data.frame_state[2] = self.frame;
-        data.pass_count = (self.frame / 60) as f32;
+        data.pass_count = (self.frame / 1) as f32;
 
         buffer.write(&data).expect("internal WebGL error");
 

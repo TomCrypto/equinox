@@ -1,6 +1,8 @@
 #include <common.glsl>
 #include <random.glsl>
 
+#define SPLIT 1
+
 #include <geometry.glsl>
 #include <instance.glsl>
 #include <material.glsl>

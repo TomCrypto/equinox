@@ -230,8 +230,15 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
         float rp = (n1 * cosT - n2 * cosI) / (n1 * cosT + n2 * cosI);
         float r = (rs * rs + rp * rp) * 0.5; // unpolarized lighting
 
+#ifdef SPLIT
+        if (rand_uniform_vec2(random).x < 0.5) {
+#else
         if (rand_uniform_vec2(random).x < r) {
+#endif
             wi = reflect(-wo, normal);
+#ifdef SPLIT
+            return MAT_DIELECTRIC_BASE_COLOR * r / 0.5;
+#endif
         } else {
             wi = (eta * cosI - cosT) * normal - eta * wo;
             flags |= RAY_FLAG_TRANSMIT;
@@ -240,7 +247,11 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
             // velocity is only important if a light source exists inside the medium
             // as otherwise the factor is cancelled out as the ray exits the medium.
 
+#ifdef SPLIT
+            return MAT_DIELECTRIC_BASE_COLOR * cosT / (cosI * eta) * (1.0 - r) / 0.5;
+#else
             return MAT_DIELECTRIC_BASE_COLOR * cosT / (cosI * eta);
+#endif
         }
     } else {
         wi = reflect(-wo, normal);

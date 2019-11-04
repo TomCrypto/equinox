@@ -13,17 +13,11 @@ uniform sampler2D photon_radius_tex;
 
 #define CELL_SIZE 0.03
 
-uvec3 get_cell_for_pos(vec3 pos) {
-    uint cell_x = uint(100 + int(floor(pos.x / CELL_SIZE)));
-    uint cell_y = uint(100 + int(floor(pos.y / CELL_SIZE)));
-    uint cell_z = uint(100 + int(floor(pos.z / CELL_SIZE)));
+ivec2 position_for_cell(vec3 cell) {
+    uvec3 cell_hash_seed = floatBitsToUint(cell);
 
-    return uvec3(cell_x, cell_y, cell_z);
-}
-
-ivec2 position_for_cell(uvec3 cell) {
     // uint coords = (cell.x * 1325290093U + cell.y * 2682811433U + cell.z * 765270841U) % (4096U * 4096U);
-    uint coords = shuffle(cell) % (4096U * 4096U);
+    uint coords = shuffle(cell_hash_seed) % (4096U * 4096U);
 
     int coord_x = int(coords % 4096U);
     int coord_y = int(coords / 4096U);
@@ -31,8 +25,8 @@ ivec2 position_for_cell(uvec3 cell) {
     return ivec2(coord_x, coord_y);
 }
 
-vec3 get_photon(vec3 cell_pos, uvec3 cell, vec3 point, float radius, uint material, uint inst, vec3 normal, vec3 wo, inout int count) {
-    ivec2 coords = position_for_cell(cell);
+vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, uint inst, vec3 normal, vec3 wo, inout int count) {
+    ivec2 coords = position_for_cell(cell_pos);
 
     uvec4 photon_data = texelFetch(photon_table, coords, 0);
 
@@ -54,11 +48,11 @@ vec3 get_photon(vec3 cell_pos, uvec3 cell, vec3 point, float radius, uint materi
 
     float sgn = (photon_throughput.b < 0.0) ? -1.0 : 1.0;
 
-    vec3 photon_direction = vec3(data2.y, data3.x, sqrt(1.0 - data2.y * data2.y - data3.x * data3.x) * sgn);
+    vec3 photon_direction = vec3(data2.y, data3.x, sqrt(max(0.0, 1.0 - data2.y * data2.y - data3.x * data3.x)) * sgn);
 
     photon_throughput.b *= sgn;
 
-    if (distance(point, photon_position) <= radius) {
+    if (dot(point - photon_position, point - photon_position) <= radius_squared) {
         float pdf;
         count += 1;
         return max(0.0, dot(-photon_direction, normal)) * photon_throughput * mat_eval_brdf(material, inst, normal, -photon_direction, wo, pdf);
@@ -80,26 +74,28 @@ void main() {
         result = vec4(throughput, 1.0); // TODO: not sure what count to use here?
     } else {
         // at this point, just accumulate all nearby photons
-        float radius = texelFetch(photon_radius_tex, ivec2(gl_FragCoord.xy - 0.5), 0).w;
+        float radius_squared = pow(texelFetch(photon_radius_tex, ivec2(gl_FragCoord.xy - 0.5), 0).w, 2.0);
         int count = 0;
 
-        vec3 accumulation = vec3(0.0);
+        if (radius_squared == 0.0) {
+            result = vec4(0.0);
+            return;
+        }
 
-        // try all surrounding cells, looking for a photon within
-        uvec3 center = get_cell_for_pos(position);
+        vec3 accumulation = vec3(0.0);
 
         // there's 27 possible points (for now!)
         for (int dx = -1; dx <= 1; ++dx) {
             for (int dy = -1; dy <= 1; ++dy) {
                 for (int dz = -1; dz <= 1; ++dz) {
-                    vec3 cell_pos = floor(position / CELL_SIZE) * CELL_SIZE + vec3(float(dx), float(dy), float(dz)) * CELL_SIZE;
+                    vec3 cell_pos = floor((position) / CELL_SIZE) + vec3(float(dx), float(dy), float(dz));
 
-                    accumulation += get_photon(cell_pos, uvec3(ivec3(center) + ivec3(dx, dy, dz)), position, radius, material, inst, normal, -direction, count);
+                    accumulation += get_photon(cell_pos, position, radius_squared, material, inst, normal, -direction, count);
                 }
             }
         }
 
-        vec3 radiance = throughput * accumulation / (50000.0 * M_PI * radius * radius);
+        vec3 radiance = throughput * accumulation / (100000.0 * M_PI * radius_squared);
 
         result = vec4(radiance, count);
     }
