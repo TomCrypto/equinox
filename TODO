@@ -26,3 +26,120 @@ Loss of precision in visible points with no photons needs to be investigated.
 
 I think the grid artifacting is due to the fact that only one photon can land in each cell in the grid; for sufficiently large cells this shows up
 as bias because each photon is constrained to that cell range... not sure though.
+
+How do we deal with large grid cells? Many photons will fall into them, probably from random directions.
+
+We must have a strategy for large grid cells because otherwise we cannot use them for initial passes, meaning our initial approximations will be
+too high variance to be useful. At the moment there are two artifacts that arise:
+
+ 1) "blocky" appearance on curved surfaces, not sure yet what causes this
+ 2) "splotches" that appear in early passes; this is likely the result of hash collisions which cause one photon on a surface to be overwritten by
+    another distant photon which happened to be mapped to the same cell. This can be mitigated by making the hash table larger, and using less
+    photons in initial passes where the photon accuracy needs to be high.
+
+One possible strategy is to simply trace many fewer photons in early passes, but do that with high accuracy. I don't know if this is a good idea
+though.
+
+The "blocky" issue "resolves" itself at lower grid cell sizes, but I need to investigate that. The splotches stop being an issue at low resolutions
+as many photons cease to contribute to the render, effectively increasing the yield.
+
+We are limited in the size of the hash table; a 16k by 16k one is already 4GB so that's probably the absolute limit. We have 4k by 4k at the moment
+which is a healthy 256MB. When tracing 100k photons we have:
+
+N = 100k
+M = 16M
+
+Expected number of collisions is:
+
+N(N - 1) / (2M) = 312
+
+If we want k collisions then we need:
+
+N(N - 1) / (2M) = k
+
+N(N - 1) = 2kM
+
+~ N^2 = 2kM
+
+N = sqrt(2kM)
+
+So in early SPPM iterations it may be better to trace LESS photons per batch to reduce the likelihood of collisions, then in later iterations we
+can ramp the photon batch size up because occasional collisions are less of a concern.
+
+This all points to the fact that the hash grid is NOT a good data structure for early passes. It's amazing for later passes where the cell size is
+so small it just works beautifully, but for large grid cells it is not even close to optimal.
+
+One thing we could do to reduce collisions is to allow for more than 1 photon per cell, maybe 2 or 4. This increases the size of our hash table
+considerably and makes querying more expensive, but it should dramatically reduce the number of collisions
+
+
+M = 100k
+N = 16M
+
+M is definitely < N / log(N)
+
+So the estimated maximum load will be:
+
+log(N) / (log(N / M)) ~ 3
+
+So allowing for up to 3 photons per cell would be a reasonable approach. How do we do that efficiently?
+
+One option is to simply stratify the hash table. Instead of generating 100k photons, generate 20k at a time, five times with an instanced draw.
+The gl_InstanceID is then used to index into a specific subset of the table, such that each cell consists of 5 consecutive slots written one after
+the other. The likelihood of a collision has decreased significantly, however querying now takes 5 times as much work (although the cell is still
+one consecutive block of memory, so queries should still remain pretty fast).
+
+At least the photon generation phase is not any more expensive.
+
+If we do this with the given scenario, AND reuse the same photon table so that we don't use 5x more memory, we get the following:
+
+M = 20k
+N = 16M / 5
+
+log(N) / (log(N / M)) ~ 2.95
+
+not a huge improvement. but if we use more memory, thereby keeping N = 16M, we have:
+
+log(N) / (log(N / M)) ~ 2.48
+
+This is probably not a winning strategy; we need to trade off way too much memory to get any substantial benefit...
+
+The PROBLEM is multiple photons falling on the same area and overwriting one another.
+
+One option is to simply... IGNORE them. As in, detect that two photons landed in the same spot, and treat them as if no photon had landed there.
+
+Does this help? Probably not... I think the problem here is not so much a missed photon (which isn't actually a big deal; the visible point would
+simply not update its radius and the photon would be caught on the next iteration). The real problem is two photons landing in the same spot, which
+causes the visible points to only register 1 photon when all other nearby visible points registered 2 or more; this is probably what is introducing
+the bias.
+
+We should try with a stencil buffer approach which simply detects and rejects "tainted" cells where duplicate photons have been written to. Simply
+ignore them, which should take care of everything; this is a quite low probability event anyway so the bias should be quite unnoticeable. Let's
+try it out.
+
+This is quite a simple change actually; we need:
+
+ 1. create a stencil buffer of the same size as the photon table
+ 2. clear the stencil buffer at the same time as the photon table
+ 3. set a stencil state which says:
+    * increment the stencil buffer on a rasterized pixel
+    * fail the stencil test if the stencil is not zero
+ 4. read the stencil buffer back at the same time as reading the photon table; if the stencil value is non-zero, disregard any photons in the cell
+    (this might actually speed up the query at high grid cell resolutions since we can skip querying the photon table)
+
+
+One possible issue here: the rasterization order may be unspecified. We can fix this by adding a deterministic, randomly generated depth value per
+photon as well, but this is potentially expensive, we could skip it until it becomes a problem.
+
+Idea: additively blend position, direction and throughput of photons in the photon table, and store a photon count as well.
+
+When gathering:
+
+  1. check length(direction) / photon count, if it's close to 1 all the photons were coming from the same direction, so assign a high weight
+     to the throughput estimate (don't divide by photon count). If the length is too far below 1, reject the sample altogether.
+       -> maybe we can use this as the "photon count" as a continuous value? not sure really
+  2. use position / photon count to get the actual photon position
+
+This will allow retaining multiple photons in the map if they all come from roughly the same direction, while rejecting them if they are unrelated
+photons. Need to see how much bias this introduces, also this may only be useful early on in the render, and we should look into narrowing the grid
+as well over time so that this becomes less useful.
