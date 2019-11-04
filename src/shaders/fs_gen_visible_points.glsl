@@ -116,7 +116,7 @@ void main() {
     uint flags;
     float unused_pdf;
 
-    for (uint bounce = 0U; bounce < 100U; ++bounce) {
+    for (uint bounce = 0U; bounce < 8U; ++bounce) {
         traversal_t traversal = traverse_scene(ray, traversal_start);
 
         if (traversal_has_hit(traversal)) {

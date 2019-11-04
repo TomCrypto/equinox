@@ -71,7 +71,7 @@ void main() {
 
     if (!unpack_visible_point(data1, data2, data3, position, direction, normal, throughput, material, inst)) {
         // no visible point, don't do anything
-        result = vec4(throughput, 1.0); // TODO: not sure what count to use here?
+        result = vec4(throughput, 0.0); // TODO: not sure what count to use here?
     } else {
         // at this point, just accumulate all nearby photons
         float radius_squared = pow(texelFetch(photon_radius_tex, ivec2(gl_FragCoord.xy - 0.5), 0).w, 2.0);

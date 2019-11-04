@@ -99,7 +99,7 @@ void main() {
     int diffuse_bounces = 0;
     bool got_specular = false;
 
-    for (uint bounce = 0U; bounce < 100U; ++bounce) {
+    for (uint bounce = 0U; bounce < 8U; ++bounce) {
         traversal_t traversal = traverse_scene(ray, 0U);
 
         if (traversal_has_hit(traversal)) {

@@ -18,3 +18,11 @@ landing n the same spot.
 
 There's a bug where the image is quite far converged, eventually some pixels start producing NaNs. This seems to happen towards the end of the
 process and never at the beginning which suggests something going wrong when the radius is too small? This needs to be investigated...
+  -> this is fixed, had to do with the radius being zero and the gather phase producing infinite radiance as a result
+
+Loss of precision in visible points with no photons needs to be investigated.
+ -> fixed by upgrading to 32-bit floats, we need to see if we can use 16-bit anyway. Problem is the visible point data is stored such that it
+    continually increments, if we store it in a normalized form (e.g. divided by number of SPPM passes) it would work better.
+
+I think the grid artifacting is due to the fact that only one photon can land in each cell in the grid; for sufficiently large cells this shows up
+as bias because each photon is constrained to that cell range... not sure though.

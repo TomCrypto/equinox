@@ -24,7 +24,7 @@ void main() {
     // update rules
     if (new_photon_data.w == 0.0) {
         photon_count = old_photon_count;
-        photon_data = old_photon_data;
+        photon_data = old_photon_data + new_photon_data;
     } else {
         photon_count = old_photon_count + ALPHA * new_photon_data.w;
 

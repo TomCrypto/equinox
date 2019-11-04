@@ -135,8 +135,8 @@ pub struct Device {
     // ping-pong buffers for the visible point data
     pub(crate) visible_point_count_a: Texture<R32F>,
     pub(crate) visible_point_count_b: Texture<R32F>,
-    pub(crate) visible_point_data_a: Texture<RGBA16F>,
-    pub(crate) visible_point_data_b: Texture<RGBA16F>,
+    pub(crate) visible_point_data_a: Texture<RGBA32F>,
+    pub(crate) visible_point_data_b: Texture<RGBA32F>,
 
     // buffer to store the visible point path information
     pub(crate) visible_point_path1: Texture<RGBA32F>,
@@ -576,7 +576,7 @@ impl Device {
 
         // temporarily hardcoded
         self.photon_table_tex.create(4096, 4096);
-        self.photon_hits.create(100_000);
+        // self.photon_hits.create(100_000);
         self.photon_fbo.rebuild(&[&self.photon_table_tex]);
 
         self.program.rebuild()?;
