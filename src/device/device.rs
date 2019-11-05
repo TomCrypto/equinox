@@ -306,6 +306,7 @@ impl Device {
                 shaders::FRAG,
                 hashmap! {
                     "Material" => BindingPoint::UniformBlock(8),
+                    "Globals" => BindingPoint::UniformBlock(7),
                     "photon_table" => BindingPoint::Texture(4),
                     "photon_radius_tex" => BindingPoint::Texture(5),
                     "visible_point_path_buf1" => BindingPoint::Texture(0),
@@ -735,6 +736,7 @@ impl Device {
         let command = self.program.begin_draw();
 
         command.bind(&self.material_buffer, "Material");
+        command.bind(&self.globals_buffer, "Globals");
         command.bind(&self.photon_table_tex, "photon_table");
         command.bind(&self.visible_point_path1, "visible_point_path_buf1");
         command.bind(&self.visible_point_path2, "visible_point_path_buf2");

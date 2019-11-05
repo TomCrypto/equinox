@@ -12,7 +12,7 @@ layout(location = 0) out float photon_count;
 layout(location = 1) out vec4 photon_data;
 layout(location = 2) out vec3 photon_radiance;
 
-#define ALPHA 0.95
+#define ALPHA 0.65
 
 void main() {
     ivec2 coords = ivec2(gl_FragCoord.xy - 0.5);
