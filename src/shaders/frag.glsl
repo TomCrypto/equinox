@@ -1,6 +1,13 @@
 #include <common.glsl>
+#include <random.glsl>
 
 #include <material_basic.glsl>
+
+layout (std140) uniform Globals {
+    vec2 filter_delta;
+    uvec4 frame_state;
+    float pass_count;
+} globals;
 
 uniform sampler2D visible_point_path_buf1;
 uniform sampler2D visible_point_path_buf2;
@@ -11,13 +18,15 @@ out vec4 result;
 uniform highp usampler2D photon_table;
 uniform sampler2D photon_radius_tex;
 
+#define FRAME_RANDOM (globals.frame_state.xy)
+
 #define CELL_SIZE 0.03
 
 ivec2 position_for_cell(vec3 cell) {
     uvec3 cell_hash_seed = floatBitsToUint(cell);
 
     // uint coords = (cell.x * 1325290093U + cell.y * 2682811433U + cell.z * 765270841U) % (4096U * 4096U);
-    uint coords = shuffle(cell_hash_seed) % (4096U * 4096U);
+    uint coords = shuffle(cell_hash_seed, FRAME_RANDOM) % (4096U * 4096U);
 
     int coord_x = int(coords % 4096U);
     int coord_y = int(coords / 4096U);

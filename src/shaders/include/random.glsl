@@ -3,8 +3,8 @@
 void _rand_mix_full(inout random_t random);
 void _rand_mix_mini(inout random_t random);
 
-uint shuffle(uvec3 data) {
-    uvec2 state = data.xy;
+uint shuffle(uvec3 data, uvec2 seed) {
+    uvec2 state = data.xy ^ seed;
 
     _rand_mix_full(state);
 

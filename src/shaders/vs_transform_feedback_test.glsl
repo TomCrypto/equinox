@@ -40,7 +40,7 @@ ivec2 hash_position(vec3 pos) {
 
     // int coords = ((cell_x * 395 + cell_y * 119 + cell_z * 1193) % (4096 * 4096) + 4096 * 4096) % (4096 * 4096);
     // uint coords = (cell_x * 1325290093U + cell_y * 2682811433U + cell_z * 765270841U) % (4096U * 4096U);
-    uint coords = shuffle(uvec3(cell_x, cell_y, cell_z)) % (4096U * 4096U);
+    uint coords = shuffle(uvec3(cell_x, cell_y, cell_z), FRAME_RANDOM) % (4096U * 4096U);
 
     int coord_x = int(coords % 4096U);
     int coord_y = int(coords / 4096U);
