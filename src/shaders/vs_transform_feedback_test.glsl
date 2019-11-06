@@ -89,7 +89,7 @@ void main() {
     ray.dir = -ray.dir;
 
     // find the bounding sphere for the scene
-    float radius = max(bbmax.x - bbmin.x, max(bbmax.y - bbmin.y, bbmax.z - bbmin.z)) / 2.0 * sqrt(2.0);
+    float radius = max(bbmax.x - bbmin.x, max(bbmax.y - bbmin.y, bbmax.z - bbmin.z)) / 2.0 * sqrt(3.0);
 
     // adjust PDF
     throughput *= M_PI * radius * radius;

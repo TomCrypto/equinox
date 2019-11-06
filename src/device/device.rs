@@ -716,34 +716,7 @@ impl Device {
 
         // UPDATE PER-PIXEL STATE
 
-        if iteration != 0 {
-            // there is a previous pass; update the per-pixel state
-
-            let command = self.visible_point_update_pixels_shader.begin_draw();
-            command.bind(&self.visible_point_pass_data, "new_photon_data_tex");
-            command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
-
-            if iteration % 2 != 0 {
-                // old data is in "a", we want to write in "b"
-                log::info!("pass complete, reading from A and writing to B");
-
-                command.bind(&self.visible_point_count_a, "old_photon_count_tex");
-                command.bind(&self.visible_point_data_a, "old_photon_data_tex");
-
-                command.set_framebuffer(&self.visible_point_b_fbo);
-            } else {
-                // old data is in "b", we want to write in "a"
-                log::info!("pass complete, reading from B and writing to A");
-
-                command.bind(&self.visible_point_count_b, "old_photon_count_tex");
-                command.bind(&self.visible_point_data_b, "old_photon_data_tex");
-
-                command.set_framebuffer(&self.visible_point_a_fbo);
-            }
-
-            command.unset_vertex_array();
-            command.draw_triangles(0, 1);
-        } else {
+        if iteration == 0 {
             // we are starting a new render, clear all pass data and set the initial search
             // radius
 
@@ -806,6 +779,44 @@ impl Device {
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
+
+        // there is a previous pass; update the per-pixel state
+
+        let command = self.visible_point_update_pixels_shader.begin_draw();
+        command.bind(&self.visible_point_pass_data, "new_photon_data_tex");
+        command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
+
+        if iteration % 2 == 0 {
+            // old data is in "a", we want to write in "b"
+            log::info!("pass complete, reading from A and writing to B");
+
+            command.bind(&self.visible_point_count_a, "old_photon_count_tex");
+            command.bind(&self.visible_point_data_a, "old_photon_data_tex");
+
+            command.set_framebuffer(&self.visible_point_b_fbo);
+        } else {
+            // old data is in "b", we want to write in "a"
+            log::info!("pass complete, reading from B and writing to A");
+
+            command.bind(&self.visible_point_count_b, "old_photon_count_tex");
+            command.bind(&self.visible_point_data_b, "old_photon_data_tex");
+
+            command.set_framebuffer(&self.visible_point_a_fbo);
+        }
+
+        command.unset_vertex_array();
+        command.draw_triangles(0, 1);
+
+        // AVERAGE RADIUS REDUCTION
+
+        // given that we fired N * M photons, with the given grid cell size we would
+        // expect the following number of photons to have fallen into each grid
+        // on average: N * M * D / C^2 = Np
+        // given this information, we can expect the ratio to be:
+        // (a + alpha Np) / (a + Np) =
+        // self.state.search_radius *= 0.9995;
+
+        log::info!("search radius = {}", self.state.search_radius);
     }
 
     pub fn render(&mut self) {
@@ -977,7 +988,7 @@ impl DeviceState {
         data.frame_state[0] = self.rng.next_u32();
         data.frame_state[1] = self.rng.next_u32();
         data.frame_state[2] = self.frame;
-        data.pass_count = (self.frame / 1) as f32;
+        data.pass_count = (1 + self.frame) as f32;
         data.photons_for_pass = photons_for_pass as f32;
         data.total_photons = self.total_photons;
         data.grid_cell_size = grid_cell_size;

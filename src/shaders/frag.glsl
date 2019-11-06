@@ -82,7 +82,9 @@ void main() {
         result = vec4(throughput, 0.0); // TODO: not sure what count to use here?
     } else {
         // at this point, just accumulate all nearby photons
-        float radius_squared = pow(texelFetch(photon_radius_tex, ivec2(gl_FragCoord.xy - 0.5), 0).w, 2.0);
+        float radius = texelFetch(photon_radius_tex, ivec2(gl_FragCoord.xy - 0.5), 0).w;
+        radius = min(radius, globals.grid_cell_size * 2.0);
+        float radius_squared = pow(radius, 2.0);
         int count = 0;
 
         if (radius_squared == 0.0) {
@@ -90,18 +92,21 @@ void main() {
             return;
         }
 
+        vec3 cell_pos = floor(position / globals.grid_cell_size);
+        vec3 in_pos = fract(position / globals.grid_cell_size);
+
+        vec3 dir = sign(in_pos - vec3(0.5));
+
         vec3 accumulation = vec3(0.0);
 
-        // there's 27 possible points (for now!)
-        for (int dx = -1; dx <= 1; ++dx) {
-            for (int dy = -1; dy <= 1; ++dy) {
-                for (int dz = -1; dz <= 1; ++dz) {
-                    vec3 cell_pos = floor((position) / globals.grid_cell_size) + vec3(float(dx), float(dy), float(dz));
-
-                    accumulation += get_photon(cell_pos, position, radius_squared, material, inst, normal, -direction, count);
-                }
-            }
-        }
+        accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
+        accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
+        accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
+        accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
+        accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
+        accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
+        accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
+        accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
 
         vec3 radiance = throughput * accumulation / (globals.photons_for_pass * M_PI * radius_squared);
 
