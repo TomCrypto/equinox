@@ -560,22 +560,29 @@ impl Device {
         // select the grid cell size
         let grid_cell_size = 2.0 * self.state.search_radius;
 
-        // select N and M; M is a power of two, and we compute the hash cell cols/rows
-        // based on that
+        // TODO: there is a bug here where "m" jumps to the next power of 2
+        // periodically, investigate this
 
-        // TODO: take into account max-m
-
-        let mut n = (self.state.integrator.photon_density / grid_cell_size.powi(2)) as usize;
+        let mut n =
+            (self.state.integrator.photon_density / grid_cell_size.powi(2)).round() as usize;
         n = n.min(self.state.integrator.photons_per_pass).max(1);
-        let mut m = self.state.integrator.photons_per_pass / n;
-        m = m.next_power_of_two();
-        // TODO: for now
-        m = 64;
-        // n = self.state.integrator.photons_per_pass / m;
-        n /= m;
+        let mut m = (self.state.integrator.photons_per_pass / n)
+            .min(2usize.pow(self.state.integrator.max_hash_cell_bits));
 
-        m = 16;
-        n = self.state.integrator.photons_per_pass / 16;
+        // if we round up, then if m = 3 we're now exceeding our budget by 4/3...
+        // we should round down...
+
+        if !m.is_power_of_two() {
+            m = (m / 2).next_power_of_two();
+        }
+
+        log::info!(
+            "(n, m, nm, r) = ({}, {}, {}, {})",
+            n,
+            m,
+            n * m,
+            self.state.search_radius
+        );
 
         let mut hash_cell_cols = 1;
         let mut hash_cell_rows = 1;
@@ -598,14 +605,14 @@ impl Device {
 
         assert_eq!(hash_cell_cols * hash_cell_rows, m);
 
-        log::info!(
+        /*log::info!(
             "frame = {}, n = {}, m = {}, hash_cell_cols = {}, hash_cell_rows = {}",
             self.state.frame,
             n,
             m,
             hash_cell_cols,
             hash_cell_rows
-        );
+        );*/
 
         // TODO: not happy with this, can we improve it
         self.state.update(
@@ -738,7 +745,7 @@ impl Device {
         // into each grid on average: N * M * D / C^2 = Np
         // given this information, we can expect the ratio to be:
         // (a + alpha Np) / (a + Np) =
-        // self.state.search_radius *= 0.9995;
+        self.state.search_radius *= 0.9995;
 
         //log::info!("search radius = {}", self.state.search_radius);
     }

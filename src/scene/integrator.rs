@@ -15,7 +15,7 @@ pub struct Integrator {
     #[default(1.0)]
     pub photon_density: f32,
 
-    #[default(5)]
+    #[default(6)]
     pub max_hash_cell_bits: u32,
 
     #[default(0.7)]

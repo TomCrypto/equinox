@@ -297,5 +297,12 @@ DONE (need to check there are no edge artifacts...)
     -> this can just replace the current "allow_mis" flag; MIS is irrelevant with the direct SPPM we are doing
     -> at the moment all non-specular surfaces are receivers
  - investigate serious performance regressions in shader builds (this wouldn't be so bad if it didn't freeze the whole browser)
+ - handle all bounces, not just one non-specular bounce...
 
 Need to test the convergence as well to see if it looks the same as before.
+
+Image gets darker... this is probably due to the search radius going down too fast and screwing up the estimates.
+Just copying the search radius to the CPU and updating it every now and then is a definite option if we want to "be sure".
+The logic for it shouldn't be too bad, though we do need to allocate a separate copy buffer and implement a fence object...
+
+We could also calculate the 
