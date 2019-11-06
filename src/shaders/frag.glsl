@@ -94,7 +94,8 @@ void main() {
 
     if (!unpack_visible_point(data1, data2, data3, position, direction, normal, throughput, material, inst)) {
         // no visible point, don't do anything
-        result = vec4(throughput, 0.0); // TODO: not sure what count to use here?
+        // result = vec4(throughput, 0.0); // TODO: not sure what count to use here?
+        result = vec4(0.0);
     } else {
         // at this point, just accumulate all nearby photons
         float radius = texelFetch(photon_radius_tex, ivec2(gl_FragCoord.xy - 0.5), 0).w;
@@ -123,7 +124,7 @@ void main() {
         accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
         accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
 
-        vec3 radiance = throughput * accumulation / (globals.photons_for_pass * M_PI * radius_squared);
+        vec3 radiance = throughput * accumulation;
 
         result = vec4(radiance, count);
     }

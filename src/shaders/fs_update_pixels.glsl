@@ -1,3 +1,5 @@
+#include <common.glsl>
+
 uniform sampler2D old_photon_count_tex;
 uniform sampler2D old_photon_data_tex;
 uniform sampler2D new_photon_data_tex;
@@ -32,5 +34,5 @@ void main() {
     photon_data.w = old_photon_data.w * sqrt(ratio);
     photon_data.rgb = (old_photon_data.rgb + new_photon_data.rgb) * ratio;
 
-    photon_radiance = photon_data.rgb / globals.pass_count;
+    photon_radiance = photon_data.rgb / (globals.total_photons * M_PI * pow(photon_data.w, 2.0));
 }
