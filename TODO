@@ -264,3 +264,17 @@ gl_InstanceID / hash_cell_cols
 The gather pass simply iterates over all of them; problem solved (kind of efficiently).
 
 Need to solve edge artifacts... it's bad...
+
+================
+
+According to the PBR book, we have the following:
+
+ * the division by Np pi r^2 does NOT happen in the rendering loop; it's done when calculating the photon radiance but does not
+   feed back into the system.
+ * direct and indirect lighting (in our case, the "no visible point" value and the visible point contributions) are handled separately
+
+The photon radiance is simply computed as:
+
+ tau / (Np * pi * radius^2)
+
+Where tau is calculated during the update, and Np is presumably the number of photons in the current pass?

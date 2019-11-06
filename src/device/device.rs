@@ -773,8 +773,6 @@ impl Device {
             command.bind(&self.visible_point_data_b, "photon_radius_tex");
         }
 
-        command.set_blend_mode(BlendMode::Add);
-
         command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
         command.set_framebuffer(&self.visible_point_pass_data_fbo);
 
