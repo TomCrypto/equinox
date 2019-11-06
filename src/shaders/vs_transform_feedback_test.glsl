@@ -4,10 +4,6 @@ layout(location = 2) in vec4 outgoing_direction;
 layout(location = 3) in vec4 incident_throughput;
 layout(location = 4) in vec4 outgoing_throughput;
 
-out vec4 out_position;
-out vec4 out_outgoing_direction;
-out vec4 out_outgoing_throughput;
-
 flat out uvec4 table_data;
 
 #include <common.glsl>
@@ -125,14 +121,12 @@ void main() {
             ray_t new_ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
 
             if ((flags & RAY_FLAG_EXTINCT) != 0U) {
-                out_position = vec4(0.0, 0.0, 0.0, -1.0);
                 gl_PointSize = 1.0;
                 gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
                 return;
             }
 
-            // if this is a DIFFUSE material, we are done; save out the photon
-            if ((flags & MAT_PROP_DIFFUSE_BSDF) != 0U) {
+            if ((flags & MAT_PROP_DELTA_BSDF) == 0U) {
                 if (diffuse_bounces == 0) {
                 /*vec2 rng = rand_uniform_vec2(random);
 
@@ -161,10 +155,6 @@ void main() {
                     table_data.g = floatBitsToUint(ray.org.y);
                     table_data.b = floatBitsToUint(ray.org.z);
                     table_data.a = 1U;*/
-
-                    out_position = vec4(ray.org, 1.0);
-                    out_outgoing_direction = vec4(new_ray.dir, 0.0);
-                    out_outgoing_throughput = vec4(throughput, 0.0);
                     return;
                 } else {
                     diffuse_bounces++;
@@ -179,7 +169,6 @@ void main() {
             // TODO: russian roulette
         } else {
             // no hit, consider photon lost
-            out_position = vec4(0.0, 0.0, 0.0, -1.0);
             gl_PointSize = 1.0;
             gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
             return;

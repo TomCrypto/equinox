@@ -8,68 +8,6 @@ use zerocopy::{AsBytes, FromBytes};
 
 use crate::*;
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Default, AsBytes, FromBytes)]
-pub(crate) struct PhotonData {
-    hit_position: [f32; 3],
-    padding1: f32,
-    incident_direction: [f32; 3],
-    padding2: f32,
-    outgoing_direction: [f32; 3],
-    padding3: f32,
-    incident_throughput: [f32; 3],
-    padding4: f32,
-    outgoing_throughput: [f32; 3],
-    padding5: f32,
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Default, AsBytes, FromBytes)]
-pub(crate) struct PhotonTreeNode {
-    hit_position: [f32; 3],
-    left_index: u32,
-    incident_direction: [f32; 3],
-    right_index: u32,
-    incident_throughput: [f32; 3],
-    axis: u32, // TODO: store material info here? if needed?
-    more_padding: [u32; 4],
-}
-
-impl VertexLayout for PhotonData {
-    const VERTEX_LAYOUT: &'static [VertexAttribute] = &[
-        VertexAttribute::new(0, 0, VertexAttributeKind::Float4), // position
-        VertexAttribute::new(1, 16, VertexAttributeKind::Float4), // incident direction
-        VertexAttribute::new(2, 32, VertexAttributeKind::Float4), // outgoing direction
-        VertexAttribute::new(3, 48, VertexAttributeKind::Float4), // incident throughput
-        VertexAttribute::new(4, 64, VertexAttributeKind::Float4), // outgoing throughput
-    ];
-}
-
-/*
-
-Buf1 (RGBA32F):
-
-    RGB => visible point position
-    A => material index + instance
-
-Buf2 (RGBA16F):
-
-    RGB => visible point throughput
-    A => {0, 1, 2, 3, 4}
-
-        0 => not a valid visible point, treat throughput as radiance
-        1 => direction.z is positive, normal.z is positive
-        2 => direction.z is positive, normal.z is negative
-        3 => direction.z is negative, normal.z is positive
-        4 => direction.z is negative, normal.z is negative
-
-Buf3 (RGBA16F):
-
-    RG => visible point path direction, packed
-    BA => visible point path surface normal, packed
-
-*/
-
 #[derive(Debug)]
 pub struct Device {
     pub(crate) gl: Context,
@@ -123,9 +61,6 @@ pub struct Device {
 
     pub(crate) load_convolution_buffers_shader: Shader,
 
-    // transform buffer for the photon data
-    pub(crate) photon_hits: VertexArray<[PhotonData]>,
-
     // textures for the photon data and kd-tree
     pub(crate) photon_table_tex: Texture<RGBA32UI>,
     pub(crate) photon_fbo: Framebuffer,
@@ -133,8 +68,8 @@ pub struct Device {
     pub(crate) test_shader: Shader,
 
     // ping-pong buffers for the visible point data
-    pub(crate) visible_point_count_a: Texture<R32F>,
-    pub(crate) visible_point_count_b: Texture<R32F>,
+    pub(crate) visible_point_count_a: Texture<RGBA32F>,
+    pub(crate) visible_point_count_b: Texture<RGBA32F>,
     pub(crate) visible_point_data_a: Texture<RGBA32F>,
     pub(crate) visible_point_data_b: Texture<RGBA32F>,
 
@@ -188,7 +123,6 @@ impl Device {
                     "envmap_marg_cdf" => BindingPoint::Texture(2),
                     "envmap_cond_cdf" => BindingPoint::Texture(3),
                 },
-                &[],
                 hashmap! {
                     "geometry-user.glsl" => "",
                 },
@@ -213,12 +147,10 @@ impl Device {
                     "new_photon_data_tex" => BindingPoint::Texture(2),
                     "Globals" => BindingPoint::UniformBlock(2),
                 },
-                &[],
                 hashmap! {},
                 hashmap! {},
             ),
             photon_table_tex: Texture::new(gl.clone()),
-            photon_hits: VertexArray::new(gl.clone()),
             fft_pass_data: VertexArray::new(gl.clone()),
             test_shader: Shader::new(
                 gl.clone(),
@@ -234,11 +166,6 @@ impl Device {
                     "envmap_marg_cdf" => BindingPoint::Texture(2),
                     "envmap_cond_cdf" => BindingPoint::Texture(3),
                 },
-                &[
-                    "out_position",
-                    "out_outgoing_direction",
-                    "out_outgoing_throughput",
-                ],
                 hashmap! {
                     "geometry-user.glsl" => "",
                 },
@@ -262,7 +189,6 @@ impl Device {
                 hashmap! {
                     "image" => BindingPoint::Texture(0),
                 },
-                &[],
                 hashmap! {},
                 hashmap! {
                     "CONV_DIMS" => "vec2(0.0, 0.0)",
@@ -281,7 +207,6 @@ impl Device {
                     "g_conv_filter" => BindingPoint::Texture(4),
                     "b_conv_filter" => BindingPoint::Texture(5),
                 },
-                &[],
                 hashmap! {},
                 hashmap! {},
             ),
@@ -295,7 +220,6 @@ impl Device {
                     "b_conv_buffer" => BindingPoint::Texture(2),
                     "source" => BindingPoint::Texture(3),
                 },
-                &[],
                 hashmap! {},
                 hashmap! {
                     "CONV_DIMS" => "vec2(0.0, 0.0)",
@@ -315,7 +239,6 @@ impl Device {
                     "visible_point_path_buf2" => BindingPoint::Texture(1),
                     "visible_point_path_buf3" => BindingPoint::Texture(2),
                 },
-                &[],
                 hashmap! {},
                 hashmap! {
                     "MATERIAL_DATA_COUNT" => "0",
@@ -331,7 +254,6 @@ impl Device {
                     "samples" => BindingPoint::Texture(0),
                     "Display" => BindingPoint::UniformBlock(0),
                 },
-                &[],
                 hashmap! {},
                 hashmap! {},
             ),

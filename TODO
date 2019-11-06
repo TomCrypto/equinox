@@ -286,5 +286,16 @@ The remaining tasks are:
 
  - putting back visible lighting (so apparently this needs to be treated as a separate quantity and normalized by the
    pass count rather than the total number of photons and should not be mixed with the photon radiance estimates)
+DONE (need to check there are no edge artifacts...)
  - shrinking the pixel radius (for the grid) somehow
+    -> this will allow us to trace more photons as the grid shrinks, quickly speeding up the render
+       right now we are constrained to whatever the initial grid size is, forever
  - dynamic calculation of n and m
+ - allow marking individual surfaces as photon receivers
+    -> this allows saying that for some really glossy surfaces we should just trace rays to estimate radiance, instead of trying to
+       estimate it with photons. specular surfaces will never be photon receivers, obviously
+    -> this can just replace the current "allow_mis" flag; MIS is irrelevant with the direct SPPM we are doing
+    -> at the moment all non-specular surfaces are receivers
+ - investigate serious performance regressions in shader builds (this wouldn't be so bad if it didn't freeze the whole browser)
+
+Need to test the convergence as well to see if it looks the same as before.

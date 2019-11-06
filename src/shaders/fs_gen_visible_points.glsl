@@ -1,7 +1,7 @@
 #include <common.glsl>
 #include <random.glsl>
 
-#define SPLIT 1
+// #define SPLIT 1
 
 #include <geometry.glsl>
 #include <instance.glsl>
@@ -133,7 +133,7 @@ void main() {
             uint material = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
 
-            if (mat_is_diffuse(material)) {
+            if (mat_is_not_specular(material)) {
                 // we found our diffuse surface, record the hit...
 
                 pack_visible_point(ray.org, ray.dir, normal, throughput, material, mat_inst, visible_point_buf1, visible_point_buf2, visible_point_buf3);

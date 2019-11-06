@@ -315,14 +315,14 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
     return vec3(MAT_OREN_NAYAR_ALBEDO) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
 }
 
-bool mat_is_diffuse(uint material) {
+bool mat_is_not_specular(uint material) {
     switch (material) {
         case 0U:
             return true;
         case 1U:
             return false;
         case 2U:
-            return false;
+            return true;
         case 3U:
             return false;
         case 4U:

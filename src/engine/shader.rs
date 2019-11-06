@@ -25,7 +25,6 @@ pub struct Shader {
     fragment: &'static str,
 
     binds: HashMap<&'static str, BindingPoint>,
-    transform_feedback: &'static [&'static str],
 
     headers: HashMap<&'static str, String>,
     defines: HashMap<&'static str, String>,
@@ -37,7 +36,6 @@ impl Shader {
         vertex: &'static str,
         fragment: &'static str,
         binds: HashMap<&'static str, BindingPoint>,
-        transform_feedback: &'static [&'static str],
         default_headers: HashMap<&'static str, &str>,
         default_defines: HashMap<&'static str, &str>,
     ) -> Self {
@@ -60,7 +58,6 @@ impl Shader {
             binds,
             headers,
             defines,
-            transform_feedback,
             invalidated: true,
         }
     }
@@ -180,15 +177,6 @@ impl Shader {
         if let Some(program) = &program {
             self.gl.attach_shader(program, vert);
             self.gl.attach_shader(program, frag);
-
-            let varyings = js_sys::Array::new();
-
-            for &varying in self.transform_feedback {
-                varyings.push(&varying.into());
-            }
-
-            self.gl
-                .transform_feedback_varyings(program, &varyings, Context::INTERLEAVED_ATTRIBS);
 
             self.gl.link_program(program);
 

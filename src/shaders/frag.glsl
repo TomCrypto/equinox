@@ -93,9 +93,7 @@ void main() {
     uint material, inst;
 
     if (!unpack_visible_point(data1, data2, data3, position, direction, normal, throughput, material, inst)) {
-        // no visible point, don't do anything
-        // result = vec4(throughput, 0.0); // TODO: not sure what count to use here?
-        result = vec4(0.0);
+        result = vec4(throughput, 0.0); // count = 0 indicates this is direct lighting
     } else {
         // at this point, just accumulate all nearby photons
         float radius = texelFetch(photon_radius_tex, ivec2(gl_FragCoord.xy - 0.5), 0).w;
