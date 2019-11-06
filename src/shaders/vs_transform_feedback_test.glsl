@@ -154,7 +154,7 @@ void main() {
                     ivec2 coords = hash_position(ray.org);
 
                     gl_PointSize = 1.0;
-                    gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / vec2(4096.0) - 1.0, 0.0, 1.0);
+                    gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / vec2(float(HASH_TABLE_COLS), float(HASH_TABLE_ROWS)) - 1.0, 0.0, 1.0);
 
                     float sgn = (ray.dir.z < 0.0) ? -1.0 : 1.0;
 

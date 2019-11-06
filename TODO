@@ -239,9 +239,12 @@ So we expect M / 8 photons per visible point on average. We need to be accurate 
 TODO:
 
  1. make Np, the initial search radius and "X" configurable in the JSON.
+DONE
  2. pick C = 2 Rs at every pass, for now don't reduce Rs.
+DONE
  3. pick N and M correctly, and implement the instanced scatter-gather pass.
  4. maintain a total photon count to normalize the final result
+DONE (sort of)
  5. reduce Rs, and adjust the gather fragment shader to either always be correct, or to always clamp the pixel's search radius to Rs
 
 With some luck the gather with M > 1 will be quite fast and we can rely on just making M large to compensate for large initial search radii without
@@ -250,3 +253,14 @@ too much slowdown. Once we are past the first few iterations anyway Rs will be q
  => we can also cap M with some option so that if the first few passes are too slow we can simply use less photons
 
 
+Need to implement the hash cell rows/cols now so that we can do multiple gather.
+
+This involves passing the relevant row/col values to both shaders. The scatter pass uses gl_InstanceID to calculate the location to place the
+photon in inside the cell:
+
+gl_InstanceID % hash_cell_cols
+gl_InstanceID / hash_cell_cols
+
+The gather pass simply iterates over all of them; problem solved (kind of efficiently).
+
+Need to solve edge artifacts... it's bad...

@@ -253,8 +253,6 @@ impl Device {
                     "INSTANCE_DATA_PRESENT" => "0",
                     "HASH_TABLE_COLS" => "0",
                     "HASH_TABLE_ROWS" => "0",
-                    "HASH_CELL_COLS" => "0",
-                    "HASH_CELL_ROWS" => "0",
                 },
             ),
             load_convolution_buffers_shader: Shader::new(
@@ -323,8 +321,6 @@ impl Device {
                     "MATERIAL_DATA_COUNT" => "0",
                     "HASH_TABLE_COLS" => "0",
                     "HASH_TABLE_ROWS" => "0",
-                    "HASH_CELL_COLS" => "0",
-                    "HASH_CELL_ROWS" => "0",
                 },
             ),
             present_program: Shader::new(
