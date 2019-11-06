@@ -6,6 +6,43 @@ use rand_chacha::ChaCha20Rng;
 use web_sys::WebGl2RenderingContext as Context;
 use zerocopy::{AsBytes, FromBytes};
 
+#[repr(C)]
+#[derive(AsBytes, FromBytes)]
+struct PixelInfo {
+    color: [f32; 3],
+    radius: f32,
+}
+
+impl PixelInfo {
+    fn key(&self) -> f32 {
+        if self.color == [0.0; 3] {
+            0.0
+        } else {
+            self.radius
+        }
+    }
+}
+
+impl PartialOrd for PixelInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PixelInfo {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.key().partial_cmp(&other.key()).unwrap()
+    }
+}
+
+impl PartialEq for PixelInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.key() == other.key()
+    }
+}
+
+impl Eq for PixelInfo {}
+
 use crate::*;
 
 #[derive(Debug)]
@@ -740,14 +777,62 @@ impl Device {
 
         // AVERAGE RADIUS REDUCTION
 
-        // given that we fired N * M photons, with the given grid cell size we
-        // would expect the following number of photons to have fallen
-        // into each grid on average: N * M * D / C^2 = Np
-        // given this information, we can expect the ratio to be:
-        // (a + alpha Np) / (a + Np) =
-        self.state.search_radius *= 0.9995;
+        // TOOD: for now just read the data back every frame, this is horrible. We'll
+        // use a pixel pack buffer to do this asynchronously, this is just to
+        // test it even works.
 
-        //log::info!("search radius = {}", self.state.search_radius);
+        let radius_data: &mut [PixelInfo] = self
+            .allocator
+            .allocate(self.samples.cols() * self.samples.rows());
+
+        let radius_data_f32: zerocopy::LayoutVerified<_, [f32]> =
+            zerocopy::LayoutVerified::new_slice(radius_data.as_bytes()).unwrap();
+
+        #[allow(unsafe_code)]
+        let float_array = unsafe { js_sys::Float32Array::view(&radius_data_f32) };
+
+        if iteration % 2 == 0 {
+            self.gl.bind_framebuffer(
+                Context::READ_FRAMEBUFFER,
+                self.visible_point_b_fbo.handle.as_ref(),
+            );
+        } else {
+            self.gl.bind_framebuffer(
+                Context::READ_FRAMEBUFFER,
+                self.visible_point_a_fbo.handle.as_ref(),
+            );
+        }
+
+        self.gl.read_buffer(Context::COLOR_ATTACHMENT1);
+
+        self.gl
+            .read_pixels_with_array_buffer_view_and_dst_offset(
+                0,
+                0,
+                self.samples.cols() as i32,
+                self.samples.rows() as i32,
+                Context::RGBA,
+                Context::FLOAT,
+                &float_array,
+                0,
+            )
+            .unwrap();
+
+        use kth::SliceExtKth;
+
+        let index = (radius_data.len() as f32 * 0.9) as usize;
+
+        radius_data.partition_by_kth(index);
+
+        let mut value: f32 = radius_data[index].radius;
+
+        log::info!(
+            "current radius = {}, max radius = {}",
+            self.state.search_radius,
+            value
+        );
+
+        self.state.search_radius = value;
     }
 
     pub fn render(&mut self) {
