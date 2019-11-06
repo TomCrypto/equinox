@@ -27,6 +27,7 @@ layout (std140) uniform Globals {
     float grid_cell_size;
     uint hash_cell_cols;
     uint hash_cell_rows;
+    float alpha;
 } globals;
 
 #define FILTER_DELTA (globals.filter_delta)

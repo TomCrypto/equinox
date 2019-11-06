@@ -648,23 +648,28 @@ impl Device {
         let mut m = self.state.integrator.photons_per_pass / n;
         m = m.next_power_of_two();
         // TODO: for now
-        m = 1;
+        m = 64;
         // n = self.state.integrator.photons_per_pass / m;
         n /= m;
 
         let mut hash_cell_cols = 1;
         let mut hash_cell_rows = 1;
+        let old_m = m;
 
-        while m > 1 {
-            if m > 4 {
+        loop {
+            if m >= 4 {
                 hash_cell_cols *= 2;
                 hash_cell_rows *= 2;
                 m /= 4;
-            } else {
+            } else if m >= 2 {
                 hash_cell_cols *= 2;
                 m /= 2;
+            } else {
+                break;
             }
         }
+
+        m = old_m;
 
         assert_eq!(hash_cell_cols * hash_cell_rows, m);
 
@@ -761,10 +766,10 @@ impl Device {
         command.bind(&self.visible_point_path3, "visible_point_path_buf3");
 
         if iteration % 2 == 0 {
-            log::info!("accumulating photons using radius in A");
+            //log::info!("accumulating photons using radius in A");
             command.bind(&self.visible_point_data_a, "photon_radius_tex");
         } else {
-            log::info!("accumulating photons using radius in B");
+            //log::info!("accumulating photons using radius in B");
             command.bind(&self.visible_point_data_b, "photon_radius_tex");
         }
 
@@ -784,7 +789,7 @@ impl Device {
 
         if iteration % 2 == 0 {
             // old data is in "a", we want to write in "b"
-            log::info!("pass complete, reading from A and writing to B");
+            //log::info!("pass complete, reading from A and writing to B");
 
             command.bind(&self.visible_point_count_a, "old_photon_count_tex");
             command.bind(&self.visible_point_data_a, "old_photon_data_tex");
@@ -792,7 +797,7 @@ impl Device {
             command.set_framebuffer(&self.visible_point_b_fbo);
         } else {
             // old data is in "b", we want to write in "a"
-            log::info!("pass complete, reading from B and writing to A");
+            //log::info!("pass complete, reading from B and writing to A");
 
             command.bind(&self.visible_point_count_b, "old_photon_count_tex");
             command.bind(&self.visible_point_data_b, "old_photon_data_tex");
@@ -805,14 +810,14 @@ impl Device {
 
         // AVERAGE RADIUS REDUCTION
 
-        // given that we fired N * M photons, with the given grid cell size we would
-        // expect the following number of photons to have fallen into each grid
-        // on average: N * M * D / C^2 = Np
+        // given that we fired N * M photons, with the given grid cell size we
+        // would expect the following number of photons to have fallen
+        // into each grid on average: N * M * D / C^2 = Np
         // given this information, we can expect the ratio to be:
         // (a + alpha Np) / (a + Np) =
         // self.state.search_radius *= 0.9995;
 
-        log::info!("search radius = {}", self.state.search_radius);
+        //log::info!("search radius = {}", self.state.search_radius);
     }
 
     pub fn render(&mut self) {
@@ -990,6 +995,7 @@ impl DeviceState {
         data.grid_cell_size = grid_cell_size;
         data.hash_cell_cols = hash_cell_cols;
         data.hash_cell_rows = hash_cell_rows;
+        data.alpha = self.integrator.alpha;
 
         buffer.write(&data).expect("internal WebGL error");
 
@@ -1008,5 +1014,6 @@ pub(crate) struct GlobalData {
     grid_cell_size: f32,
     hash_cell_cols: u32,
     hash_cell_rows: u32,
-    padding: [f32; 3],
+    alpha: f32,
+    padding: [f32; 2],
 }

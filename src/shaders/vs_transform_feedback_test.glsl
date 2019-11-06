@@ -27,6 +27,7 @@ layout (std140) uniform Globals {
     float grid_cell_size;
     uint hash_cell_cols;
     uint hash_cell_rows;
+    float alpha;
 } globals;
 
 #define FILTER_DELTA (globals.filter_delta)
@@ -37,19 +38,6 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-/*
-
-#defines for the hash table addressing:
-
-// depend on hash table size
-HASH_COLS 4096U
-HASH_ROWS 4096U
-// depend on "M" parameter (powers of 2)
-HASH_CELL_COLS 1U
-HASH_CELL_ROWS 1U
-
-*/
-
 ivec2 hash_position(vec3 pos) {
     uint cell_x = floatBitsToUint(floor(pos.x / globals.grid_cell_size));
     uint cell_y = floatBitsToUint(floor(pos.y / globals.grid_cell_size));
@@ -59,10 +47,13 @@ ivec2 hash_position(vec3 pos) {
     // uint coords = (cell_x * 1325290093U + cell_y * 2682811433U + cell_z * 765270841U) % (4096U * 4096U);
     uint coords = shuffle(uvec3(cell_x, cell_y, cell_z), FRAME_RANDOM) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
 
+    int cell_dx = gl_InstanceID % int(globals.hash_cell_cols);
+    int cell_dy = gl_InstanceID / int(globals.hash_cell_rows);
+
     int coord_x = int(coords % HASH_TABLE_COLS);
     int coord_y = int(coords / HASH_TABLE_COLS);
 
-    return ivec2(coord_x, coord_y);
+    return ivec2(coord_x / int(globals.hash_cell_cols) * int(globals.hash_cell_cols) + cell_dx, coord_y / int(globals.hash_cell_rows) * int(globals.hash_cell_rows) + cell_dy);
 }
 
 vec3 get_relative_pos_in_cell(vec3 pos) {
