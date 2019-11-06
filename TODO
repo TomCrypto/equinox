@@ -278,3 +278,13 @@ The photon radiance is simply computed as:
  tau / (Np * pi * radius^2)
 
 Where tau is calculated during the update, and Np is presumably the number of photons in the current pass?
+
+
+Everything seems to work great otherwise, need to put back the visible lighting component and we should be good.
+
+The remaining tasks are:
+
+ - putting back visible lighting (so apparently this needs to be treated as a separate quantity and normalized by the
+   pass count rather than the total number of photons and should not be mixed with the photon radiance estimates)
+ - shrinking the pixel radius (for the grid) somehow
+ - dynamic calculation of n and m

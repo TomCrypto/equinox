@@ -48,7 +48,7 @@ ivec2 hash_position(vec3 pos) {
     uint coords = shuffle(uvec3(cell_x, cell_y, cell_z), FRAME_RANDOM) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
 
     int cell_dx = gl_InstanceID % int(globals.hash_cell_cols);
-    int cell_dy = gl_InstanceID / int(globals.hash_cell_rows);
+    int cell_dy = gl_InstanceID / int(globals.hash_cell_cols);
 
     int coord_x = int(coords % HASH_TABLE_COLS);
     int coord_y = int(coords / HASH_TABLE_COLS);
@@ -65,7 +65,7 @@ vec3 get_relative_pos_in_cell(vec3 pos) {
 }
 
 void main() {
-    random_t random = rand_initialize_from_seed(uvec2(gl_VertexID) + FRAME_RANDOM);
+    random_t random = rand_initialize_from_seed(uvec2(gl_VertexID, gl_InstanceID) + FRAME_RANDOM);
 
     ray_t ray;
 

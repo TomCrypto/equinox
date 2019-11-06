@@ -652,6 +652,9 @@ impl Device {
         // n = self.state.integrator.photons_per_pass / m;
         n /= m;
 
+        m = 16;
+        n = self.state.integrator.photons_per_pass / 16;
+
         let mut hash_cell_cols = 1;
         let mut hash_cell_rows = 1;
         let old_m = m;
