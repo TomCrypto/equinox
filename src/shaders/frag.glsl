@@ -7,6 +7,11 @@ layout (std140) uniform Globals {
     vec2 filter_delta;
     uvec4 frame_state;
     float pass_count;
+    float photons_for_pass;
+    float total_photons;
+    float grid_cell_size;
+    uint hash_cell_cols;
+    uint hash_cell_rows;
 } globals;
 
 uniform sampler2D visible_point_path_buf1;
@@ -20,16 +25,14 @@ uniform sampler2D photon_radius_tex;
 
 #define FRAME_RANDOM (globals.frame_state.xy)
 
-#define CELL_SIZE 0.03
-
 ivec2 position_for_cell(vec3 cell) {
     uvec3 cell_hash_seed = floatBitsToUint(cell);
 
     // uint coords = (cell.x * 1325290093U + cell.y * 2682811433U + cell.z * 765270841U) % (4096U * 4096U);
-    uint coords = shuffle(cell_hash_seed, FRAME_RANDOM) % (4096U * 4096U);
+    uint coords = shuffle(cell_hash_seed, FRAME_RANDOM) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
 
-    int coord_x = int(coords % 4096U);
-    int coord_y = int(coords / 4096U);
+    int coord_x = int(coords % HASH_TABLE_COLS);
+    int coord_y = int(coords / HASH_TABLE_COLS);
 
     return ivec2(coord_x, coord_y);
 }
@@ -50,10 +53,6 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
     if (data2.y == 0.0 && data3.x == 0.0) {
         return vec3(0.0); // no photon
     }
-
-    // photon_position = photon_position + cell_pos;
-
-    // vec3 photon_position = vec3(cell) * CELL_SIZE + photon_relative_position;
 
     float sgn = (photon_throughput.b < 0.0) ? -1.0 : 1.0;
 
@@ -97,14 +96,14 @@ void main() {
         for (int dx = -1; dx <= 1; ++dx) {
             for (int dy = -1; dy <= 1; ++dy) {
                 for (int dz = -1; dz <= 1; ++dz) {
-                    vec3 cell_pos = floor((position) / CELL_SIZE) + vec3(float(dx), float(dy), float(dz));
+                    vec3 cell_pos = floor((position) / globals.grid_cell_size) + vec3(float(dx), float(dy), float(dz));
 
                     accumulation += get_photon(cell_pos, position, radius_squared, material, inst, normal, -direction, count);
                 }
             }
         }
 
-        vec3 radiance = throughput * accumulation / (100000.0 * M_PI * radius_squared);
+        vec3 radiance = throughput * accumulation / (globals.photons_for_pass * M_PI * radius_squared);
 
         result = vec4(radiance, count);
     }

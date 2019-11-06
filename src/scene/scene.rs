@@ -1,4 +1,6 @@
-use crate::{Aperture, Camera, Dirty, Display, Environment, Geometry, Instance, Material, Raster};
+use crate::{
+    Aperture, Camera, Dirty, Display, Environment, Geometry, Instance, Integrator, Material, Raster,
+};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -18,6 +20,7 @@ pub struct Scene {
     pub environment: Dirty<Environment>,
     pub display: Dirty<Display>,
     pub aperture: Dirty<Option<Aperture>>,
+    pub integrator: Dirty<Integrator>,
 
     #[serde(skip)]
     pub assets: HashMap<String, Vec<u8>>,

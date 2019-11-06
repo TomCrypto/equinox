@@ -6,6 +6,11 @@ layout (std140) uniform Globals {
     vec2 filter_delta;
     uvec4 frame_state;
     float pass_count;
+    float photons_for_pass;
+    float total_photons;
+    float grid_cell_size;
+    uint hash_cell_cols;
+    uint hash_cell_rows;
 } globals;
 
 layout(location = 0) out float photon_count;
@@ -21,18 +26,12 @@ void main() {
     vec4 old_photon_data = texelFetch(old_photon_data_tex, coords, 0).rgba;
     vec4 new_photon_data = texelFetch(new_photon_data_tex, coords, 0).rgba;
 
-    // update rules
-    if (new_photon_data.w == 0.0) {
-        photon_count = old_photon_count;
-        photon_data = old_photon_data + new_photon_data;
-    } else {
-        photon_count = old_photon_count + ALPHA * new_photon_data.w;
+    photon_count = old_photon_count + ALPHA * new_photon_data.w;
 
-        float ratio = photon_count / (old_photon_count + new_photon_data.w);
-        
-        photon_data.w = old_photon_data.w * sqrt(ratio);
-        photon_data.rgb = (old_photon_data.rgb + new_photon_data.rgb) * ratio;
-    }
+    float ratio = (photon_count == 0.0) ? 1.0 : (photon_count / (old_photon_count + new_photon_data.w));
 
-    photon_radiance = photon_data.rgb / (1.0 * globals.pass_count);
+    photon_data.w = old_photon_data.w * sqrt(ratio);
+    photon_data.rgb = (old_photon_data.rgb + new_photon_data.rgb) * ratio;
+
+    photon_radiance = photon_data.rgb / globals.pass_count;
 }

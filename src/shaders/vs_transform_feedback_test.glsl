@@ -21,6 +21,12 @@ flat out uvec4 table_data;
 layout (std140) uniform Globals {
     vec2 filter_delta;
     uvec4 frame_state;
+    float pass_count;
+    float photons_for_pass;
+    float total_photons;
+    float grid_cell_size;
+    uint hash_cell_cols;
+    uint hash_cell_rows;
 } globals;
 
 #define FILTER_DELTA (globals.filter_delta)
@@ -31,27 +37,38 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-#define CELL_SIZE 0.03
+/*
+
+#defines for the hash table addressing:
+
+// depend on hash table size
+HASH_COLS 4096U
+HASH_ROWS 4096U
+// depend on "M" parameter (powers of 2)
+HASH_CELL_COLS 1U
+HASH_CELL_ROWS 1U
+
+*/
 
 ivec2 hash_position(vec3 pos) {
-    uint cell_x = floatBitsToUint(floor(pos.x / CELL_SIZE));
-    uint cell_y = floatBitsToUint(floor(pos.y / CELL_SIZE));
-    uint cell_z = floatBitsToUint(floor(pos.z / CELL_SIZE));
+    uint cell_x = floatBitsToUint(floor(pos.x / globals.grid_cell_size));
+    uint cell_y = floatBitsToUint(floor(pos.y / globals.grid_cell_size));
+    uint cell_z = floatBitsToUint(floor(pos.z / globals.grid_cell_size));
 
     // int coords = ((cell_x * 395 + cell_y * 119 + cell_z * 1193) % (4096 * 4096) + 4096 * 4096) % (4096 * 4096);
     // uint coords = (cell_x * 1325290093U + cell_y * 2682811433U + cell_z * 765270841U) % (4096U * 4096U);
-    uint coords = shuffle(uvec3(cell_x, cell_y, cell_z), FRAME_RANDOM) % (4096U * 4096U);
+    uint coords = shuffle(uvec3(cell_x, cell_y, cell_z), FRAME_RANDOM) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
 
-    int coord_x = int(coords % 4096U);
-    int coord_y = int(coords / 4096U);
+    int coord_x = int(coords % HASH_TABLE_COLS);
+    int coord_y = int(coords / HASH_TABLE_COLS);
 
     return ivec2(coord_x, coord_y);
 }
 
 vec3 get_relative_pos_in_cell(vec3 pos) {
-    float cell_x = fract(pos.x / CELL_SIZE);
-    float cell_y = fract(pos.y / CELL_SIZE);
-    float cell_z = fract(pos.z / CELL_SIZE);
+    float cell_x = fract(pos.x / globals.grid_cell_size);
+    float cell_y = fract(pos.y / globals.grid_cell_size);
+    float cell_z = fract(pos.z / globals.grid_cell_size);
 
     return vec3(cell_x, cell_y, cell_z);
 }
@@ -141,7 +158,7 @@ void main() {
 
                     float sgn = (ray.dir.z < 0.0) ? -1.0 : 1.0;
 
-                    vec3 cell_pos = floor(ray.org / CELL_SIZE) * CELL_SIZE;
+                    vec3 cell_pos = floor(ray.org / globals.grid_cell_size) * globals.grid_cell_size;
                     vec3 relative_position = ray.org; // - cell_pos;
 
                     table_data.r = packHalf2x16(relative_position.xy);

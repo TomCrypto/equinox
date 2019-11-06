@@ -10,4 +10,5 @@ export![
     raster,
     scene,
     aperture,
+    integrator,
 ];

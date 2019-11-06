@@ -75,6 +75,10 @@ impl WebScene {
             self.scene.aperture = new_scene.aperture;
         }
 
+        if self.scene.integrator != new_scene.integrator {
+            self.scene.integrator = new_scene.integrator;
+        }
+
         Ok(())
     }
 

@@ -398,6 +398,12 @@ impl<'a> DrawCommand<'a> {
             .draw_arrays(Context::POINTS, index as i32, points as i32);
     }
 
+    pub fn draw_points_instanced(&self, points: usize, instances: usize) {
+        self.shader
+            .gl
+            .draw_arrays_instanced(Context::POINTS, 0, points as i32, instances as i32);
+    }
+
     fn bind_uniform_buffer(&self, handle: Option<&WebGlBuffer>, slot: &str) {
         if let Some(&BindingPoint::UniformBlock(slot)) = self.shader.binds.get(slot) {
             self.shader

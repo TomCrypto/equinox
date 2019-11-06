@@ -22,6 +22,11 @@ layout (std140) uniform Globals {
     vec2 filter_delta;
     uvec4 frame_state;
     float pass_count;
+    float photons_for_pass;
+    float total_photons;
+    float grid_cell_size;
+    uint hash_cell_cols;
+    uint hash_cell_rows;
 } globals;
 
 #define FILTER_DELTA (globals.filter_delta)

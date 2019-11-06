@@ -250,7 +250,11 @@ impl Device {
                     "INSTANCE_DATA_COUNT" => "0",
                     "GEOMETRY_DATA_COUNT" => "0",
                     "MATERIAL_DATA_COUNT" => "0",
-                    "INSTANCE_DATA_PRESENT" => "0"
+                    "INSTANCE_DATA_PRESENT" => "0",
+                    "HASH_TABLE_COLS" => "0",
+                    "HASH_TABLE_ROWS" => "0",
+                    "HASH_CELL_COLS" => "0",
+                    "HASH_CELL_ROWS" => "0",
                 },
             ),
             load_convolution_buffers_shader: Shader::new(
@@ -317,6 +321,10 @@ impl Device {
                 hashmap! {},
                 hashmap! {
                     "MATERIAL_DATA_COUNT" => "0",
+                    "HASH_TABLE_COLS" => "0",
+                    "HASH_TABLE_ROWS" => "0",
+                    "HASH_CELL_COLS" => "0",
+                    "HASH_CELL_ROWS" => "0",
                 },
             ),
             present_program: Shader::new(
@@ -566,6 +574,36 @@ impl Device {
             Ok(())
         })?;
 
+        invalidated |= Dirty::clean(&mut scene.integrator, |integrator| {
+            if integrator.hash_table_bits < 20 {
+                return Err(Error::new("hash_table_bits needs to be at least 20"));
+            }
+
+            // TODO: return an error if the texture is too large to create here...
+            // (check against the size limits or something)
+
+            let col_bits = integrator.hash_table_bits / 2;
+            let row_bits = integrator.hash_table_bits - col_bits;
+
+            let cols = 2usize.pow(col_bits);
+            let rows = 2usize.pow(row_bits);
+
+            self.photon_table_tex.create(cols, rows);
+            self.photon_fbo.rebuild(&[&self.photon_table_tex]);
+
+            self.program
+                .set_define("HASH_TABLE_COLS", format!("{}U", cols));
+            self.program
+                .set_define("HASH_TABLE_ROWS", format!("{}U", rows));
+
+            self.test_shader
+                .set_define("HASH_TABLE_COLS", format!("{}U", cols));
+            self.test_shader
+                .set_define("HASH_TABLE_ROWS", format!("{}U", rows));
+
+            Ok(())
+        })?;
+
         // These are post-processing settings that don't apply to the path-traced light
         // transport simulation, so we don't need to invalidate the render buffer here.
 
@@ -574,11 +612,6 @@ impl Device {
 
             Ok(())
         })?;
-
-        // temporarily hardcoded
-        self.photon_table_tex.create(4096, 4096);
-        // self.photon_hits.create(100_000);
-        self.photon_fbo.rebuild(&[&self.photon_table_tex]);
 
         self.program.rebuild()?;
         self.present_program.rebuild()?;
@@ -606,99 +639,125 @@ impl Device {
             return;
         }
 
+        // select the grid cell size
+        let grid_cell_size = 2.0 * self.state.search_radius;
+
+        // select N and M; M is a power of two, and we compute the hash cell cols/rows
+        // based on that
+
+        // TODO: take into account max-m
+
+        let mut n = (self.state.integrator.photon_density / grid_cell_size.powi(2)) as usize;
+        n = n.min(self.state.integrator.photons_per_pass).max(1);
+        let mut m = self.state.integrator.photons_per_pass / n;
+        m = m.next_power_of_two();
+        // TODO: for now
+        m = 1;
+        // n = self.state.integrator.photons_per_pass / m;
+        n /= m;
+
+        let mut hash_cell_cols = 1;
+        let mut hash_cell_rows = 1;
+
+        while m > 1 {
+            if m > 4 {
+                hash_cell_cols *= 2;
+                hash_cell_rows *= 2;
+                m /= 4;
+            } else {
+                hash_cell_cols *= 2;
+                m /= 2;
+            }
+        }
+
+        assert_eq!(hash_cell_cols * hash_cell_rows, m);
+
+        log::info!(
+            "frame = {}, n = {}, m = {}, hash_cell_cols = {}, hash_cell_rows = {}",
+            self.state.frame,
+            n,
+            m,
+            hash_cell_cols,
+            hash_cell_rows
+        );
+
         // TODO: not happy with this, can we improve it
-        self.state
-            .update(&mut self.allocator, &mut self.globals_buffer);
+        self.state.update(
+            &mut self.allocator,
+            &mut self.globals_buffer,
+            (n * m) as u32,
+            grid_cell_size,
+            hash_cell_cols as u32,
+            hash_cell_rows as u32,
+        );
 
         let iteration = self.state.frame - 1;
 
-        const ITERATIONS_PER_PASS: u32 = 1;
+        // this is a new pass; reset all the per-pass data
+        // GENERATE THE VISIBLE POINT INFORMATION
 
-        if iteration % ITERATIONS_PER_PASS == 0 {
-            // this is a new pass; reset all the per-pass data
+        let command = self.visible_point_gen_shader.begin_draw();
 
-            let command = self.visible_point_gen_shader.begin_draw();
+        command.bind(&self.camera_buffer, "Camera");
+        command.bind(&self.geometry_buffer, "Geometry");
+        command.bind(&self.material_buffer, "Material");
+        command.bind(&self.instance_buffer, "Instance");
+        command.bind(&self.globals_buffer, "Globals");
+        command.bind(&self.raster_buffer, "Raster");
+        command.bind(&self.envmap_texture, "envmap_texture");
+        command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
+        command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
 
-            command.bind(&self.camera_buffer, "Camera");
-            command.bind(&self.geometry_buffer, "Geometry");
-            command.bind(&self.material_buffer, "Material");
-            command.bind(&self.instance_buffer, "Instance");
-            command.bind(&self.globals_buffer, "Globals");
-            command.bind(&self.raster_buffer, "Raster");
-            command.bind(&self.envmap_texture, "envmap_texture");
-            command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
-            command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
+        command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
+        command.set_framebuffer(&self.visible_point_path_fbo);
 
+        command.unset_vertex_array();
+        command.draw_triangles(0, 1);
+
+        // UPDATE PER-PIXEL STATE
+
+        if iteration != 0 {
+            // there is a previous pass; update the per-pixel state
+
+            let command = self.visible_point_update_pixels_shader.begin_draw();
+            command.bind(&self.visible_point_pass_data, "new_photon_data_tex");
             command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
-            command.set_framebuffer(&self.visible_point_path_fbo);
+
+            if iteration % 2 != 0 {
+                // old data is in "a", we want to write in "b"
+                log::info!("pass complete, reading from A and writing to B");
+
+                command.bind(&self.visible_point_count_a, "old_photon_count_tex");
+                command.bind(&self.visible_point_data_a, "old_photon_data_tex");
+
+                command.set_framebuffer(&self.visible_point_b_fbo);
+            } else {
+                // old data is in "b", we want to write in "a"
+                log::info!("pass complete, reading from B and writing to A");
+
+                command.bind(&self.visible_point_count_b, "old_photon_count_tex");
+                command.bind(&self.visible_point_data_b, "old_photon_data_tex");
+
+                command.set_framebuffer(&self.visible_point_a_fbo);
+            }
 
             command.unset_vertex_array();
             command.draw_triangles(0, 1);
+        } else {
+            // we are starting a new render, clear all pass data and set the initial search
+            // radius
 
-            if iteration != 0 {
-                // there is a previous pass; update the per-pixel state
-
-                let which = (iteration / ITERATIONS_PER_PASS) % 2 != 0;
-
-                if which {
-                    // old data is in "a", we want to write in "b"
-                    log::info!("pass complete, reading from A and writing to B");
-
-                    let command = self.visible_point_update_pixels_shader.begin_draw();
-
-                    command.set_viewport(
-                        0,
-                        0,
-                        self.samples.cols() as i32,
-                        self.samples.rows() as i32,
-                    );
-
-                    command.bind(&self.visible_point_count_a, "old_photon_count_tex");
-                    command.bind(&self.visible_point_data_a, "old_photon_data_tex");
-                    command.bind(&self.visible_point_pass_data, "new_photon_data_tex");
-
-                    command.set_framebuffer(&self.visible_point_b_fbo);
-
-                    command.unset_vertex_array();
-                    command.draw_triangles(0, 1);
-                } else {
-                    // old data is in "b", we want to write in "a"
-                    log::info!("pass complete, reading from B and writing to A");
-
-                    let command = self.visible_point_update_pixels_shader.begin_draw();
-
-                    command.set_viewport(
-                        0,
-                        0,
-                        self.samples.cols() as i32,
-                        self.samples.rows() as i32,
-                    );
-
-                    command.bind(&self.visible_point_count_b, "old_photon_count_tex");
-                    command.bind(&self.visible_point_data_b, "old_photon_data_tex");
-                    command.bind(&self.visible_point_pass_data, "new_photon_data_tex");
-
-                    command.set_framebuffer(&self.visible_point_a_fbo);
-
-                    command.unset_vertex_array();
-                    command.draw_triangles(0, 1);
-                }
-            } else {
-                // clear the count
-                self.visible_point_a_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
-
-                // initialize the search radius to some value, and the radiance to zero
-                log::info!("writing some initial data to visible_point_data A");
-                self.visible_point_a_fbo.clear(1, [0.0, 0.0, 0.0, 0.03]);
-            }
-
-            self.visible_point_pass_data_fbo
-                .clear(0, [0.0, 0.0, 0.0, 0.0]);
+            self.visible_point_a_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
+            self.visible_point_a_fbo
+                .clear(1, [0.0, 0.0, 0.0, self.state.search_radius]);
         }
 
-        let command = self.test_shader.begin_draw();
+        // GENERATE PHOTONS
 
-        command.unset_vertex_array();
+        self.visible_point_pass_data_fbo
+            .clear(0, [0.0, 0.0, 0.0, 0.0]);
+
+        let command = self.test_shader.begin_draw();
 
         command.bind(&self.geometry_buffer, "Geometry");
         command.bind(&self.material_buffer, "Material");
@@ -709,29 +768,19 @@ impl Device {
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
 
-        /*self.gl.bind_buffer(Context::ARRAY_BUFFER, None);
-
-        self.gl.bind_buffer_range_with_i32_and_i32(
-            Context::TRANSFORM_FEEDBACK_BUFFER,
+        command.set_viewport(
             0,
-            self.photon_hits.buf_handle.as_ref(),
             0,
-            (200_000 * std::mem::size_of::<PhotonData>()) as i32,
-        );*/
-
-        command.set_viewport(0, 0, 4096, 4096);
+            self.photon_table_tex.cols() as i32,
+            self.photon_table_tex.rows() as i32,
+        );
         command.set_framebuffer(&self.photon_fbo);
         self.photon_fbo.clear_ui(0, [0, 0, 0, 0]);
 
-        //self.gl.begin_transform_feedback(Context::POINTS);
-        command.draw_points(0, 100_000);
-        //self.gl.end_transform_feedback();
+        command.unset_vertex_array();
+        command.draw_points_instanced(n, m);
 
-        /*self.gl
-        .bind_buffer_base(Context::TRANSFORM_FEEDBACK_BUFFER, 0, None);*/
-
-        // at this point we've drawn a bunch of photons into our photon hash table
-        // it's time to render and try to gather these photons at visible points...
+        // GATHER PHOTONS BACK INTO VISIBLE POINTS
 
         let command = self.program.begin_draw();
 
@@ -742,7 +791,7 @@ impl Device {
         command.bind(&self.visible_point_path2, "visible_point_path_buf2");
         command.bind(&self.visible_point_path3, "visible_point_path_buf3");
 
-        if (iteration / ITERATIONS_PER_PASS) % 2 == 0 {
+        if iteration % 2 == 0 {
             log::info!("accumulating photons using radius in A");
             command.bind(&self.visible_point_data_a, "photon_radius_tex");
         } else {
@@ -750,8 +799,6 @@ impl Device {
             command.bind(&self.visible_point_data_b, "photon_radius_tex");
         }
 
-        // let weight = (self.state.frame as f32 - 1.0) / (self.state.frame as f32);
-        // command.set_blend_mode(BlendMode::Accumulate { weight });
         command.set_blend_mode(BlendMode::Add);
 
         command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
@@ -868,6 +915,10 @@ pub(crate) struct DeviceState {
     pub(crate) enable_lens_flare: bool,
 
     pub(crate) frame: u32,
+
+    pub(crate) integrator: Integrator,
+    pub(crate) search_radius: f32,
+    pub(crate) total_photons: f32,
 }
 
 impl Default for DeviceState {
@@ -877,6 +928,9 @@ impl Default for DeviceState {
             filter_rng: Qrng::new(0),
             filter: RasterFilter::default(),
             enable_lens_flare: false,
+            search_radius: 0.0,
+            integrator: Integrator::default(),
+            total_photons: 0.0,
             frame: 0,
         }
     }
@@ -893,9 +947,19 @@ impl DeviceState {
         self.enable_lens_flare = scene.aperture.is_some();
 
         self.filter = scene.raster.filter;
+        self.integrator = *scene.integrator;
+        self.search_radius = scene.integrator.initial_search_radius;
     }
 
-    pub fn update(&mut self, allocator: &mut Allocator, buffer: &mut UniformBuffer<GlobalData>) {
+    pub fn update(
+        &mut self,
+        allocator: &mut Allocator,
+        buffer: &mut UniformBuffer<GlobalData>,
+        photons_for_pass: u32,
+        grid_cell_size: f32,
+        hash_cell_cols: u32,
+        hash_cell_rows: u32,
+    ) {
         // we don't want the first (0, 0) sample from the sequence
         let (mut x, mut y) = self.filter_rng.next::<(f32, f32)>();
 
@@ -903,6 +967,8 @@ impl DeviceState {
             x = 0.5;
             y = 0.5;
         }
+
+        self.total_photons += photons_for_pass as f32;
 
         let data: &mut GlobalData = allocator.allocate_one();
 
@@ -912,6 +978,11 @@ impl DeviceState {
         data.frame_state[1] = self.rng.next_u32();
         data.frame_state[2] = self.frame;
         data.pass_count = (self.frame / 1) as f32;
+        data.photons_for_pass = photons_for_pass as f32;
+        data.total_photons = self.total_photons;
+        data.grid_cell_size = grid_cell_size;
+        data.hash_cell_cols = hash_cell_cols;
+        data.hash_cell_rows = hash_cell_rows;
 
         buffer.write(&data).expect("internal WebGL error");
 
@@ -925,5 +996,10 @@ pub(crate) struct GlobalData {
     filter_delta: [f32; 4],
     frame_state: [u32; 4],
     pass_count: f32,
+    photons_for_pass: f32,
+    total_photons: f32,
+    grid_cell_size: f32,
+    hash_cell_cols: u32,
+    hash_cell_rows: u32,
     padding: [f32; 3],
 }

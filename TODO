@@ -143,3 +143,110 @@ When gathering:
 This will allow retaining multiple photons in the map if they all come from roughly the same direction, while rejecting them if they are unrelated
 photons. Need to see how much bias this introduces, also this may only be useful early on in the render, and we should look into narrowing the grid
 as well over time so that this becomes less useful.
+
+This approach doesn't work and introduces too much bias. We will do this:
+
+Let the user specify an expected specific photon density measure with units 1 / m^2. Call this D.
+
+Then, given an average search radius Rs for the current SPPM pass, we can select a grid cell size C which minimizes the average cost of the
+gather pass. For instance C = 2Rs or something similar. Given this, we only want one photon per cell at most, meaning we want:
+
+C^3 * D * N = 1  =>  N = 1 / (C^2 * D)
+
+This is the maximum number of photons we are allowed to fire in a given scatter-gather pass to avoid exhausting our hash table.
+
+So for instance with a specific density of 10000 per cubic meter, and a grid cell size of 1mm, we get N = 100k
+
+The basic idea is that if C is large, N must be low, whereas if C is low, N can be large.
+
+If N is too low for the pass to be efficient, we can still parallelize by dividing the hash table into M sections, and doing M passes of N
+photons, with each pass dropping a photon in a given section of the hash table. The gather pass simply scans the M "subcells" in each cell
+to accumulate the photons. This is probably more efficient than doing multiple separate scatter-gather passes.
+
+So, for each SPPM pass (one per frame) do the following:
+
+ - select a target number of photons per pass Np
+ - select grid cell size C based on the average search radius
+ - pick the largest N we can, based on hash table size and user-provided photon density estimates
+ - set M = Np / N, rounded to a power of two
+ - do M (instanced) scatter passes, with each instance scattering into the corresponding hash subtable
+ - do a gather pass, which reads M entries per cell
+
+Initially we might start with M = 4 or 8 or similar, and as C decreases (because the search radius decreases) N will increase and M will
+decrease, after some (small) number of passes we will have M = 1 and will be running at full speed. The scatter phase is always as fast as
+possible, the gather phase is slow by a factor of M (approximately).
+
+Selection of C
+==============
+
+Given the search radius Rs we simply pick a grid cell size which minimizes the amount of gather work required. At most we should want to look
+up 4 cells for each visible point, which is possible if we set C = 2Rs. Then, given a visible point inside a grid cell, we only have to search
+the neighbours that it is closest to (up to 4), and not all 26 neighbours.
+
+Selection of Np
+===============
+
+There is an absolute limit for Np that is dependent on the hash table size. This is the point at which we expect a non-negligible number of
+collisions. Fundamentally, a photon collision means all photons but the last one were wasted; too many photons and we are just wasting power
+computing photons which are going to get overwritten later.
+
+This needs proper analysis but for now we can say that Np must be <= 5% of the hash table capacity. So 16M entries => 800k photons max.
+
+This also depends on the scene and maybe on the device, so we could just leave this as a configurable option together with the hash table
+capacity. Just put some reasonable limits on it.
+
+Selection of N
+==============
+
+This one is trickier. We need to make sure that, given the user-provided density estimates (which in turn depend on how the lights are sampled)
+we don't consistently register more than one photon in a cell. Doubling the number of photons fired will double the expected number of photons
+in each cell, so we want:
+
+if N * D is photons / m^2, then the number of photons in C^2 will be N * D * C^2. We want N * D * C^2 = 1 photon, so N = 1 photon / (D * C^2)
+
+N * C^2 / D = 1    =>    N = D / C^2   =>   N = D / (4 Rs^2)
+
+Where C is the grid cell size, and D is a user-provided photon density, in units of photons / m^2. It's essentially a scaling factor which
+determines the maximum photon density in the scene. If D is higher than the true photon density, we will fire too many photons and will register
+more than one photon per cell, leading to bias. If D is lower than the true photon density, the hash table will be underutilized and we will
+waste performance in the gather phase.
+
+It's obvious that N must be proportional to 1 / C^2, since the smaller the grid cell size the more photons we can register in the grid per unit
+area. We can define some proportionality factor which allows scaling the number of photons; it should be tweaked per-scene. If it's set too
+high, bias will be introduced as too many photons are overwritten and artifacts will show up. If it's set too low, the hash table will be
+underutilized and the gather phase will be slower than it needs to be.
+
+[photons] = X [meters]^[-2]
+
+so X is [photons] [meters]^2. not sure what the physical significance of this value is. Make X configurable, and it can be initialized to 1.
+
+Selection of M
+==============
+
+M = Np / N
+
+How does Rs decrease? Under the assumption that we get one photon per cell (or M photons per cell really) per pass, and C = 2Rs, we can expect
+the search radius for each visible point to contain some number of cells.
+
+Volume of the search radius: 4/3 pi Rs^3
+
+Volume of a cell: 4/3 pi C^3 = 4/3 pi 8Rs^3
+
+4/3 pi Rs^3 / 4/3 pi 8Rs^3 = 1 / 8
+
+So we expect M / 8 photons per visible point on average. We need to be accurate here to ensure we don't reduce the radius too quickly.
+
+TODO:
+
+ 1. make Np, the initial search radius and "X" configurable in the JSON.
+ 2. pick C = 2 Rs at every pass, for now don't reduce Rs.
+ 3. pick N and M correctly, and implement the instanced scatter-gather pass.
+ 4. maintain a total photon count to normalize the final result
+ 5. reduce Rs, and adjust the gather fragment shader to either always be correct, or to always clamp the pixel's search radius to Rs
+
+With some luck the gather with M > 1 will be quite fast and we can rely on just making M large to compensate for large initial search radii without
+too much slowdown. Once we are past the first few iterations anyway Rs will be quite low and we can go at full speed again.
+
+ => we can also cap M with some option so that if the first few passes are too slow we can simply use less photons
+
+
