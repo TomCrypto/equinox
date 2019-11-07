@@ -582,8 +582,8 @@ impl Device {
             Ok(())
         })?;
 
-        // These are post-processing settings that don't apply to the path-traced light
-        // transport simulation, so we don't need to invalidate the render buffer here.
+        // These are post-processing settings that don't directly apply to the light
+        // transport simulation; we don't need to invalidate any render buffer here.
 
         Dirty::clean(&mut scene.display, |display| {
             self.update_display(display)?;
@@ -660,7 +660,7 @@ impl Device {
         (cols, rows)
     }
 
-    /// Further refines the path-traced render buffer.
+    /// Further refines the rendering.
     pub fn refine(&mut self) {
         if self.device_lost {
             return;

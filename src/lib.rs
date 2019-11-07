@@ -1,4 +1,4 @@
-//! The Equinox path tracing renderer, see the README for more information.
+//! The Equinox stochastic photon mapper, see the README for more information.
 
 #![deny(unsafe_code)]
 #![feature(slice_partition_at_index)]
