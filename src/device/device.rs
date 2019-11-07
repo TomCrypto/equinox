@@ -611,6 +611,55 @@ impl Device {
         Ok(invalidated)
     }
 
+    /*
+
+    Optimize n * 2^s, under the constraints:
+
+    0 < n <= target
+    0 <= s < max_s
+
+    n * 2^s <= max_load
+
+    */
+
+    // given a target number of photons and an absolute maximum load, calculate the
+    // largest n * 2^s <= max_load such that n < target. all else being equal,
+    // prefer smaller m if possible.
+    fn calculate_photon_batch(&self, max_load: usize, target: usize) -> (usize, usize) {
+        let mut best_n = 0;
+        let mut best_m = 0;
+
+        for s in 0..self.state.integrator.max_hash_cell_bits {
+            let m = 1 << s;
+            let n = (max_load / m).min(target);
+
+            if n * m > best_n * best_m {
+                best_n = n;
+                best_m = m;
+            }
+        }
+
+        (best_n, best_m)
+    }
+
+    fn get_hash_cell_dimensions(mut m: usize) -> (usize, usize) {
+        let mut cols = 1;
+        let mut rows = 1;
+
+        while m != 1 {
+            if m >= 4 {
+                cols *= 2;
+                rows *= 2;
+                m /= 4;
+            } else {
+                cols *= 2;
+                m /= 2;
+            }
+        }
+
+        (cols, rows)
+    }
+
     /// Further refines the path-traced render buffer.
     pub fn refine(&mut self) {
         if self.device_lost {
@@ -620,42 +669,14 @@ impl Device {
         // select the grid cell size
         let grid_cell_size = 2.0 * self.state.search_radius;
 
-        // TODO: there is a bug here where "m" jumps to the next power of 2
-        // periodically, investigate this
+        let target = ((self.state.integrator.photon_density / grid_cell_size.powi(2)).round()
+            as usize)
+            .min(self.state.integrator.photons_per_pass)
+            .max(1);
 
-        let mut n =
-            (self.state.integrator.photon_density / grid_cell_size.powi(2)).round() as usize;
-        n = n.min(self.state.integrator.photons_per_pass).max(1);
-        let mut m = (self.state.integrator.photons_per_pass / n)
-            .min(2usize.pow(self.state.integrator.max_hash_cell_bits));
+        let (n, m) = self.calculate_photon_batch(self.state.integrator.photons_per_pass, target);
 
-        // if we round up, then if m = 3 we're now exceeding our budget by 4/3...
-        // we should round down...
-
-        if !m.is_power_of_two() {
-            m = (m / 2).next_power_of_two();
-        }
-
-        let mut hash_cell_cols = 1;
-        let mut hash_cell_rows = 1;
-        let old_m = m;
-
-        loop {
-            if m >= 4 {
-                hash_cell_cols *= 2;
-                hash_cell_rows *= 2;
-                m /= 4;
-            } else if m >= 2 {
-                hash_cell_cols *= 2;
-                m /= 2;
-            } else {
-                break;
-            }
-        }
-
-        m = old_m;
-
-        assert_eq!(hash_cell_cols * hash_cell_rows, m);
+        let (hash_cell_cols, hash_cell_rows) = Self::get_hash_cell_dimensions(m);
 
         // TODO: not happy with this, can we improve it
         self.state.update(
