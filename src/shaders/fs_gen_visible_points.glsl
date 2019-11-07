@@ -145,7 +145,9 @@ void main() {
                 return;
             } else {
                 // NOT DIFFUSE: just keep tracing as usual...
-                ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
+                vec3 beta;
+                ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, beta, flags, random);
+                throughput *= beta;
 
                 if ((flags & RAY_FLAG_EXTINCT) != 0U) {
                     break; // no need to trace further
@@ -158,9 +160,7 @@ void main() {
                 }
             }            
         } else {
-            if ((flags & RAY_FLAG_ENVMAP_SAMPLED) == 0U) {
-                radiance += throughput * env_eval_light(ray.dir, unused_pdf);
-            }
+            radiance += throughput * env_eval_light(ray.dir, unused_pdf);
 
             break;
         }

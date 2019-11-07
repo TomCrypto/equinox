@@ -63,6 +63,10 @@ vec3 get_relative_pos_in_cell(vec3 pos) {
     return vec3(cell_x, cell_y, cell_z);
 }
 
+float luminance(vec3 x) {
+    return dot(x, vec3(0.2126, 0.7152, 0.0722));
+}
+
 void main() {
     random_t random = rand_initialize_from_seed(uvec2(gl_VertexID, gl_InstanceID) + FRAME_RANDOM);
 
@@ -105,7 +109,7 @@ void main() {
     uint flags;
     int diffuse_bounces = 0;
 
-    for (uint bounce = 0U; bounce < 8U; ++bounce) {
+    for (uint bounce = 0U; bounce < 20U; ++bounce) {
         traversal_t traversal = traverse_scene(ray, 0U);
 
         if (traversal_has_hit(traversal)) {
@@ -116,38 +120,26 @@ void main() {
             uint material = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
 
-            vec3 last_throughput = throughput;
-            vec3 radiance; // unused
+            // <<Add photon contribution to nearby visible points>>
 
-            float p = 0.5; // max(last_throughput.x, max(last_throughput.y, last_throughput.z));
-            bool pass = false;
-
-            vec2 rng = rand_uniform_vec2(random);
-
-            if (rng.x < p) {
-                pass = true;
-                last_throughput /= p;
-                throughput /= p;
-            }
+            // this is where we decide whether to deposit the photon or not
 
             // TODO: don't hardcode this constant later
             bool is_receiver = (material & 0x8000U) != 0U;
             material &= ~0x8000U;
 
-            if (is_receiver && pass) {
-                // deposit with russian roulette probability
-                // if we pass the check, the photon always continues
-                // else, it is deposited if possible, or is killed
+            if (is_receiver) {
+                // if we deposit the photon with probability p, then we need to do something
+                // with the throughput of further paths?
+                // if we deposit the photon with probability 0.99, then 99% of photons will be
+                // deposited in the first bounce; future bounces must be boosted up by 1 / 0.01
 
-                
+                float p = 0.5; // (diffuse_bounces != 2) ? 0.0 : 1.0;
+                diffuse_bounces++;
 
-                /*vec2 rng = rand_uniform_vec2(random);
-
-                throughput /= 0.5;
-                last_throughput /= 0.5;
-
-                if (rng.x < 0.5) {*/
-                    // resolution is 4096 x 4096... assume a grid resolution of 0.5cm for now
+                if (rand_uniform_vec2(random).x < p) {
+                    // deposit the photon with probability p
+                    throughput /= p;
 
                     ivec2 coords = hash_position(ray.org);
 
@@ -158,31 +150,43 @@ void main() {
                     vec3 relative_position = ray.org - cell_pos;
 
                     table_major = vec4(relative_position, ray.dir.x);
-                    table_minor = vec4(ray.dir.z, last_throughput.rgb * ((ray.dir.y < 0.0) ? -1.0 : 1.0));
+                    table_minor = vec4(ray.dir.z, throughput.rgb * ((ray.dir.y < 0.0) ? -1.0 : 1.0));
                     return;
-                } else if (pass) {
-
-            // interact with the material, get the new direction...
-            ray_t new_ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
-
-            if ((flags & RAY_FLAG_EXTINCT) != 0U) {
-                gl_PointSize = 1.0;
-                gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
-                return;
+                } else {
+                    // we didn't deposit the photon with probability 1 - p
+                    throughput /= 1.0 - p;
+                }
             }
 
-            ray = new_ray;
-                } else {
-                    break;
-                }
+            // <<Sample BSDF fr and direction wi for reflected photon>> 
 
-            // not a diffuse material, keep bouncing...
-            // TODO: russian roulette
+            vec3 new_beta;
+
+            ray_t new_ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, new_beta, flags, random);
+
+            if ((flags & RAY_FLAG_EXTINCT) != 0U) {
+                break;
+            }
+
+            /*vec3 bnew = throughput * new_beta;
+
+            float q = max(0.0, 1.0 - luminance(bnew) / luminance(throughput));
+
+            if (rand_uniform_vec2(random).x < q) {
+                break; // no photon, kill the path
+            }
+
+            throughput = bnew / (1.0 - q);*/
+
+            throughput *= new_beta;
+
+            ray = new_ray;
         } else {
-            // no hit, consider photon lost
-            gl_PointSize = 1.0;
-            gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
-            return;
+            break;
         }
     }
+
+    // no hit, consider photon lost
+    gl_PointSize = 1.0;
+    gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
 }

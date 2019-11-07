@@ -48,7 +48,9 @@ void main() {
         photon_data.w = old_photon_data.w * sqrt(ratio);
         photon_data.rgb = (old_photon_data.rgb + new_photon_data.rgb) * ratio;
     }
+    
+    float radius = min(photon_data.w, globals.grid_cell_size * 2.0);
 
     photon_radiance = photon_direct_and_count.rgb / (globals.pass_count)
-                    + photon_data.rgb / (globals.total_photons * M_PI * pow(photon_data.w, 2.0));
+                    + photon_data.rgb / (globals.total_photons * M_PI * pow(radius, 2.0));
 }

@@ -490,9 +490,9 @@ impl Device {
                 (&self.samples, 0),
             ]);
             self.visible_point_a_readback_fbo
-                .rebuild(&[(&self.visible_point_data_a, 4)]);
+                .rebuild(&[(&self.visible_point_data_a, 0)]);
             self.visible_point_b_readback_fbo
-                .rebuild(&[(&self.visible_point_data_b, 4)]);
+                .rebuild(&[(&self.visible_point_data_b, 0)]);
             self.visible_point_b_fbo.rebuild(&[
                 (&self.visible_point_count_b, 0),
                 (&self.visible_point_data_b, 0),
@@ -506,7 +506,7 @@ impl Device {
             self.visible_point_pass_data_fbo
                 .rebuild(&[(&self.visible_point_pass_data, 0)]);
 
-            let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(4);
+            let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(0);
 
             self.radius_readback.create(mipped_cols * mipped_rows);
 
@@ -814,9 +814,9 @@ impl Device {
 
                     let mut list = Vec::with_capacity(radius_data.len());
 
-                    for i in 0..(radius_data.len() / 16) {
-                        if radius_data[16 * i].color != [0.0; 3] {
-                            list.push(radius_data[16 * i].radius);
+                    for i in 0..(radius_data.len()) {
+                        if radius_data[i].radius < self.state.search_radius {
+                            list.push(radius_data[i].radius);
                         }
                     }
 
@@ -825,13 +825,15 @@ impl Device {
                     }
 
                     let count = list.len();
-                    let index = (count as f32 * 0.9) as usize;
+                    let index = (count as f32 * 1.0) as usize - 1;
 
                     let kth_value = *list
                         .partition_at_index_by(index, |lhs, rhs| lhs.partial_cmp(rhs).unwrap())
                         .1;
 
                     self.state.search_radius = kth_value;
+
+                    log::info!("radius = {}", kth_value);
                 }
             } else {
                 // no readback yet, perform one
@@ -839,7 +841,7 @@ impl Device {
                 if iteration % 2 == 0 {
                     self.visible_point_data_b.gen_mipmaps();
 
-                    let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(4);
+                    let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(0);
 
                     self.radius_readback
                         .start_readback(
@@ -852,7 +854,7 @@ impl Device {
                 } else {
                     self.visible_point_data_a.gen_mipmaps();
 
-                    let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(4);
+                    let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(0);
 
                     self.radius_readback
                         .start_readback(

@@ -1,7 +1,7 @@
 #include <common.glsl>
 #include <random.glsl>
 
-#include <material_basic.glsl>
+#include <material.glsl>
 
 layout (std140) uniform Globals {
     vec2 filter_delta;
@@ -72,7 +72,7 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
 
             float pdf;
             count += 1;
-            result += abs(dot(-photon_direction, normal)) * abs(photon_throughput) * mat_eval_brdf(material, inst, normal, -photon_direction, wo, pdf);
+            result += abs(photon_throughput) * mat_eval_brdf(material, inst, normal, -photon_direction, wo, pdf);
         }
     }
 
