@@ -58,7 +58,7 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
             vec2 data3 = unpackHalf2x16(photon_data.b);
             vec2 data4 = unpackHalf2x16(photon_data.a);
 
-            vec3 photon_position = vec3(data1.xy, data2.x);
+            vec3 photon_position = cell_pos * globals.grid_cell_size + vec3(data1.xy, data2.x);
             vec3 photon_throughput = vec3(data3.y, data4.xy);
 
             if (data2.y == 0.0 && data3.x == 0.0) {

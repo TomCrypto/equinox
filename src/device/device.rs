@@ -504,12 +504,6 @@ impl Device {
 
             let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(4);
 
-            log::info!(
-                "mipped_cols = {}, mipped_rows = {}",
-                mipped_cols,
-                mipped_rows
-            );
-
             self.radius_readback.create(mipped_cols * mipped_rows);
 
             self.render_fbo.rebuild(&[(&self.render, 0)]);
@@ -623,9 +617,11 @@ impl Device {
 
         let mut n =
             (self.state.integrator.photon_density / grid_cell_size.powi(2)).round() as usize;
+        log::info!("initial n = {}", n);
         n = n.min(self.state.integrator.photons_per_pass).max(1);
         let mut m = (self.state.integrator.photons_per_pass / n)
             .min(2usize.pow(self.state.integrator.max_hash_cell_bits));
+        log::info!("initial m = {}", m);
 
         // if we round up, then if m = 3 we're now exceeding our budget by 4/3...
         // we should round down...
@@ -633,6 +629,8 @@ impl Device {
         if !m.is_power_of_two() {
             m = (m / 2).next_power_of_two();
         }
+
+        log::info!("rounded m = {}", m);
 
         /*log::info!(
             "(n, m, nm, r) = ({}, {}, {}, {})",
@@ -663,14 +661,14 @@ impl Device {
 
         assert_eq!(hash_cell_cols * hash_cell_rows, m);
 
-        /*log::info!(
+        log::info!(
             "frame = {}, n = {}, m = {}, hash_cell_cols = {}, hash_cell_rows = {}",
             self.state.frame,
             n,
             m,
             hash_cell_cols,
             hash_cell_rows
-        );*/
+        );
 
         // TODO: not happy with this, can we improve it
         self.state.update(
@@ -803,10 +801,10 @@ impl Device {
         self.state.theoretical_radius *= ratio;
         self.state.total_photons_per_pixel += m as f32;
 
-        log::info!(
+        /*log::info!(
             "theoretical radius = {}",
             self.state.theoretical_radius * 2.0
-        );
+        );*/
 
         // don't readback for the first few frames
         if self.state.frame != 0 && self.state.frame % 15 == 0 {
@@ -844,6 +842,8 @@ impl Device {
                     let kth_value = radius_data.iter().sorted().nth(index).unwrap();*/
 
                     log::info!("got radius = {}", kth_value);
+
+                    self.state.search_radius = kth_value;
                 }
             } else {
                 // no readback yet, perform one

@@ -35,13 +35,11 @@ layout (std140) uniform Raster {
 } raster;
 
 ivec2 hash_position(vec3 pos) {
-    uint cell_x = floatBitsToUint(floor(pos.x / globals.grid_cell_size));
-    uint cell_y = floatBitsToUint(floor(pos.y / globals.grid_cell_size));
-    uint cell_z = floatBitsToUint(floor(pos.z / globals.grid_cell_size));
+    uvec3 cell = floatBitsToUint(floor(pos / globals.grid_cell_size));
 
     // int coords = ((cell_x * 395 + cell_y * 119 + cell_z * 1193) % (4096 * 4096) + 4096 * 4096) % (4096 * 4096);
     // uint coords = (cell_x * 1325290093U + cell_y * 2682811433U + cell_z * 765270841U) % (4096U * 4096U);
-    uint coords = shuffle(uvec3(cell_x, cell_y, cell_z), FRAME_RANDOM) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
+    uint coords = shuffle(cell, FRAME_RANDOM) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
 
     int cell_dx = gl_InstanceID % int(globals.hash_cell_cols);
     int cell_dy = gl_InstanceID / int(globals.hash_cell_cols);
@@ -144,7 +142,7 @@ void main() {
                     float sgn = (ray.dir.z < 0.0) ? -1.0 : 1.0;
 
                     vec3 cell_pos = floor(ray.org / globals.grid_cell_size) * globals.grid_cell_size;
-                    vec3 relative_position = ray.org; // - cell_pos;
+                    vec3 relative_position = ray.org - cell_pos;
 
                     table_data.r = packHalf2x16(relative_position.xy);
                     table_data.g = packHalf2x16(vec2(relative_position.z, ray.dir.x));
