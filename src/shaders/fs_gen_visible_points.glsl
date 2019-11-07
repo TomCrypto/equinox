@@ -134,7 +134,10 @@ void main() {
             uint material = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
 
-            if (mat_is_not_specular(material)) {
+            bool is_receiver = (material & 0x8000U) != 0U;
+            material &= ~0x8000U;
+
+            if (is_receiver) {
                 // we found our diffuse surface, record the hit...
 
                 pack_visible_point(ray.org, ray.dir, normal, throughput, material, mat_inst, visible_point_buf1, visible_point_buf2, visible_point_buf3);

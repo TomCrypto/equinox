@@ -103,7 +103,6 @@ void main() {
     // now fire the ray at the world, hoping for an intersection
     uint flags;
     int diffuse_bounces = 0;
-    bool got_specular = false;
 
     for (uint bounce = 0U; bounce < 8U; ++bounce) {
         traversal_t traversal = traverse_scene(ray, 0U);
@@ -119,17 +118,28 @@ void main() {
             vec3 last_throughput = throughput;
             vec3 radiance; // unused
 
-            // interact with the material, get the new direction...
-            ray_t new_ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
+            float p = 0.5; // max(last_throughput.x, max(last_throughput.y, last_throughput.z));
+            bool pass = false;
 
-            if ((flags & RAY_FLAG_EXTINCT) != 0U) {
-                gl_PointSize = 1.0;
-                gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
-                return;
+            vec2 rng = rand_uniform_vec2(random);
+
+            if (rng.x < p) {
+                pass = true;
+                last_throughput /= p;
+                throughput /= p;
             }
 
-            if ((flags & MAT_PROP_DELTA_BSDF) == 0U) {
-                if (diffuse_bounces == 0) {
+            // TODO: don't hardcode this constant later
+            bool is_receiver = (material & 0x8000U) != 0U;
+            material &= ~0x8000U;
+
+            if (is_receiver && !pass) {
+                // deposit with russian roulette probability
+                // if we pass the check, the photon always continues
+                // else, it is deposited if possible, or is killed
+
+                
+
                 /*vec2 rng = rand_uniform_vec2(random);
 
                 throughput /= 0.5;
@@ -158,14 +168,21 @@ void main() {
                     table_data.b = floatBitsToUint(ray.org.z);
                     table_data.a = 1U;*/
                     return;
-                } else {
-                    diffuse_bounces++;
-                }
-            } else {
-                got_specular = true;
+                } else if (pass) {
+
+            // interact with the material, get the new direction...
+            ray_t new_ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, throughput, radiance, flags, random);
+
+            if ((flags & RAY_FLAG_EXTINCT) != 0U) {
+                gl_PointSize = 1.0;
+                gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
+                return;
             }
 
             ray = new_ray;
+                } else {
+                    break;
+                }
 
             // not a diffuse material, keep bouncing...
             // TODO: russian roulette

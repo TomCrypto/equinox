@@ -10,5 +10,5 @@ pub struct Instance {
     #[serde(default)]
     pub parameters: Vec<f32>,
     #[serde(default)]
-    pub allow_mis: bool,
+    pub receiver: bool,
 }

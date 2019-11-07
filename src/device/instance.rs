@@ -44,7 +44,7 @@ impl Device {
             instance_info.push(InstanceInfo {
                 bbox,
                 cost: geometry.evaluation_cost(),
-                allow_mis: instance.allow_mis,
+                receiver: instance.receiver && material.can_be_receiver(),
                 geometry: instance.geometry as u16,
                 geo_inst: geometry_start,
                 material: material_index(material),
@@ -139,7 +139,7 @@ impl SceneInstanceNode {
         material: u16,
         mat_inst: u16,
         is_last: bool,
-        allow_mis: bool,
+        receiver: bool,
     ) -> Self {
         assert!(geometry < 0x8000 && geo_inst < 0x8000);
         assert!(material < 0x8000 && mat_inst < 0x8000);
@@ -148,7 +148,7 @@ impl SceneInstanceNode {
             min,
             max,
             word1: Self::pack_u32(geo_inst, geometry) | Self::is_last_bit(is_last),
-            word2: Self::pack_u32(mat_inst, material) | Self::mis_flag(allow_mis),
+            word2: Self::pack_u32(mat_inst, material) | Self::receiver_flag(receiver),
         }
     }
 
@@ -178,8 +178,8 @@ impl SceneInstanceNode {
         }
     }
 
-    fn mis_flag(allow_mis: bool) -> u32 {
-        if allow_mis {
+    fn receiver_flag(receiver: bool) -> u32 {
+        if receiver {
             0x8000
         } else {
             0x0000
@@ -195,7 +195,7 @@ impl SceneInstanceNode {
 pub struct InstanceInfo {
     pub bbox: BoundingBox,
     pub cost: f32,
-    pub allow_mis: bool,
+    pub receiver: bool,
     pub geometry: u16,
     pub geo_inst: u16,
     pub material: u16,
@@ -263,7 +263,7 @@ impl<'a> HierarchyBuilder<'a> {
             leaf.material,
             leaf.mat_inst,
             is_last,
-            leaf.allow_mis,
+            leaf.receiver,
         );
 
         if !is_last {

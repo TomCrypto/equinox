@@ -34,3 +34,16 @@ pub enum Material {
         roughness: f32,
     },
 }
+
+impl Material {
+    pub fn can_be_receiver(&self) -> bool {
+        match self {
+            Self::Lambertian { .. } => true,
+            Self::IdealReflection { .. } => false,
+            Self::IdealRefraction { .. } => false,
+            Self::Phong { .. } => true,
+            Self::Dielectric { .. } => false,
+            Self::OrenNayar { .. } => true,
+        }
+    }
+}
