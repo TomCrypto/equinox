@@ -134,7 +134,7 @@ void main() {
             bool is_receiver = (material & 0x8000U) != 0U;
             material &= ~0x8000U;
 
-            if (is_receiver && !pass) {
+            if (is_receiver && pass) {
                 // deposit with russian roulette probability
                 // if we pass the check, the photon always continues
                 // else, it is deposited if possible, or is killed
