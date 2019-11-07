@@ -4,7 +4,8 @@ layout(location = 2) in vec4 outgoing_direction;
 layout(location = 3) in vec4 incident_throughput;
 layout(location = 4) in vec4 outgoing_throughput;
 
-flat out uvec4 table_data;
+out vec4 table_major;
+out vec4 table_minor;
 
 #include <common.glsl>
 #include <random.glsl>
@@ -153,20 +154,11 @@ void main() {
                     gl_PointSize = 1.0;
                     gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / vec2(float(HASH_TABLE_COLS), float(HASH_TABLE_ROWS)) - 1.0, 0.0, 1.0);
 
-                    float sgn = (ray.dir.z < 0.0) ? -1.0 : 1.0;
-
                     vec3 cell_pos = floor(ray.org / globals.grid_cell_size) * globals.grid_cell_size;
                     vec3 relative_position = ray.org - cell_pos;
 
-                    table_data.r = packHalf2x16(relative_position.xy);
-                    table_data.g = packHalf2x16(vec2(relative_position.z, ray.dir.x));
-                    table_data.b = packHalf2x16(vec2(ray.dir.y, last_throughput.r));
-                    table_data.a = packHalf2x16(vec2(last_throughput.g, last_throughput.b * sgn));
-
-                    /*table_data.r = floatBitsToUint(ray.org.x);
-                    table_data.g = floatBitsToUint(ray.org.y);
-                    table_data.b = floatBitsToUint(ray.org.z);
-                    table_data.a = 1U;*/
+                    table_major = vec4(relative_position, ray.dir.x);
+                    table_minor = vec4(ray.dir.z, last_throughput.rgb * ((ray.dir.y < 0.0) ? -1.0 : 1.0));
                     return;
                 } else if (pass) {
 

@@ -1,7 +1,10 @@
-flat in uvec4 table_data;
+in vec4 table_major;
+in vec4 table_minor;
 
-out uvec4 photon;
+layout (location = 0) out vec4 photon_major;
+layout (location = 1) out vec4 photon_minor;
 
 void main() {
-    photon = table_data;
+    photon_major = table_major;
+    photon_minor = table_minor;
 }

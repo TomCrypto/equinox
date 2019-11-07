@@ -22,7 +22,8 @@ uniform sampler2D visible_point_path_buf3;
 
 out vec4 result;
 
-uniform highp usampler2D photon_table;
+uniform sampler2D photon_table_major;
+uniform sampler2D photon_table_minor;
 uniform sampler2D photon_radius_tex;
 
 #define FRAME_RANDOM (globals.frame_state.xy)
@@ -49,33 +50,29 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
 
     for (uint y = 0U; y < globals.hash_cell_rows; ++y) {
         for (uint x = 0U; x < globals.hash_cell_cols; ++x) {
-            uvec4 photon_data = texelFetch(photon_table, coords + ivec2(x, y), 0);
+            vec4 major_data = texelFetch(photon_table_major, coords + ivec2(x, y), 0);
 
-            vec2 data1 = unpackHalf2x16(photon_data.r);
-            vec2 data2 = unpackHalf2x16(photon_data.g);
-            vec2 data3 = unpackHalf2x16(photon_data.b);
-            vec2 data4 = unpackHalf2x16(photon_data.a);
-
-            vec3 photon_position = cell_pos * globals.grid_cell_size + vec3(data1.xy, data2.x);
-            vec3 photon_throughput = vec3(data3.y, data4.xy);
-
-            if (data2.y == 0.0 && data3.x == 0.0) {
+            if (major_data == vec4(-1.0)) {
                 continue;
             }
 
-            float sgn = (photon_throughput.b < 0.0) ? -1.0 : 1.0;
+            vec3 photon_position = cell_pos * globals.grid_cell_size + major_data.xyz;
 
-            vec3 photon_direction = vec3(data2.y, data3.x, sqrt(max(0.0, 1.0 - data2.y * data2.y - data3.x * data3.x)) * sgn);
-
-            photon_throughput.b *= sgn;
-
-            if (dot(point - photon_position, point - photon_position) <= radius_squared) {
-                float pdf;
-                count += 1;
-                result += max(0.0, dot(-photon_direction, normal)) * photon_throughput * mat_eval_brdf(material, inst, normal, -photon_direction, wo, pdf);
-            } else {
+            if (dot(point - photon_position, point - photon_position) > radius_squared) {
                 continue;
             }
+
+            vec4 minor_data = texelFetch(photon_table_minor, coords + ivec2(x, y), 0);
+
+            vec3 photon_throughput = minor_data.yzw;
+
+            float sgn = any(lessThan(photon_throughput, vec3(0.0))) ? -1.0 : 1.0;
+
+            vec3 photon_direction = vec3(major_data.w, sqrt(max(0.0, 1.0 - major_data.w * major_data.w - minor_data.x * minor_data.x)) * sgn, minor_data.x);
+
+            float pdf;
+            count += 1;
+            result += abs(dot(-photon_direction, normal)) * abs(photon_throughput) * mat_eval_brdf(material, inst, normal, -photon_direction, wo, pdf);
         }
     }
 

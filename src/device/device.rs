@@ -98,8 +98,10 @@ pub struct Device {
 
     pub(crate) load_convolution_buffers_shader: Shader,
 
-    // textures for the photon data and kd-tree
-    pub(crate) photon_table_tex: Texture<RGBA32UI>,
+    // textures for the photon hash table (major has the position information)
+    pub(crate) photon_hash_table_major: Texture<RGBA16F>,
+    pub(crate) photon_hash_table_minor: Texture<RGBA16F>,
+
     pub(crate) photon_fbo: Framebuffer,
 
     pub(crate) test_shader: Shader,
@@ -194,7 +196,8 @@ impl Device {
                 hashmap! {},
                 hashmap! {},
             ),
-            photon_table_tex: Texture::new(gl.clone()),
+            photon_hash_table_major: Texture::new(gl.clone()),
+            photon_hash_table_minor: Texture::new(gl.clone()),
             fft_pass_data: VertexArray::new(gl.clone()),
             test_shader: Shader::new(
                 gl.clone(),
@@ -277,7 +280,8 @@ impl Device {
                 hashmap! {
                     "Material" => BindingPoint::UniformBlock(8),
                     "Globals" => BindingPoint::UniformBlock(7),
-                    "photon_table" => BindingPoint::Texture(4),
+                    "photon_table_major" => BindingPoint::Texture(4),
+                    "photon_table_minor" => BindingPoint::Texture(6),
                     "photon_radius_tex" => BindingPoint::Texture(5),
                     "visible_point_path_buf1" => BindingPoint::Texture(0),
                     "visible_point_path_buf2" => BindingPoint::Texture(1),
@@ -558,8 +562,12 @@ impl Device {
             let cols = 2usize.pow(col_bits);
             let rows = 2usize.pow(row_bits);
 
-            self.photon_table_tex.create(cols, rows);
-            self.photon_fbo.rebuild(&[(&self.photon_table_tex, 0)]);
+            self.photon_hash_table_major.create(cols, rows);
+            self.photon_hash_table_minor.create(cols, rows);
+            self.photon_fbo.rebuild(&[
+                (&self.photon_hash_table_major, 0),
+                (&self.photon_hash_table_minor, 0),
+            ]);
 
             self.program
                 .set_define("HASH_TABLE_COLS", format!("{}U", cols));
@@ -712,11 +720,12 @@ impl Device {
         command.set_viewport(
             0,
             0,
-            self.photon_table_tex.cols() as i32,
-            self.photon_table_tex.rows() as i32,
+            self.photon_hash_table_major.cols() as i32,
+            self.photon_hash_table_minor.rows() as i32,
         );
         command.set_framebuffer(&self.photon_fbo);
-        self.photon_fbo.clear_ui(0, [0, 0, 0, 0]);
+        self.photon_fbo.clear(0, [-1.0; 4]);
+        self.photon_fbo.clear(1, [-1.0; 4]);
 
         command.unset_vertex_array();
         command.draw_points_instanced(n, m);
@@ -727,7 +736,8 @@ impl Device {
 
         command.bind(&self.material_buffer, "Material");
         command.bind(&self.globals_buffer, "Globals");
-        command.bind(&self.photon_table_tex, "photon_table");
+        command.bind(&self.photon_hash_table_major, "photon_table_major");
+        command.bind(&self.photon_hash_table_minor, "photon_table_minor");
         command.bind(&self.visible_point_path1, "visible_point_path_buf1");
         command.bind(&self.visible_point_path2, "visible_point_path_buf2");
         command.bind(&self.visible_point_path3, "visible_point_path_buf3");
@@ -907,6 +917,8 @@ impl Device {
         self.spectrum_temp1_fbo.invalidate();
         self.spectrum_temp2_fbo.invalidate();
         self.render_fbo.invalidate();
+        self.photon_hash_table_major.invalidate();
+        self.photon_hash_table_minor.invalidate();
         self.photon_fbo.invalidate();
         self.aperture_fbo.invalidate();
 
