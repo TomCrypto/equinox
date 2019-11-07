@@ -45,17 +45,19 @@ function displayPhotons(amount: number): string {
     return `${amount} photons`;
   }
 
-  if (amount < 1000000) {
-    return `${(amount / 1000).toFixed(1)}K photons`;
+  if (amount < 1e6) {
+    return `${(amount / 1e3).toFixed(1)}K photons`;
   }
 
-  if (amount < 1000000000) {
-    return `${(amount / 1000000).toFixed(1)}M photons`;
+  if (amount < 1e9) {
+    return `${(amount / 1e6).toFixed(1)}M photons`;
   }
 
-  if (amount < 1000000000000) {
-    return `${(amount / 1000000000).toFixed(1)}B photons`;
+  if (amount < 1e12) {
+    return `${(amount / 1e9).toFixed(1)}B photons`;
   }
+
+  return `${(amount / 1e12).toFixed(1)}T photons`;
 }
 
 @Component
