@@ -7,8 +7,8 @@ use web_sys::WebGl2RenderingContext as Context;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(C)]
-#[derive(AsBytes, FromBytes)]
-struct PixelInfo {
+#[derive(AsBytes, FromBytes, Debug, Clone, Copy)]
+pub(crate) struct PixelInfo {
     color: [f32; 3],
     radius: f32,
 }
@@ -109,6 +109,8 @@ pub struct Device {
     pub(crate) visible_point_count_b: Texture<RGBA32F>,
     pub(crate) visible_point_data_a: Texture<RGBA32F>,
     pub(crate) visible_point_data_b: Texture<RGBA32F>,
+    pub(crate) visible_point_a_readback_fbo: Framebuffer,
+    pub(crate) visible_point_b_readback_fbo: Framebuffer,
 
     // buffer to store the visible point path information
     pub(crate) visible_point_path1: Texture<RGBA32F>,
@@ -132,6 +134,8 @@ pub struct Device {
     pub(crate) visible_point_update_pixels_shader: Shader,
     pub(crate) visible_point_gen_shader: Shader,
 
+    pub(crate) radius_readback: ReadbackBuffer<[PixelInfo]>,
+
     pub(crate) allocator: Allocator,
 
     device_lost: bool,
@@ -145,6 +149,9 @@ impl Device {
         Ok(Self {
             allocator: Allocator::new(),
             gl: gl.clone(),
+            visible_point_a_readback_fbo: Framebuffer::new(gl.clone()),
+            visible_point_b_readback_fbo: Framebuffer::new(gl.clone()),
+            radius_readback: ReadbackBuffer::new(gl.clone()),
             visible_point_gen_shader: Shader::new(
                 gl.clone(),
                 shaders::VS_FULLSCREEN,
@@ -416,7 +423,7 @@ impl Device {
             self.render
                 .create(raster.width.get() as usize, raster.height.get() as usize);
 
-            self.samples_fbo.rebuild(&[&self.samples]);
+            self.samples_fbo.rebuild(&[(&self.samples, 0)]);
 
             // Configure the shaders with the desired resolutions...
 
@@ -461,9 +468,9 @@ impl Device {
             self.visible_point_count_b
                 .create(raster.width.get() as usize, raster.height.get() as usize);
             self.visible_point_data_a
-                .create(raster.width.get() as usize, raster.height.get() as usize);
+                .create_mipped(raster.width.get() as usize, raster.height.get() as usize);
             self.visible_point_data_b
-                .create(raster.width.get() as usize, raster.height.get() as usize);
+                .create_mipped(raster.width.get() as usize, raster.height.get() as usize);
             self.visible_point_path1
                 .create(raster.width.get() as usize, raster.height.get() as usize);
             self.visible_point_path2
@@ -474,40 +481,54 @@ impl Device {
                 .create(raster.width.get() as usize, raster.height.get() as usize);
 
             self.visible_point_a_fbo.rebuild(&[
-                &self.visible_point_count_a,
-                &self.visible_point_data_a,
-                &self.samples,
+                (&self.visible_point_count_a, 0),
+                (&self.visible_point_data_a, 0),
+                (&self.samples, 0),
             ]);
+            self.visible_point_a_readback_fbo
+                .rebuild(&[(&self.visible_point_data_a, 4)]);
+            self.visible_point_b_readback_fbo
+                .rebuild(&[(&self.visible_point_data_b, 4)]);
             self.visible_point_b_fbo.rebuild(&[
-                &self.visible_point_count_b,
-                &self.visible_point_data_b,
-                &self.samples,
+                (&self.visible_point_count_b, 0),
+                (&self.visible_point_data_b, 0),
+                (&self.samples, 0),
             ]);
             self.visible_point_path_fbo.rebuild(&[
-                &self.visible_point_path1,
-                &self.visible_point_path2,
-                &self.visible_point_path3,
+                (&self.visible_point_path1, 0),
+                (&self.visible_point_path2, 0),
+                (&self.visible_point_path3, 0),
             ]);
             self.visible_point_pass_data_fbo
-                .rebuild(&[&self.visible_point_pass_data]);
+                .rebuild(&[(&self.visible_point_pass_data, 0)]);
 
-            self.render_fbo.rebuild(&[&self.render]);
+            let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(4);
+
+            log::info!(
+                "mipped_cols = {}, mipped_rows = {}",
+                mipped_cols,
+                mipped_rows
+            );
+
+            self.radius_readback.create(mipped_cols * mipped_rows);
+
+            self.render_fbo.rebuild(&[(&self.render, 0)]);
             self.aperture_fbo.rebuild(&[
-                &self.r_aperture_spectrum,
-                &self.g_aperture_spectrum,
-                &self.b_aperture_spectrum,
+                (&self.r_aperture_spectrum, 0),
+                (&self.g_aperture_spectrum, 0),
+                (&self.b_aperture_spectrum, 0),
             ]);
 
             self.spectrum_temp1_fbo.rebuild(&[
-                &self.rspectrum_temp1,
-                &self.gspectrum_temp1,
-                &self.bspectrum_temp1,
+                (&self.rspectrum_temp1, 0),
+                (&self.gspectrum_temp1, 0),
+                (&self.bspectrum_temp1, 0),
             ]);
 
             self.spectrum_temp2_fbo.rebuild(&[
-                &self.rspectrum_temp2,
-                &self.gspectrum_temp2,
-                &self.bspectrum_temp2,
+                (&self.rspectrum_temp2, 0),
+                (&self.gspectrum_temp2, 0),
+                (&self.bspectrum_temp2, 0),
             ]);
 
             self.prepare_fft_pass_data();
@@ -544,7 +565,7 @@ impl Device {
             let rows = 2usize.pow(row_bits);
 
             self.photon_table_tex.create(cols, rows);
-            self.photon_fbo.rebuild(&[&self.photon_table_tex]);
+            self.photon_fbo.rebuild(&[(&self.photon_table_tex, 0)]);
 
             self.program
                 .set_define("HASH_TABLE_COLS", format!("{}U", cols));
@@ -613,13 +634,13 @@ impl Device {
             m = (m / 2).next_power_of_two();
         }
 
-        log::info!(
+        /*log::info!(
             "(n, m, nm, r) = ({}, {}, {}, {})",
             n,
             m,
             n * m,
             self.state.search_radius
-        );
+        );*/
 
         let mut hash_cell_cols = 1;
         let mut hash_cell_rows = 1;
@@ -775,64 +796,89 @@ impl Device {
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
 
-        // AVERAGE RADIUS REDUCTION
-
-        // TOOD: for now just read the data back every frame, this is horrible. We'll
-        // use a pixel pack buffer to do this asynchronously, this is just to
-        // test it even works.
-
-        let radius_data: &mut [PixelInfo] = self
-            .allocator
-            .allocate(self.samples.cols() * self.samples.rows());
-
-        let radius_data_f32: zerocopy::LayoutVerified<_, [f32]> =
-            zerocopy::LayoutVerified::new_slice(radius_data.as_bytes()).unwrap();
-
-        #[allow(unsafe_code)]
-        let float_array = unsafe { js_sys::Float32Array::view(&radius_data_f32) };
-
-        if iteration % 2 == 0 {
-            self.gl.bind_framebuffer(
-                Context::READ_FRAMEBUFFER,
-                self.visible_point_b_fbo.handle.as_ref(),
-            );
-        } else {
-            self.gl.bind_framebuffer(
-                Context::READ_FRAMEBUFFER,
-                self.visible_point_a_fbo.handle.as_ref(),
-            );
-        }
-
-        self.gl.read_buffer(Context::COLOR_ATTACHMENT1);
-
-        self.gl
-            .read_pixels_with_array_buffer_view_and_dst_offset(
-                0,
-                0,
-                self.samples.cols() as i32,
-                self.samples.rows() as i32,
-                Context::RGBA,
-                Context::FLOAT,
-                &float_array,
-                0,
-            )
-            .unwrap();
-
-        use kth::SliceExtKth;
-
-        let index = (radius_data.len() as f32 * 0.9) as usize;
-
-        radius_data.partition_by_kth(index);
-
-        let mut value: f32 = radius_data[index].radius;
+        let mut ratio = (self.state.total_photons_per_pixel
+            + self.state.integrator.alpha * m as f32)
+            / (self.state.total_photons_per_pixel + m as f32);
+        ratio = ratio.sqrt();
+        self.state.theoretical_radius *= ratio;
+        self.state.total_photons_per_pixel += m as f32;
 
         log::info!(
-            "current radius = {}, max radius = {}",
-            self.state.search_radius,
-            value
+            "theoretical radius = {}",
+            self.state.theoretical_radius * 2.0
         );
 
-        self.state.search_radius = value;
+        // don't readback for the first few frames
+        if self.state.frame != 0 && self.state.frame % 15 == 0 {
+            if self.state.readback_started {
+                let radius_data: &mut [PixelInfo] =
+                    self.allocator.allocate(self.radius_readback.len);
+
+                if self.radius_readback.end_readback(radius_data) {
+                    // log::info!("got the readback data!!");
+                    self.state.readback_started = false;
+
+                    let mut list = Vec::with_capacity(radius_data.len());
+
+                    for i in 0..(radius_data.len() / 16) {
+                        if radius_data[16 * i].color != [0.0; 3] {
+                            list.push(radius_data[16 * i].radius);
+                        }
+                    }
+
+                    if list.len() == 0 {
+                        return;
+                    }
+
+                    // list.sort_unstable();
+
+                    let count = list.len();
+                    let index = (count as f32 * 0.9) as usize;
+
+                    let kth_value = *list
+                        .partition_at_index_by(index, |lhs, rhs| lhs.partial_cmp(rhs).unwrap())
+                        .1;
+
+                    /*use lazysort::Sorted;
+
+                    let kth_value = radius_data.iter().sorted().nth(index).unwrap();*/
+
+                    log::info!("got radius = {}", kth_value);
+                }
+            } else {
+                // no readback yet, perform one
+
+                if iteration % 2 == 0 {
+                    self.visible_point_data_b.gen_mipmaps();
+
+                    let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(4);
+
+                    self.radius_readback
+                        .start_readback(
+                            mipped_cols,
+                            mipped_rows,
+                            &self.visible_point_b_readback_fbo,
+                            0,
+                        )
+                        .unwrap();
+                } else {
+                    self.visible_point_data_a.gen_mipmaps();
+
+                    let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(4);
+
+                    self.radius_readback
+                        .start_readback(
+                            mipped_cols,
+                            mipped_rows,
+                            &self.visible_point_a_readback_fbo,
+                            0,
+                        )
+                        .unwrap();
+                }
+
+                self.state.readback_started = true;
+            }
+        }
     }
 
     pub fn render(&mut self) {
@@ -946,6 +992,9 @@ pub(crate) struct DeviceState {
     pub(crate) integrator: Integrator,
     pub(crate) search_radius: f32,
     pub(crate) total_photons: f32,
+    pub(crate) readback_started: bool,
+    pub(crate) total_photons_per_pixel: f32,
+    pub(crate) theoretical_radius: f32,
 }
 
 impl Default for DeviceState {
@@ -958,6 +1007,9 @@ impl Default for DeviceState {
             search_radius: 0.0,
             integrator: Integrator::default(),
             total_photons: 0.0,
+            readback_started: false,
+            total_photons_per_pixel: 0.0,
+            theoretical_radius: 0.0,
             frame: 0,
         }
     }
@@ -976,6 +1028,7 @@ impl DeviceState {
         self.filter = scene.raster.filter;
         self.integrator = *scene.integrator;
         self.search_radius = scene.integrator.initial_search_radius;
+        self.theoretical_radius = scene.integrator.initial_search_radius;
     }
 
     pub fn update(

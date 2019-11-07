@@ -8,16 +8,6 @@ use std::mem::size_of;
 use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer};
 use zerocopy::{AsBytes, FromBytes};
 
-/*
-
-UBOs start without a size, as before. when written to, they get resized as needed. the maximum
-size can be queried from a method on the UBO, and this can be queried by the caller before trying
-to create the UBO to abort if the UBO is too large.
-
-
-
-*/
-
 #[derive(Debug)]
 pub struct UniformBuffer<T: ?Sized> {
     gl: Context,

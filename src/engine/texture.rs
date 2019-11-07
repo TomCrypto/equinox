@@ -189,6 +189,21 @@ impl<T: TextureFormat<Filterable = True, Compressed = False>> Texture<T> {
         }
     }
 
+    pub fn gen_mipmaps(&mut self) {
+        self.gl
+            .hint(Context::GENERATE_MIPMAP_HINT, Context::FASTEST);
+        self.gl
+            .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
+        self.gl.generate_mipmap(Context::TEXTURE_2D);
+    }
+
+    pub fn level_dimensions(&self, level: usize) -> (usize, usize) {
+        let level_cols = (self.cols() / (1 << level)).max(1);
+        let level_rows = (self.rows() / (1 << level)).max(1);
+
+        (level_cols, level_rows)
+    }
+
     fn mip_levels(cols: usize, rows: usize) -> usize {
         1 + (cols.max(rows) as f32).log2().floor() as usize
     }
