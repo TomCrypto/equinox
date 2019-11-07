@@ -617,11 +617,9 @@ impl Device {
 
         let mut n =
             (self.state.integrator.photon_density / grid_cell_size.powi(2)).round() as usize;
-        //log::info!("initial n = {}", n);
         n = n.min(self.state.integrator.photons_per_pass).max(1);
         let mut m = (self.state.integrator.photons_per_pass / n)
             .min(2usize.pow(self.state.integrator.max_hash_cell_bits));
-        //log::info!("initial m = {}", m);
 
         // if we round up, then if m = 3 we're now exceeding our budget by 4/3...
         // we should round down...
@@ -629,16 +627,6 @@ impl Device {
         if !m.is_power_of_two() {
             m = (m / 2).next_power_of_two();
         }
-
-        //log::info!("rounded m = {}", m);
-
-        /*log::info!(
-            "(n, m, nm, r) = ({}, {}, {}, {})",
-            n,
-            m,
-            n * m,
-            self.state.search_radius
-        );*/
 
         let mut hash_cell_cols = 1;
         let mut hash_cell_rows = 1;
@@ -660,8 +648,6 @@ impl Device {
         m = old_m;
 
         assert_eq!(hash_cell_cols * hash_cell_rows, m);
-
-        log::info!("frame = {}, n = {}, m = {}", self.state.frame, n, m);
 
         // TODO: not happy with this, can we improve it
         self.state.update(
@@ -747,10 +733,8 @@ impl Device {
         command.bind(&self.visible_point_path3, "visible_point_path_buf3");
 
         if iteration % 2 == 0 {
-            //log::info!("accumulating photons using radius in A");
             command.bind(&self.visible_point_data_a, "photon_radius_tex");
         } else {
-            //log::info!("accumulating photons using radius in B");
             command.bind(&self.visible_point_data_b, "photon_radius_tex");
         }
 
@@ -767,17 +751,11 @@ impl Device {
         command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
 
         if iteration % 2 == 0 {
-            // old data is in "a", we want to write in "b"
-            //log::info!("pass complete, reading from A and writing to B");
-
             command.bind(&self.visible_point_count_a, "old_photon_count_tex");
             command.bind(&self.visible_point_data_a, "old_photon_data_tex");
 
             command.set_framebuffer(&self.visible_point_b_fbo);
         } else {
-            // old data is in "b", we want to write in "a"
-            //log::info!("pass complete, reading from B and writing to A");
-
             command.bind(&self.visible_point_count_b, "old_photon_count_tex");
             command.bind(&self.visible_point_data_b, "old_photon_data_tex");
 
@@ -794,11 +772,6 @@ impl Device {
         self.state.theoretical_radius *= ratio;
         self.state.total_photons_per_pixel += m as f32;
 
-        /*log::info!(
-            "theoretical radius = {}",
-            self.state.theoretical_radius * 2.0
-        );*/
-
         // don't readback for the first few frames
         if self.state.frame != 0 && self.state.frame % 15 == 0 {
             if self.state.readback_started {
@@ -806,7 +779,6 @@ impl Device {
                     self.allocator.allocate(self.radius_readback.len);
 
                 if self.radius_readback.end_readback(radius_data) {
-                    // log::info!("got the readback data!!");
                     self.state.readback_started = false;
 
                     let mut list = Vec::with_capacity(radius_data.len());
@@ -821,20 +793,12 @@ impl Device {
                         return;
                     }
 
-                    // list.sort_unstable();
-
                     let count = list.len();
                     let index = (count as f32 * 0.9) as usize;
 
                     let kth_value = *list
                         .partition_at_index_by(index, |lhs, rhs| lhs.partial_cmp(rhs).unwrap())
                         .1;
-
-                    /*use lazysort::Sorted;
-
-                    let kth_value = radius_data.iter().sorted().nth(index).unwrap();*/
-
-                    // log::info!("got radius = {}", kth_value);
 
                     self.state.search_radius = kth_value;
                 }

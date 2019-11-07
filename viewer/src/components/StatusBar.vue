@@ -6,8 +6,8 @@
     <div class="resolution">
       <pre><p>{{ width }}×{{ height }}</p></pre>
     </div>
-    <div class="sample-count">
-      <pre><p>{{ sampleInfo }}</p></pre>
+    <div class="pass-info">
+      <pre><p>{{ passInfo }}</p></pre>
     </div>
     <div class="frame-cpu-time">
       <pre><p>{{ cpuFrameInfo }}</p></pre>
@@ -36,11 +36,34 @@ function displayTime(milliseconds: number): string {
   return `${milliseconds.toFixed(0).padStart(4, " ")} ms`;
 }
 
+function displayPhotons(amount: number): string {
+  if (amount == 1) {
+    return "1 photon";
+  }
+
+  if (amount < 1000) {
+    return `${amount} photons`;
+  }
+
+  if (amount < 1000000) {
+    return `${(amount / 1000).toFixed(1)}K photons`;
+  }
+
+  if (amount < 1000000000) {
+    return `${(amount / 1000000).toFixed(1)}M photons`;
+  }
+
+  if (amount < 1000000000000) {
+    return `${(amount / 1000000000).toFixed(1)}B photons`;
+  }
+}
+
 @Component
 export default class extends Vue {
   @Prop() private width!: number;
   @Prop() private height!: number;
-  @Prop() private sampleCount!: number;
+  @Prop() private sppmPasses!: number;
+  @Prop() private sppmPhotons!: number;
   @Prop() private vendor!: string;
   @Prop() private renderer!: string;
   @Prop() private isContextLost!: boolean;
@@ -49,13 +72,13 @@ export default class extends Vue {
   @Prop() private gpuFrameTime!: number | null;
   @Prop() private syncInterval!: number | null;
 
-  get sampleInfo(): string {
+  get passInfo(): string {
     if (this.isContextLost) {
       return "CONTEXT LOST!";
-    } else if (this.sampleCount == 1) {
-      return `1 sample`;
+    } else if (this.sppmPasses == 1) {
+      return `1 pass`;
     } else {
-      return `${this.sampleCount} samples`;
+      return `${this.sppmPasses} passes, ${displayPhotons(this.sppmPhotons)}`;
     }
   }
 
@@ -112,8 +135,8 @@ export default class extends Vue {
   width: 70px;
 }
 
-.sample-count {
-  width: 130px;
+.pass-info {
+  width: 230px;
 }
 
 .resolution {

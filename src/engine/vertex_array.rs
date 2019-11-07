@@ -10,7 +10,7 @@ use zerocopy::{AsBytes, FromBytes};
 #[derive(Debug)]
 pub struct VertexArray<T: ?Sized> {
     gl: Context,
-    pub(crate) buf_handle: Option<WebGlBuffer>, // TODO: fix
+    buf_handle: Option<WebGlBuffer>,
     vao_handle: Option<WebGlVertexArrayObject>,
     vertex_count: usize,
     phantom: PhantomData<T>,

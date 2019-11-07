@@ -28,7 +28,8 @@
 
     <StatusBar
       v-if="canvas !== null"
-      :sample-count="sampleCount"
+      :sppm-passes="sppmPasses"
+      :sppm-photons="sppmPhotons"
       :is-context-lost="isContextLost"
       :width="canvasWidth"
       :height="canvasHeight"
@@ -261,7 +262,8 @@ export default class App extends Vue {
   private context: WebGL2RenderingContext | null = null;
   private canvasWidth: number = 0;
   private canvasHeight: number = 0;
-  private sampleCount: number = 0;
+  private sppmPhotons: number = 0;
+  private sppmPasses: number = 0;
 
   created() {
     this.scene = new this.equinox.WebScene();
@@ -379,7 +381,8 @@ export default class App extends Vue {
       this.canvasWidth = this.canvas.width;
       this.canvasHeight = this.canvas.height;
 
-      this.sampleCount = this.device.sample_count();
+      this.sppmPhotons = this.device.sppm_photons();
+      this.sppmPasses = this.device.sppm_passes();
 
       this.scene.set_raster_dimensions(this.canvas.width, this.canvas.height);
 
@@ -417,7 +420,8 @@ export default class App extends Vue {
     });
 
     const info = {
-      samples: this.device.sample_count(),
+      sppm_passes: this.device.sppm_passes(),
+      sppm_photons: this.device.sppm_photons(),
       vendor: this.contextVendor,
       renderer: this.contextRenderer,
       version: this.equinox.version()

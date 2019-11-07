@@ -355,15 +355,27 @@ impl WebDevice {
         Ok(self.device.update(&mut scene.scene)?)
     }
 
+    /// Refines the render using the integrator.
     pub fn refine(&mut self) {
         self.device.refine();
     }
 
+    /// Renders the current integrator data.
     pub fn render(&mut self) {
         self.device.render();
     }
 
     pub fn sample_count(&self) -> u32 {
+        self.device.state.frame
+    }
+
+    /// Returns the number of photons traced by the SPPM integrator.
+    pub fn sppm_photons(&self) -> f64 {
+        self.device.state.total_photons as f64
+    }
+
+    /// Returns the number of passes performed by the SPPM integrator.
+    pub fn sppm_passes(&self) -> u32 {
         self.device.state.frame
     }
 
