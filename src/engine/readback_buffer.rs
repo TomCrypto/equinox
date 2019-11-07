@@ -39,8 +39,6 @@ impl<T: AsBytes + FromBytes> ReadbackBuffer<[T]> {
         // TODO: how to expose the FBO handle safely??
         // TODO: how to pass in the pixel type/format?
 
-        //info!("Readback started (sync inserted)");
-
         self.gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, None);
         self.gl
             .bind_framebuffer(Context::READ_FRAMEBUFFER, framebuffer.handle.as_ref());
