@@ -23,6 +23,7 @@ layout (std140) uniform Globals {
     float grid_cell_size;
     uint hash_cell_cols;
     uint hash_cell_rows;
+    uint hash_cell_col_bits;
     float alpha;
 } globals;
 
@@ -41,13 +42,16 @@ ivec2 hash_position(vec3 pos) {
     // uint coords = (cell_x * 1325290093U + cell_y * 2682811433U + cell_z * 765270841U) % (4096U * 4096U);
     uint coords = shuffle(cell, FRAME_RANDOM) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
 
-    int cell_dx = gl_InstanceID % int(globals.hash_cell_cols);
-    int cell_dy = gl_InstanceID / int(globals.hash_cell_cols);
+    uint cell_dx = uint(gl_InstanceID) & (globals.hash_cell_cols - 1U); // % globals.hash_cell_cols;
+    uint cell_dy = uint(gl_InstanceID) >> globals.hash_cell_col_bits; // / globals.hash_cell_cols;
 
-    int coord_x = int(coords % HASH_TABLE_COLS);
-    int coord_y = int(coords / HASH_TABLE_COLS);
+    uint coord_x = coords % HASH_TABLE_COLS;
+    uint coord_y = coords / HASH_TABLE_COLS;
 
-    return ivec2(coord_x / int(globals.hash_cell_cols) * int(globals.hash_cell_cols) + cell_dx, coord_y / int(globals.hash_cell_rows) * int(globals.hash_cell_rows) + cell_dy);
+    coord_x &= ~(globals.hash_cell_cols - 1U);
+    coord_y &= ~(globals.hash_cell_rows - 1U);
+
+    return ivec2(coord_x + cell_dx, coord_y + cell_dy);
 }
 
 vec3 get_relative_pos_in_cell(vec3 pos) {

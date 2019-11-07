@@ -617,11 +617,11 @@ impl Device {
 
         let mut n =
             (self.state.integrator.photon_density / grid_cell_size.powi(2)).round() as usize;
-        log::info!("initial n = {}", n);
+        //log::info!("initial n = {}", n);
         n = n.min(self.state.integrator.photons_per_pass).max(1);
         let mut m = (self.state.integrator.photons_per_pass / n)
             .min(2usize.pow(self.state.integrator.max_hash_cell_bits));
-        log::info!("initial m = {}", m);
+        //log::info!("initial m = {}", m);
 
         // if we round up, then if m = 3 we're now exceeding our budget by 4/3...
         // we should round down...
@@ -630,7 +630,7 @@ impl Device {
             m = (m / 2).next_power_of_two();
         }
 
-        log::info!("rounded m = {}", m);
+        //log::info!("rounded m = {}", m);
 
         /*log::info!(
             "(n, m, nm, r) = ({}, {}, {}, {})",
@@ -661,14 +661,7 @@ impl Device {
 
         assert_eq!(hash_cell_cols * hash_cell_rows, m);
 
-        log::info!(
-            "frame = {}, n = {}, m = {}, hash_cell_cols = {}, hash_cell_rows = {}",
-            self.state.frame,
-            n,
-            m,
-            hash_cell_cols,
-            hash_cell_rows
-        );
+        log::info!("frame = {}, n = {}, m = {}", self.state.frame, n, m);
 
         // TODO: not happy with this, can we improve it
         self.state.update(
@@ -841,7 +834,7 @@ impl Device {
 
                     let kth_value = radius_data.iter().sorted().nth(index).unwrap();*/
 
-                    log::info!("got radius = {}", kth_value);
+                    // log::info!("got radius = {}", kth_value);
 
                     self.state.search_radius = kth_value;
                 }
@@ -1063,6 +1056,7 @@ impl DeviceState {
         data.grid_cell_size = grid_cell_size;
         data.hash_cell_cols = hash_cell_cols;
         data.hash_cell_rows = hash_cell_rows;
+        data.hash_cell_col_bits = (hash_cell_cols - 1).count_ones();
         data.alpha = self.integrator.alpha;
 
         buffer.write(&data).expect("internal WebGL error");
@@ -1082,6 +1076,7 @@ pub(crate) struct GlobalData {
     grid_cell_size: f32,
     hash_cell_cols: u32,
     hash_cell_rows: u32,
+    hash_cell_col_bits: u32,
     alpha: f32,
-    padding: [f32; 2],
+    padding: [f32; 1],
 }
