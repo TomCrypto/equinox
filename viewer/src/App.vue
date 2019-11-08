@@ -181,6 +181,15 @@ export default class App extends Vue {
       return;
     }
 
+    if (!this.mouseMoved) {
+      // reconstruct coordinates from scene json in case they changed
+
+      const direction = this.scene.json().camera.direction;
+
+      this.phi = Math.atan2(direction.z, direction.x);
+      this.theta = Math.acos(direction.y);
+    }
+
     this.phi += -event.movementX * 0.001;
     this.theta += event.movementY * 0.001;
 
