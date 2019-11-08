@@ -118,6 +118,7 @@ pub struct Device {
     pub(crate) visible_point_path1: Texture<RGBA32F>,
     pub(crate) visible_point_path2: Texture<RGBA32F>,
     pub(crate) visible_point_path3: Texture<RGBA32F>,
+    pub(crate) visible_point_path4: Texture<RGBA32F>,
 
     // buffer to store the visible point properties for this pass (photon contributions + photon
     // count)
@@ -191,6 +192,7 @@ impl Device {
                     "old_photon_count_tex" => BindingPoint::Texture(0),
                     "old_photon_data_tex" => BindingPoint::Texture(1),
                     "new_photon_data_tex" => BindingPoint::Texture(2),
+                    "visible_point_direct" => BindingPoint::Texture(3),
                     "Globals" => BindingPoint::UniformBlock(2),
                 },
                 hashmap! {},
@@ -339,6 +341,7 @@ impl Device {
             visible_point_path1: Texture::new(gl.clone()),
             visible_point_path2: Texture::new(gl.clone()),
             visible_point_path3: Texture::new(gl.clone()),
+            visible_point_path4: Texture::new(gl.clone()),
             visible_point_pass_data: Texture::new(gl.clone()),
             visible_point_a_fbo: Framebuffer::new(gl.clone()),
             visible_point_b_fbo: Framebuffer::new(gl.clone()),
@@ -481,6 +484,8 @@ impl Device {
                 .create(raster.width.get() as usize, raster.height.get() as usize);
             self.visible_point_path3
                 .create(raster.width.get() as usize, raster.height.get() as usize);
+            self.visible_point_path4
+                .create(raster.width.get() as usize, raster.height.get() as usize);
             self.visible_point_pass_data
                 .create(raster.width.get() as usize, raster.height.get() as usize);
 
@@ -502,6 +507,7 @@ impl Device {
                 (&self.visible_point_path1, 0),
                 (&self.visible_point_path2, 0),
                 (&self.visible_point_path3, 0),
+                (&self.visible_point_path4, 0),
             ]);
             self.visible_point_pass_data_fbo
                 .rebuild(&[(&self.visible_point_pass_data, 0)]);
@@ -779,6 +785,7 @@ impl Device {
 
         let command = self.visible_point_update_pixels_shader.begin_draw();
         command.bind(&self.visible_point_pass_data, "new_photon_data_tex");
+        command.bind(&self.visible_point_path4, "visible_point_direct");
         command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
 
         if iteration % 2 == 0 {
@@ -952,6 +959,7 @@ impl Device {
         self.visible_point_path1.invalidate();
         self.visible_point_path2.invalidate();
         self.visible_point_path3.invalidate();
+        self.visible_point_path4.invalidate();
         self.visible_point_pass_data.invalidate();
 
         self.visible_point_a_fbo.invalidate();

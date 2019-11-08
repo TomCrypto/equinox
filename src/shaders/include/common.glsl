@@ -116,8 +116,8 @@ bool unpack_visible_point(vec4 data1, vec4 data2, vec4 data3, out vec3 position,
     return true;
 }
 
-void pack_visible_point(vec3 position, vec3 direction, vec3 normal, vec3 throughput,
-                        uint material, uint inst, out vec4 data1, out vec4 data2, out vec4 data3) {
+void pack_visible_point(vec3 position, vec3 direction, vec3 normal, vec3 throughput, vec3 radiance,
+                        uint material, uint inst, out vec4 data1, out vec4 data2, out vec4 data3, out vec4 data4) {
     data1.xyz = position;
     data2.xyz = throughput;
     data1.w = uintBitsToFloat(material | (inst << 16));
@@ -136,12 +136,15 @@ void pack_visible_point(vec3 position, vec3 direction, vec3 normal, vec3 through
 
     data3.xy = direction.xz;
     data3.zw = normal.xz;
+    
+    data4.rgb = radiance;
 }
 
-void pack_invalid_visible_point(vec3 radiance, out vec4 data1, out vec4 data2, out vec4 data3) {
+void pack_invalid_visible_point(vec3 radiance, out vec4 data1, out vec4 data2, out vec4 data3, out vec4 data4) {
     data1.xyz = vec3(0.0);
     data1.w = uintBitsToFloat(0xffffffffU);
-    data2.xyz = radiance;
+    data2.xyz = vec3(0.0);
     data2.w = 0.0;
     data3 = vec4(0.0);
+    data4.rgb = radiance;
 }

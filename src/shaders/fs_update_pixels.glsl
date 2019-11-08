@@ -3,6 +3,7 @@
 uniform sampler2D old_photon_count_tex;
 uniform sampler2D old_photon_data_tex;
 uniform sampler2D new_photon_data_tex;
+uniform sampler2D visible_point_direct;
 
 layout (std140) uniform Globals {
     vec2 filter_delta;
@@ -27,27 +28,24 @@ void main() {
     vec4 old_photon_other = texelFetch(old_photon_count_tex, coords, 0).rgba;
     vec4 old_photon_data = texelFetch(old_photon_data_tex, coords, 0).rgba;
     vec4 new_photon_data = texelFetch(new_photon_data_tex, coords, 0).rgba;
+    vec3 visible_point_direct_rgb = texelFetch(visible_point_direct, coords, 0).rgb;
 
     vec3 old_photon_direct = old_photon_other.rgb;
     float old_photon_count = old_photon_other.w;
 
-    if (new_photon_data.w == 0.0) {
-        // treat as direct lighting
-        photon_direct_and_count.w = old_photon_count;
-        photon_direct_and_count.rgb = old_photon_direct + new_photon_data.rgb;
+    float photon_count = old_photon_count + globals.alpha * new_photon_data.w;
 
-        photon_data = old_photon_data;
-    } else {
-        // treat as photon contributions
-        float photon_count = old_photon_count + globals.alpha * new_photon_data.w;
+    float ratio = 1.0;
 
-        float ratio = photon_count / (old_photon_count + new_photon_data.w);
-
-        photon_direct_and_count.rgb = old_photon_direct;
-        photon_direct_and_count.w = photon_count;
-        photon_data.w = old_photon_data.w * sqrt(ratio);
-        photon_data.rgb = (old_photon_data.rgb + new_photon_data.rgb) * ratio;
+    if (new_photon_data.w != 0.0) {
+        ratio = photon_count / (old_photon_count + new_photon_data.w);
     }
+
+    photon_data.w = old_photon_data.w * sqrt(ratio);
+    photon_data.rgb = (old_photon_data.rgb + new_photon_data.rgb) * ratio;
+
+    photon_direct_and_count.w = photon_count;
+    photon_direct_and_count.rgb = old_photon_direct + visible_point_direct_rgb;
     
     float radius = min(photon_data.w, globals.grid_cell_size * 2.0);
 

@@ -105,14 +105,10 @@ void main() {
     // compute a good ray origin
     ray.org = real_pos - 100.0 * ray.dir;
 
-    // throughput *= 2.0;
-
     // now fire the ray at the world, hoping for an intersection
     uint flags;
-    int diffuse_bounces = 0;
-    int target = 2;
 
-    for (uint bounce = 0U; bounce < 100U; ++bounce) {
+    for (uint bounce = 0U; bounce < 8U; ++bounce) {
         traversal_t traversal = traverse_scene(ray, 0U);
 
         if (traversal_has_hit(traversal)) {
@@ -131,13 +127,28 @@ void main() {
             bool is_receiver = (material & 0x8000U) != 0U;
             material &= ~0x8000U;
 
-            /*if (uint(globals.pass_count) % 2U == 0U) {
-                is_receiver = is_receiver && (bounce == 0U);
-            } else {*/
-                is_receiver = is_receiver && (bounce == 0U);   
-            // }
+            is_receiver = is_receiver && (bounce != 0U);
 
-            // is_receiver = is_receiver && (bounce != 0U);
+            // make a choice whether to deposit the photon here or to continue
+            // for now let's deposit with probability 0.5, seems reasonably
+
+            float deposit_p = 0.5;
+
+            if (is_receiver && rand_uniform_vec2(random).x < deposit_p) {
+                vec3 photon_throughput = throughput / deposit_p;
+
+                ivec2 coords = hash_position(ray.org);
+
+                gl_PointSize = 1.0;
+                gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / vec2(float(HASH_TABLE_COLS), float(HASH_TABLE_ROWS)) - 1.0, 0.0, 1.0);
+
+                vec3 cell_pos = floor(ray.org / globals.grid_cell_size) * globals.grid_cell_size;
+                vec3 relative_position = ray.org - cell_pos;
+
+                table_major = vec4(relative_position, ray.dir.x);
+                table_minor = vec4(ray.dir.z, photon_throughput.rgb * ((ray.dir.y < 0.0) ? -1.0 : 1.0));
+                return;
+            }
 
             vec3 new_beta;
 
@@ -152,29 +163,11 @@ void main() {
             float q = max(0.0, 1.0 - luminance(bnew) / luminance(throughput));
 
             if (rand_uniform_vec2(random).x < q) {
-                throughput /= q;
-
-                if (is_receiver) {
-                    ivec2 coords = hash_position(ray.org);
-
-                    gl_PointSize = 1.0;
-                    gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / vec2(float(HASH_TABLE_COLS), float(HASH_TABLE_ROWS)) - 1.0, 0.0, 1.0);
-
-                    vec3 cell_pos = floor(ray.org / globals.grid_cell_size) * globals.grid_cell_size;
-                    vec3 relative_position = ray.org - cell_pos;
-
-                    table_major = vec4(relative_position, ray.dir.x);
-                    table_minor = vec4(ray.dir.z, throughput.rgb * ((ray.dir.y < 0.0) ? -1.0 : 1.0));
-                    return;
-                } else {
-                    return; // dead
-                }
+                // terminate the path! we're not interested in this path anymore
+                return;
             }
 
             throughput = bnew / (1.0 - q);
-            // throughput *= new_beta;
-
-            // <<Sample BSDF fr and direction wi for reflected photon>> 
 
             ray = new_ray;
         } else {

@@ -11,6 +11,7 @@
 layout(location = 0) out vec4 visible_point_buf1;
 layout(location = 1) out vec4 visible_point_buf2;
 layout(location = 2) out vec4 visible_point_buf3;
+layout(location = 3) out vec4 visible_point_buf4;
 
 layout (std140) uniform Camera {
     vec4 origin_plane[4];
@@ -108,6 +109,28 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
     dir = normalize(target - origin);
 }
 
+vec3 sample_direct_lighting(ray_t ray, vec3 normal, uint material, uint mat_inst, random_t random) {
+    // 1. sample random light direction
+    vec3 wi;
+    float pdf;
+
+    vec3 radiance = env_sample_light(wi, pdf, random);
+
+    // can we see the light?
+    traversal_t traversal = traverse_scene(make_ray(ray.org, wi, normal), 0U);
+
+    if (traversal_has_hit(traversal)) {
+        // fail, light is occluded
+        return vec3(0.0);
+    } else {
+        vec3 wo = -ray.dir;
+
+        radiance *= abs(dot(wi, normal)) * mat_eval_brdf(material, mat_inst, normal, wi, wo, pdf);
+
+        return radiance;
+    }
+}
+
 // End camera stuff
 
 void main() {
@@ -138,9 +161,13 @@ void main() {
             material &= ~0x8000U;
 
             if (is_receiver) {
+                // try and accumulate direct lighting here
+
+                radiance = throughput * sample_direct_lighting(ray, normal, material, mat_inst, random);
+
                 // we found our diffuse surface, record the hit...
 
-                pack_visible_point(ray.org, ray.dir, normal, throughput, material, mat_inst, visible_point_buf1, visible_point_buf2, visible_point_buf3);
+                pack_visible_point(ray.org, ray.dir, normal, throughput, radiance, material, mat_inst, visible_point_buf1, visible_point_buf2, visible_point_buf3, visible_point_buf4);
 
                 return;
             } else {
@@ -187,5 +214,5 @@ void main() {
     // store the position + packed direction in an RGBA32F texture
     // store the throughput + flags in an RGBA16F texture
 
-    pack_invalid_visible_point(radiance, visible_point_buf1, visible_point_buf2, visible_point_buf3);
+    pack_invalid_visible_point(radiance, visible_point_buf1, visible_point_buf2, visible_point_buf3, visible_point_buf4);
 }

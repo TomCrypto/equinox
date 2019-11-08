@@ -20,6 +20,10 @@ uniform sampler2D visible_point_path_buf1;
 uniform sampler2D visible_point_path_buf2;
 uniform sampler2D visible_point_path_buf3;
 
+// direct lighting consists of:
+//  - any path consisting of only non-receiving surfaces (no point to gather photons from)
+//  - any path of the form camera - receiving surface - light ("explicit light sampling")
+
 out vec4 result;
 
 uniform sampler2D photon_table_major;
@@ -88,7 +92,7 @@ void main() {
     uint material, inst;
 
     if (!unpack_visible_point(data1, data2, data3, position, direction, normal, throughput, material, inst)) {
-        result = vec4(throughput, 0.0); // count = 0 indicates this is direct lighting
+        result = vec4(0.0); // no photon contributions
     } else {
         // at this point, just accumulate all nearby photons
         float radius = texelFetch(photon_radius_tex, ivec2(gl_FragCoord.xy - 0.5), 0).w;
