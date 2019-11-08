@@ -110,16 +110,12 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 }
 
 vec3 sample_direct_lighting(ray_t ray, vec3 normal, uint material, uint mat_inst, random_t random) {
-    // 1. sample random light direction
     vec3 wi;
     float pdf;
 
     vec3 radiance = env_sample_light(wi, pdf, random);
 
-    // can we see the light?
-    traversal_t traversal = traverse_scene(make_ray(ray.org, wi, normal), 0U);
-
-    if (traversal_has_hit(traversal)) {
+    if (is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
         // fail, light is occluded
         return vec3(0.0);
     } else {
