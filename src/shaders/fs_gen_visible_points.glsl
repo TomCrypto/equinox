@@ -108,12 +108,38 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 }
 
 vec3 sample_direct_lighting(ray_t ray, vec3 normal, uint material, uint mat_inst, random_t random) {
+    float lightPdf, scatterPdf;
+
     vec3 wi;
-    float pdf;
+    vec3 wo = -ray.dir;
 
-    vec3 radiance = env_sample_light(wi, pdf, random);
+    vec3 Li = env_sample_light(wi, lightPdf, random);
+    vec3 radiance;
 
-    if (is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
+    if (lightPdf != 0.0) {
+        vec3 f = mat_eval_brdf(material, mat_inst, normal, wi, wo, scatterPdf) * abs(dot(wi, normal));
+
+        if (scatterPdf != 0.0 && !is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
+            radiance += f * Li * power_heuristic(lightPdf, scatterPdf);
+        }
+    }
+
+    vec3 f = mat_sample_brdf(material, mat_inst, normal, wi, wo, scatterPdf, random);
+
+    if (scatterPdf != 0.0 && !is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
+        Li = env_eval_light(wi, lightPdf);
+
+        if (lightPdf != 0.0) {
+            radiance += f * Li * power_heuristic(scatterPdf, lightPdf);
+        }
+    }
+
+    return radiance;
+
+    /*
+        
+
+
         // fail, light is occluded
         return vec3(0.0);
     } else {
@@ -122,7 +148,7 @@ vec3 sample_direct_lighting(ray_t ray, vec3 normal, uint material, uint mat_inst
         radiance *= abs(dot(wi, normal)) * mat_eval_brdf(material, mat_inst, normal, wi, wo, pdf);
 
         return radiance;
-    }
+    }*/
 }
 
 // End camera stuff
@@ -139,6 +165,7 @@ void main() {
     uint traversal_start = 0U;
     uint flags;
     float unused_pdf;
+    bool explicit_light = false;
 
     for (uint bounce = 0U; bounce < 8U; ++bounce) {
         traversal_t traversal = traverse_scene(ray, traversal_start);
@@ -154,11 +181,15 @@ void main() {
             bool is_receiver = (material & 0x8000U) != 0U;
             material &= ~0x8000U;
 
+            // TODO: add back a direct light sampling flag? ...
+            if (mat_is_not_specular(material)) {
+                radiance += throughput * sample_direct_lighting(ray, normal, material, mat_inst, random);
+                explicit_light = true;
+            } else {
+                explicit_light = false;
+            }
+
             if (is_receiver) {
-                // try and accumulate direct lighting here
-
-                radiance = throughput * sample_direct_lighting(ray, normal, material, mat_inst, random);
-
                 // we found our diffuse surface, record the hit...
 
                 pack_visible_point(ray.org, ray.dir, normal, throughput, radiance, material, mat_inst, visible_point_buf1, visible_point_buf2, visible_point_buf3, visible_point_buf4);
@@ -181,7 +212,9 @@ void main() {
                 }
             }            
         } else {
-            radiance += throughput * env_eval_light(ray.dir, unused_pdf);
+            if (!explicit_light) {
+                radiance += throughput * env_eval_light(ray.dir, unused_pdf);
+            }
 
             break;
         }

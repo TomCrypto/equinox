@@ -323,6 +323,46 @@ vec3 mat_eval_brdf(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo, out 
     }
 }
 
+bool mat_is_not_specular(uint material) {
+    switch (material) {
+        case 0U:
+            return true;
+        case 1U:
+            return false;
+        case 2U:
+            return true;
+        case 3U:
+            return false;
+        case 4U:
+            return false;
+        case 5U:
+            return true;
+        default:
+            return false;
+    }
+}
+
+vec3 mat_sample_brdf(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
+    uint flags;
+
+    switch (material) {
+        case 0U:
+            return mat_lambertian_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+        case 1U:
+            return mat_ideal_reflection_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+        case 2U:
+            return mat_phong_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+        case 3U:
+            return mat_ideal_refraction_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+        case 4U:
+            return mat_dielectric_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+        case 5U:
+            return mat_oren_nayar_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+        default:
+            return vec3(0.0);
+    }
+}
+
 // == HIGH-LEVEL MATERIAL INTERACTION ============================================================
 
 #define MAT_INTERACT(absorption, eval_brdf, sample_brdf, props) {                                 \
