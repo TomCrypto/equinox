@@ -149,7 +149,9 @@ vec3 mat_phong_absorption(uint inst, float path_length, inout uint flags) {
 }
 
 vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
-    if (dot(wi, normal) <= 0.0 || dot(wo, normal) <= 0.0) {
+    float wi_n = dot(wi, normal);
+
+    if (wi_n <= 0.0 || dot(wo, normal) <= 0.0) {
         return pdf = 0.0, vec3(0.0);
     }
 
@@ -157,7 +159,7 @@ vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf
 
     pdf = cos_alpha * (MAT_PHONG_EXPONENT + 1.0) / M_2PI;
 
-    return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / M_2PI * cos_alpha;
+    return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / M_2PI * cos_alpha / wi_n;
 }
 
 vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
@@ -228,15 +230,8 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
         float rp = (n1 * cosT - n2 * cosI) / (n1 * cosT + n2 * cosI);
         float r = (rs * rs + rp * rp) * 0.5; // unpolarized lighting
 
-#ifdef SPLIT
-        if (rand_uniform_vec2(random).x < 0.5) {
-#else
         if (rand_uniform_vec2(random).x < r) {
-#endif
             wi = reflect(-wo, normal);
-#ifdef SPLIT
-            return MAT_DIELECTRIC_BASE_COLOR * r / 0.5;
-#endif
         } else {
             wi = (eta * cosI - cosT) * normal - eta * wo;
             flags |= RAY_FLAG_TRANSMIT;
@@ -245,11 +240,7 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
             // velocity is only important if a light source exists inside the medium
             // as otherwise the factor is cancelled out as the ray exits the medium.
 
-#ifdef SPLIT
-            return MAT_DIELECTRIC_BASE_COLOR * cosT / (cosI * eta) * (1.0 - r) / 0.5;
-#else
             return MAT_DIELECTRIC_BASE_COLOR * cosT / (cosI * eta);
-#endif
         }
     } else {
         wi = reflect(-wo, normal);
