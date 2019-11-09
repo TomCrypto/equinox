@@ -60,11 +60,6 @@ impl Device {
             self.photon_hash_table_minor.rows() as i32,
         );
 
-        // TODO: might be able to get away with not clearing the hash table if we can
-        // store some state in there saying how old the photon is. we can
-        // probably spare a few bits in the position field, we don't need much at all.
-        // this is a micro-optimization for normal size hash tables though
-
         command.set_framebuffer(&self.photon_fbo);
         self.photon_fbo.clear(0, [-1.0; 4]);
         self.photon_fbo.clear(1, [-1.0; 4]);
