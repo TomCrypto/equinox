@@ -106,6 +106,17 @@ pub struct Device {
 
     pub(crate) test_shader: Shader,
 
+    pub(crate) integrator_ld_count: Texture<RGBA32F>, // TODO: can this not be 16F? ...
+    pub(crate) integrator_li_count: Texture<RGBA32F>, /* TODO: this REALLY should be able to be
+                                                       * FP16 */
+    pub(crate) integrator_li_range: Texture<RGBA32F>, // TODO: try to make 16F as well
+
+    pub(crate) integrator_gather_fbo: Framebuffer,
+    pub(crate) integrator_update_fbo: Framebuffer,
+
+    pub(crate) integrator_estimate_radiance_shader: Shader,
+    pub(crate) integrator_update_estimates_shader: Shader,
+
     // ping-pong buffers for the visible point data
     pub(crate) visible_point_count_a: Texture<RGBA32F>,
     pub(crate) visible_point_count_b: Texture<RGBA32F>,
@@ -152,6 +163,41 @@ impl Device {
         Ok(Self {
             allocator: Allocator::new(),
             gl: gl.clone(),
+
+            integrator_ld_count: Texture::new(gl.clone()),
+            integrator_li_count: Texture::new(gl.clone()),
+            integrator_li_range: Texture::new(gl.clone()),
+
+            integrator_gather_fbo: Framebuffer::new(gl.clone()),
+            integrator_update_fbo: Framebuffer::new(gl.clone()),
+
+            integrator_update_estimates_shader: Shader::new(
+                gl.clone(),
+                shaders::VS_FULLSCREEN,
+                shaders::FS_UPDATE_ESTIMATES,
+                hashmap! {
+                    "Globals" => BindingPoint::UniformBlock(0),
+                    "ld_count_tex" => BindingPoint::Texture(0),
+                    "li_count_tex" => BindingPoint::Texture(1),
+                },
+                hashmap! {},
+                hashmap! {},
+            ),
+
+            integrator_estimate_radiance_shader: Shader::new(
+                gl.clone(),
+                shaders::VS_FULLSCREEN,
+                shaders::FS_ESTIMATE_RADIANCE,
+                hashmap! {
+                    "Globals" => BindingPoint::UniformBlock(0),
+                    "ld_count_tex" => BindingPoint::Texture(0),
+                    "li_count_tex" => BindingPoint::Texture(2), // DEBUG
+                    "li_range_tex" => BindingPoint::Texture(1),
+                },
+                hashmap! {},
+                hashmap! {},
+            ),
+
             visible_point_a_readback_fbo: Framebuffer::new(gl.clone()),
             visible_point_b_readback_fbo: Framebuffer::new(gl.clone()),
             radius_readback: ReadbackBuffer::new(gl.clone()),
@@ -169,6 +215,9 @@ impl Device {
                     "envmap_texture" => BindingPoint::Texture(1),
                     "envmap_marg_cdf" => BindingPoint::Texture(2),
                     "envmap_cond_cdf" => BindingPoint::Texture(3),
+                    "li_range_tex" => BindingPoint::Texture(4),
+                    "photon_table_major" => BindingPoint::Texture(5),
+                    "photon_table_minor" => BindingPoint::Texture(6),
                 },
                 hashmap! {
                     "geometry-user.glsl" => "",
@@ -181,7 +230,9 @@ impl Device {
                     "INSTANCE_DATA_COUNT" => "0",
                     "GEOMETRY_DATA_COUNT" => "0",
                     "MATERIAL_DATA_COUNT" => "0",
-                    "INSTANCE_DATA_PRESENT" => "0"
+                    "INSTANCE_DATA_PRESENT" => "0",
+                    "HASH_TABLE_COLS" => "0",
+                    "HASH_TABLE_ROWS" => "0",
                 },
             ),
             visible_point_update_pixels_shader: Shader::new(
@@ -512,6 +563,21 @@ impl Device {
             self.visible_point_pass_data_fbo
                 .rebuild(&[(&self.visible_point_pass_data, 0)]);
 
+            let render_cols = raster.width.get() as usize;
+            let render_rows = raster.height.get() as usize;
+
+            self.integrator_ld_count.create(render_cols, render_rows);
+            self.integrator_li_count.create(render_cols, render_rows);
+            self.integrator_li_range.create(render_cols, render_rows);
+
+            self.integrator_gather_fbo.rebuild(&[
+                (&self.integrator_ld_count, 0),
+                (&self.integrator_li_count, 0),
+            ]);
+
+            self.integrator_update_fbo
+                .rebuild(&[(&self.integrator_li_range, 0)]);
+
             let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(0);
 
             self.radius_readback.create(mipped_cols * mipped_rows);
@@ -575,9 +641,9 @@ impl Device {
                 (&self.photon_hash_table_minor, 0),
             ]);
 
-            self.program
+            self.visible_point_gen_shader
                 .set_define("HASH_TABLE_COLS", format!("{}U", cols));
-            self.program
+            self.visible_point_gen_shader
                 .set_define("HASH_TABLE_ROWS", format!("{}U", rows));
 
             self.test_shader
@@ -599,6 +665,9 @@ impl Device {
 
         self.program.rebuild()?;
         self.present_program.rebuild()?;
+
+        self.integrator_estimate_radiance_shader.rebuild()?;
+        self.integrator_update_estimates_shader.rebuild()?;
 
         self.read_convolution_buffers_shader.rebuild()?;
         self.fft_shader.rebuild()?;
@@ -697,110 +766,21 @@ impl Device {
 
         // GENERATE PHOTONS
 
-        self.visible_point_pass_data_fbo
-            .clear(0, [0.0, 0.0, 0.0, 0.0]);
-
-        let command = self.test_shader.begin_draw();
-
-        command.bind(&self.geometry_buffer, "Geometry");
-        command.bind(&self.material_buffer, "Material");
-        command.bind(&self.instance_buffer, "Instance");
-        command.bind(&self.globals_buffer, "Globals");
-        command.bind(&self.raster_buffer, "Raster");
-        command.bind(&self.envmap_texture, "envmap_texture");
-        command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
-        command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
-
-        command.set_viewport(
-            0,
-            0,
-            self.photon_hash_table_major.cols() as i32,
-            self.photon_hash_table_minor.rows() as i32,
-        );
-        command.set_framebuffer(&self.photon_fbo);
-        self.photon_fbo.clear(0, [-1.0; 4]);
-        self.photon_fbo.clear(1, [-1.0; 4]);
-
-        command.unset_vertex_array();
-        command.draw_points_instanced(n, m);
-
-        // this is a new pass; reset all the per-pass data
-        // GENERATE THE VISIBLE POINT INFORMATION
-
-        let command = self.visible_point_gen_shader.begin_draw();
-
-        command.bind(&self.camera_buffer, "Camera");
-        command.bind(&self.geometry_buffer, "Geometry");
-        command.bind(&self.material_buffer, "Material");
-        command.bind(&self.instance_buffer, "Instance");
-        command.bind(&self.globals_buffer, "Globals");
-        command.bind(&self.raster_buffer, "Raster");
-        command.bind(&self.envmap_texture, "envmap_texture");
-        command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
-        command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
-
-        command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
-        command.set_framebuffer(&self.visible_point_path_fbo);
-
-        command.unset_vertex_array();
-        command.draw_triangles(0, 1);
-
-        // UPDATE PER-PIXEL STATE
-
         if iteration == 0 {
             // we are starting a new render, clear all pass data and set the initial search
             // radius
 
-            self.visible_point_a_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
-            self.visible_point_a_fbo
-                .clear(1, [0.0, 0.0, 0.0, self.state.search_radius]);
+            self.integrator_gather_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
+            self.integrator_update_fbo
+                .clear(0, [0.0, 0.0, 0.0, self.state.search_radius.powi(2)]);
         }
 
-        // GATHER PHOTONS BACK INTO VISIBLE POINTS
+        self.scatter_photons(n, m);
+        self.gather_photons();
+        self.update_estimates();
+        self.estimate_radiance();
 
-        let command = self.program.begin_draw();
-
-        command.bind(&self.material_buffer, "Material");
-        command.bind(&self.globals_buffer, "Globals");
-        command.bind(&self.photon_hash_table_major, "photon_table_major");
-        command.bind(&self.photon_hash_table_minor, "photon_table_minor");
-        command.bind(&self.visible_point_path1, "visible_point_path_buf1");
-        command.bind(&self.visible_point_path2, "visible_point_path_buf2");
-        command.bind(&self.visible_point_path3, "visible_point_path_buf3");
-
-        if iteration % 2 == 0 {
-            command.bind(&self.visible_point_data_a, "photon_radius_tex");
-        } else {
-            command.bind(&self.visible_point_data_b, "photon_radius_tex");
-        }
-
-        command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
-        command.set_framebuffer(&self.visible_point_pass_data_fbo);
-
-        command.unset_vertex_array();
-        command.draw_triangles(0, 1);
-
-        // there is a previous pass; update the per-pixel state
-
-        let command = self.visible_point_update_pixels_shader.begin_draw();
-        command.bind(&self.visible_point_pass_data, "new_photon_data_tex");
-        command.bind(&self.visible_point_path4, "visible_point_direct");
-        command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
-
-        if iteration % 2 == 0 {
-            command.bind(&self.visible_point_count_a, "old_photon_count_tex");
-            command.bind(&self.visible_point_data_a, "old_photon_data_tex");
-
-            command.set_framebuffer(&self.visible_point_b_fbo);
-        } else {
-            command.bind(&self.visible_point_count_b, "old_photon_count_tex");
-            command.bind(&self.visible_point_data_b, "old_photon_data_tex");
-
-            command.set_framebuffer(&self.visible_point_a_fbo);
-        }
-
-        command.unset_vertex_array();
-        command.draw_triangles(0, 1);
+        return; // TODO: put back search radius estimate later...
 
         let mut ratio = (self.state.total_photons_per_pixel
             + self.state.integrator.alpha * m as f32)
@@ -950,6 +930,16 @@ impl Device {
         self.photon_hash_table_minor.invalidate();
         self.photon_fbo.invalidate();
         self.aperture_fbo.invalidate();
+
+        self.integrator_ld_count.invalidate();
+        self.integrator_li_count.invalidate();
+        self.integrator_li_range.invalidate();
+
+        self.integrator_gather_fbo.invalidate();
+        self.integrator_update_fbo.invalidate();
+
+        self.integrator_estimate_radiance_shader.invalidate();
+        self.integrator_update_estimates_shader.invalidate();
 
         self.visible_point_count_a.invalidate();
         self.visible_point_count_b.invalidate();

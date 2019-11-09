@@ -6,10 +6,13 @@
 #include <material.glsl>
 #include <environment.glsl>
 
-layout(location = 0) out vec4 visible_point_buf1;
-layout(location = 1) out vec4 visible_point_buf2;
-layout(location = 2) out vec4 visible_point_buf3;
-layout(location = 3) out vec4 visible_point_buf4;
+uniform sampler2D li_range_tex; // we only use the alpha channel which contains the pixel radius^2
+uniform sampler2D photon_table_major;
+uniform sampler2D photon_table_minor;
+
+layout(location = 0) out vec4 ld_count_output; // direct lighting + total photon count
+// NOTE: this compensates for the weighted blender
+layout(location = 1) out vec4 li_count_output; // indirect lighting + photon pass count
 
 layout (std140) uniform Camera {
     vec4 origin_plane[4];
@@ -37,6 +40,82 @@ layout (std140) uniform Globals {
 layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
+
+ivec2 base_coords(vec3 cell) {
+    uvec3 cell_hash_seed = floatBitsToUint(cell);
+
+    // uint coords = (cell.x * 1325290093U + cell.y * 2682811433U + cell.z * 765270841U) % (4096U * 4096U);
+    uint coords = shuffle(cell_hash_seed, FRAME_RANDOM) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
+
+    uint coord_x = coords % HASH_TABLE_COLS;
+    uint coord_y = coords / HASH_TABLE_COLS;
+
+    coord_x &= ~(globals.hash_cell_cols - 1U);
+    coord_y &= ~(globals.hash_cell_rows - 1U);
+
+    return ivec2(coord_x, coord_y);
+}
+
+vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, uint inst, vec3 normal, vec3 wo, inout float count) {
+    ivec2 coords = base_coords(cell_pos);
+
+    vec3 result = vec3(0.0);
+
+    for (uint y = 0U; y < globals.hash_cell_rows; ++y) {
+        for (uint x = 0U; x < globals.hash_cell_cols; ++x) {
+            vec4 major_data = texelFetch(photon_table_major, coords + ivec2(x, y), 0);
+
+            if (major_data == vec4(-1.0)) {
+                continue;
+            }
+
+            vec3 photon_position = cell_pos * globals.grid_cell_size + major_data.xyz;
+
+            if (dot(point - photon_position, point - photon_position) > radius_squared) {
+                continue;
+            }
+
+            vec4 minor_data = texelFetch(photon_table_minor, coords + ivec2(x, y), 0);
+
+            vec3 photon_throughput = minor_data.yzw;
+
+            float sgn = any(lessThan(photon_throughput, vec3(0.0))) ? -1.0 : 1.0;
+
+            vec3 photon_direction = vec3(major_data.w, sqrt(max(0.0, 1.0 - major_data.w * major_data.w - minor_data.x * minor_data.x)) * sgn, minor_data.x);
+
+            float pdf;
+            count += 1.0;
+            result += abs(photon_throughput) * mat_eval_brdf(material, inst, normal, -photon_direction, wo, pdf);
+        }
+    }
+
+    return result;
+}
+
+vec3 gather_photons(float radius_squared, vec3 position, vec3 direction, vec3 normal, uint material, uint inst, out float count) {
+    if (radius_squared == 0.0) {
+        return vec3(0.0);
+    }
+
+    vec3 cell_pos = floor(position / globals.grid_cell_size);
+    vec3 in_pos = fract(position / globals.grid_cell_size);
+
+    vec3 dir = sign(in_pos - vec3(0.5));
+
+    vec3 accumulation = vec3(0.0);
+
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
+
+    return accumulation;
+}
+
 
 // Low-discrepancy sequence generator.
 //
@@ -135,25 +214,13 @@ vec3 sample_direct_lighting(ray_t ray, vec3 normal, uint material, uint mat_inst
     }
 
     return radiance;
-
-    /*
-        
-
-
-        // fail, light is occluded
-        return vec3(0.0);
-    } else {
-        vec3 wo = -ray.dir;
-
-        radiance *= abs(dot(wi, normal)) * mat_eval_brdf(material, mat_inst, normal, wi, wo, pdf);
-
-        return radiance;
-    }*/
 }
 
 // End camera stuff
 
 void main() {
+    float weight = 1.0 - (globals.pass_count - 1.0) / globals.pass_count;
+
     vec3 radiance = vec3(0.0);
 
     random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
@@ -191,8 +258,14 @@ void main() {
 
             if (is_receiver) {
                 // we found our diffuse surface, record the hit...
+                float radius_squared = texelFetch(li_range_tex, ivec2(gl_FragCoord - 0.5), 0).w;
 
-                pack_visible_point(ray.org, ray.dir, normal, throughput, radiance, material, mat_inst, visible_point_buf1, visible_point_buf2, visible_point_buf3, visible_point_buf4);
+                float count = 0.0;
+
+                vec3 indirect_radiance = throughput * gather_photons(radius_squared, ray.org, ray.dir, normal, material, mat_inst, count);
+
+                ld_count_output = vec4(radiance, globals.alpha * count / weight);
+                li_count_output = vec4(indirect_radiance, count) / weight;
 
                 return;
             } else {
@@ -235,11 +308,6 @@ void main() {
         }*/
     }
 
-    // if we hit nothing or eventually hit a light with no diffuse bounces, record the
-    // throughput normally and set a special flag indicating this
-    
-    // store the position + packed direction in an RGBA32F texture
-    // store the throughput + flags in an RGBA16F texture
-
-    pack_invalid_visible_point(radiance, visible_point_buf1, visible_point_buf2, visible_point_buf3, visible_point_buf4);
+    ld_count_output = vec4(radiance, 0.0);
+    li_count_output = vec4(0.0);
 }

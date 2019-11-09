@@ -9,4 +9,5 @@ export![
     material,
     raster,
     device,
+    integrator,
 ];
