@@ -609,7 +609,6 @@ impl Device {
 
         if invalidated {
             self.state.reset(scene);
-            self.reset_refinement();
         }
 
         self.allocator.shrink_to_watermark();
@@ -696,6 +695,35 @@ impl Device {
 
         let iteration = self.state.frame - 1;
 
+        // GENERATE PHOTONS
+
+        self.visible_point_pass_data_fbo
+            .clear(0, [0.0, 0.0, 0.0, 0.0]);
+
+        let command = self.test_shader.begin_draw();
+
+        command.bind(&self.geometry_buffer, "Geometry");
+        command.bind(&self.material_buffer, "Material");
+        command.bind(&self.instance_buffer, "Instance");
+        command.bind(&self.globals_buffer, "Globals");
+        command.bind(&self.raster_buffer, "Raster");
+        command.bind(&self.envmap_texture, "envmap_texture");
+        command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
+        command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
+
+        command.set_viewport(
+            0,
+            0,
+            self.photon_hash_table_major.cols() as i32,
+            self.photon_hash_table_minor.rows() as i32,
+        );
+        command.set_framebuffer(&self.photon_fbo);
+        self.photon_fbo.clear(0, [-1.0; 4]);
+        self.photon_fbo.clear(1, [-1.0; 4]);
+
+        command.unset_vertex_array();
+        command.draw_points_instanced(n, m);
+
         // this is a new pass; reset all the per-pass data
         // GENERATE THE VISIBLE POINT INFORMATION
 
@@ -727,35 +755,6 @@ impl Device {
             self.visible_point_a_fbo
                 .clear(1, [0.0, 0.0, 0.0, self.state.search_radius]);
         }
-
-        // GENERATE PHOTONS
-
-        self.visible_point_pass_data_fbo
-            .clear(0, [0.0, 0.0, 0.0, 0.0]);
-
-        let command = self.test_shader.begin_draw();
-
-        command.bind(&self.geometry_buffer, "Geometry");
-        command.bind(&self.material_buffer, "Material");
-        command.bind(&self.instance_buffer, "Instance");
-        command.bind(&self.globals_buffer, "Globals");
-        command.bind(&self.raster_buffer, "Raster");
-        command.bind(&self.envmap_texture, "envmap_texture");
-        command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
-        command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
-
-        command.set_viewport(
-            0,
-            0,
-            self.photon_hash_table_major.cols() as i32,
-            self.photon_hash_table_minor.rows() as i32,
-        );
-        command.set_framebuffer(&self.photon_fbo);
-        self.photon_fbo.clear(0, [-1.0; 4]);
-        self.photon_fbo.clear(1, [-1.0; 4]);
-
-        command.unset_vertex_array();
-        command.draw_points_instanced(n, m);
 
         // GATHER PHOTONS BACK INTO VISIBLE POINTS
 
@@ -971,10 +970,6 @@ impl Device {
         self.device_lost = false;
 
         Ok(true)
-    }
-
-    fn reset_refinement(&mut self) {
-        self.samples_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
     }
 }
 
