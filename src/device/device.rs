@@ -879,7 +879,7 @@ impl DeviceState {
         data.frame_state[0] = self.rng.next_u32();
         data.frame_state[1] = self.rng.next_u32();
         data.frame_state[2] = self.frame;
-        data.pass_count = (1 + self.frame) as f32;
+        data.pass_count = 1 + self.frame;
         data.photons_for_pass = photons_for_pass as f32;
         data.total_photons = self.total_photons;
         data.grid_cell_size = grid_cell_size;
@@ -899,7 +899,7 @@ impl DeviceState {
 pub(crate) struct GlobalData {
     filter_delta: [f32; 4],
     frame_state: [u32; 4],
-    pass_count: f32,
+    pass_count: u32,
     photons_for_pass: f32,
     total_photons: f32,
     grid_cell_size: f32,

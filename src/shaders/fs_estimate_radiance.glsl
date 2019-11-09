@@ -8,7 +8,7 @@ uniform sampler2D li_range_tex;
 layout (std140) uniform Globals {
     vec2 filter_delta;
     uvec4 frame_state;
-    float pass_count;
+    uint pass_count;
     float photons_for_pass;
     float total_photons;
     float grid_cell_size;
@@ -21,7 +21,7 @@ layout (std140) uniform Globals {
 void extract_estimates(ivec2 coords, out vec3 ld, out vec3 li, out float range) {
     vec4 li_data = texelFetch(li_range_tex, coords, 0);
 
-    ld = texelFetch(ld_count_tex, coords, 0).rgb / integrator.pass_count;
+    ld = texelFetch(ld_count_tex, coords, 0).rgb / float(integrator.pass_count);
     li = li_data.rgb;
     range = li_data.w;
 }

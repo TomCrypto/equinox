@@ -18,7 +18,7 @@ out vec4 table_minor;
 layout (std140) uniform Globals {
     vec2 filter_delta;
     uvec4 frame_state;
-    float pass_count;
+    uint pass_count;
     float photons_for_pass;
     float total_photons;
     float grid_cell_size;
