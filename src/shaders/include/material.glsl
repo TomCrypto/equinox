@@ -226,21 +226,19 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
     if (cosT > 0.0) {
         cosT = sqrt(cosT);
 
-        float rs = (n1 * cosI - n2 * cosT) / (n1 * cosI + n2 * cosT);
-        float rp = (n1 * cosT - n2 * cosI) / (n1 * cosT + n2 * cosI);
-        float r = (rs * rs + rp * rp) * 0.5; // unpolarized lighting
+        // Account for change in beam area and wave velocity; the change in wave
+        // velocity is only important if a light source exists inside the medium
+        // as otherwise the factor is cancelled out as the ray exits the medium.
 
-        if (rand_uniform_vec2(random).x < r) {
-            wi = reflect(-wo, normal);
-        } else {
+        float ts = 1.0 / (n1 * cosI + n2 * cosT); // s-polarized fresnel
+        float tp = 1.0 / (n1 * cosT + n2 * cosI); // p-polarized fresnel
+        float t = 2.0 * (ts * ts + tp * tp) * (n1 * cosI) * (n2 * cosT);
+
+        if (rand_uniform_vec2(random).x < t) {
             wi = (eta * cosI - cosT) * normal - eta * wo;
             flags |= RAY_FLAG_TRANSMIT;
-
-            // Account for change in beam area and wave velocity; the change in wave
-            // velocity is only important if a light source exists inside the medium
-            // as otherwise the factor is cancelled out as the ray exits the medium.
-
-            return MAT_DIELECTRIC_BASE_COLOR * cosT / (cosI * eta);
+        } else {
+            wi = reflect(-wo, normal);
         }
     } else {
         wi = reflect(-wo, normal);
