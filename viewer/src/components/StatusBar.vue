@@ -78,7 +78,7 @@ export default class extends Vue {
     if (this.isContextLost) {
       return "CONTEXT LOST!";
     } else if (this.sppmPasses == 1) {
-      return `1 pass`;
+      return `1 pass, ${displayPhotons(this.sppmPhotons)}`;
     } else {
       return `${this.sppmPasses} passes, ${displayPhotons(this.sppmPhotons)}`;
     }
