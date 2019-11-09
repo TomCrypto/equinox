@@ -23,7 +23,7 @@ void extract_estimates(ivec2 coords, out vec3 ld, out vec3 li, out float range) 
 
     ld = texelFetch(ld_count_tex, coords, 0).rgb / float(integrator.pass_count);
     li = li_data.rgb;
-    range = li_data.w;
+    range = min(li_data.w, pow(integrator.grid_cell_size * 0.5, 2.0));
 }
 
 void main() {

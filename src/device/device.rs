@@ -117,8 +117,6 @@ pub struct Device {
 
     pub(crate) visible_point_gen_shader: Shader,
 
-    pub(crate) radius_readback: ReadbackBuffer<[PixelInfo]>,
-
     pub(crate) allocator: Allocator,
 
     device_lost: bool,
@@ -166,7 +164,6 @@ impl Device {
                 hashmap! {},
             ),
 
-            radius_readback: ReadbackBuffer::new(gl.clone()),
             visible_point_gen_shader: Shader::new(
                 gl.clone(),
                 shaders::VS_FULLSCREEN,
@@ -454,8 +451,6 @@ impl Device {
             self.integrator_update_fbo
                 .rebuild(&[(&self.integrator_li_range, 0)]);
 
-            self.radius_readback.create(render_cols * render_rows);
-
             self.render_fbo.rebuild(&[(&self.render, 0)]);
             self.aperture_fbo.rebuild(&[
                 (&self.r_aperture_spectrum, 0),
@@ -612,7 +607,6 @@ impl Device {
             return;
         }
 
-        // select the grid cell size
         let grid_cell_size = 2.0 * self.state.search_radius;
 
         let target = ((self.state.integrator.capacity_multiplier / grid_cell_size.powi(2)).round()
@@ -636,15 +630,20 @@ impl Device {
 
         let iteration = self.state.frame - 1;
 
-        // GENERATE PHOTONS
-
         if iteration == 0 {
             // we are starting a new render, clear all pass data and set the initial search
             // radius
 
             self.integrator_gather_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
-            self.integrator_update_fbo
-                .clear(0, [0.0, 0.0, 0.0, self.state.search_radius.powi(2)]);
+            self.integrator_update_fbo.clear(
+                0,
+                [
+                    0.0,
+                    0.0,
+                    0.0,
+                    self.state.integrator.initial_search_radius.powi(2),
+                ],
+            );
         }
 
         self.scatter_photons(n, m);
@@ -652,61 +651,10 @@ impl Device {
         self.update_estimates();
         self.estimate_radiance();
 
-        let mut ratio = (self.state.total_photons_per_pixel
-            + self.state.integrator.alpha * m as f32)
-            / (self.state.total_photons_per_pixel + m as f32);
-        ratio = ratio.sqrt();
-        self.state.theoretical_radius *= ratio;
-        self.state.total_photons_per_pixel += m as f32;
+        let k = (1.0 - self.state.integrator.alpha) / 2.0;
 
-        // don't readback for the first few frames
-        if self.state.frame != 0 && self.state.frame % 15 == 0 {
-            if self.state.readback_started {
-                let radius_data: &mut [PixelInfo] =
-                    self.allocator.allocate(self.radius_readback.len);
-
-                if self.radius_readback.end_readback(radius_data) {
-                    self.state.readback_started = false;
-
-                    let mut list = Vec::with_capacity(radius_data.len());
-
-                    for i in 0..(radius_data.len()) {
-                        if radius_data[i].radius
-                            < self.state.search_radius * self.state.search_radius - 1e-6
-                        {
-                            list.push(radius_data[i].radius);
-                        }
-                    }
-
-                    if list.len() == 0 {
-                        return;
-                    }
-
-                    let count = list.len();
-                    let index = (count as f32 * 1.0) as usize - 1;
-
-                    let kth_value = *list
-                        .partition_at_index_by(index, |lhs, rhs| lhs.partial_cmp(rhs).unwrap())
-                        .1;
-
-                    self.state.search_radius = kth_value.sqrt();
-
-                    log::info!("radius = {}", kth_value.sqrt());
-                }
-            } else {
-                // no readback yet, perform one; we need to read li_range
-                self.radius_readback
-                    .start_readback(
-                        self.integrator_li_range.cols(),
-                        self.integrator_li_range.rows(),
-                        &self.integrator_update_fbo,
-                        0,
-                    )
-                    .unwrap();
-
-                self.state.readback_started = true;
-            }
-        }
+        self.state.search_radius =
+            self.state.integrator.initial_search_radius * (self.state.frame as f32).powf(-k);
     }
 
     pub fn render(&mut self) {
@@ -791,8 +739,6 @@ impl Device {
         self.integrator_estimate_radiance_shader.invalidate();
         self.integrator_update_estimates_shader.invalidate();
 
-        self.radius_readback.invalidate();
-
         scene.dirty_all_fields();
         self.device_lost = false;
 
@@ -814,9 +760,6 @@ pub(crate) struct DeviceState {
     pub(crate) integrator: Integrator,
     pub(crate) search_radius: f32,
     pub(crate) total_photons: f32,
-    pub(crate) readback_started: bool,
-    pub(crate) total_photons_per_pixel: f32,
-    pub(crate) theoretical_radius: f32,
 }
 
 impl Default for DeviceState {
@@ -829,9 +772,6 @@ impl Default for DeviceState {
             search_radius: 0.0,
             integrator: Integrator::default(),
             total_photons: 0.0,
-            readback_started: false,
-            total_photons_per_pixel: 0.0,
-            theoretical_radius: 0.0,
             frame: 0,
         }
     }
@@ -850,7 +790,6 @@ impl DeviceState {
         self.filter = scene.raster.filter;
         self.integrator = *scene.integrator;
         self.search_radius = scene.integrator.initial_search_radius;
-        self.theoretical_radius = scene.integrator.initial_search_radius;
     }
 
     pub fn update(

@@ -259,6 +259,7 @@ void main() {
             if (is_receiver) {
                 // we found our diffuse surface, record the hit...
                 float radius_squared = texelFetch(li_range_tex, ivec2(gl_FragCoord - 0.5), 0).w;
+                radius_squared = min(radius_squared, pow(globals.grid_cell_size * 0.5, 2.0));
 
                 float count = 0.0;
 
