@@ -615,7 +615,7 @@ impl Device {
         // select the grid cell size
         let grid_cell_size = 2.0 * self.state.search_radius;
 
-        let target = ((self.state.integrator.photon_density / grid_cell_size.powi(2)).round()
+        let target = ((self.state.integrator.capacity_multiplier / grid_cell_size.powi(2)).round()
             as usize)
             .min(self.state.integrator.photons_per_pass)
             .max(1);

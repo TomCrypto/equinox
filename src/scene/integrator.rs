@@ -13,7 +13,8 @@ pub struct Integrator {
     pub initial_search_radius: f32,
 
     #[default(1.0)]
-    pub photon_density: f32,
+    #[serde(alias = "photon_density")]
+    pub capacity_multiplier: f32,
 
     #[default(6)]
     pub max_hash_cell_bits: u32,

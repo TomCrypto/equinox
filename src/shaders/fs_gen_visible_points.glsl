@@ -65,7 +65,7 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
         for (uint x = 0U; x < globals.hash_cell_cols; ++x) {
             vec4 major_data = texelFetch(photon_table_major, coords + ivec2(x, y), 0);
 
-            if (major_data == vec4(-1.0)) {
+            if (major_data.x < 0.0) {
                 continue;
             }
 
@@ -103,6 +103,8 @@ vec3 gather_photons(float radius_squared, vec3 position, vec3 direction, vec3 no
     vec3 dir = sign(in_pos - vec3(0.5));
 
     vec3 accumulation = vec3(0.0);
+
+    // TODO: in many cases it might be possible to skip most or all of these; maybe worth investigating based on the ACTUAL radius
 
     accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
     accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
