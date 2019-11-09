@@ -49,7 +49,6 @@ use crate::*;
 pub struct Device {
     pub(crate) gl: Context,
 
-    pub(crate) program: Shader,
     pub(crate) present_program: Shader,
 
     pub(crate) read_convolution_buffers_shader: Shader,
@@ -277,27 +276,6 @@ impl Device {
                 hashmap! {
                     "CONV_DIMS" => "vec2(0.0, 0.0)",
                     "IMAGE_DIMS" => "vec2(0.0, 0.0)",
-                },
-            ),
-            program: Shader::new(
-                gl.clone(),
-                shaders::VS_FULLSCREEN,
-                shaders::FRAG,
-                hashmap! {
-                    "Material" => BindingPoint::UniformBlock(8),
-                    "Globals" => BindingPoint::UniformBlock(7),
-                    "photon_table_major" => BindingPoint::Texture(4),
-                    "photon_table_minor" => BindingPoint::Texture(6),
-                    "photon_radius_tex" => BindingPoint::Texture(5),
-                    "visible_point_path_buf1" => BindingPoint::Texture(0),
-                    "visible_point_path_buf2" => BindingPoint::Texture(1),
-                    "visible_point_path_buf3" => BindingPoint::Texture(2),
-                },
-                hashmap! {},
-                hashmap! {
-                    "MATERIAL_DATA_COUNT" => "0",
-                    "HASH_TABLE_COLS" => "0",
-                    "HASH_TABLE_ROWS" => "0",
                 },
             ),
             present_program: Shader::new(
@@ -559,7 +537,6 @@ impl Device {
             Ok(())
         })?;
 
-        self.program.rebuild()?;
         self.present_program.rebuild()?;
 
         self.integrator_estimate_radiance_shader.rebuild()?;
@@ -764,7 +741,6 @@ impl Device {
             return Ok(false);
         }
 
-        self.program.invalidate();
         self.present_program.invalidate();
         self.read_convolution_buffers_shader.invalidate();
         self.fft_shader.invalidate();
