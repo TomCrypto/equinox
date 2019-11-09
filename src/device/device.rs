@@ -107,8 +107,7 @@ pub struct Device {
     pub(crate) test_shader: Shader,
 
     pub(crate) integrator_ld_count: Texture<RGBA32F>, // TODO: can this not be 16F? ...
-    pub(crate) integrator_li_count: Texture<RGBA32F>, /* TODO: this REALLY should be able to be
-                                                       * FP16 */
+    pub(crate) integrator_li_count: Texture<RGBA16F>,
     pub(crate) integrator_li_range: Texture<RGBA32F>, // TODO: try to make 16F as well
 
     pub(crate) integrator_gather_fbo: Framebuffer,
@@ -117,35 +116,6 @@ pub struct Device {
     pub(crate) integrator_estimate_radiance_shader: Shader,
     pub(crate) integrator_update_estimates_shader: Shader,
 
-    // ping-pong buffers for the visible point data
-    pub(crate) visible_point_count_a: Texture<RGBA32F>,
-    pub(crate) visible_point_count_b: Texture<RGBA32F>,
-    pub(crate) visible_point_data_a: Texture<RGBA32F>,
-    pub(crate) visible_point_data_b: Texture<RGBA32F>,
-    pub(crate) visible_point_a_readback_fbo: Framebuffer,
-    pub(crate) visible_point_b_readback_fbo: Framebuffer,
-
-    // buffer to store the visible point path information
-    pub(crate) visible_point_path1: Texture<RGBA32F>,
-    pub(crate) visible_point_path2: Texture<RGBA32F>,
-    pub(crate) visible_point_path3: Texture<RGBA32F>,
-    pub(crate) visible_point_path4: Texture<RGBA32F>,
-
-    // buffer to store the visible point properties for this pass (photon contributions + photon
-    // count)
-    pub(crate) visible_point_pass_data: Texture<RGBA32F>,
-
-    // FBO to write into each set of visible point data
-    pub(crate) visible_point_a_fbo: Framebuffer,
-    pub(crate) visible_point_b_fbo: Framebuffer,
-
-    // FBO to write into the path information texture
-    pub(crate) visible_point_path_fbo: Framebuffer,
-
-    // FBO to write into the pass data texture
-    pub(crate) visible_point_pass_data_fbo: Framebuffer,
-
-    pub(crate) visible_point_update_pixels_shader: Shader,
     pub(crate) visible_point_gen_shader: Shader,
 
     pub(crate) radius_readback: ReadbackBuffer<[PixelInfo]>,
@@ -191,15 +161,12 @@ impl Device {
                 hashmap! {
                     "Globals" => BindingPoint::UniformBlock(0),
                     "ld_count_tex" => BindingPoint::Texture(0),
-                    "li_count_tex" => BindingPoint::Texture(2), // DEBUG
                     "li_range_tex" => BindingPoint::Texture(1),
                 },
                 hashmap! {},
                 hashmap! {},
             ),
 
-            visible_point_a_readback_fbo: Framebuffer::new(gl.clone()),
-            visible_point_b_readback_fbo: Framebuffer::new(gl.clone()),
             radius_readback: ReadbackBuffer::new(gl.clone()),
             visible_point_gen_shader: Shader::new(
                 gl.clone(),
@@ -234,20 +201,6 @@ impl Device {
                     "HASH_TABLE_COLS" => "0",
                     "HASH_TABLE_ROWS" => "0",
                 },
-            ),
-            visible_point_update_pixels_shader: Shader::new(
-                gl.clone(),
-                shaders::VS_FULLSCREEN,
-                shaders::FS_UPDATE_PIXELS,
-                hashmap! {
-                    "old_photon_count_tex" => BindingPoint::Texture(0),
-                    "old_photon_data_tex" => BindingPoint::Texture(1),
-                    "new_photon_data_tex" => BindingPoint::Texture(2),
-                    "visible_point_direct" => BindingPoint::Texture(3),
-                    "Globals" => BindingPoint::UniformBlock(2),
-                },
-                hashmap! {},
-                hashmap! {},
             ),
             photon_hash_table_major: Texture::new(gl.clone()),
             photon_hash_table_minor: Texture::new(gl.clone()),
@@ -385,19 +338,6 @@ impl Device {
             spectrum_temp2_fbo: Framebuffer::new(gl.clone()),
             photon_fbo: Framebuffer::new(gl.clone()),
             samples: Texture::new(gl.clone()),
-            visible_point_count_a: Texture::new(gl.clone()),
-            visible_point_count_b: Texture::new(gl.clone()),
-            visible_point_data_a: Texture::new(gl.clone()),
-            visible_point_data_b: Texture::new(gl.clone()),
-            visible_point_path1: Texture::new(gl.clone()),
-            visible_point_path2: Texture::new(gl.clone()),
-            visible_point_path3: Texture::new(gl.clone()),
-            visible_point_path4: Texture::new(gl.clone()),
-            visible_point_pass_data: Texture::new(gl.clone()),
-            visible_point_a_fbo: Framebuffer::new(gl.clone()),
-            visible_point_b_fbo: Framebuffer::new(gl.clone()),
-            visible_point_path_fbo: Framebuffer::new(gl.clone()),
-            visible_point_pass_data_fbo: Framebuffer::new(gl.clone()),
             device_lost: true,
             state: DeviceState::new(),
         })
@@ -521,48 +461,6 @@ impl Device {
             self.g_aperture_spectrum.create(2048, 1024);
             self.b_aperture_spectrum.create(2048, 1024);
 
-            self.visible_point_count_a
-                .create(raster.width.get() as usize, raster.height.get() as usize);
-            self.visible_point_count_b
-                .create(raster.width.get() as usize, raster.height.get() as usize);
-            self.visible_point_data_a
-                .create_mipped(raster.width.get() as usize, raster.height.get() as usize);
-            self.visible_point_data_b
-                .create_mipped(raster.width.get() as usize, raster.height.get() as usize);
-            self.visible_point_path1
-                .create(raster.width.get() as usize, raster.height.get() as usize);
-            self.visible_point_path2
-                .create(raster.width.get() as usize, raster.height.get() as usize);
-            self.visible_point_path3
-                .create(raster.width.get() as usize, raster.height.get() as usize);
-            self.visible_point_path4
-                .create(raster.width.get() as usize, raster.height.get() as usize);
-            self.visible_point_pass_data
-                .create(raster.width.get() as usize, raster.height.get() as usize);
-
-            self.visible_point_a_fbo.rebuild(&[
-                (&self.visible_point_count_a, 0),
-                (&self.visible_point_data_a, 0),
-                (&self.samples, 0),
-            ]);
-            self.visible_point_a_readback_fbo
-                .rebuild(&[(&self.visible_point_data_a, 0)]);
-            self.visible_point_b_readback_fbo
-                .rebuild(&[(&self.visible_point_data_b, 0)]);
-            self.visible_point_b_fbo.rebuild(&[
-                (&self.visible_point_count_b, 0),
-                (&self.visible_point_data_b, 0),
-                (&self.samples, 0),
-            ]);
-            self.visible_point_path_fbo.rebuild(&[
-                (&self.visible_point_path1, 0),
-                (&self.visible_point_path2, 0),
-                (&self.visible_point_path3, 0),
-                (&self.visible_point_path4, 0),
-            ]);
-            self.visible_point_pass_data_fbo
-                .rebuild(&[(&self.visible_point_pass_data, 0)]);
-
             let render_cols = raster.width.get() as usize;
             let render_rows = raster.height.get() as usize;
 
@@ -578,9 +476,7 @@ impl Device {
             self.integrator_update_fbo
                 .rebuild(&[(&self.integrator_li_range, 0)]);
 
-            let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(0);
-
-            self.radius_readback.create(mipped_cols * mipped_rows);
+            self.radius_readback.create(render_cols * render_rows);
 
             self.render_fbo.rebuild(&[(&self.render, 0)]);
             self.aperture_fbo.rebuild(&[
@@ -673,7 +569,6 @@ impl Device {
         self.fft_shader.rebuild()?;
         self.load_convolution_buffers_shader.rebuild()?;
         self.test_shader.rebuild()?;
-        self.visible_point_update_pixels_shader.rebuild()?;
         self.visible_point_gen_shader.rebuild()?;
 
         if invalidated {
@@ -780,8 +675,6 @@ impl Device {
         self.update_estimates();
         self.estimate_radiance();
 
-        return; // TODO: put back search radius estimate later...
-
         let mut ratio = (self.state.total_photons_per_pixel
             + self.state.integrator.alpha * m as f32)
             / (self.state.total_photons_per_pixel + m as f32);
@@ -801,7 +694,9 @@ impl Device {
                     let mut list = Vec::with_capacity(radius_data.len());
 
                     for i in 0..(radius_data.len()) {
-                        if radius_data[i].radius < self.state.search_radius {
+                        if radius_data[i].radius
+                            < self.state.search_radius * self.state.search_radius - 1e-6
+                        {
                             list.push(radius_data[i].radius);
                         }
                     }
@@ -817,40 +712,20 @@ impl Device {
                         .partition_at_index_by(index, |lhs, rhs| lhs.partial_cmp(rhs).unwrap())
                         .1;
 
-                    self.state.search_radius = kth_value;
+                    self.state.search_radius = kth_value.sqrt();
 
-                    log::info!("radius = {}", kth_value);
+                    log::info!("radius = {}", kth_value.sqrt());
                 }
             } else {
-                // no readback yet, perform one
-
-                if iteration % 2 == 0 {
-                    self.visible_point_data_b.gen_mipmaps();
-
-                    let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(0);
-
-                    self.radius_readback
-                        .start_readback(
-                            mipped_cols,
-                            mipped_rows,
-                            &self.visible_point_b_readback_fbo,
-                            0,
-                        )
-                        .unwrap();
-                } else {
-                    self.visible_point_data_a.gen_mipmaps();
-
-                    let (mipped_cols, mipped_rows) = self.visible_point_data_a.level_dimensions(0);
-
-                    self.radius_readback
-                        .start_readback(
-                            mipped_cols,
-                            mipped_rows,
-                            &self.visible_point_a_readback_fbo,
-                            0,
-                        )
-                        .unwrap();
-                }
+                // no readback yet, perform one; we need to read li_range
+                self.radius_readback
+                    .start_readback(
+                        self.integrator_li_range.cols(),
+                        self.integrator_li_range.rows(),
+                        &self.integrator_update_fbo,
+                        0,
+                    )
+                    .unwrap();
 
                 self.state.readback_started = true;
             }
@@ -895,7 +770,6 @@ impl Device {
         self.fft_shader.invalidate();
         self.load_convolution_buffers_shader.invalidate();
         self.test_shader.invalidate();
-        self.visible_point_update_pixels_shader.invalidate();
         self.visible_point_gen_shader.invalidate();
         self.camera_buffer.invalidate();
         self.geometry_buffer.invalidate();
@@ -941,20 +815,7 @@ impl Device {
         self.integrator_estimate_radiance_shader.invalidate();
         self.integrator_update_estimates_shader.invalidate();
 
-        self.visible_point_count_a.invalidate();
-        self.visible_point_count_b.invalidate();
-        self.visible_point_data_a.invalidate();
-        self.visible_point_data_b.invalidate();
-        self.visible_point_path1.invalidate();
-        self.visible_point_path2.invalidate();
-        self.visible_point_path3.invalidate();
-        self.visible_point_path4.invalidate();
-        self.visible_point_pass_data.invalidate();
-
-        self.visible_point_a_fbo.invalidate();
-        self.visible_point_b_fbo.invalidate();
-        self.visible_point_path_fbo.invalidate();
-        self.visible_point_pass_data_fbo.invalidate();
+        self.radius_readback.invalidate();
 
         scene.dirty_all_fields();
         self.device_lost = false;

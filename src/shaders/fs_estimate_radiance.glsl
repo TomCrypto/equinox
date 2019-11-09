@@ -3,7 +3,6 @@
 layout (location = 0) out vec3 radiance;
 
 uniform sampler2D ld_count_tex;
-uniform sampler2D li_count_tex; // DEBUG
 uniform sampler2D li_range_tex;
 
 layout (std140) uniform Globals {
@@ -22,7 +21,7 @@ layout (std140) uniform Globals {
 void extract_estimates(ivec2 coords, out vec3 ld, out vec3 li, out float range) {
     vec4 li_data = texelFetch(li_range_tex, coords, 0);
 
-    ld = texelFetch(ld_count_tex, coords, 0).rgb;
+    ld = texelFetch(ld_count_tex, coords, 0).rgb / integrator.pass_count;
     li = li_data.rgb;
     range = li_data.w;
 }

@@ -92,23 +92,11 @@ impl Device {
 
         command.set_framebuffer(&self.integrator_gather_fbo);
 
-        /*
-
-        Here we just use accumulative blending for both Ld and total photon count, meaning that
-        at the end of the process ld_count contains ld / pass_count and count / pass_count.
-
-        As a consequence, to write anything into li_count, all channels must be predivided by
-        (pass_count) / (pass_count + 1) or something like that to cancel out the blending logic)
-
-        */
-
         self.integrator_gather_fbo.clear(1, [0.0; 4]);
-
-        let weight = 1.0 - (self.state.frame as f32 - 1.0) / self.state.frame as f32;
 
         command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
 
-        command.set_blend_mode(BlendMode::Accumulate { weight });
+        command.set_blend_mode(BlendMode::Add);
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
@@ -137,7 +125,6 @@ impl Device {
         command.bind(&self.globals_buffer, "Globals");
         command.bind(&self.integrator_ld_count, "ld_count_tex");
         command.bind(&self.integrator_li_range, "li_range_tex");
-        command.bind(&self.integrator_li_count, "li_count_tex"); // DEBUG
 
         command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
 

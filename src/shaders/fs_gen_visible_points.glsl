@@ -219,8 +219,6 @@ vec3 sample_direct_lighting(ray_t ray, vec3 normal, uint material, uint mat_inst
 // End camera stuff
 
 void main() {
-    float weight = 1.0 - (globals.pass_count - 1.0) / globals.pass_count;
-
     vec3 radiance = vec3(0.0);
 
     random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
@@ -264,8 +262,8 @@ void main() {
 
                 vec3 indirect_radiance = throughput * gather_photons(radius_squared, ray.org, ray.dir, normal, material, mat_inst, count);
 
-                ld_count_output = vec4(radiance, globals.alpha * count / weight);
-                li_count_output = vec4(indirect_radiance, count) / weight;
+                ld_count_output = vec4(radiance, count);
+                li_count_output = vec4(indirect_radiance, count);
 
                 return;
             } else {

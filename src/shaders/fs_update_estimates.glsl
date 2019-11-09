@@ -30,13 +30,7 @@ void main() {
     vec3 li;
     float count, photons;
 
+    float K = (1.0 - integrator.alpha) / integrator.alpha; // radius reduction
     extract_pass_pixel_data(ivec2(gl_FragCoord.xy - 0.5), li, count, photons);
-
-    float ratio = 1.0;
-
-    if (count != 0.0) {
-        ratio = count / (count + photons * (1.0 - integrator.alpha));
-    }
-
-    li_range = vec4(li, ratio);
+    li_range = vec4(li, (count == 0.0) ? 1.0 : count / (count + photons * K));
 }

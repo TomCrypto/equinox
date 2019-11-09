@@ -65,15 +65,19 @@ impl Shader {
     pub fn set_header(&mut self, header: &'static str, value: impl ToString) {
         assert!(self.headers.contains_key(header));
 
-        self.headers.insert(header, value.to_string());
-        self.invalidated = true;
+        if self.headers.get(header) != Some(&value.to_string()) {
+            self.headers.insert(header, value.to_string());
+            self.invalidated = true;
+        }
     }
 
     pub fn set_define(&mut self, define: &'static str, value: impl ToString) {
         assert!(self.defines.contains_key(define));
 
-        self.defines.insert(define, value.to_string());
-        self.invalidated = true;
+        if self.defines.get(define) != Some(&value.to_string()) {
+            self.defines.insert(define, value.to_string());
+            self.invalidated = true;
+        }
     }
 
     pub fn begin_draw(&self) -> DrawCommand {
