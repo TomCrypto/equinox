@@ -49,16 +49,10 @@ ivec2 hash_entry_for_cell(cell_t cell, uint index) {
                                              index >> integrator.hash_cell_col_bits);
 }
 
-/*bool sphere_in_cell(float radius_squared, vec3 center, cell_t cell) {
-    // TODO: implement...
-}*/
+bool sphere_in_cell_broadphase(float radius_squared, vec3 sphere_center, cell_t cell) {
+    vec3 center = (cell + vec3(0.5)) * integrator.cell_size;
 
-/*bool sphere_cell_test(float radius_squared, vec3 origin) {
-    float distance = 0.0;
+    float cell_bounds_radius_squared = 3.0 / 4.0 * integrator.cell_size * integrator.cell_size;
 
-    distance += sqr(max(origin.x, 0.0)) + sqr(min(origin.x + globals.grid_cell_size, 0.0));
-    distance += sqr(max(origin.y, 0.0)) + sqr(min(origin.y + globals.grid_cell_size, 0.0));
-    distance += sqr(max(origin.z, 0.0)) + sqr(min(origin.z + globals.grid_cell_size, 0.0));
-
-    return distance <= radius_squared;
-}*/
+    return dot(center - sphere_center, center - sphere_center) < radius_squared + cell_bounds_radius_squared;
+}

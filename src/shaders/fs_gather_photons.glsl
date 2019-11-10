@@ -24,22 +24,8 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-float sqr(float x) {
-    return x * x;
-}
-
-bool sphere_cell_test(float radius_squared, vec3 origin) {
-    float distance = 0.0;
-
-    distance += sqr(max(origin.x, 0.0)) + sqr(min(origin.x + integrator.cell_size, 0.0));
-    distance += sqr(max(origin.y, 0.0)) + sqr(min(origin.y + integrator.cell_size, 0.0));
-    distance += sqr(max(origin.z, 0.0)) + sqr(min(origin.z + integrator.cell_size, 0.0));
-
-    return distance <= radius_squared;
-}
-
 vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, uint inst, vec3 normal, vec3 wo, inout float count) {
-    if (!sphere_cell_test(radius_squared, cell_pos * integrator.cell_size - point)) {
+    if (!sphere_in_cell_broadphase(radius_squared, point, cell_pos)) {
         return vec3(0.0);
     }
 
