@@ -149,8 +149,6 @@ impl Device {
                     "GEOMETRY_DATA_COUNT" => "0",
                     "MATERIAL_DATA_COUNT" => "0",
                     "INSTANCE_DATA_PRESENT" => "0",
-                    "HASH_TABLE_COLS" => "0",
-                    "HASH_TABLE_ROWS" => "0",
                 },
             ),
             photon_hash_table_major: Texture::new(gl.clone()),
@@ -182,8 +180,6 @@ impl Device {
                     "GEOMETRY_DATA_COUNT" => "0",
                     "MATERIAL_DATA_COUNT" => "0",
                     "INSTANCE_DATA_PRESENT" => "0",
-                    "HASH_TABLE_COLS" => "0",
-                    "HASH_TABLE_ROWS" => "0",
                 },
             ),
             load_convolution_buffers_shader: Shader::new(
@@ -465,16 +461,6 @@ impl Device {
                 (&self.photon_hash_table_major, 0),
                 (&self.photon_hash_table_minor, 0),
             ]);
-
-            self.integrator_gather_photons_shader
-                .set_define("HASH_TABLE_COLS", format!("{}U", cols));
-            self.integrator_gather_photons_shader
-                .set_define("HASH_TABLE_ROWS", format!("{}U", rows));
-
-            self.integrator_scatter_photons_shader
-                .set_define("HASH_TABLE_COLS", format!("{}U", cols));
-            self.integrator_scatter_photons_shader
-                .set_define("HASH_TABLE_ROWS", format!("{}U", rows));
 
             Ok(())
         })?;

@@ -26,6 +26,11 @@ pub struct IntegratorData {
     hash_cell_cols: u32,
     hash_cell_rows: u32,
     hash_cell_col_bits: u32,
+
+    hash_cols_mask: u32,
+    hash_rows_mask: u32,
+
+    hash_dimensions: [f32; 2],
 }
 
 pub struct IntegratorPass {
@@ -126,6 +131,13 @@ impl Device {
         data.hash_cell_cols = hash_cell_cols as u32;
         data.hash_cell_rows = hash_cell_rows as u32;
         data.hash_cell_col_bits = (hash_cell_cols - 1).count_ones();
+        data.hash_dimensions[0] = self.photon_hash_table_major.cols() as f32;
+        data.hash_dimensions[1] = self.photon_hash_table_major.rows() as f32;
+
+        data.hash_cols_mask =
+            ((self.photon_hash_table_major.cols() - 1) & !(hash_cell_cols - 1)) as u32;
+        data.hash_rows_mask =
+            ((self.photon_hash_table_major.rows() - 1) & !(hash_cell_rows - 1)) as u32;
 
         self.integrator_buffer.write(&data)
     }
@@ -150,8 +162,8 @@ impl Device {
         );
 
         command.set_framebuffer(&self.photon_fbo);
-        self.photon_fbo.clear(0, [-1.0; 4]);
-        self.photon_fbo.clear(1, [-1.0; 4]);
+        self.photon_fbo.clear(0, [1e20; 4]);
+        self.photon_fbo.clear(1, [1e20; 4]);
 
         command.unset_vertex_array();
         command.draw_points_instanced(pass.n, pass.m);
@@ -222,7 +234,7 @@ impl Device {
         let mut best_n = 0;
         let mut best_m = 0;
 
-        for s in 0..self.state.integrator.max_hash_cell_bits {
+        for s in 0..=self.state.integrator.max_hash_cell_bits {
             let m = 1 << s;
             let n = (max_load / m).min(target);
 

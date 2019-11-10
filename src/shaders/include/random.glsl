@@ -3,19 +3,6 @@
 void _rand_mix_full(inout random_t random);
 void _rand_mix_mini(inout random_t random);
 
-uint shuffle(uvec3 data, uvec2 seed) {
-    uvec2 state = data.xy ^ seed;
-
-    _rand_mix_full(state);
-
-    state.x ^= data.z;
-    state.y ^= data.z;
-
-    _rand_mix_full(state);
-
-    return state.x;
-}
-
 // Initializes the random generator with a seed.
 random_t rand_initialize_from_seed(uvec2 seed) {
     _rand_mix_full(seed);
@@ -38,7 +25,7 @@ float rand_uniform_float(inout random_t random) {
 // Random number generation internals.
 //
 // This is an implementation of the Speck cipher with a fixed key. The "full" function is used
-// when the input is seriously correlated e.g. fragment coordinates, while the "mini" function
+// when the input is seriously correlated like fragment coordinates, while the "mini" function
 // can be called repeatedly on an internal state to produce more random numbers at lower cost.
 
 #define ROR8(x) ((x >> 8U) | (x << 24U))

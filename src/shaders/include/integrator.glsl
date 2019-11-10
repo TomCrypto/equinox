@@ -1,5 +1,7 @@
 #include <common.glsl>
 
+#include <random.glsl>
+
 #define cell_t vec3
 
 layout (std140) uniform Integrator {
@@ -15,24 +17,39 @@ layout (std140) uniform Integrator {
     uint hash_cell_cols;        // The number of columns in a hash cell
     uint hash_cell_rows;        // The number of rows in a hash cell
     uint hash_cell_col_bits;    // The number of bits in hash_cell_cols
+
+    uint hash_cols_mask;
+    uint hash_rows_mask;
+
+    vec2 hash_dimensions;
 } integrator;
 
 cell_t cell_for_point(vec3 point) {
     return floor(point / integrator.cell_size);
 }
 
-/*ivec2 hash_entry_for_cell(cell_t cell) {
-    uvec3 seed = floatBitsToUint(cell);
+uint internal_hash_cell_key(uvec3 key, uvec2 seed) {
+    uvec2 state = key.xy ^ seed;
 
-    uint index = 0U; // do the hashing etc... something fast ideally
+    _rand_mix_mini(state);
+    state ^= key.z ^ seed;
+    _rand_mix_mini(state);
 
-    index %= HASH_TABLE_COLS * HASH_TABLE_ROWS; // get index into hash table range
-
-    return ivec2((index % HASH_TABLE_COLS) & ~(integrator.hash_cell_cols - 1U),
-                 (index / HASH_TABLE_COLS) & ~(integrator.hash_cell_rows - 1U));
+    return state.x ^ state.y;
 }
 
-bool sphere_in_cell(float radius_squared, vec3 center, cell_t cell) {
+ivec2 hash_entry_for_cell(cell_t cell) {
+    uint index = internal_hash_cell_key(floatBitsToUint(cell), integrator.rng);
+
+    return ivec2(index & integrator.hash_cols_mask, (index >> 16U) & integrator.hash_rows_mask);
+}
+
+ivec2 hash_entry_for_cell(cell_t cell, uint index) {
+    return hash_entry_for_cell(cell) + ivec2(index & (integrator.hash_cell_cols - 1U),
+                                             index >> integrator.hash_cell_col_bits);
+}
+
+/*bool sphere_in_cell(float radius_squared, vec3 center, cell_t cell) {
     // TODO: implement...
 }*/
 

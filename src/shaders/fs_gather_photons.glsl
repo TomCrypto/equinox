@@ -24,20 +24,6 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-ivec2 base_coords(vec3 cell) {
-    uvec3 cell_hash_seed = floatBitsToUint(cell);
-
-    uint coords = shuffle(cell_hash_seed, integrator.rng) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
-
-    uint coord_x = coords % HASH_TABLE_COLS;
-    uint coord_y = coords / HASH_TABLE_COLS;
-
-    coord_x &= ~(integrator.hash_cell_cols - 1U);
-    coord_y &= ~(integrator.hash_cell_rows - 1U);
-
-    return ivec2(coord_x, coord_y);
-}
-
 float sqr(float x) {
     return x * x;
 }
@@ -57,17 +43,13 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
         return vec3(0.0);
     }
 
-    ivec2 coords = base_coords(cell_pos);
+    ivec2 coords = hash_entry_for_cell(cell_pos);
 
     vec3 result = vec3(0.0);
 
     for (uint y = 0U; y < integrator.hash_cell_rows; ++y) {
         for (uint x = 0U; x < integrator.hash_cell_cols; ++x) {
             vec4 major_data = texelFetch(photon_table_major, coords + ivec2(x, y), 0);
-
-            if (major_data.x < 0.0) {
-                continue;
-            }
 
             vec3 photon_position = cell_pos * integrator.cell_size + major_data.xyz;
 

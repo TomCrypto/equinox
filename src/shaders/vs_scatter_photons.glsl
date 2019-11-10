@@ -1,9 +1,3 @@
-layout(location = 0) in vec4 position;
-layout(location = 1) in vec4 incident_direction;
-layout(location = 2) in vec4 outgoing_direction;
-layout(location = 3) in vec4 incident_throughput;
-layout(location = 4) in vec4 outgoing_throughput;
-
 out vec4 table_major;
 out vec4 table_minor;
 
@@ -19,33 +13,6 @@ out vec4 table_minor;
 layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
-
-ivec2 hash_position(vec3 pos) {
-    uvec3 cell = floatBitsToUint(floor(pos / integrator.cell_size));
-
-    // int coords = ((cell_x * 395 + cell_y * 119 + cell_z * 1193) % (4096 * 4096) + 4096 * 4096) % (4096 * 4096);
-    // uint coords = (cell_x * 1325290093U + cell_y * 2682811433U + cell_z * 765270841U) % (4096U * 4096U);
-    uint coords = shuffle(cell, integrator.rng) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
-
-    uint cell_dx = uint(gl_InstanceID) & (integrator.hash_cell_cols - 1U);
-    uint cell_dy = uint(gl_InstanceID) >> integrator.hash_cell_col_bits;
-
-    uint coord_x = coords % HASH_TABLE_COLS;
-    uint coord_y = coords / HASH_TABLE_COLS;
-
-    coord_x &= ~(integrator.hash_cell_cols - 1U);
-    coord_y &= ~(integrator.hash_cell_rows - 1U);
-
-    return ivec2(coord_x + cell_dx, coord_y + cell_dy);
-}
-
-vec3 get_relative_pos_in_cell(vec3 pos) {
-    float cell_x = fract(pos.x / integrator.cell_size);
-    float cell_y = fract(pos.y / integrator.cell_size);
-    float cell_z = fract(pos.z / integrator.cell_size);
-
-    return vec3(cell_x, cell_y, cell_z);
-}
 
 float luminance(vec3 x) {
     return dot(x, vec3(0.2126, 0.7152, 0.0722));
@@ -121,10 +88,10 @@ void main() {
             if (is_receiver && rand_uniform_vec2(random).x < deposit_p) {
                 vec3 photon_throughput = throughput / deposit_p;
 
-                ivec2 coords = hash_position(ray.org);
+                ivec2 coords = hash_entry_for_cell(cell_for_point(ray.org), uint(gl_InstanceID));
 
                 gl_PointSize = 1.0;
-                gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / vec2(float(HASH_TABLE_COLS), float(HASH_TABLE_ROWS)) - 1.0, 0.0, 1.0);
+                gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / integrator.hash_dimensions - 1.0, 0.0, 1.0);
 
                 vec3 cell_pos = floor(ray.org / integrator.cell_size) * integrator.cell_size;
                 vec3 relative_position = ray.org - cell_pos;
