@@ -31,6 +31,10 @@ bool traversal_has_hit(traversal_t traversal) {
     return traversal.hit.x != 0xffffffffU;
 }
 
+float luminance(vec3 color) {
+    return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
 // Takes a ray segment and a bounding box and clips the ray to be fully contained
 // inside the bounding box. Returns true if the ray intersected the bounding box.
 bool ray_bbox(vec3 org, vec3 idir, inout vec2 range, vec3 bbmin, vec3 bbmax) {

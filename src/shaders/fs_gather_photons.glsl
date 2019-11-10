@@ -37,7 +37,7 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
         for (uint x = 0U; x < integrator.hash_cell_cols; ++x) {
             vec4 major_data = texelFetch(photon_table_major, coords + ivec2(x, y), 0);
 
-            vec3 photon_position = cell_pos * integrator.cell_size + major_data.xyz;
+            vec3 photon_position = (cell_pos + major_data.xyz) * integrator.cell_size;
 
             if (dot(point - photon_position, point - photon_position) > radius_squared) {
                 continue;

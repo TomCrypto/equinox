@@ -14,8 +14,13 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-float luminance(vec3 x) {
-    return dot(x, vec3(0.2126, 0.7152, 0.0722));
+void record_photon(ray_t ray, vec3 throughput) {
+    ivec2 coords = hash_entry_for_cell(cell_for_point(ray.org), uint(gl_InstanceID));
+
+    gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / integrator.hash_dimensions - 1.0, 0.0, 1.0);
+
+    table_major = vec4(fract(ray.org / integrator.cell_size), ray.dir.x);
+    table_minor = vec4(ray.dir.z, throughput * ((ray.dir.y < 0.0) ? -1.0 : 1.0));
 }
 
 void main() {
@@ -70,40 +75,20 @@ void main() {
             uint material = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
 
-            // <<Add photon contribution to nearby visible points>>
-
-            // this is where we decide whether to deposit the photon or not
-
             // TODO: don't hardcode this constant later
             bool is_receiver = (material & 0x8000U) != 0U;
             material &= ~0x8000U;
 
             is_receiver = is_receiver && (bounce != 0U);
 
-            // make a choice whether to deposit the photon here or to continue
-            // for now let's deposit with probability 0.5, seems reasonably
-
-            float deposit_p = 0.5;
-
-            if (is_receiver && rand_uniform_vec2(random).x < deposit_p) {
-                vec3 photon_throughput = throughput / deposit_p;
-
-                ivec2 coords = hash_entry_for_cell(cell_for_point(ray.org), uint(gl_InstanceID));
-
-                gl_PointSize = 1.0;
-                gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / integrator.hash_dimensions - 1.0, 0.0, 1.0);
-
-                vec3 cell_pos = floor(ray.org / integrator.cell_size) * integrator.cell_size;
-                vec3 relative_position = ray.org - cell_pos;
-
-                table_major = vec4(relative_position, ray.dir.x);
-                table_minor = vec4(ray.dir.z, photon_throughput.rgb * ((ray.dir.y < 0.0) ? -1.0 : 1.0));
-                return;
+            if (is_receiver && rand_uniform_vec2(random).x < 0.5) {
+                record_photon(ray, throughput / 0.5);
+                return; // rasterize this photon now
             }
 
             vec3 new_beta;
 
-            ray_t new_ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, new_beta, flags, random);
+            ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, new_beta, flags, random);
 
             if ((flags & RAY_FLAG_EXTINCT) != 0U) {
                 break;
@@ -114,19 +99,15 @@ void main() {
             float q = max(0.0, 1.0 - luminance(bnew) / luminance(throughput));
 
             if (rand_uniform_vec2(random).x < q) {
-                // terminate the path! we're not interested in this path anymore
-                return;
+                break;
             }
 
             throughput = bnew / (1.0 - q);
-
-            ray = new_ray;
         } else {
             break;
         }
     }
 
-    // no hit, consider photon lost
-    gl_PointSize = 1.0;
-    gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
+    // prevent photon from being rasterized
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }
