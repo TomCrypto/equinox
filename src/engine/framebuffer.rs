@@ -16,7 +16,7 @@ pub trait AsAttachment {
 #[derive(Debug)]
 pub struct Framebuffer {
     gl: Context,
-    pub handle: Option<WebGlFramebuffer>, // TODO: make private
+    handle: Option<WebGlFramebuffer>,
 }
 
 impl Framebuffer {

@@ -170,7 +170,6 @@ impl Device {
     }
 
     pub(crate) fn gather_photons(&mut self) {
-        // TODO: rename to "integrator_gather_photons_shader" when it works
         let command = self.integrator_gather_photons_shader.begin_draw();
 
         command.bind(&self.camera_buffer, "Camera");
