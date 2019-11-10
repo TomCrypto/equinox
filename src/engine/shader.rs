@@ -2,6 +2,8 @@
 use log::{debug, error, info, warn};
 
 use crate::Framebuffer;
+use crypto::rc4::Rc4;
+use crypto::symmetriccipher::SynchronousStreamCipher;
 use js_sys::Error;
 use regex::Regex;
 use std::collections::HashMap;
@@ -21,8 +23,8 @@ pub struct Shader {
     gl: Context,
     invalidated: bool,
     handle: Option<WebGlProgram>,
-    vertex: &'static str,
-    fragment: &'static str,
+    vertex: &'static [u8],
+    fragment: &'static [u8],
 
     binds: HashMap<&'static str, BindingPoint>,
 
@@ -30,11 +32,21 @@ pub struct Shader {
     defines: HashMap<&'static str, String>,
 }
 
+fn decrypt_shader(ciphertext: &[u8]) -> String {
+    let mut rc4 = Rc4::new(b"\x80\x33\x5d\x92\x96\x5f\xbd\x83\x63\x5f\xbd\x86\x54\x7f\xf9\x3c");
+
+    let mut output = vec![0; ciphertext.len()];
+
+    rc4.process(ciphertext, &mut output);
+
+    String::from_utf8(output).unwrap()
+}
+
 impl Shader {
     pub fn new(
         gl: Context,
-        vertex: &'static str,
-        fragment: &'static str,
+        vertex: &'static [u8],
+        fragment: &'static [u8],
         binds: HashMap<&'static str, BindingPoint>,
         default_headers: HashMap<&'static str, &str>,
         default_defines: HashMap<&'static str, &str>,
@@ -101,8 +113,8 @@ impl Shader {
 
         self.invalidated = false;
 
-        let vert = self.compile_shader(Context::VERTEX_SHADER, &self.vertex)?;
-        let frag = self.compile_shader(Context::FRAGMENT_SHADER, &self.fragment)?;
+        let vert = self.compile_shader(Context::VERTEX_SHADER, &decrypt_shader(self.vertex))?;
+        let frag = self.compile_shader(Context::FRAGMENT_SHADER, &decrypt_shader(self.fragment))?;
 
         if let (Some(vert), Some(frag)) = (&vert, &frag) {
             self.handle = self.link_program(vert, frag)?;

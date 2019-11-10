@@ -1,3 +1,5 @@
+use crypto::rc4::Rc4;
+use crypto::symmetriccipher::SynchronousStreamCipher;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::env::var_os;
@@ -39,11 +41,25 @@ fn preprocess_shaders(dir: &str, ext: &str, include_path: &str) -> Result<()> {
             )
             .unwrap();
 
+            let out_dir: PathBuf = var_os("OUT_DIR").unwrap().into();
+            let shader = read_to_string(out_dir.join(path.file_name().unwrap()))?;
+
+            let mut rc4 =
+                Rc4::new(b"\x80\x33\x5d\x92\x96\x5f\xbd\x83\x63\x5f\xbd\x86\x54\x7f\xf9\x3c");
+
+            let mut output = vec![0; shader.as_bytes().len()];
+            let mut bytes = String::new();
+
+            rc4.process(shader.as_bytes(), &mut output);
+
+            for byte in output {
+                bytes.push_str(&format!("{}, ", byte));
+            }
+
             write!(
                 generated_file,
-                "pub const {}: &str = include_str!(\"{}\");\n",
-                name,
-                path.display(),
+                "pub const {}: &[u8] = &[{}];\n",
+                name, bytes,
             )
             .unwrap();
         }
