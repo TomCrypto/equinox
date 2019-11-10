@@ -2,52 +2,141 @@
 use log::{debug, info, warn};
 
 use crate::BlendMode;
-use crate::Device;
+use crate::{Aperture, Device, Integrator, RasterFilter, Scene};
+use js_sys::Error;
+use quasirandom::Qrng;
+use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaCha20Rng;
+use zerocopy::{AsBytes, FromBytes};
 
-/*
+#[repr(C)]
+#[derive(AsBytes, FromBytes, Debug)]
+pub struct IntegratorData {
+    rng: [u32; 2],
+    pass: u32,
 
-Textures:
+    padding: [u32; 1],
 
-RGBA32F: pixel_state_li_radius_main   - stores total Li and radius^2 for the pixel
-RGBA16F: pixel_state_li_count_temp   - stores new Li and the photon count for that pixel for this pass, intermediate data
-RGBA16F: pixel_state_ld_count         - stores total Ld and photon count for the pixel, both divided by the pass count
-                                        (this means Ld is usable as a radiance estimate; the photon count must be multiplied before use)
+    filter_offset: [f32; 2],
 
-make the first one RGBA16F eventually when we figure out how to do it; it needs to be normalized against something
+    photon_count: f32,
+    sppm_alpha: f32,
 
-Framebuffers:
+    cell_size: f32,
+    hash_cell_cols: u32,
+    hash_cell_rows: u32,
+    hash_cell_col_bits: u32,
+}
 
-SHADER 1: for accumulating ld + count:
+pub struct IntegratorPass {
+    pub n: usize,
+    pub m: usize,
+    pub cell_size: f32,
+}
 
-    location 0 => pixel_state_ld_count
-    location 1 => pixel_state_li_count_temp
+#[derive(Debug)]
+pub struct IntegratorState {
+    pub(crate) rng: ChaCha20Rng,
+    pub(crate) filter_rng: Qrng,
 
-BINDS: pixel_state_li_radius_main (to get the pixel's search radius)
+    pub(crate) filter: RasterFilter,
+    pub(crate) integrator: Integrator,
+    pub(crate) aperture: Option<Aperture>,
 
-SHADER 2: for updating Li + radius:
+    pub(crate) current_pass: u32,
+    pub(crate) photon_count: f32,
+}
 
-    location 0 => pixel_state_li_radius_main
-
-BINDS: pixel_state_ld_count (to get the previous photon count), pixel_state_li_count_temp (to get the pass photon count, and the pass Li)
-        -> this is used to calculate the ratio which is used to update both Li and radius^2 for the current pixel
-
-SHADER 3: for combining the radiance estimates:
-
-    location 0 => "samples" (we'll fix this up later)
-
-BINDS: pixel_state_li_radius_main, pixel_state_ld_count
-
-
-*/
+impl Default for IntegratorState {
+    fn default() -> Self {
+        Self {
+            rng: ChaCha20Rng::seed_from_u64(0),
+            filter_rng: Qrng::new(0),
+            filter: RasterFilter::default(),
+            aperture: None,
+            integrator: Integrator::default(),
+            photon_count: 0.0,
+            current_pass: 0,
+        }
+    }
+}
 
 impl Device {
-    pub(crate) fn scatter_photons(&mut self, n: usize, m: usize) {
+    pub(crate) fn reset_integrator_state(&mut self, scene: &mut Scene) {
+        self.state = IntegratorState::default();
+
+        self.state.aperture = (*scene.aperture).clone();
+        self.state.filter = scene.raster.filter;
+        self.state.integrator = *scene.integrator;
+
+        self.integrator_gather_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
+        self.integrator_update_fbo.clear(
+            0,
+            [
+                0.0,
+                0.0,
+                0.0,
+                self.state.integrator.initial_search_radius.powi(2),
+            ],
+        );
+    }
+
+    pub(crate) fn prepare_integrator_pass(&self) -> IntegratorPass {
+        let k = (1.0 - self.state.integrator.alpha) / 2.0;
+
+        let search_radius = self.state.integrator.initial_search_radius
+            * (1.0 + self.state.current_pass as f32).powf(-k);
+
+        let cell_size = 2.0 * search_radius;
+
+        let target = ((self.state.integrator.capacity_multiplier / cell_size.powi(2)).round()
+            as usize)
+            .min(self.state.integrator.photons_per_pass)
+            .max(1);
+
+        let (n, m) = self.calculate_photon_batch(self.state.integrator.photons_per_pass, target);
+
+        IntegratorPass { n, m, cell_size }
+    }
+
+    pub(crate) fn update_integrator_state(&mut self, pass: &IntegratorPass) -> Result<(), Error> {
+        self.state.current_pass += 1;
+        self.state.photon_count += (pass.n * pass.m) as f32;
+
+        let (hash_cell_cols, hash_cell_rows) = Self::get_hash_cell_dimensions(pass.m);
+
+        // we need to ignore the first (0, 0) sample from the sequence
+        let (mut x, mut y) = self.state.filter_rng.next::<(f32, f32)>();
+
+        if x == 0.0 && y == 0.0 {
+            x = 0.5;
+            y = 0.5;
+        }
+
+        let data: &mut IntegratorData = self.allocator.allocate_one();
+
+        data.filter_offset[0] = 4.0 * self.state.filter.importance_sample(x) - 2.0;
+        data.filter_offset[1] = 4.0 * self.state.filter.importance_sample(y) - 2.0;
+        data.rng[0] = self.state.rng.next_u32();
+        data.rng[1] = self.state.rng.next_u32();
+        data.pass = self.state.current_pass;
+        data.photon_count = self.state.photon_count;
+        data.sppm_alpha = self.state.integrator.alpha;
+        data.cell_size = pass.cell_size;
+        data.hash_cell_cols = hash_cell_cols as u32;
+        data.hash_cell_rows = hash_cell_rows as u32;
+        data.hash_cell_col_bits = (hash_cell_cols - 1).count_ones();
+
+        self.integrator_buffer.write(&data)
+    }
+
+    pub(crate) fn scatter_photons(&mut self, pass: &IntegratorPass) {
         let command = self.integrator_scatter_photons_shader.begin_draw();
 
         command.bind(&self.geometry_buffer, "Geometry");
         command.bind(&self.material_buffer, "Material");
         command.bind(&self.instance_buffer, "Instance");
-        command.bind(&self.globals_buffer, "Globals");
+        command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
@@ -65,7 +154,7 @@ impl Device {
         self.photon_fbo.clear(1, [-1.0; 4]);
 
         command.unset_vertex_array();
-        command.draw_points_instanced(n, m);
+        command.draw_points_instanced(pass.n, pass.m);
     }
 
     pub(crate) fn gather_photons(&mut self) {
@@ -76,7 +165,7 @@ impl Device {
         command.bind(&self.geometry_buffer, "Geometry");
         command.bind(&self.material_buffer, "Material");
         command.bind(&self.instance_buffer, "Instance");
-        command.bind(&self.globals_buffer, "Globals");
+        command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
@@ -100,7 +189,7 @@ impl Device {
     pub(crate) fn update_estimates(&mut self) {
         let command = self.integrator_update_estimates_shader.begin_draw();
 
-        command.bind(&self.globals_buffer, "Globals");
+        command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.integrator_ld_count, "ld_count_tex");
         command.bind(&self.integrator_li_count, "li_count_tex");
 
@@ -117,7 +206,7 @@ impl Device {
     pub(crate) fn estimate_radiance(&mut self) {
         let command = self.integrator_estimate_radiance_shader.begin_draw();
 
-        command.bind(&self.globals_buffer, "Globals");
+        command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.integrator_ld_count, "ld_count_tex");
         command.bind(&self.integrator_li_range, "li_range_tex");
 
@@ -127,5 +216,40 @@ impl Device {
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
+    }
+
+    fn calculate_photon_batch(&self, max_load: usize, target: usize) -> (usize, usize) {
+        let mut best_n = 0;
+        let mut best_m = 0;
+
+        for s in 0..self.state.integrator.max_hash_cell_bits {
+            let m = 1 << s;
+            let n = (max_load / m).min(target);
+
+            if n * m > best_n * best_m {
+                best_n = n;
+                best_m = m;
+            }
+        }
+
+        (best_n, best_m)
+    }
+
+    fn get_hash_cell_dimensions(mut m: usize) -> (usize, usize) {
+        let mut cols = 1;
+        let mut rows = 1;
+
+        while m != 1 {
+            if m >= 4 {
+                cols *= 2;
+                rows *= 2;
+                m /= 4;
+            } else {
+                cols *= 2;
+                m /= 2;
+            }
+        }
+
+        (cols, rows)
     }
 }

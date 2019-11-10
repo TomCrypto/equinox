@@ -5,37 +5,20 @@
 #include <instance.glsl>
 #include <material.glsl>
 #include <environment.glsl>
+#include <integrator.glsl>
 
-uniform sampler2D li_range_tex; // we only use the alpha channel which contains the pixel radius^2
+uniform sampler2D li_range_tex;
 uniform sampler2D photon_table_major;
 uniform sampler2D photon_table_minor;
 
-layout(location = 0) out vec4 ld_count_output; // direct lighting + total photon count
-// NOTE: this compensates for the weighted blender
-layout(location = 1) out vec4 li_count_output; // indirect lighting + photon pass count
+layout(location = 0) out vec4 ld_count_output;
+layout(location = 1) out vec4 li_count_output;
 
 layout (std140) uniform Camera {
     vec4 origin_plane[4];
     vec4 target_plane[4];
     vec4 aperture_settings;
 } camera;
-
-layout (std140) uniform Globals {
-    vec2 filter_delta;
-    uvec4 frame_state;
-    uint pass_count;
-    float photons_for_pass;
-    float total_photons;
-    float grid_cell_size;
-    uint hash_cell_cols;
-    uint hash_cell_rows;
-    uint hash_cell_col_bits;
-    float alpha;
-} globals;
-
-#define FILTER_DELTA (globals.filter_delta)
-#define FRAME_RANDOM (globals.frame_state.xy)
-#define FRAME_NUMBER (globals.frame_state.z)
 
 layout (std140) uniform Raster {
     vec4 dimensions;
@@ -44,32 +27,49 @@ layout (std140) uniform Raster {
 ivec2 base_coords(vec3 cell) {
     uvec3 cell_hash_seed = floatBitsToUint(cell);
 
-    // uint coords = (cell.x * 1325290093U + cell.y * 2682811433U + cell.z * 765270841U) % (4096U * 4096U);
-    uint coords = shuffle(cell_hash_seed, FRAME_RANDOM) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
+    uint coords = shuffle(cell_hash_seed, integrator.rng) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
 
     uint coord_x = coords % HASH_TABLE_COLS;
     uint coord_y = coords / HASH_TABLE_COLS;
 
-    coord_x &= ~(globals.hash_cell_cols - 1U);
-    coord_y &= ~(globals.hash_cell_rows - 1U);
+    coord_x &= ~(integrator.hash_cell_cols - 1U);
+    coord_y &= ~(integrator.hash_cell_rows - 1U);
 
     return ivec2(coord_x, coord_y);
 }
 
+float sqr(float x) {
+    return x * x;
+}
+
+bool sphere_cell_test(float radius_squared, vec3 origin) {
+    float distance = 0.0;
+
+    distance += sqr(max(origin.x, 0.0)) + sqr(min(origin.x + integrator.cell_size, 0.0));
+    distance += sqr(max(origin.y, 0.0)) + sqr(min(origin.y + integrator.cell_size, 0.0));
+    distance += sqr(max(origin.z, 0.0)) + sqr(min(origin.z + integrator.cell_size, 0.0));
+
+    return distance <= radius_squared;
+}
+
 vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, uint inst, vec3 normal, vec3 wo, inout float count) {
+    if (!sphere_cell_test(radius_squared, cell_pos * integrator.cell_size - point)) {
+        return vec3(0.0);
+    }
+
     ivec2 coords = base_coords(cell_pos);
 
     vec3 result = vec3(0.0);
 
-    for (uint y = 0U; y < globals.hash_cell_rows; ++y) {
-        for (uint x = 0U; x < globals.hash_cell_cols; ++x) {
+    for (uint y = 0U; y < integrator.hash_cell_rows; ++y) {
+        for (uint x = 0U; x < integrator.hash_cell_cols; ++x) {
             vec4 major_data = texelFetch(photon_table_major, coords + ivec2(x, y), 0);
 
             if (major_data.x < 0.0) {
                 continue;
             }
 
-            vec3 photon_position = cell_pos * globals.grid_cell_size + major_data.xyz;
+            vec3 photon_position = cell_pos * integrator.cell_size + major_data.xyz;
 
             if (dot(point - photon_position, point - photon_position) > radius_squared) {
                 continue;
@@ -97,14 +97,18 @@ vec3 gather_photons(float radius_squared, vec3 position, vec3 direction, vec3 no
         return vec3(0.0);
     }
 
-    vec3 cell_pos = floor(position / globals.grid_cell_size);
-    vec3 in_pos = fract(position / globals.grid_cell_size);
+    vec3 cell_pos = floor(position / integrator.cell_size);
+    vec3 in_pos = fract(position / integrator.cell_size);
 
     vec3 dir = sign(in_pos - vec3(0.5));
 
     vec3 accumulation = vec3(0.0);
 
     // TODO: in many cases it might be possible to skip most or all of these; maybe worth investigating based on the ACTUAL radius
+
+    // The "box" here is given by cell_pos + dir * vec, which gives the minimum origin of the box.
+    // The sphere is given by position + radius_squared
+    // It's easier to work with a sphere at the origin, so let's say the sphere is at the origin; 
 
     accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
     accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
@@ -116,17 +120,6 @@ vec3 gather_photons(float radius_squared, vec3 position, vec3 direction, vec3 no
     accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
 
     return accumulation;
-}
-
-
-// Low-discrepancy sequence generator.
-//
-// Given a fixed, unchanging key, this will produce a low-discrepancy sequence of 2D points
-// as a function of frame number, e.g. on the next frame for the same key the next point in
-// the sequence will be produced.
-
-vec2 low_discrepancy_2d(uvec2 key) {
-    return fract(vec2((key + FRAME_NUMBER) % 8192U) * vec2(0.7548776662, 0.5698402909));
 }
 
 // Begin camera stuff
@@ -172,7 +165,7 @@ vec3 bilinear(vec4 p[4], vec2 uv) {
 }
 
 void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
-    vec2 raster_uv = (gl_FragCoord.xy + FILTER_DELTA) * raster.dimensions.w;
+    vec2 raster_uv = (gl_FragCoord.xy + integrator.filter_offset) * raster.dimensions.w;
     raster_uv.x -= (raster.dimensions.x * raster.dimensions.w - 1.0) * 0.5;
 
     vec3 origin = bilinear(camera.origin_plane, evaluate_aperture_uv(random) * 0.5 + 0.5);
@@ -223,7 +216,7 @@ vec3 sample_direct_lighting(ray_t ray, vec3 normal, uint material, uint mat_inst
 void main() {
     vec3 radiance = vec3(0.0);
 
-    random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + FRAME_RANDOM);
+    random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + integrator.rng);
 
     ray_t ray;
     evaluate_primary_ray(random, ray.org, ray.dir);
@@ -259,7 +252,7 @@ void main() {
             if (is_receiver) {
                 // we found our diffuse surface, record the hit...
                 float radius_squared = texelFetch(li_range_tex, ivec2(gl_FragCoord - 0.5), 0).w;
-                radius_squared = min(radius_squared, pow(globals.grid_cell_size * 0.5, 2.0));
+                radius_squared = min(radius_squared, pow(integrator.cell_size * 0.5, 2.0));
 
                 float count = 0.0;
 

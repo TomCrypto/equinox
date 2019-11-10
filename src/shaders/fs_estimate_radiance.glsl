@@ -1,35 +1,24 @@
 #include <common.glsl>
 
+#include <integrator.glsl>
+
 layout (location = 0) out vec3 radiance;
 
 uniform sampler2D ld_count_tex;
 uniform sampler2D li_range_tex;
 
-layout (std140) uniform Globals {
-    vec2 filter_delta;
-    uvec4 frame_state;
-    uint pass_count;
-    float photons_for_pass;
-    float total_photons;
-    float grid_cell_size;
-    uint hash_cell_cols;
-    uint hash_cell_rows;
-    uint hash_cell_col_bits;
-    float alpha;
-} integrator;
-
-void extract_estimates(ivec2 coords, out vec3 ld, out vec3 li, out float range) {
+void unpack_estimates(ivec2 coords, out vec3 ld, out vec3 li, out float range) {
     vec4 li_data = texelFetch(li_range_tex, coords, 0);
 
-    ld = texelFetch(ld_count_tex, coords, 0).rgb / float(integrator.pass_count);
+    ld = texelFetch(ld_count_tex, coords, 0).rgb / float(integrator.pass);
     li = li_data.rgb;
-    range = min(li_data.w, pow(integrator.grid_cell_size * 0.5, 2.0));
+    range = min(li_data.w, pow(integrator.cell_size * 0.5, 2.0));
 }
 
 void main() {
     vec3 ld, li;
     float range;
 
-    extract_estimates(ivec2(gl_FragCoord.xy - 0.5), ld, li, range);
-    radiance = ld + li / (integrator.total_photons * M_PI * range);
+    unpack_estimates(ivec2(gl_FragCoord.xy - 0.5), ld, li, range);
+    radiance = ld + li / (integrator.photon_count * M_PI * range);
 }

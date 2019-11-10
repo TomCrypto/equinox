@@ -1,47 +1,6 @@
 use js_sys::Error;
 use maplit::hashmap;
-use quasirandom::Qrng;
-use rand::{RngCore, SeedableRng};
-use rand_chacha::ChaCha20Rng;
 use web_sys::WebGl2RenderingContext as Context;
-use zerocopy::{AsBytes, FromBytes};
-
-#[repr(C)]
-#[derive(AsBytes, FromBytes, Debug, Clone, Copy)]
-pub(crate) struct PixelInfo {
-    color: [f32; 3],
-    radius: f32,
-}
-
-impl PixelInfo {
-    fn key(&self) -> f32 {
-        if self.color == [0.0; 3] {
-            0.0
-        } else {
-            self.radius
-        }
-    }
-}
-
-impl PartialOrd for PixelInfo {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for PixelInfo {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.key().partial_cmp(&other.key()).unwrap()
-    }
-}
-
-impl PartialEq for PixelInfo {
-    fn eq(&self, other: &Self) -> bool {
-        self.key() == other.key()
-    }
-}
-
-impl Eq for PixelInfo {}
 
 use crate::*;
 
@@ -54,20 +13,17 @@ pub struct Device {
     pub(crate) read_convolution_buffers_shader: Shader,
     pub(crate) fft_shader: Shader,
 
-    pub(crate) camera_buffer: UniformBuffer<CameraData>,
-
     pub(crate) geometry_buffer: UniformBuffer<[GeometryParameter]>,
     pub(crate) material_buffer: UniformBuffer<[MaterialParameter]>,
     pub(crate) instance_buffer: UniformBuffer<[SceneInstanceNode]>,
 
-    pub(crate) display_buffer: UniformBuffer<DisplayData>,
-
     pub(crate) envmap_marg_cdf: Texture<R16F>,
     pub(crate) envmap_cond_cdf: Texture<R16F>,
-
     pub(crate) envmap_texture: Texture<RGBA16F>,
 
-    pub(crate) globals_buffer: UniformBuffer<GlobalData>,
+    pub(crate) display_buffer: UniformBuffer<DisplayData>,
+    pub(crate) camera_buffer: UniformBuffer<CameraData>,
+    pub(crate) integrator_buffer: UniformBuffer<IntegratorData>,
     pub(crate) raster_buffer: UniformBuffer<RasterData>,
 
     pub(crate) samples: Texture<RGBA32F>,
@@ -97,7 +53,6 @@ pub struct Device {
 
     pub(crate) load_convolution_buffers_shader: Shader,
 
-    // textures for the photon hash table (major has the position information)
     pub(crate) photon_hash_table_major: Texture<RGBA16F>,
     pub(crate) photon_hash_table_minor: Texture<RGBA16F>,
 
@@ -121,7 +76,7 @@ pub struct Device {
 
     device_lost: bool,
 
-    pub(crate) state: DeviceState,
+    pub(crate) state: IntegratorState,
 }
 
 impl Device {
@@ -143,7 +98,7 @@ impl Device {
                 shaders::VS_FULLSCREEN,
                 shaders::FS_UPDATE_ESTIMATES,
                 hashmap! {
-                    "Globals" => BindingPoint::UniformBlock(0),
+                    "Integrator" => BindingPoint::UniformBlock(0),
                     "ld_count_tex" => BindingPoint::Texture(0),
                     "li_count_tex" => BindingPoint::Texture(1),
                 },
@@ -156,7 +111,7 @@ impl Device {
                 shaders::VS_FULLSCREEN,
                 shaders::FS_ESTIMATE_RADIANCE,
                 hashmap! {
-                    "Globals" => BindingPoint::UniformBlock(0),
+                    "Integrator" => BindingPoint::UniformBlock(0),
                     "ld_count_tex" => BindingPoint::Texture(0),
                     "li_range_tex" => BindingPoint::Texture(1),
                 },
@@ -173,7 +128,7 @@ impl Device {
                     "Instance" => BindingPoint::UniformBlock(4),
                     "Geometry" => BindingPoint::UniformBlock(7),
                     "Material" => BindingPoint::UniformBlock(8),
-                    "Globals" => BindingPoint::UniformBlock(2),
+                    "Integrator" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
                     "envmap_texture" => BindingPoint::Texture(1),
                     "envmap_marg_cdf" => BindingPoint::Texture(2),
@@ -209,7 +164,7 @@ impl Device {
                     "Instance" => BindingPoint::UniformBlock(4),
                     "Geometry" => BindingPoint::UniformBlock(7),
                     "Material" => BindingPoint::UniformBlock(8),
-                    "Globals" => BindingPoint::UniformBlock(2),
+                    "Integrator" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
                     "envmap_texture" => BindingPoint::Texture(1),
                     "envmap_marg_cdf" => BindingPoint::Texture(2),
@@ -292,7 +247,7 @@ impl Device {
             instance_buffer: UniformBuffer::new(gl.clone()),
             raster_buffer: UniformBuffer::new(gl.clone()),
             display_buffer: UniformBuffer::new(gl.clone()),
-            globals_buffer: UniformBuffer::new(gl.clone()),
+            integrator_buffer: UniformBuffer::new(gl.clone()),
             envmap_texture: Texture::new(gl.clone()),
             envmap_marg_cdf: Texture::new(gl.clone()),
             envmap_cond_cdf: Texture::new(gl.clone()),
@@ -314,7 +269,7 @@ impl Device {
             photon_fbo: Framebuffer::new(gl.clone()),
             samples: Texture::new(gl.clone()),
             device_lost: true,
-            state: DeviceState::new(),
+            state: IntegratorState::default(),
         })
     }
 
@@ -545,7 +500,7 @@ impl Device {
         self.integrator_gather_photons_shader.rebuild()?;
 
         if invalidated {
-            self.state.reset(scene);
+            self.reset_integrator_state(scene);
         }
 
         self.allocator.shrink_to_watermark();
@@ -553,123 +508,36 @@ impl Device {
         Ok(invalidated)
     }
 
-    /*
-
-    Optimize n * 2^s, under the constraints:
-
-    0 < n <= target
-    0 <= s < max_s
-
-    n * 2^s <= max_load
-
-    */
-
-    // given a target number of photons and an absolute maximum load, calculate the
-    // largest n * 2^s <= max_load such that n < target. all else being equal,
-    // prefer smaller m if possible.
-    fn calculate_photon_batch(&self, max_load: usize, target: usize) -> (usize, usize) {
-        let mut best_n = 0;
-        let mut best_m = 0;
-
-        for s in 0..self.state.integrator.max_hash_cell_bits {
-            let m = 1 << s;
-            let n = (max_load / m).min(target);
-
-            if n * m > best_n * best_m {
-                best_n = n;
-                best_m = m;
-            }
-        }
-
-        (best_n, best_m)
-    }
-
-    fn get_hash_cell_dimensions(mut m: usize) -> (usize, usize) {
-        let mut cols = 1;
-        let mut rows = 1;
-
-        while m != 1 {
-            if m >= 4 {
-                cols *= 2;
-                rows *= 2;
-                m /= 4;
-            } else {
-                cols *= 2;
-                m /= 2;
-            }
-        }
-
-        (cols, rows)
-    }
-
-    /// Further refines the rendering.
-    pub fn refine(&mut self) {
+    /// Refines the current render state by performing an SPPM pass.
+    pub fn refine(&mut self) -> Result<(), Error> {
         if self.device_lost {
-            return;
+            return Ok(());
         }
 
-        let k = (1.0 - self.state.integrator.alpha) / 2.0;
+        let pass = self.prepare_integrator_pass();
 
-        let search_radius =
-            self.state.integrator.initial_search_radius * (self.state.frame as f32).powf(-k);
-
-        let grid_cell_size = 2.0 * search_radius;
-
-        let target = ((self.state.integrator.capacity_multiplier / grid_cell_size.powi(2)).round()
-            as usize)
-            .min(self.state.integrator.photons_per_pass)
-            .max(1);
-
-        let (n, m) = self.calculate_photon_batch(self.state.integrator.photons_per_pass, target);
-
-        let (hash_cell_cols, hash_cell_rows) = Self::get_hash_cell_dimensions(m);
-
-        // TODO: not happy with this, can we improve it
-        self.state.update(
-            &mut self.allocator,
-            &mut self.globals_buffer,
-            (n * m) as u32,
-            grid_cell_size,
-            hash_cell_cols as u32,
-            hash_cell_rows as u32,
-        );
-
-        let iteration = self.state.frame - 1;
-
-        if iteration == 0 {
-            // we are starting a new render, clear all pass data and set the initial search
-            // radius
-
-            self.integrator_gather_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
-            self.integrator_update_fbo.clear(
-                0,
-                [
-                    0.0,
-                    0.0,
-                    0.0,
-                    self.state.integrator.initial_search_radius.powi(2),
-                ],
-            );
-        }
-
-        self.scatter_photons(n, m);
+        self.update_integrator_state(&pass)?;
+        self.scatter_photons(&pass);
         self.gather_photons();
         self.update_estimates();
         self.estimate_radiance();
+
+        Ok(())
     }
 
-    pub fn render(&mut self) {
+    /// Renders the current render state into the context's canvas.
+    pub fn render(&mut self) -> Result<(), Error> {
         if self.device_lost {
-            return;
+            return Ok(());
         }
 
-        if self.state.enable_lens_flare {
+        if self.state.aperture.is_some() {
             self.render_lens_flare();
         }
 
         let command = self.present_program.begin_draw();
 
-        if self.state.enable_lens_flare {
+        if self.state.aperture.is_some() {
             command.bind(&self.render, "samples");
         } else {
             command.bind(&self.samples, "samples");
@@ -683,6 +551,8 @@ impl Device {
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
+
+        Ok(())
     }
 
     fn try_restore(&mut self, scene: &mut Scene) -> Result<bool, Error> {
@@ -704,7 +574,7 @@ impl Device {
         self.envmap_marg_cdf.invalidate();
         self.envmap_cond_cdf.invalidate();
         self.envmap_texture.invalidate();
-        self.globals_buffer.invalidate();
+        self.integrator_buffer.invalidate();
         self.raster_buffer.invalidate();
         self.samples.invalidate();
         self.samples_fbo.invalidate();
@@ -745,104 +615,4 @@ impl Device {
 
         Ok(true)
     }
-}
-
-#[derive(Debug)]
-pub(crate) struct DeviceState {
-    pub(crate) rng: ChaCha20Rng,
-    pub(crate) filter_rng: Qrng,
-
-    pub(crate) filter: RasterFilter,
-
-    pub(crate) enable_lens_flare: bool,
-
-    pub(crate) frame: u32,
-
-    pub(crate) integrator: Integrator,
-    pub(crate) total_photons: f32,
-}
-
-impl Default for DeviceState {
-    fn default() -> Self {
-        Self {
-            rng: ChaCha20Rng::seed_from_u64(0),
-            filter_rng: Qrng::new(0),
-            filter: RasterFilter::default(),
-            enable_lens_flare: false,
-            integrator: Integrator::default(),
-            total_photons: 0.0,
-            frame: 0,
-        }
-    }
-}
-
-impl DeviceState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn reset(&mut self, scene: &mut Scene) {
-        *self = Self::new();
-
-        self.enable_lens_flare = scene.aperture.is_some();
-
-        self.filter = scene.raster.filter;
-        self.integrator = *scene.integrator;
-    }
-
-    pub fn update(
-        &mut self,
-        allocator: &mut Allocator,
-        buffer: &mut UniformBuffer<GlobalData>,
-        photons_for_pass: u32,
-        grid_cell_size: f32,
-        hash_cell_cols: u32,
-        hash_cell_rows: u32,
-    ) {
-        // we don't want the first (0, 0) sample from the sequence
-        let (mut x, mut y) = self.filter_rng.next::<(f32, f32)>();
-
-        if x == 0.0 && y == 0.0 {
-            x = 0.5;
-            y = 0.5;
-        }
-
-        self.total_photons += photons_for_pass as f32;
-
-        let data: &mut GlobalData = allocator.allocate_one();
-
-        data.filter_delta[0] = 4.0 * self.filter.importance_sample(x) - 2.0;
-        data.filter_delta[1] = 4.0 * self.filter.importance_sample(y) - 2.0;
-        data.frame_state[0] = self.rng.next_u32();
-        data.frame_state[1] = self.rng.next_u32();
-        data.frame_state[2] = self.frame;
-        data.pass_count = 1 + self.frame;
-        data.photons_for_pass = photons_for_pass as f32;
-        data.total_photons = self.total_photons;
-        data.grid_cell_size = grid_cell_size;
-        data.hash_cell_cols = hash_cell_cols;
-        data.hash_cell_rows = hash_cell_rows;
-        data.hash_cell_col_bits = (hash_cell_cols - 1).count_ones();
-        data.alpha = self.integrator.alpha;
-
-        buffer.write(&data).expect("internal WebGL error");
-
-        self.frame += 1;
-    }
-}
-
-#[repr(C)]
-#[derive(AsBytes, FromBytes, Debug)]
-pub(crate) struct GlobalData {
-    filter_delta: [f32; 4],
-    frame_state: [u32; 4],
-    pass_count: u32,
-    photons_for_pass: f32,
-    total_photons: f32,
-    grid_cell_size: f32,
-    hash_cell_cols: u32,
-    hash_cell_rows: u32,
-    hash_cell_col_bits: u32,
-    alpha: f32,
-    padding: [f32; 1],
 }

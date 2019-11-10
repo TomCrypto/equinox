@@ -14,51 +14,35 @@ out vec4 table_minor;
 #include <instance.glsl>
 #include <material.glsl>
 #include <environment.glsl>
-
-layout (std140) uniform Globals {
-    vec2 filter_delta;
-    uvec4 frame_state;
-    uint pass_count;
-    float photons_for_pass;
-    float total_photons;
-    float grid_cell_size;
-    uint hash_cell_cols;
-    uint hash_cell_rows;
-    uint hash_cell_col_bits;
-    float alpha;
-} globals;
-
-#define FILTER_DELTA (globals.filter_delta)
-#define FRAME_RANDOM (globals.frame_state.xy)
-#define FRAME_NUMBER (globals.frame_state.z)
+#include <integrator.glsl>
 
 layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
 ivec2 hash_position(vec3 pos) {
-    uvec3 cell = floatBitsToUint(floor(pos / globals.grid_cell_size));
+    uvec3 cell = floatBitsToUint(floor(pos / integrator.cell_size));
 
     // int coords = ((cell_x * 395 + cell_y * 119 + cell_z * 1193) % (4096 * 4096) + 4096 * 4096) % (4096 * 4096);
     // uint coords = (cell_x * 1325290093U + cell_y * 2682811433U + cell_z * 765270841U) % (4096U * 4096U);
-    uint coords = shuffle(cell, FRAME_RANDOM) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
+    uint coords = shuffle(cell, integrator.rng) % (HASH_TABLE_COLS * HASH_TABLE_ROWS);
 
-    uint cell_dx = uint(gl_InstanceID) & (globals.hash_cell_cols - 1U); // % globals.hash_cell_cols;
-    uint cell_dy = uint(gl_InstanceID) >> globals.hash_cell_col_bits; // / globals.hash_cell_cols;
+    uint cell_dx = uint(gl_InstanceID) & (integrator.hash_cell_cols - 1U);
+    uint cell_dy = uint(gl_InstanceID) >> integrator.hash_cell_col_bits;
 
     uint coord_x = coords % HASH_TABLE_COLS;
     uint coord_y = coords / HASH_TABLE_COLS;
 
-    coord_x &= ~(globals.hash_cell_cols - 1U);
-    coord_y &= ~(globals.hash_cell_rows - 1U);
+    coord_x &= ~(integrator.hash_cell_cols - 1U);
+    coord_y &= ~(integrator.hash_cell_rows - 1U);
 
     return ivec2(coord_x + cell_dx, coord_y + cell_dy);
 }
 
 vec3 get_relative_pos_in_cell(vec3 pos) {
-    float cell_x = fract(pos.x / globals.grid_cell_size);
-    float cell_y = fract(pos.y / globals.grid_cell_size);
-    float cell_z = fract(pos.z / globals.grid_cell_size);
+    float cell_x = fract(pos.x / integrator.cell_size);
+    float cell_y = fract(pos.y / integrator.cell_size);
+    float cell_z = fract(pos.z / integrator.cell_size);
 
     return vec3(cell_x, cell_y, cell_z);
 }
@@ -68,7 +52,7 @@ float luminance(vec3 x) {
 }
 
 void main() {
-    random_t random = rand_initialize_from_seed(uvec2(gl_VertexID, gl_InstanceID) + FRAME_RANDOM);
+    random_t random = rand_initialize_from_seed(uvec2(gl_VertexID, gl_InstanceID) + integrator.rng);
 
     ray_t ray;
 
@@ -142,7 +126,7 @@ void main() {
                 gl_PointSize = 1.0;
                 gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / vec2(float(HASH_TABLE_COLS), float(HASH_TABLE_ROWS)) - 1.0, 0.0, 1.0);
 
-                vec3 cell_pos = floor(ray.org / globals.grid_cell_size) * globals.grid_cell_size;
+                vec3 cell_pos = floor(ray.org / integrator.cell_size) * integrator.cell_size;
                 vec3 relative_position = ray.org - cell_pos;
 
                 table_major = vec4(relative_position, ray.dir.x);
