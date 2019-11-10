@@ -1,5 +1,3 @@
-#include <common.glsl>
-
 #include <integrator.glsl>
 
 layout (location = 0) out vec4 li_range;
@@ -8,11 +6,12 @@ uniform sampler2D ld_count_tex;
 uniform sampler2D li_count_tex;
 
 void unpack_pass_pixel_state(ivec2 coords, out vec3 li, out float count, out float photons) {
+    vec4 ld_data = texelFetch(ld_count_tex, coords, 0);
     vec4 li_data = texelFetch(li_count_tex, coords, 0);
 
     li = li_data.rgb;
-    count = texelFetch(ld_count_tex, coords, 0).w;
-    photons = li_data.w;
+    count = ld_data.a;
+    photons = li_data.a;
 }
 
 void main() {
