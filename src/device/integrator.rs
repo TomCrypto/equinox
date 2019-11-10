@@ -13,12 +13,10 @@ use zerocopy::{AsBytes, FromBytes};
 #[derive(AsBytes, FromBytes, Debug)]
 pub struct IntegratorData {
     rng: [u32; 2],
-    pass: u32,
-
-    padding: [u32; 1],
-
     filter_offset: [f32; 2],
 
+    current_pass: u32,
+    photon_rate: f32,
     photon_count: f32,
     sppm_alpha: f32,
 
@@ -124,7 +122,8 @@ impl Device {
         data.filter_offset[1] = 4.0 * self.state.filter.importance_sample(y) - 2.0;
         data.rng[0] = self.state.rng.next_u32();
         data.rng[1] = self.state.rng.next_u32();
-        data.pass = self.state.current_pass;
+        data.current_pass = self.state.current_pass;
+        data.photon_rate = self.state.integrator.photon_rate.max(0.05).min(0.95);
         data.photon_count = self.state.photon_count;
         data.sppm_alpha = self.state.integrator.alpha;
         data.cell_size = pass.cell_size;

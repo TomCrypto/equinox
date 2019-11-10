@@ -10,7 +10,7 @@ uniform sampler2D li_range_tex;
 void unpack_estimates(ivec2 coords, out vec3 ld, out vec3 li, out float range) {
     vec4 li_data = texelFetch(li_range_tex, coords, 0);
 
-    ld = texelFetch(ld_count_tex, coords, 0).rgb / float(integrator.pass);
+    ld = texelFetch(ld_count_tex, coords, 0).rgb / float(integrator.current_pass);
     li = li_data.rgb;
     range = min(li_data.w, pow(integrator.cell_size * 0.5, 2.0));
 }

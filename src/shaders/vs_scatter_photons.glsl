@@ -81,9 +81,9 @@ void main() {
 
             is_receiver = is_receiver && (bounce != 0U);
 
-            if (is_receiver && rand_uniform_vec2(random).x < 0.5) {
-                record_photon(ray, throughput / 0.5);
-                return; // rasterize this photon now
+            if (is_receiver && rand_uniform_vec2(random).x < integrator.photon_rate) {
+                record_photon(ray, throughput / integrator.photon_rate);
+                return; // rasterize this point into the hash table now
             }
 
             vec3 new_beta;
@@ -108,6 +108,6 @@ void main() {
         }
     }
 
-    // prevent photon from being rasterized
+    // prevent point from being rasterized
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }

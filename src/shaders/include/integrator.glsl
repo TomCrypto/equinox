@@ -6,10 +6,10 @@
 
 layout (std140) uniform Integrator {
     uvec2 rng;                  // Random bits for the current pass
-    uint pass;                  // The pass number, starting at 1
-
     vec2 filter_offset;         // The camera filter offset
 
+    uint current_pass;          // The pass number, starting at 1
+    float photon_rate;          // Probability of photon being stored
     float photon_count;         // The total number of photons fired
     float sppm_alpha;           // The integrator's alpha parameter
 
