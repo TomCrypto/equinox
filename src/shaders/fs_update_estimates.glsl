@@ -5,7 +5,7 @@ layout (location = 0) out vec4 li_range;
 uniform sampler2D ld_count_tex;
 uniform sampler2D li_count_tex;
 
-void unpack_pass_pixel_state(ivec2 coords, out vec3 li, out float count, out float photons) {
+void unpack_pixel_pass_state(ivec2 coords, out vec3 li, out float count, out float photons) {
     vec4 ld_data = texelFetch(ld_count_tex, coords, 0);
     vec4 li_data = texelFetch(li_count_tex, coords, 0);
 
@@ -20,7 +20,7 @@ void main() {
 
     vec3 li;
     float count, photons;
-    
-    unpack_pass_pixel_state(ivec2(gl_FragCoord.xy - 0.5), li, count, photons);
+
+    unpack_pixel_pass_state(ivec2(gl_FragCoord.xy - 0.5), li, count, photons);
     li_range = vec4(li, (count == 0.0) ? 1.0 : count / (count + photons * K));
 }
