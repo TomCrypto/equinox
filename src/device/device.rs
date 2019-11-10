@@ -607,7 +607,12 @@ impl Device {
             return;
         }
 
-        let grid_cell_size = 2.0 * self.state.search_radius;
+        let k = (1.0 - self.state.integrator.alpha) / 2.0;
+
+        let search_radius =
+            self.state.integrator.initial_search_radius * (self.state.frame as f32).powf(-k);
+
+        let grid_cell_size = 2.0 * search_radius;
 
         let target = ((self.state.integrator.capacity_multiplier / grid_cell_size.powi(2)).round()
             as usize)
@@ -650,11 +655,6 @@ impl Device {
         self.gather_photons();
         self.update_estimates();
         self.estimate_radiance();
-
-        let k = (1.0 - self.state.integrator.alpha) / 2.0;
-
-        self.state.search_radius =
-            self.state.integrator.initial_search_radius * (self.state.frame as f32).powf(-k);
     }
 
     pub fn render(&mut self) {
@@ -758,7 +758,6 @@ pub(crate) struct DeviceState {
     pub(crate) frame: u32,
 
     pub(crate) integrator: Integrator,
-    pub(crate) search_radius: f32,
     pub(crate) total_photons: f32,
 }
 
@@ -769,7 +768,6 @@ impl Default for DeviceState {
             filter_rng: Qrng::new(0),
             filter: RasterFilter::default(),
             enable_lens_flare: false,
-            search_radius: 0.0,
             integrator: Integrator::default(),
             total_photons: 0.0,
             frame: 0,
@@ -789,7 +787,6 @@ impl DeviceState {
 
         self.filter = scene.raster.filter;
         self.integrator = *scene.integrator;
-        self.search_radius = scene.integrator.initial_search_radius;
     }
 
     pub fn update(

@@ -50,9 +50,6 @@ version = "0.8"
 [dependencies.js-sys]
 version = "0.3"
 
-[dependencies.lazysort]
-version = "0.2"
-
 [dependencies.log]
 version = "0.4"
 
@@ -98,7 +95,6 @@ features = [
   'WebGlFramebuffer',
   'WebGlProgram',
   'WebGlShader',
-  'WebGlSync',
   'WebGlTexture',
   'WebGlUniformLocation',
   'WebGlVertexArrayObject',
