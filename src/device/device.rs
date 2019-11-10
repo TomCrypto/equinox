@@ -342,11 +342,15 @@ impl Device {
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
             self.update_raster(raster)?;
 
+            if raster.width == 0 || raster.height == 0 {
+                return Err(Error::new("raster dimensions must be nonzero"));
+            }
+
             self.samples
-                .create(raster.width.get() as usize, raster.height.get() as usize);
+                .create(raster.width as usize, raster.height as usize);
 
             self.render
-                .create(raster.width.get() as usize, raster.height.get() as usize);
+                .create(raster.width as usize, raster.height as usize);
 
             self.samples_fbo.rebuild(&[(&self.samples, 0)]);
 
@@ -359,8 +363,7 @@ impl Device {
                 "IMAGE_DIMS",
                 format!(
                     "vec2({:+e}, {:+e})",
-                    raster.width.get() as f32,
-                    raster.height.get() as f32
+                    raster.width as f32, raster.height as f32
                 ),
             );
 
@@ -371,8 +374,7 @@ impl Device {
                 "IMAGE_DIMS",
                 format!(
                     "vec2({:+e}, {:+e})",
-                    raster.width.get() as f32,
-                    raster.height.get() as f32
+                    raster.width as f32, raster.height as f32
                 ),
             );
 
@@ -388,8 +390,8 @@ impl Device {
             self.g_aperture_spectrum.create(2048, 1024);
             self.b_aperture_spectrum.create(2048, 1024);
 
-            let render_cols = raster.width.get() as usize;
-            let render_rows = raster.height.get() as usize;
+            let render_cols = raster.width as usize;
+            let render_rows = raster.height as usize;
 
             self.integrator_ld_count.create(render_cols, render_rows);
             self.integrator_li_count.create(render_cols, render_rows);

@@ -3,7 +3,6 @@ use cgmath::prelude::*;
 use cgmath::{Basis3, Vector3};
 use js_sys::{Array, Error};
 use serde::{de::DeserializeOwned, Serialize};
-use std::num::NonZeroU32;
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
 
@@ -29,11 +28,11 @@ impl WebScene {
     }
 
     pub fn raster_width(&self) -> u32 {
-        self.scene.raster.width.get()
+        self.scene.raster.width
     }
 
     pub fn raster_height(&self) -> u32 {
-        self.scene.raster.height.get()
+        self.scene.raster.height
     }
 
     /// Reconfigures the scene using the provided scene JSON data.
@@ -132,12 +131,12 @@ impl WebScene {
     }
 
     pub fn set_raster_dimensions(&mut self, width: u32, height: u32) {
-        if self.scene.raster.width.get() != width {
-            self.scene.raster.width = NonZeroU32::new(width).unwrap();
+        if self.scene.raster.width != width {
+            self.scene.raster.width = width;
         }
 
-        if self.scene.raster.height.get() != height {
-            self.scene.raster.height = NonZeroU32::new(height).unwrap();
+        if self.scene.raster.height != height {
+            self.scene.raster.height = height;
         }
     }
 

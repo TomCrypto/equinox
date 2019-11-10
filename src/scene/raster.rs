@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
-use std::num::NonZeroU32;
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize, SmartDefault)]
 #[serde(tag = "type", rename_all = "kebab-case")]
@@ -58,9 +57,9 @@ impl RasterFilter {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, SmartDefault)]
 pub struct Raster {
-    #[default(NonZeroU32::new(256).unwrap())]
-    pub width: NonZeroU32,
-    #[default(NonZeroU32::new(256).unwrap())]
-    pub height: NonZeroU32,
+    #[default(150)]
+    pub width: u32,
+    #[default(150)]
+    pub height: u32,
     pub filter: RasterFilter,
 }
