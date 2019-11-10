@@ -72,12 +72,6 @@ vec3 gather_photons(float radius_squared, vec3 position, vec3 direction, vec3 no
 
     vec3 accumulation = vec3(0.0);
 
-    // TODO: in many cases it might be possible to skip most or all of these; maybe worth investigating based on the ACTUAL radius
-
-    // The "box" here is given by cell_pos + dir * vec, which gives the minimum origin of the box.
-    // The sphere is given by position + radius_squared
-    // It's easier to work with a sphere at the origin, so let's say the sphere is at the origin; 
-
     accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
     accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
     accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
@@ -101,7 +95,7 @@ vec2 evaluate_circular_aperture_uv(inout random_t random) {
 }
 
 vec2 evaluate_polygon_aperture_uv(inout random_t random) {
-    vec2 uv = rand_uniform_vec2(random); // low_discrepancy_2d(pixel_state);
+    vec2 uv = rand_uniform_vec2(random);
 
     float corner = floor(uv.s * camera.aperture_settings.y);
 
