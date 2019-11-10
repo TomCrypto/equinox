@@ -11,8 +11,8 @@ uniform sampler2D li_range_tex;
 uniform sampler2D photon_table_major;
 uniform sampler2D photon_table_minor;
 
-layout(location = 0) out vec4 ld_count_output;
-layout(location = 1) out vec4 li_count_output;
+layout(location = 0) out vec4 ld_count;
+layout(location = 1) out vec4 li_count;
 
 layout (std140) uniform Camera {
     vec4 origin_plane[4];
@@ -143,50 +143,20 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
     dir = normalize(target - origin);
 }
 
-vec3 sample_direct_lighting(ray_t ray, vec3 normal, uint material, uint mat_inst, random_t random) {
-    float lightPdf, scatterPdf;
-
-    vec3 wi;
-    vec3 wo = -ray.dir;
-
-    vec3 Li = env_sample_light(wi, lightPdf, random);
-    vec3 radiance;
-
-    if (lightPdf != 0.0) {
-        vec3 f = mat_eval_brdf(material, mat_inst, normal, wi, wo, scatterPdf) * abs(dot(wi, normal));
-
-        if (scatterPdf != 0.0 && !is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
-            radiance += f * Li * power_heuristic(lightPdf, scatterPdf);
-        }
-    }
-
-    vec3 f = mat_sample_brdf(material, mat_inst, normal, wi, wo, scatterPdf, random);
-
-    if (scatterPdf != 0.0 && !is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
-        Li = env_eval_light(wi, lightPdf);
-
-        if (lightPdf != 0.0) {
-            radiance += f * Li * power_heuristic(scatterPdf, lightPdf);
-        }
-    }
-
-    return radiance;
-}
-
 // End camera stuff
 
-void main() {
-    vec3 radiance = vec3(0.0);
-
-    random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + integrator.rng);
-
-    ray_t ray;
-    evaluate_primary_ray(random, ray.org, ray.dir);
+void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout random_t random) {
+    float radius_squared = texelFetch(li_range_tex, ivec2(gl_FragCoord - 0.5), 0).w;
+    radius_squared = min(radius_squared, pow(integrator.cell_size * 0.5, 2.0));
 
     vec3 throughput = vec3(1.0);
     uint traversal_start = 0U;
-    float unused_pdf;
     bool explicit_light = false;
+    float light_pdf, material_pdf;
+    vec3 normal;
+    uint material;
+    uint mat_inst;
+    vec3 wi, f;
 
     for (uint bounce = 0U; bounce < 8U; ++bounce) {
         traversal_t traversal = traverse_scene(ray, traversal_start);
@@ -194,73 +164,102 @@ void main() {
         if (traversal_has_hit(traversal)) {
             ray.org += ray.dir * traversal.range.y;
 
-            vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
+            normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
 
-            uint material = traversal.hit.y & 0xffffU;
-            uint mat_inst = traversal.hit.y >> 16U;
-
-            bool is_receiver = (material & 0x8000U) != 0U;
-            material &= ~0x8000U;
+            material = traversal.hit.y & 0xffffU;
+            mat_inst = traversal.hit.y >> 16U;
 
             // TODO: add back a direct light sampling flag? ...
+            bool is_receiver = MAT_IS_RECEIVER(material);
+
+            // TODO: remove when we've fully converted to new materials
+            material &= 0x7fffU;
+
             if (mat_is_not_specular(material)) {
-                radiance += throughput * sample_direct_lighting(ray, normal, material, mat_inst, random);
+                vec3 Li = env_sample_light(wi, light_pdf, random);
+
+                if (light_pdf != 0.0) {
+                    f = mat_eval_brdf(material, mat_inst, normal, wi, -ray.dir, material_pdf) * abs(dot(wi, normal));
+
+                    if (material_pdf != 0.0 && !is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
+                        ld += throughput * f * Li * power_heuristic(light_pdf, material_pdf);
+                    }
+                }
+
                 explicit_light = true;
             } else {
                 explicit_light = false;
             }
 
+            bool inside = dot(ray.dir, normal) > 0.0;
+
+            #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
+                throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
+    \
+                if (is_receiver) {  \
+                    f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, random);        \
+                }  else {  \
+    \
+                vec3 f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, random);            \
+                                                                                                  \
+                float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));      \
+                                                                                                  \
+                if (rand_uniform_float(random) < q) {                                             \
+                    return;                                                                       \
+                }                                                                                 \
+                                                                                                  \
+                throughput *= f / (1.0 - q);                                                      \
+                \
+                ray = make_ray(ray.org, wi, normal);                                              \
+                }\
+            }
+
+            MAT_DO_SWITCH(material)
+            #undef MAT_SWITCH_LOGIC
+
             if (is_receiver) {
-                // we found our diffuse surface, record the hit...
-                float radius_squared = texelFetch(li_range_tex, ivec2(gl_FragCoord - 0.5), 0).w;
-                radius_squared = min(radius_squared, pow(integrator.cell_size * 0.5, 2.0));
+                if (material_pdf != 0.0 && !is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
+                    vec3 Li = env_eval_light(wi, light_pdf);
 
-                float count = 0.0;
+                    if (light_pdf != 0.0) {
+                        ld += throughput * f * Li * power_heuristic(material_pdf, light_pdf);
+                    }
+                }
 
-                vec3 indirect_radiance = throughput * gather_photons(radius_squared, ray.org, ray.dir, normal, material, mat_inst, count);
-
-                ld_count_output = vec4(radiance, count);
-                li_count_output = vec4(indirect_radiance, count);
-
+                li = throughput * gather_photons(radius_squared, ray.org, ray.dir, normal, material, mat_inst, count);
                 return;
+            }
+
+            if (!inside && dot(wi, normal) < 0.0) {
+                traversal_start = traversal.hit.z;
             } else {
-                // NOT DIFFUSE: just keep tracing as usual...
-                vec3 beta;
-                ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, beta, random);
-                throughput *= beta;
-
-                /*if (((~flags) & (RAY_FLAG_OUTSIDE | RAY_FLAG_TRANSMIT)) == 0U) {
-                    traversal_start = traversal.hit.z;
-                } else {
-                    traversal_start = 0U;
-                }*/
-
                 traversal_start = 0U;
-            }            
+            }
         } else {
+            float light_pdf;
+
+            vec3 l = env_eval_light(ray.dir, light_pdf);
+
             if (!explicit_light) {
-                radiance += throughput * env_eval_light(ray.dir, unused_pdf);
+                ld += throughput * l;
+            } else {
+                ld += throughput * l * power_heuristic(material_pdf, light_pdf);
             }
 
             break;
         }
-
-        /*if (bounce <= 2U) {
-            continue;
-        }
-
-        // russian roulette
-
-        vec2 rng = rand_uniform_vec2(random);
-        float p = min(1.0, max(throughput.x, max(throughput.y, throughput.z)));
-
-        if (rng.x < p) {
-            throughput /= p;
-        } else {
-            break;
-        }*/
     }
+}
 
-    ld_count_output = vec4(radiance, 0.0);
-    li_count_output = vec4(0.0);
+void main() {
+    random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + integrator.rng);
+
+    ray_t ray;
+    evaluate_primary_ray(random, ray.org, ray.dir);
+
+    float count; // number of photons gathered at the visible point
+    gather_photons(ld_count.rgb, li_count.rgb, count, ray, random);
+
+    ld_count.a = count;
+    li_count.a = count;
 }

@@ -5,13 +5,6 @@ layout (std140) uniform Material {
     vec4 data[MATERIAL_DATA_COUNT];
 } material_buffer;
 
-#define MAT_FLAG_MASK                                                                    0xff00U
-
-#define RAY_FLAG_OUTSIDE                                                             (1U <<  0U)
-#define RAY_FLAG_TRANSMIT                                                            (1U <<  1U)
-#define RAY_FLAG_EXTINCT                                                             (1U <<  2U)
-#define RAY_FLAG_MASK                                                                    0x00ffU
-
 // == LAMBERTIAN =================================================================================
 #define MAT_LAMBERTIAN_ALBEDO                               material_buffer.data[inst +  0U].xyz
 // == IDEAL REFLECTION ===========================================================================
@@ -327,84 +320,13 @@ bool mat_is_not_specular(uint material) {
     }
 }
 
-vec3 mat_sample_brdf(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
-    switch (material) {
-        case 0U:
-            return mat_lambertian_sample_brdf(inst, normal, wi, wo, pdf, random);
-        case 1U:
-            return mat_ideal_reflection_sample_brdf(inst, normal, wi, wo, pdf, random);
-        case 2U:
-            return mat_phong_sample_brdf(inst, normal, wi, wo, pdf, random);
-        case 3U:
-            return mat_ideal_refraction_sample_brdf(inst, normal, wi, wo, pdf, random);
-        case 4U:
-            return mat_dielectric_sample_brdf(inst, normal, wi, wo, pdf, random);
-        case 5U:
-            return mat_oren_nayar_sample_brdf(inst, normal, wi, wo, pdf, random);
-        default:
-            return vec3(0.0);
-    }
-}
-
-// == HIGH-LEVEL MATERIAL INTERACTION ============================================================
-
-#define MAT_INTERACT(absorption, eval_brdf, sample_brdf, props) {                                 \
-    float scatter_pdf;                                                                            \
-    vec3 wi;                                                                                      \
-                                                                                                  \
-    beta = absorption(inst, dot(wo, normal) <= 0.0, path_length);                                 \
-                                                                                                  \
-    beta *= sample_brdf(inst, normal, wi, wo, scatter_pdf, random);                               \
-    return ray_t(point + PREC * sign(dot(wi, normal)) * normal, wi);                              \
-}
-
-ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, float path_length,
-                   out vec3 beta, inout random_t random) {
-    switch (material & ~MAT_FLAG_MASK) {
-        case 0U:
-            MAT_INTERACT(mat_lambertian_absorption,
-                         mat_lambertian_eval_brdf,
-                         mat_lambertian_sample_brdf,
-                         MAT_PROP_DIFFUSE_BSDF)
-        case 1U:
-            MAT_INTERACT(mat_ideal_reflection_absorption,
-                         mat_ideal_reflection_eval_brdf,
-                         mat_ideal_reflection_sample_brdf,
-                         MAT_PROP_DELTA_BSDF)
-        case 2U:
-            MAT_INTERACT(mat_phong_absorption,
-                         mat_phong_eval_brdf,
-                         mat_phong_sample_brdf,
-                         MAT_PROP_GLOSSY_BSDF)
-        case 3U:
-            MAT_INTERACT(mat_ideal_refraction_absorption,
-                         mat_ideal_refraction_eval_brdf,
-                         mat_ideal_refraction_sample_brdf,
-                         MAT_PROP_DELTA_BSDF)
-        case 4U:
-            MAT_INTERACT(mat_dielectric_absorption,
-                         mat_dielectric_eval_brdf,
-                         mat_dielectric_sample_brdf,
-                         MAT_PROP_DELTA_BSDF)
-        case 5U:
-            MAT_INTERACT(mat_oren_nayar_absorption,
-                         mat_oren_nayar_eval_brdf,
-                         mat_oren_nayar_sample_brdf,
-                         MAT_PROP_DIFFUSE_BSDF)
-        default:
-            return ray_t(point, normal);
-    }
-}
-
-#undef MAT_INTERACT
-
 #define MAT_IS_RECEIVER(material) \
     ((material & 0x8000U) != 0U)
 
 // An X-macro for inlining arbitrary code inside a material switch-case, to avoid repetitively
 // having to dispatch to specific material functions; it expands the `MAT_SWITCH_LOGIC` macro.
 
-#define MAT_SWITCH(material)                                                                      \
+#define MAT_DO_SWITCH(material)                                                                   \
     switch (material & 0x7fffU) {                                                                 \
         case 0U:                                                                                  \
             MAT_SWITCH_LOGIC(mat_lambertian_absorption,                                           \

@@ -54,9 +54,10 @@ bool scatter_photon(ray_t ray, inout random_t random, vec3 throughput) {
                     return true; /* rasterize photon into the hash table */                       \
                 }                                                                                 \
                                                                                                   \
-                float scatter_pdf;                                                                \
+                throughput /= is_receiver ? 1.0 - integrator.photon_rate : 1.0;                   \
                                                                                                   \
-                vec3 f = sample(mat_inst, normal, wi, -ray.dir, scatter_pdf, random);             \
+                float material_pdf; /* we don't need the PDF of the sampling method */            \
+                vec3 f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, random);            \
                                                                                                   \
                 float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));      \
                                                                                                   \
@@ -69,7 +70,7 @@ bool scatter_photon(ray_t ray, inout random_t random, vec3 throughput) {
                 ray = make_ray(ray.org, wi, normal);                                              \
             }
 
-            MAT_SWITCH(material)
+            MAT_DO_SWITCH(material)
             #undef MAT_SWITCH_LOGIC
 
             if (!inside && dot(wi, normal) < 0.0) {
