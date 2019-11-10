@@ -103,7 +103,7 @@ pub struct Device {
 
     pub(crate) photon_fbo: Framebuffer,
 
-    pub(crate) test_shader: Shader,
+    pub(crate) integrator_scatter_photons_shader: Shader,
 
     pub(crate) integrator_ld_count: Texture<RGBA32F>, // TODO: can this not be 16F? ...
     pub(crate) integrator_li_count: Texture<RGBA16F>,
@@ -115,7 +115,7 @@ pub struct Device {
     pub(crate) integrator_estimate_radiance_shader: Shader,
     pub(crate) integrator_update_estimates_shader: Shader,
 
-    pub(crate) visible_point_gen_shader: Shader,
+    pub(crate) integrator_gather_photons_shader: Shader,
 
     pub(crate) allocator: Allocator,
 
@@ -164,10 +164,10 @@ impl Device {
                 hashmap! {},
             ),
 
-            visible_point_gen_shader: Shader::new(
+            integrator_gather_photons_shader: Shader::new(
                 gl.clone(),
                 shaders::VS_FULLSCREEN,
-                shaders::FS_GEN_VISIBLE_POINTS,
+                shaders::FS_GATHER_PHOTONS,
                 hashmap! {
                     "Camera" => BindingPoint::UniformBlock(0),
                     "Instance" => BindingPoint::UniformBlock(4),
@@ -201,10 +201,10 @@ impl Device {
             photon_hash_table_major: Texture::new(gl.clone()),
             photon_hash_table_minor: Texture::new(gl.clone()),
             fft_pass_data: VertexArray::new(gl.clone()),
-            test_shader: Shader::new(
+            integrator_scatter_photons_shader: Shader::new(
                 gl.clone(),
-                shaders::VS_TRANSFORM_FEEDBACK_TEST,
-                shaders::FS_DUMMY,
+                shaders::VS_SCATTER_PHOTONS,
+                shaders::FS_SCATTER_PHOTONS,
                 hashmap! {
                     "Instance" => BindingPoint::UniformBlock(4),
                     "Geometry" => BindingPoint::UniformBlock(7),
@@ -353,9 +353,10 @@ impl Device {
 
             let code = generator.generate(&geometry_functions);
 
-            self.visible_point_gen_shader
+            self.integrator_gather_photons_shader
                 .set_header("geometry-user.glsl", &code);
-            self.test_shader.set_header("geometry-user.glsl", &code);
+            self.integrator_scatter_photons_shader
+                .set_header("geometry-user.glsl", &code);
 
             Dirty::dirty(instances);
 
@@ -510,14 +511,14 @@ impl Device {
                 (&self.photon_hash_table_minor, 0),
             ]);
 
-            self.visible_point_gen_shader
+            self.integrator_gather_photons_shader
                 .set_define("HASH_TABLE_COLS", format!("{}U", cols));
-            self.visible_point_gen_shader
+            self.integrator_gather_photons_shader
                 .set_define("HASH_TABLE_ROWS", format!("{}U", rows));
 
-            self.test_shader
+            self.integrator_scatter_photons_shader
                 .set_define("HASH_TABLE_COLS", format!("{}U", cols));
-            self.test_shader
+            self.integrator_scatter_photons_shader
                 .set_define("HASH_TABLE_ROWS", format!("{}U", rows));
 
             Ok(())
@@ -540,8 +541,8 @@ impl Device {
         self.read_convolution_buffers_shader.rebuild()?;
         self.fft_shader.rebuild()?;
         self.load_convolution_buffers_shader.rebuild()?;
-        self.test_shader.rebuild()?;
-        self.visible_point_gen_shader.rebuild()?;
+        self.integrator_scatter_photons_shader.rebuild()?;
+        self.integrator_gather_photons_shader.rebuild()?;
 
         if invalidated {
             self.state.reset(scene);
@@ -693,8 +694,8 @@ impl Device {
         self.read_convolution_buffers_shader.invalidate();
         self.fft_shader.invalidate();
         self.load_convolution_buffers_shader.invalidate();
-        self.test_shader.invalidate();
-        self.visible_point_gen_shader.invalidate();
+        self.integrator_scatter_photons_shader.invalidate();
+        self.integrator_gather_photons_shader.invalidate();
         self.camera_buffer.invalidate();
         self.geometry_buffer.invalidate();
         self.material_buffer.invalidate();

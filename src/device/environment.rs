@@ -16,11 +16,15 @@ impl Device {
         environment: &Environment,
     ) -> Result<(), Error> {
         if environment.map.is_some() {
-            self.visible_point_gen_shader.set_define("HAS_ENVMAP", 1);
-            self.test_shader.set_define("HAS_ENVMAP", 1);
+            self.integrator_gather_photons_shader
+                .set_define("HAS_ENVMAP", 1);
+            self.integrator_scatter_photons_shader
+                .set_define("HAS_ENVMAP", 1);
         } else {
-            self.visible_point_gen_shader.set_define("HAS_ENVMAP", 0);
-            self.test_shader.set_define("HAS_ENVMAP", 0);
+            self.integrator_gather_photons_shader
+                .set_define("HAS_ENVMAP", 0);
+            self.integrator_scatter_photons_shader
+                .set_define("HAS_ENVMAP", 0);
         }
 
         if let Some(map) = &environment.map {
@@ -45,15 +49,17 @@ impl Device {
             let cols = header.dimensions[0] as usize;
             let rows = header.dimensions[1] as usize;
 
-            self.visible_point_gen_shader
+            self.integrator_gather_photons_shader
                 .set_define("ENVMAP_COLS", cols);
-            self.visible_point_gen_shader
+            self.integrator_gather_photons_shader
                 .set_define("ENVMAP_ROWS", rows);
-            self.visible_point_gen_shader
+            self.integrator_gather_photons_shader
                 .set_define("ENVMAP_ROTATION", format!("{:+e}", map.rotation));
-            self.test_shader.set_define("ENVMAP_COLS", cols);
-            self.test_shader.set_define("ENVMAP_ROWS", rows);
-            self.test_shader
+            self.integrator_scatter_photons_shader
+                .set_define("ENVMAP_COLS", cols);
+            self.integrator_scatter_photons_shader
+                .set_define("ENVMAP_ROWS", rows);
+            self.integrator_scatter_photons_shader
                 .set_define("ENVMAP_ROTATION", format!("{:+e}", map.rotation));
 
             let mut luminance = vec![0.0f32; cols * rows];

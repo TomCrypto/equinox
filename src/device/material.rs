@@ -114,9 +114,9 @@ impl Device {
         }
 
         self.material_buffer.write_array(&parameters)?;
-        self.visible_point_gen_shader
+        self.integrator_gather_photons_shader
             .set_define("MATERIAL_DATA_COUNT", self.material_buffer.element_count());
-        self.test_shader
+        self.integrator_scatter_photons_shader
             .set_define("MATERIAL_DATA_COUNT", self.material_buffer.element_count());
 
         Ok(())

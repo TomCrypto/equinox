@@ -61,19 +61,21 @@ impl Device {
         HierarchyBuilder::new(&mut nodes).build(&mut instance_info);
 
         self.instance_buffer.write_array(&nodes)?;
-        self.visible_point_gen_shader
+        self.integrator_gather_photons_shader
             .set_define("INSTANCE_DATA_COUNT", self.instance_buffer.element_count());
-        self.test_shader
+        self.integrator_scatter_photons_shader
             .set_define("INSTANCE_DATA_COUNT", self.instance_buffer.element_count());
 
         if instance_info.is_empty() {
-            self.visible_point_gen_shader
+            self.integrator_gather_photons_shader
                 .set_define("INSTANCE_DATA_PRESENT", 0);
-            self.test_shader.set_define("INSTANCE_DATA_PRESENT", 0);
+            self.integrator_scatter_photons_shader
+                .set_define("INSTANCE_DATA_PRESENT", 0);
         } else {
-            self.visible_point_gen_shader
+            self.integrator_gather_photons_shader
                 .set_define("INSTANCE_DATA_PRESENT", 1);
-            self.test_shader.set_define("INSTANCE_DATA_PRESENT", 1);
+            self.integrator_scatter_photons_shader
+                .set_define("INSTANCE_DATA_PRESENT", 1);
         }
 
         // This implements parameter renumbering to ensure that all memory accesses in
@@ -107,9 +109,9 @@ impl Device {
         }
 
         self.geometry_buffer.write_array(&params)?;
-        self.visible_point_gen_shader
+        self.integrator_gather_photons_shader
             .set_define("GEOMETRY_DATA_COUNT", self.geometry_buffer.element_count());
-        self.test_shader
+        self.integrator_scatter_photons_shader
             .set_define("GEOMETRY_DATA_COUNT", self.geometry_buffer.element_count());
 
         Ok(())

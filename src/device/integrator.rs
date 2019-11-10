@@ -42,7 +42,7 @@ BINDS: pixel_state_li_radius_main, pixel_state_ld_count
 
 impl Device {
     pub(crate) fn scatter_photons(&mut self, n: usize, m: usize) {
-        let command = self.test_shader.begin_draw();
+        let command = self.integrator_scatter_photons_shader.begin_draw();
 
         command.bind(&self.geometry_buffer, "Geometry");
         command.bind(&self.material_buffer, "Material");
@@ -70,7 +70,7 @@ impl Device {
 
     pub(crate) fn gather_photons(&mut self) {
         // TODO: rename to "integrator_gather_photons_shader" when it works
-        let command = self.visible_point_gen_shader.begin_draw();
+        let command = self.integrator_gather_photons_shader.begin_draw();
 
         command.bind(&self.camera_buffer, "Camera");
         command.bind(&self.geometry_buffer, "Geometry");
