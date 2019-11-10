@@ -38,6 +38,8 @@ void main() {
     vec3 throughput = env_sample_light(ray.dir, unused_pdf, random);
     ray.dir = -ray.dir;
 
+    // TODO: better sampling for this, maybe using an ellipse or something to better fit the AABB
+
     // find the bounding sphere for the scene
     float radius = max(bbmax.x - bbmin.x, max(bbmax.y - bbmin.y, bbmax.z - bbmin.z)) / 2.0 * sqrt(3.0);
 
@@ -59,7 +61,7 @@ void main() {
     vec3 real_pos = rotate(base_pos, ray.dir);
 
     // compute a good ray origin
-    ray.org = real_pos - 100.0 * ray.dir;
+    ray.org = real_pos - radius * ray.dir;
 
     // now fire the ray at the world, hoping for an intersection
     uint flags;
@@ -81,7 +83,9 @@ void main() {
 
             is_receiver = is_receiver && (bounce != 0U);
 
-            if (is_receiver && rand_uniform_vec2(random).x < integrator.photon_rate) {
+            vec2 weights = rand_uniform_vec2(random);
+
+            if (is_receiver && weights.x < integrator.photon_rate) {
                 record_photon(ray, throughput / integrator.photon_rate);
                 return; // rasterize this point into the hash table now
             }
@@ -98,7 +102,7 @@ void main() {
 
             float q = max(0.0, 1.0 - luminance(bnew) / luminance(throughput));
 
-            if (rand_uniform_vec2(random).x < q) {
+            if (weights.y < q) {
                 break;
             }
 
