@@ -45,11 +45,11 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
 
             vec4 minor_data = texelFetch(photon_table_minor, coords + ivec2(x, y), 0);
 
-            vec3 photon_throughput = minor_data.yzw;
+            vec3 photon_throughput = minor_data.xyz;
 
             float sgn = any(lessThan(photon_throughput, vec3(0.0))) ? -1.0 : 1.0;
 
-            vec3 photon_direction = vec3(major_data.w, sqrt(max(0.0, 1.0 - major_data.w * major_data.w - minor_data.x * minor_data.x)) * sgn, minor_data.x);
+            vec3 photon_direction = vec3(major_data.w, sqrt(max(0.0, 1.0 - major_data.w * major_data.w - minor_data.w * minor_data.w)) * sgn, minor_data.w);
 
             float pdf;
             count += 1.0;

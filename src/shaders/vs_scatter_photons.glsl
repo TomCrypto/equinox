@@ -1,5 +1,5 @@
-out vec4 table_major;
-out vec4 table_minor;
+out vec4 photon_major_data;
+out vec4 photon_minor_data;
 
 #include <common.glsl>
 #include <random.glsl>
@@ -17,10 +17,11 @@ layout (std140) uniform Raster {
 void record_photon(ray_t ray, vec3 throughput) {
     ivec2 coords = hash_entry_for_cell(cell_for_point(ray.org), uint(gl_InstanceID));
 
-    gl_Position = vec4(2.0 * (vec2(0.5) + vec2(coords)) / integrator.hash_dimensions - 1.0, 0.0, 1.0);
+    photon_major_data = vec4(     fract(ray.org / integrator.cell_size), ray.dir.x);
+    photon_minor_data = vec4(ray.dir.y < 0.0 ? -throughput : throughput, ray.dir.z);
 
-    table_major = vec4(fract(ray.org / integrator.cell_size), ray.dir.x);
-    table_minor = vec4(ray.dir.z, throughput * ((ray.dir.y < 0.0) ? -1.0 : 1.0));
+    vec2 clip_space = 2.0 * (vec2(0.5) + vec2(coords)) / integrator.hash_dimensions - 1.0;
+    gl_Position = vec4(clip_space, 0.0, 1.0); // put the photon into its hash table entry
 }
 
 void main() {
