@@ -12,10 +12,6 @@ layout (std140) uniform Material {
 #define RAY_FLAG_EXTINCT                                                             (1U <<  2U)
 #define RAY_FLAG_MASK                                                                    0x00ffU
 
-#define MAT_PROP_DIFFUSE_BSDF                                                        (1U <<  8U)
-#define MAT_PROP_GLOSSY_BSDF                                                         (1U <<  9U)
-#define MAT_PROP_DELTA_BSDF                                                          (1U << 10U)
-
 // == LAMBERTIAN =================================================================================
 #define MAT_LAMBERTIAN_ALBEDO                               material_buffer.data[inst +  0U].xyz
 // == IDEAL REFLECTION ===========================================================================
@@ -39,9 +35,8 @@ layout (std140) uniform Material {
 
 // == LAMBERTIAN BSDF ============================================================================
 
-vec3 mat_lambertian_absorption(uint inst, float path_length, inout uint flags) {
-    if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
-        flags |= RAY_FLAG_EXTINCT;
+vec3 mat_lambertian_absorption(uint inst, bool inside, float path_length) {
+    if (inside) {
         return vec3(0.0);
     }
 
@@ -60,7 +55,7 @@ vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out floa
     return vec3(MAT_LAMBERTIAN_ALBEDO / M_PI);
 }
 
-vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
+vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
     vec2 rng = rand_uniform_vec2(random);
 
     float r = sqrt(rng.x);
@@ -81,9 +76,8 @@ vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 
 // == IDEAL REFLECTION BSDF ======================================================================
 
-vec3 mat_ideal_reflection_absorption(uint inst, float path_length, inout uint flags) {
-    if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
-        flags |= RAY_FLAG_EXTINCT;
+vec3 mat_ideal_reflection_absorption(uint inst, bool inside, float path_length) {
+    if (inside) {
         return vec3(0.0);
     }
 
@@ -94,7 +88,7 @@ vec3 mat_ideal_reflection_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, ou
     return pdf = 0.0, vec3(0.0);
 }
 
-vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
+vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
     pdf = 1.0;
     wi = reflect(-wo, normal);
 
@@ -103,7 +97,7 @@ vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 
 // == IDEAL REFRACTION BSDF ======================================================================
 
-vec3 mat_ideal_refraction_absorption(uint inst, float path_length, inout uint flags) {
+vec3 mat_ideal_refraction_absorption(uint inst, bool inside, float path_length) {
     return vec3(1.0); // TODO: add external extinction coefficients
 }
 
@@ -113,7 +107,7 @@ vec3 mat_ideal_refraction_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, ou
     return vec3(0.0);
 }
 
-vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
+vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
     pdf = 1.0;
 
     if (dot(wo, normal) >= 0.0) {
@@ -121,16 +115,12 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 
         if (wi == vec3(0.0)) {
             wi = reflect(-wo, normal);
-        } else {
-            flags |= RAY_FLAG_TRANSMIT;
         }
     } else {
         wi = refract(-wo, -normal, MAT_IDEAL_REFRACTION_IOR);
 
         if (wi == vec3(0.0)) {
             wi = reflect(-wo, -normal);
-        } else {
-            flags |= RAY_FLAG_TRANSMIT;
         }
     }
 
@@ -139,9 +129,8 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 
 // == PHONG BSDF =================================================================================
 
-vec3 mat_phong_absorption(uint inst, float path_length, inout uint flags) {
-    if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
-        flags |= RAY_FLAG_EXTINCT;
+vec3 mat_phong_absorption(uint inst, bool inside, float path_length) {
+    if (inside) {
         return vec3(0.0);
     }
 
@@ -162,7 +151,7 @@ vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf
     return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / M_2PI * cos_alpha / wi_n;
 }
 
-vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
+vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
     vec2 rng = rand_uniform_vec2(random);
 
     float phi = M_2PI * rng.x;
@@ -185,10 +174,10 @@ vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out flo
 
 // == DIELECTRIC BSDF ============================================================================
 
-vec3 mat_dielectric_absorption(uint inst, float path_length, inout uint flags) {
+vec3 mat_dielectric_absorption(uint inst, bool inside, float path_length) {
     vec3 extinction;
 
-    if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
+    if (inside) {
         extinction = MAT_DIELECTRIC_INTERNAL_EXTINCTION_COEFFICIENT
                    * MAT_DIELECTRIC_INTERNAL_REFRACTIVE_INDEX;
     } else {
@@ -203,7 +192,7 @@ vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out floa
     return pdf = 0.0, vec3(0.0);
 }
 
-vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
+vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
     pdf = 1.0;
 
     float n1, n2, cosI = dot(wo, normal);
@@ -236,7 +225,6 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 
         if (rand_uniform_vec2(random).x < t) {
             wi = (eta * cosI - cosT) * normal - eta * wo;
-            flags |= RAY_FLAG_TRANSMIT;
         } else {
             wi = reflect(-wo, normal);
         }
@@ -249,9 +237,8 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 
 // == OREN-NAYAR BSDF ============================================================================
 
-vec3 mat_oren_nayar_absorption(uint inst, float path_length, inout uint flags) {
-    if ((flags & RAY_FLAG_OUTSIDE) == 0U) {
-        flags |= RAY_FLAG_EXTINCT;
+vec3 mat_oren_nayar_absorption(uint inst, bool inside, float path_length) {
+    if (inside) {
         return vec3(0.0);
     }
 
@@ -282,7 +269,7 @@ vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out floa
     return vec3(MAT_OREN_NAYAR_ALBEDO / M_PI) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
 }
 
-vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout uint flags, inout random_t random) {
+vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
     vec2 rng = rand_uniform_vec2(random);
 
     float r = sqrt(rng.x);
@@ -341,21 +328,19 @@ bool mat_is_not_specular(uint material) {
 }
 
 vec3 mat_sample_brdf(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout random_t random) {
-    uint flags;
-
     switch (material) {
         case 0U:
-            return mat_lambertian_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+            return mat_lambertian_sample_brdf(inst, normal, wi, wo, pdf, random);
         case 1U:
-            return mat_ideal_reflection_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+            return mat_ideal_reflection_sample_brdf(inst, normal, wi, wo, pdf, random);
         case 2U:
-            return mat_phong_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+            return mat_phong_sample_brdf(inst, normal, wi, wo, pdf, random);
         case 3U:
-            return mat_ideal_refraction_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+            return mat_ideal_refraction_sample_brdf(inst, normal, wi, wo, pdf, random);
         case 4U:
-            return mat_dielectric_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+            return mat_dielectric_sample_brdf(inst, normal, wi, wo, pdf, random);
         case 5U:
-            return mat_oren_nayar_sample_brdf(inst, normal, wi, wo, pdf, flags, random);
+            return mat_oren_nayar_sample_brdf(inst, normal, wi, wo, pdf, random);
         default:
             return vec3(0.0);
     }
@@ -364,27 +349,17 @@ vec3 mat_sample_brdf(uint material, uint inst, vec3 normal, out vec3 wi, vec3 wo
 // == HIGH-LEVEL MATERIAL INTERACTION ============================================================
 
 #define MAT_INTERACT(absorption, eval_brdf, sample_brdf, props) {                                 \
-    float light_pdf, scatter_pdf;                                                                 \
+    float scatter_pdf;                                                                            \
     vec3 wi;                                                                                      \
                                                                                                   \
-    flags |= RAY_FLAG_OUTSIDE * uint(dot(wo, normal) > 0.0);                                      \
+    beta = absorption(inst, dot(wo, normal) <= 0.0, path_length);                                 \
                                                                                                   \
-    beta = absorption(inst, path_length, flags);                                                  \
-                                                                                                  \
-    if ((flags & RAY_FLAG_EXTINCT) != 0U) {                                                       \
-        return ray_t(point, normal);                                                              \
-    }                                                                                             \
-                                                                                                  \
-    beta *= sample_brdf(inst, normal, wi, wo, scatter_pdf, flags, random);                        \
-                                                                                                  \
-    flags = (flags & ~MAT_FLAG_MASK) | props; /* store properties */                              \
+    beta *= sample_brdf(inst, normal, wi, wo, scatter_pdf, random);                               \
     return ray_t(point + PREC * sign(dot(wi, normal)) * normal, wi);                              \
 }
 
 ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, float path_length,
-                   out vec3 beta, out uint flags, inout random_t random) {
-    flags = material & MAT_FLAG_MASK;
-
+                   out vec3 beta, inout random_t random) {
     switch (material & ~MAT_FLAG_MASK) {
         case 0U:
             MAT_INTERACT(mat_lambertian_absorption,
@@ -417,9 +392,48 @@ ray_t mat_interact(uint material, uint inst, vec3 normal, vec3 wo, vec3 point, f
                          mat_oren_nayar_sample_brdf,
                          MAT_PROP_DIFFUSE_BSDF)
         default:
-            flags |= RAY_FLAG_EXTINCT;
             return ray_t(point, normal);
     }
 }
 
 #undef MAT_INTERACT
+
+#define MAT_IS_RECEIVER(material) \
+    ((material & 0x8000U) != 0U)
+
+// An X-macro for inlining arbitrary code inside a material switch-case, to avoid repetitively
+// having to dispatch to specific material functions; it expands the `MAT_SWITCH_LOGIC` macro.
+
+#define MAT_SWITCH(material)                                                                      \
+    switch (material & 0x7fffU) {                                                                 \
+        case 0U:                                                                                  \
+            MAT_SWITCH_LOGIC(mat_lambertian_absorption,                                           \
+                             mat_lambertian_eval_brdf,                                            \
+                             mat_lambertian_sample_brdf)                                          \
+            break;                                                                                \
+        case 1U:                                                                                  \
+            MAT_SWITCH_LOGIC(mat_ideal_reflection_absorption,                                     \
+                             mat_ideal_reflection_eval_brdf,                                      \
+                             mat_ideal_reflection_sample_brdf)                                    \
+            break;                                                                                \
+        case 2U:                                                                                  \
+            MAT_SWITCH_LOGIC(mat_phong_absorption,                                                \
+                             mat_phong_eval_brdf,                                                 \
+                             mat_phong_sample_brdf)                                               \
+            break;                                                                                \
+        case 3U:                                                                                  \
+            MAT_SWITCH_LOGIC(mat_ideal_refraction_absorption,                                     \
+                             mat_ideal_refraction_eval_brdf,                                      \
+                             mat_ideal_refraction_sample_brdf)                                    \
+            break;                                                                                \
+        case 4U:                                                                                  \
+            MAT_SWITCH_LOGIC(mat_dielectric_absorption,                                           \
+                             mat_dielectric_eval_brdf,                                            \
+                             mat_dielectric_sample_brdf)                                          \
+            break;                                                                                \
+        case 5U:                                                                                  \
+            MAT_SWITCH_LOGIC(mat_oren_nayar_absorption,                                           \
+                             mat_oren_nayar_eval_brdf,                                            \
+                             mat_oren_nayar_sample_brdf)                                          \
+            break;                                                                                \
+    }

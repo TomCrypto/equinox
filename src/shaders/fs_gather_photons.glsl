@@ -185,7 +185,6 @@ void main() {
 
     vec3 throughput = vec3(1.0);
     uint traversal_start = 0U;
-    uint flags;
     float unused_pdf;
     bool explicit_light = false;
 
@@ -227,18 +226,16 @@ void main() {
             } else {
                 // NOT DIFFUSE: just keep tracing as usual...
                 vec3 beta;
-                ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, beta, flags, random);
+                ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, beta, random);
                 throughput *= beta;
 
-                if ((flags & RAY_FLAG_EXTINCT) != 0U) {
-                    break; // no need to trace further
-                }
-
-                if (((~flags) & (RAY_FLAG_OUTSIDE | RAY_FLAG_TRANSMIT)) == 0U) {
+                /*if (((~flags) & (RAY_FLAG_OUTSIDE | RAY_FLAG_TRANSMIT)) == 0U) {
                     traversal_start = traversal.hit.z;
                 } else {
                     traversal_start = 0U;
-                }
+                }*/
+
+                traversal_start = 0U;
             }            
         } else {
             if (!explicit_light) {

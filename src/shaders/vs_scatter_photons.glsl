@@ -24,6 +24,67 @@ void record_photon(ray_t ray, vec3 throughput) {
     gl_Position = vec4(clip_space, 0.0, 1.0); // put the photon into its hash table entry
 }
 
+bool scatter_photon(ray_t ray, inout random_t random, vec3 throughput) {
+    uint traversal_start = 0U;
+
+    for (uint bounce = 0U; bounce < 8U; ++bounce) {
+        traversal_t traversal = traverse_scene(ray, traversal_start);
+
+        if (traversal_has_hit(traversal)) {
+            ray.org += ray.dir * traversal.range.y;
+
+            vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
+
+            uint material = traversal.hit.y & 0xffffU;
+            uint mat_inst = traversal.hit.y >> 16U;
+            
+            vec2 weights = rand_uniform_vec2(random);
+
+            // TODO: add direct lighting flag to extend the first bounce check....
+            bool is_receiver = MAT_IS_RECEIVER(material) && (bounce != 0U);
+
+            bool inside = dot(ray.dir, normal) > 0.0;
+            vec3 wi;
+
+            #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
+                throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
+                                                                                                  \
+                if (is_receiver && weights.x < integrator.photon_rate) {                          \
+                    record_photon(ray, throughput / integrator.photon_rate);                      \
+                    return true; /* rasterize photon into the hash table */                       \
+                }                                                                                 \
+                                                                                                  \
+                float scatter_pdf;                                                                \
+                                                                                                  \
+                vec3 f = sample(mat_inst, normal, wi, -ray.dir, scatter_pdf, random);             \
+                                                                                                  \
+                float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));      \
+                                                                                                  \
+                if (weights.y < q) {                                                              \
+                    return false;                                                                 \
+                }                                                                                 \
+                                                                                                  \
+                throughput *= f / (1.0 - q);                                                      \
+                                                                                                  \
+                ray = make_ray(ray.org, wi, normal);                                              \
+            }
+
+            MAT_SWITCH(material)
+            #undef MAT_SWITCH_LOGIC
+
+            if (!inside && dot(wi, normal) < 0.0) {
+                traversal_start = traversal.hit.z;
+            } else {
+                traversal_start = 0U;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    return false;
+}
+
 void main() {
     random_t random = rand_initialize_from_seed(uvec2(gl_VertexID, gl_InstanceID) + integrator.rng);
 
@@ -64,55 +125,8 @@ void main() {
     // compute a good ray origin
     ray.org = real_pos - radius * ray.dir;
 
-    // now fire the ray at the world, hoping for an intersection
-    uint flags;
-
-    for (uint bounce = 0U; bounce < 8U; ++bounce) {
-        traversal_t traversal = traverse_scene(ray, 0U);
-
-        if (traversal_has_hit(traversal)) {
-            ray.org += ray.dir * traversal.range.y;
-
-            vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
-
-            uint material = traversal.hit.y & 0xffffU;
-            uint mat_inst = traversal.hit.y >> 16U;
-
-            // TODO: don't hardcode this constant later
-            bool is_receiver = (material & 0x8000U) != 0U;
-            material &= ~0x8000U;
-
-            is_receiver = is_receiver && (bounce != 0U);
-
-            vec2 weights = rand_uniform_vec2(random);
-
-            if (is_receiver && weights.x < integrator.photon_rate) {
-                record_photon(ray, throughput / integrator.photon_rate);
-                return; // rasterize this point into the hash table now
-            }
-
-            vec3 new_beta;
-
-            ray = mat_interact(material, mat_inst, normal, -ray.dir, ray.org, traversal.range.y, new_beta, flags, random);
-
-            if ((flags & RAY_FLAG_EXTINCT) != 0U) {
-                break;
-            }
-
-            vec3 bnew = throughput * new_beta;
-
-            float q = max(0.0, 1.0 - luminance(bnew) / luminance(throughput));
-
-            if (weights.y < q) {
-                break;
-            }
-
-            throughput = bnew / (1.0 - q);
-        } else {
-            break;
-        }
+    if (!scatter_photon(ray, random, throughput)) {
+        // prevent point from being rasterized
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     }
-
-    // prevent point from being rasterized
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }
