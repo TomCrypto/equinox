@@ -167,9 +167,10 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout 
 
             bool is_receiver = MAT_IS_RECEIVER(material);
 
-            mis = MAT_SAMPLE_EXPLICIT(material);
+            mis = MAT_SAMPLE_EXPLICIT(material) && (bounce != integrator.max_gather_bounces - 1U);
 
             vec3 wi, f, mis_f, mis_wi;
+            float mis_material_pdf;
 
             light_pdf = 0.0;
             vec3 light = mis ? env_sample_light(mis_wi, light_pdf, random) : vec3(0.0);
@@ -180,7 +181,7 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout 
                 throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
                                                                                                   \
                 if (light_pdf != 0.0) {                                                           \
-                    mis_f = eval(mat_inst, normal, mis_wi, -ray.dir, material_pdf)                \
+                    mis_f = eval(mat_inst, normal, mis_wi, -ray.dir, mis_material_pdf)            \
                           * abs(dot(mis_wi, normal)) * throughput;                                \
                 }                                                                                 \
                                                                                                   \
@@ -203,9 +204,9 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout 
                 mis_f *= adjustment;
             }
 
-            if (light_pdf != 0.0 && material_pdf != 0.0) {
+            if (light_pdf != 0.0 && mis_material_pdf != 0.0) {
                 if (!is_ray_occluded(make_ray(ray.org, mis_wi, normal), 1.0 / 0.0)) {
-                    ld += mis_f * light * power_heuristic(light_pdf, material_pdf);
+                    ld += mis_f * light * power_heuristic(light_pdf, mis_material_pdf);
                 }
             }
 
