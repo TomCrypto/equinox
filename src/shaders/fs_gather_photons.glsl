@@ -145,7 +145,7 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout random_t random) {
+void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, random_t random) {
     float radius_squared = texelFetch(li_range_tex, ivec2(gl_FragCoord - 0.5), 0).w;
     radius_squared = min(radius_squared, pow(integrator.cell_size * 0.5, 2.0));
 

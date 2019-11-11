@@ -121,7 +121,10 @@ impl Device {
 
     pub(crate) fn update_integrator_state(&mut self, pass: &IntegratorPass) -> Result<(), Error> {
         self.state.current_pass += 1;
-        self.state.photon_count += (pass.n * pass.m) as f32;
+
+        if self.state.receivers_present {
+            self.state.photon_count += (pass.n * pass.m) as f32;
+        }
 
         let (hash_cell_cols, hash_cell_rows) = Self::get_hash_cell_dimensions(pass.m);
 
@@ -141,7 +144,7 @@ impl Device {
         data.rng[1] = self.state.rng.next_u32();
         data.current_pass = self.state.current_pass;
         data.photon_rate = self.state.integrator.photon_rate.max(0.05).min(0.95);
-        data.photon_count = self.state.photon_count;
+        data.photon_count = self.state.photon_count.max(1.0);
         data.sppm_alpha = self.state.integrator.alpha;
         data.cell_size = pass.cell_size;
         data.hash_cell_cols = hash_cell_cols as u32;

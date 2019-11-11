@@ -28,7 +28,7 @@ void discard_photon() {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }
 
-bool scatter_photon(inout ray_t ray, inout vec3 throughput, inout random_t random) {
+bool scatter_photon(inout ray_t ray, inout vec3 throughput, random_t random) {
     for (uint bounce = 0U; bounce < integrator.max_scatter_bounces; ++bounce) {
         traversal_t traversal = traverse_scene(ray, 0U);
 
@@ -45,7 +45,7 @@ bool scatter_photon(inout ray_t ray, inout vec3 throughput, inout random_t rando
             // Note surfaces will NEVER receive first bounce photons. The "sample explicit" flag
             // is purely an optimization meant for when a surface cannot directly see any light.
 
-            bool is_receiver = (bounce != 0U) && MAT_IS_RECEIVER(material);
+            bool is_receiver = MAT_IS_RECEIVER(material) && (bounce != 0U);
 
             bool inside = dot(ray.dir, normal) > 0.0;
             vec3 f;
@@ -60,8 +60,8 @@ bool scatter_photon(inout ray_t ray, inout vec3 throughput, inout random_t rando
                                                                                                   \
                 throughput /= is_receiver ? 1.0 - integrator.photon_rate : 1.0;                   \
                                                                                                   \
-                float material_pdf; /* we don't need the PDF of the sampling method */            \
-                f = sample(mat_inst, normal, ray.dir, -ray.dir, material_pdf, random);            \
+                float unused_pdf; /* we don't need the PDF of the sampling method */              \
+                f = sample(mat_inst, normal, ray.dir, -ray.dir, unused_pdf, random);              \
             }
 
             MAT_DO_SWITCH(material)
