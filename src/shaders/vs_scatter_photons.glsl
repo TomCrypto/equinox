@@ -27,7 +27,7 @@ void record_photon(ray_t ray, vec3 throughput) {
 bool scatter_photon(ray_t ray, inout random_t random, vec3 throughput) {
     uint traversal_start = 0U;
 
-    for (uint bounce = 0U; bounce < 8U; ++bounce) {
+    for (uint bounce = 0U; bounce < integrator.max_scatter_bounces; ++bounce) {
         traversal_t traversal = traverse_scene(ray, traversal_start);
 
         if (traversal_has_hit(traversal)) {

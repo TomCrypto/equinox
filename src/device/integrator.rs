@@ -29,6 +29,11 @@ pub struct IntegratorData {
     hash_rows_mask: u32,
 
     hash_dimensions: [f32; 2],
+
+    max_scatter_bounces: u32,
+    max_gather_bounces: u32,
+
+    padding: [u32; 2],
 }
 
 pub struct IntegratorPass {
@@ -132,6 +137,8 @@ impl Device {
         data.hash_cell_col_bits = (hash_cell_cols - 1).count_ones();
         data.hash_dimensions[0] = self.photon_hash_table_major.cols() as f32;
         data.hash_dimensions[1] = self.photon_hash_table_major.rows() as f32;
+        data.max_scatter_bounces = self.state.integrator.max_scatter_bounces;
+        data.max_gather_bounces = self.state.integrator.max_gather_bounces;
 
         data.hash_cols_mask =
             ((self.photon_hash_table_major.cols() - 1) & !(hash_cell_cols - 1)) as u32;

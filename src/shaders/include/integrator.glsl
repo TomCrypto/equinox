@@ -22,6 +22,9 @@ layout (std140) uniform Integrator {
     uint hash_rows_mask;
 
     vec2 hash_dimensions;
+
+    uint max_scatter_bounces;
+    uint max_gather_bounces;
 } integrator;
 
 cell_t cell_for_point(vec3 point) {

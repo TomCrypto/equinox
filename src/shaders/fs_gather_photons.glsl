@@ -158,7 +158,7 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout 
     uint mat_inst;
     vec3 wi, f;
 
-    for (uint bounce = 0U; bounce < 8U; ++bounce) {
+    for (uint bounce = 0U; bounce < integrator.max_gather_bounces; ++bounce) {
         traversal_t traversal = traverse_scene(ray, traversal_start);
 
         if (traversal_has_hit(traversal)) {
