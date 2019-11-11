@@ -36,14 +36,14 @@ pub enum Material {
 }
 
 impl Material {
-    pub fn can_be_receiver(&self) -> bool {
+    pub fn has_delta_bsdf(&self) -> bool {
         match self {
-            Self::Lambertian { .. } => true,
-            Self::IdealReflection { .. } => false,
-            Self::IdealRefraction { .. } => false,
-            Self::Phong { .. } => true,
-            Self::Dielectric { .. } => false,
-            Self::OrenNayar { .. } => true,
+            Self::Lambertian { .. } => false,
+            Self::IdealReflection { .. } => true,
+            Self::IdealRefraction { .. } => true,
+            Self::Phong { .. } => false,
+            Self::Dielectric { .. } => true,
+            Self::OrenNayar { .. } => false,
         }
     }
 }

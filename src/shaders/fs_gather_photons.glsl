@@ -60,7 +60,7 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
     return result;
 }
 
-vec3 gather_photons(float radius_squared, vec3 position, vec3 direction, vec3 normal, uint material, uint inst, out float count) {
+vec3 gather_photons_in_sphere(float radius_squared, vec3 position, vec3 wo, vec3 normal, uint material, uint inst, out float count) {
     if (radius_squared == 0.0) {
         return vec3(0.0);
     }
@@ -72,14 +72,14 @@ vec3 gather_photons(float radius_squared, vec3 position, vec3 direction, vec3 no
 
     vec3 accumulation = vec3(0.0);
 
-    accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
-    accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
-    accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
-    accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
-    accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
-    accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
-    accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 0.0), position, radius_squared, material, inst, normal, -direction, count);
-    accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 1.0), position, radius_squared, material, inst, normal, -direction, count);
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 0.0), position, radius_squared, material, inst, normal, wo, count);
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 1.0), position, radius_squared, material, inst, normal, wo, count);
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 0.0), position, radius_squared, material, inst, normal, wo, count);
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 1.0), position, radius_squared, material, inst, normal, wo, count);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 0.0), position, radius_squared, material, inst, normal, wo, count);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 1.0), position, radius_squared, material, inst, normal, wo, count);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 0.0), position, radius_squared, material, inst, normal, wo, count);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 1.0), position, radius_squared, material, inst, normal, wo, count);
 
     return accumulation;
 }
@@ -168,9 +168,7 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout 
 
             bool is_receiver = MAT_IS_RECEIVER(material);
 
-            // TODO: remove when we've fully converted to new materials
-            // TODO: add back a direct light sampling flag? ...
-            mis = mat_is_not_specular(material & 0x7fffU);
+            mis = MAT_SAMPLE_EXPLICIT(material);
 
             vec3 wi, f, mis_f, mis_wi;
 
@@ -214,7 +212,7 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout 
 
             if (is_receiver) {
                 if (mis) {
-                    // Finish the MIS direct light sampling procedure we started earlier. This
+                    // Finish the MIS direct light sampling procedure we started earlier; this
                     // is done to ensure that the MIS weights result in an unbiased estimator.
 
                     if (!is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
@@ -224,16 +222,15 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout 
                     }
                 }
 
-                // TODO: remove mask when we've converted to new materials
-                li = throughput * gather_photons(radius_squared, ray.org, ray.dir, normal, material & 0x7fffU, mat_inst, count);
+                li = throughput * gather_photons_in_sphere(radius_squared, ray.org, -ray.dir, normal, material, mat_inst, count);
                 return;
             }
 
             ray = make_ray(ray.org, wi, normal); // delay this for the occlusion checks above
             traversal_start = (!inside && dot(ray.dir, normal) < 0.0) ? traversal.hit.z : 0U;
         } else {
-            // If we started an MIS direct light sampling procedure in the previous bounce, finish
-            // it now; the ray was clearly not occluded so accumulate this light with MIS weights.
+            // If we began an MIS direct light sampling procedure in the previous bounce, finish
+            // it now; the ray was clearly not occluded so accumulate the light with MIS weight.
 
             vec3 light = env_eval_light(ray.dir, light_pdf);
 

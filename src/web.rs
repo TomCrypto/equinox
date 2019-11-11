@@ -238,21 +238,27 @@ impl WebScene {
             geometry: 0,
             material: 1,
             parameters: vec![],
-            receiver: true,
+            photon_receiver: true,
+            sample_explicit: true,
+            visible: true,
         });
 
         self.scene.instance_list.push(Instance {
             geometry: 1,
             material: 5,
             parameters: vec![0.0, 0.8, 0.0],
-            receiver: true,
+            photon_receiver: true,
+            sample_explicit: true,
+            visible: true,
         });
 
         self.scene.instance_list.push(Instance {
             geometry: 1,
             material: 2,
             parameters: vec![-2.0, 0.8, 0.0],
-            receiver: true,
+            photon_receiver: true,
+            sample_explicit: true,
+            visible: true,
         }); /*
 
             self.scene.instance_list.push(Instance {

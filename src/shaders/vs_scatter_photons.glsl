@@ -40,11 +40,12 @@ bool scatter_photon(ray_t ray, inout random_t random, vec3 throughput) {
             
             vec2 weights = rand_uniform_vec2(random);
 
-            // TODO: add direct lighting flag to extend the first bounce check....
-            bool is_receiver = MAT_IS_RECEIVER(material) && (bounce != 0U);
+            // Note surfaces will NEVER receive first bounce photons. The "sample explicit" flag
+            // is purely an optimization meant for when a surface cannot directly see any light.
+
+            bool is_receiver = (bounce != 0U) && MAT_IS_RECEIVER(material);
 
             bool inside = dot(ray.dir, normal) > 0.0;
-            vec3 wi;
 
             #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
                 throughput *= absorption(mat_inst, inside, traversal.range.y);                    \

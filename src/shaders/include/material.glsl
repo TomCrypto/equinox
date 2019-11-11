@@ -283,7 +283,7 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
 }
 
 vec3 mat_eval_brdf(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
-    switch (material) {
+    switch (material & 0x3fffU) {
         case 0U:
             return mat_lambertian_eval_brdf(inst, normal, wi, wo, pdf);
         case 1U:
@@ -301,33 +301,17 @@ vec3 mat_eval_brdf(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo, out 
     }
 }
 
-bool mat_is_not_specular(uint material) {
-    switch (material) {
-        case 0U:
-            return true;
-        case 1U:
-            return false;
-        case 2U:
-            return true;
-        case 3U:
-            return false;
-        case 4U:
-            return false;
-        case 5U:
-            return true;
-        default:
-            return false;
-    }
-}
-
 #define MAT_IS_RECEIVER(material) \
     ((material & 0x8000U) != 0U)
+
+#define MAT_SAMPLE_EXPLICIT(material) \
+    ((material & 0x4000U) != 0U)
 
 // An X-macro for inlining arbitrary code inside a material switch-case, to avoid repetitively
 // having to dispatch to specific material functions; it expands the `MAT_SWITCH_LOGIC` macro.
 
 #define MAT_DO_SWITCH(material)                                                                   \
-    switch (material & 0x7fffU) {                                                                 \
+    switch (material & 0x3fffU) {                                                                 \
         case 0U:                                                                                  \
             MAT_SWITCH_LOGIC(mat_lambertian_absorption,                                           \
                              mat_lambertian_eval_brdf,                                            \

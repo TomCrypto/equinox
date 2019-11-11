@@ -53,6 +53,8 @@ pub struct IntegratorState {
 
     pub(crate) current_pass: u32,
     pub(crate) photon_count: f32,
+
+    pub(crate) receivers_present: bool,
 }
 
 impl Default for IntegratorState {
@@ -65,6 +67,7 @@ impl Default for IntegratorState {
             integrator: Integrator::default(),
             photon_count: 0.0,
             current_pass: 0,
+            receivers_present: false,
         }
     }
 }
@@ -87,6 +90,15 @@ impl Device {
                 self.state.integrator.initial_search_radius.powi(2),
             ],
         );
+
+        self.state.receivers_present = false;
+
+        for instance in scene.instance_list.iter() {
+            if instance.visible && instance.photon_receiver {
+                self.state.receivers_present = true;
+                break;
+            }
+        }
     }
 
     pub(crate) fn prepare_integrator_pass(&self) -> IntegratorPass {
@@ -149,6 +161,10 @@ impl Device {
     }
 
     pub(crate) fn scatter_photons(&mut self, pass: &IntegratorPass) {
+        if !self.state.receivers_present {
+            return;
+        }
+
         let command = self.integrator_scatter_photons_shader.begin_draw();
 
         command.bind(&self.geometry_buffer, "Geometry");
@@ -204,6 +220,10 @@ impl Device {
     }
 
     pub(crate) fn update_estimates(&mut self) {
+        if !self.state.receivers_present {
+            return;
+        }
+
         let command = self.integrator_update_estimates_shader.begin_draw();
 
         command.bind(&self.integrator_buffer, "Integrator");

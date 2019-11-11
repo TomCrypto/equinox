@@ -34,6 +34,10 @@ impl Device {
         let mut geometry_start = 0;
 
         for instance in instance_list {
+            if !instance.visible {
+                continue;
+            }
+
             let geometry = &geometry_list[instance.geometry];
             let material = &material_list[instance.material];
 
@@ -44,7 +48,8 @@ impl Device {
             instance_info.push(InstanceInfo {
                 bbox,
                 cost: geometry.evaluation_cost(),
-                receiver: instance.receiver && material.can_be_receiver(),
+                photon_receiver: instance.photon_receiver && !material.has_delta_bsdf(),
+                sample_explicit: instance.sample_explicit && !material.has_delta_bsdf(),
                 geometry: instance.geometry as u16,
                 geo_inst: geometry_start,
                 material: material_index(material),
@@ -54,7 +59,7 @@ impl Device {
             geometry_start += (instance.parameters.len() as u16 + 3) / 4;
         }
 
-        let node_count = HierarchyBuilder::node_count_for_leaves(instance_list.len());
+        let node_count = HierarchyBuilder::node_count_for_leaves(instance_info.len());
 
         let mut nodes = self.allocator.allocate(node_count);
 
@@ -84,6 +89,7 @@ impl Device {
 
         let geometry_parameter_count: usize = instance_list
             .iter()
+            .filter(|inst| inst.visible)
             .map(|inst| (inst.parameters.len() + 3) / 4)
             .sum();
 
@@ -91,6 +97,10 @@ impl Device {
         let mut offset = 0;
 
         for instance in instance_list {
+            if !instance.visible {
+                continue;
+            }
+
             let indices = renumber_parameters(&geometry_list[instance.geometry]);
             let block_count = (indices.len() + 3) / 4;
 
@@ -141,16 +151,26 @@ impl SceneInstanceNode {
         material: u16,
         mat_inst: u16,
         is_last: bool,
-        receiver: bool,
+        photon_receiver: bool,
+        sample_explicit: bool,
     ) -> Self {
         assert!(geometry < 0x8000 && geo_inst < 0x8000);
         assert!(material < 0x8000 && mat_inst < 0x8000);
 
+        let mut material_instance_flags = 0;
+
+        material_instance_flags |= Self::photon_receiver_flag(photon_receiver);
+        material_instance_flags |= Self::sample_explicit_flag(sample_explicit);
+
+        let mut geometry_instance_flags = 0;
+
+        geometry_instance_flags |= Self::is_last_flag(is_last);
+
         Self {
             min,
             max,
-            word1: Self::pack_u32(geo_inst, geometry) | Self::is_last_bit(is_last),
-            word2: Self::pack_u32(mat_inst, material) | Self::receiver_flag(receiver),
+            word1: Self::pack_u32(geo_inst, geometry) | geometry_instance_flags,
+            word2: Self::pack_u32(mat_inst, material) | material_instance_flags,
         }
     }
 
@@ -172,7 +192,7 @@ impl SceneInstanceNode {
         }
     }
 
-    fn is_last_bit(is_last: bool) -> u32 {
+    fn is_last_flag(is_last: bool) -> u32 {
         if is_last {
             0x8000
         } else {
@@ -180,9 +200,17 @@ impl SceneInstanceNode {
         }
     }
 
-    fn receiver_flag(receiver: bool) -> u32 {
-        if receiver {
+    fn photon_receiver_flag(photon_receiver: bool) -> u32 {
+        if photon_receiver {
             0x8000
+        } else {
+            0x0000
+        }
+    }
+
+    fn sample_explicit_flag(sample_explicit: bool) -> u32 {
+        if sample_explicit {
+            0x4000
         } else {
             0x0000
         }
@@ -197,7 +225,8 @@ impl SceneInstanceNode {
 pub struct InstanceInfo {
     pub bbox: BoundingBox,
     pub cost: f32,
-    pub receiver: bool,
+    pub photon_receiver: bool,
+    pub sample_explicit: bool,
     pub geometry: u16,
     pub geo_inst: u16,
     pub material: u16,
@@ -265,7 +294,8 @@ impl<'a> HierarchyBuilder<'a> {
             leaf.material,
             leaf.mat_inst,
             is_last,
-            leaf.receiver,
+            leaf.photon_receiver,
+            leaf.sample_explicit,
         );
 
         if !is_last {

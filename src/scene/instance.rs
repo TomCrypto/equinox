@@ -9,6 +9,14 @@ pub struct Instance {
     pub material: usize,
     #[serde(default)]
     pub parameters: Vec<f32>,
-    #[serde(default)]
-    pub receiver: bool,
+    #[serde(default = "true_default")]
+    pub photon_receiver: bool,
+    #[serde(default = "true_default")]
+    pub sample_explicit: bool,
+    #[serde(default = "true_default")]
+    pub visible: bool,
+}
+
+fn true_default() -> bool {
+    true
 }
