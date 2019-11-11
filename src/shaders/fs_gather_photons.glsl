@@ -167,15 +167,16 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, random
 
             bool is_receiver = MAT_IS_RECEIVER(material);
 
-            mis = MAT_SAMPLE_EXPLICIT(material) && (bounce != integrator.max_gather_bounces - 1U);
+            bool inside = dot(ray.dir, normal) > 0.0;
+
+            mis = MAT_SAMPLE_EXPLICIT(material) && (bounce != integrator.max_gather_bounces - 1U)
+                                                && !inside;
 
             vec3 wi, f, mis_f, mis_wi;
             float mis_material_pdf;
 
             light_pdf = 0.0;
             vec3 light = mis ? env_sample_light(mis_wi, light_pdf, random) : vec3(0.0);
-
-            bool inside = dot(ray.dir, normal) > 0.0;
 
             #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
                 throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
