@@ -56,8 +56,8 @@ bool scatter_photon(ray_t ray, inout random_t random, vec3 throughput) {
                                                                                                   \
                 throughput /= is_receiver ? 1.0 - integrator.photon_rate : 1.0;                   \
                                                                                                   \
-                float material_pdf; /* we don't need the PDF of the sampling method */            \
-                vec3 f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, random);            \
+                float material_pdf; /* we don't need the PDF of the sampling method here */       \
+                vec3 f = sample(mat_inst, normal, ray.dir, -ray.dir, material_pdf, random);       \
                                                                                                   \
                 float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));      \
                                                                                                   \
@@ -67,17 +67,13 @@ bool scatter_photon(ray_t ray, inout random_t random, vec3 throughput) {
                                                                                                   \
                 throughput *= f / (1.0 - q);                                                      \
                                                                                                   \
-                ray = make_ray(ray.org, wi, normal);                                              \
+                ray = make_ray(ray.org, ray.dir, normal);                                         \
             }
 
             MAT_DO_SWITCH(material)
             #undef MAT_SWITCH_LOGIC
 
-            if (!inside && dot(wi, normal) < 0.0) {
-                traversal_start = traversal.hit.z;
-            } else {
-                traversal_start = 0U;
-            }
+            traversal_start = (!inside && dot(ray.dir, normal) < 0.0) ? traversal.hit.z : 0U;
         } else {
             return false;
         }

@@ -149,14 +149,11 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout 
     float radius_squared = texelFetch(li_range_tex, ivec2(gl_FragCoord - 0.5), 0).w;
     radius_squared = min(radius_squared, pow(integrator.cell_size * 0.5, 2.0));
 
+    float light_pdf, material_pdf;
     vec3 throughput = vec3(1.0);
     uint traversal_start = 0U;
-    bool explicit_light = false;
-    float light_pdf, material_pdf;
-    vec3 normal;
-    uint material;
-    uint mat_inst;
-    vec3 wi, f;
+
+    bool mis = false;
 
     for (uint bounce = 0U; bounce < integrator.max_gather_bounces; ++bounce) {
         traversal_t traversal = traverse_scene(ray, traversal_start);
@@ -164,89 +161,85 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout 
         if (traversal_has_hit(traversal)) {
             ray.org += ray.dir * traversal.range.y;
 
-            normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
+            vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
 
-            material = traversal.hit.y & 0xffffU;
-            mat_inst = traversal.hit.y >> 16U;
+            uint material = traversal.hit.y & 0xffffU;
+            uint mat_inst = traversal.hit.y >> 16U;
 
-            // TODO: add back a direct light sampling flag? ...
             bool is_receiver = MAT_IS_RECEIVER(material);
 
             // TODO: remove when we've fully converted to new materials
-            material &= 0x7fffU;
+            // TODO: add back a direct light sampling flag? ...
+            mis = mat_is_not_specular(material & 0x7fffU);
 
-            if (mat_is_not_specular(material)) {
-                vec3 Li = env_sample_light(wi, light_pdf, random);
+            vec3 wi, f, mis_f, mis_wi;
 
-                if (light_pdf != 0.0) {
-                    f = mat_eval_brdf(material, mat_inst, normal, wi, -ray.dir, material_pdf) * abs(dot(wi, normal));
-
-                    if (material_pdf != 0.0 && !is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
-                        ld += throughput * f * Li * power_heuristic(light_pdf, material_pdf);
-                    }
-                }
-
-                explicit_light = true;
-            } else {
-                explicit_light = false;
-            }
+            light_pdf = 0.0;
+            vec3 light = mis ? env_sample_light(mis_wi, light_pdf, random) : vec3(0.0);
 
             bool inside = dot(ray.dir, normal) > 0.0;
 
             #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
                 throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
-    \
-                if (is_receiver) {  \
-                    f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, random);        \
-                }  else {  \
-    \
-                vec3 f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, random);            \
                                                                                                   \
-                float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));      \
-                                                                                                  \
-                if (rand_uniform_float(random) < q) {                                             \
-                    return;                                                                       \
+                if (light_pdf != 0.0) {                                                           \
+                    mis_f = eval(mat_inst, normal, mis_wi, -ray.dir, material_pdf)                \
+                          * abs(dot(mis_wi, normal)) * throughput;                                \
                 }                                                                                 \
                                                                                                   \
-                throughput *= f / (1.0 - q);                                                      \
-                \
-                ray = make_ray(ray.org, wi, normal);                                              \
-                }\
+                f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, random);                 \
             }
 
             MAT_DO_SWITCH(material)
             #undef MAT_SWITCH_LOGIC
 
-            if (is_receiver) {
-                if (material_pdf != 0.0 && !is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
-                    vec3 Li = env_eval_light(wi, light_pdf);
+            if (!is_receiver) {
+                float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));
 
-                    if (light_pdf != 0.0) {
-                        ld += throughput * f * Li * power_heuristic(material_pdf, light_pdf);
+                if (rand_uniform_float(random) < q) {
+                    return;
+                }
+
+                float adjustment = 1.0 / (1.0 - q);
+
+                throughput *= f * adjustment;
+                mis_f *= adjustment;
+            }
+
+            if (light_pdf != 0.0 && material_pdf != 0.0) {
+                if (!is_ray_occluded(make_ray(ray.org, mis_wi, normal), 1.0 / 0.0)) {
+                    ld += mis_f * light * power_heuristic(light_pdf, material_pdf);
+                }
+            }
+
+            if (is_receiver) {
+                if (mis) {
+                    // Finish the MIS direct light sampling procedure we started earlier. This
+                    // is done to ensure that the MIS weights result in an unbiased estimator.
+
+                    if (!is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
+                        vec3 light = env_eval_light(wi, light_pdf);
+
+                        ld += throughput * f * light * power_heuristic(material_pdf, light_pdf);
                     }
                 }
 
-                li = throughput * gather_photons(radius_squared, ray.org, ray.dir, normal, material, mat_inst, count);
+                // TODO: remove mask when we've converted to new materials
+                li = throughput * gather_photons(radius_squared, ray.org, ray.dir, normal, material & 0x7fffU, mat_inst, count);
                 return;
             }
 
-            if (!inside && dot(wi, normal) < 0.0) {
-                traversal_start = traversal.hit.z;
-            } else {
-                traversal_start = 0U;
-            }
+            ray = make_ray(ray.org, wi, normal); // delay this for the occlusion checks above
+            traversal_start = (!inside && dot(ray.dir, normal) < 0.0) ? traversal.hit.z : 0U;
         } else {
-            float light_pdf;
+            // If we started an MIS direct light sampling procedure in the previous bounce, finish
+            // it now; the ray was clearly not occluded so accumulate this light with MIS weights.
 
-            vec3 l = env_eval_light(ray.dir, light_pdf);
+            vec3 light = env_eval_light(ray.dir, light_pdf);
 
-            if (!explicit_light) {
-                ld += throughput * l;
-            } else {
-                ld += throughput * l * power_heuristic(material_pdf, light_pdf);
-            }
+            ld += throughput * light * (mis ? power_heuristic(material_pdf, light_pdf) : 1.0);
 
-            break;
+            return;
         }
     }
 }
