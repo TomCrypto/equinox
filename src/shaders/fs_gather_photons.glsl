@@ -151,12 +151,11 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout 
 
     float light_pdf, material_pdf;
     vec3 throughput = vec3(1.0);
-    uint traversal_start = 0U;
 
     bool mis = false;
 
     for (uint bounce = 0U; bounce < integrator.max_gather_bounces; ++bounce) {
-        traversal_t traversal = traverse_scene(ray, traversal_start);
+        traversal_t traversal = traverse_scene(ray, 0U);
 
         if (traversal_has_hit(traversal)) {
             ray.org += ray.dir * traversal.range.y;
@@ -226,8 +225,7 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, inout 
                 return;
             }
 
-            ray = make_ray(ray.org, wi, normal); // delay this for the occlusion checks above
-            traversal_start = (!inside && dot(ray.dir, normal) < 0.0) ? traversal.hit.z : 0U;
+            ray = make_ray(ray.org, wi, normal);
         } else {
             // If we began an MIS direct light sampling procedure in the previous bounce, finish
             // it now; the ray was clearly not occluded so accumulate the light with MIS weight.

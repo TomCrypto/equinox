@@ -14,7 +14,7 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-void record_photon(ray_t ray, vec3 throughput) {
+void deposit_photon(ray_t ray, vec3 throughput) {
     ivec2 coords = hash_entry_for_cell(cell_for_point(ray.org), uint(gl_InstanceID));
 
     photon_major_data = vec4(     fract(ray.org / integrator.cell_size), ray.dir.x);
@@ -24,11 +24,13 @@ void record_photon(ray_t ray, vec3 throughput) {
     gl_Position = vec4(clip_space, 0.0, 1.0); // put the photon into its hash table entry
 }
 
-bool scatter_photon(ray_t ray, inout random_t random, vec3 throughput) {
-    uint traversal_start = 0U;
+void discard_photon() {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+}
 
+bool scatter_photon(inout ray_t ray, inout vec3 throughput, inout random_t random) {
     for (uint bounce = 0U; bounce < integrator.max_scatter_bounces; ++bounce) {
-        traversal_t traversal = traverse_scene(ray, traversal_start);
+        traversal_t traversal = traverse_scene(ray, 0U);
 
         if (traversal_has_hit(traversal)) {
             ray.org += ray.dir * traversal.range.y;
@@ -46,35 +48,34 @@ bool scatter_photon(ray_t ray, inout random_t random, vec3 throughput) {
             bool is_receiver = (bounce != 0U) && MAT_IS_RECEIVER(material);
 
             bool inside = dot(ray.dir, normal) > 0.0;
+            vec3 f;
 
             #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
                 throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
                                                                                                   \
                 if (is_receiver && weights.x < integrator.photon_rate) {                          \
-                    record_photon(ray, throughput / integrator.photon_rate);                      \
-                    return true; /* rasterize photon into the hash table */                       \
+                    throughput /= integrator.photon_rate;                                         \
+                    return true; /* deposit the photon */                                         \
                 }                                                                                 \
                                                                                                   \
                 throughput /= is_receiver ? 1.0 - integrator.photon_rate : 1.0;                   \
                                                                                                   \
-                float material_pdf; /* we don't need the PDF of the sampling method here */       \
-                vec3 f = sample(mat_inst, normal, ray.dir, -ray.dir, material_pdf, random);       \
-                                                                                                  \
-                float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));      \
-                                                                                                  \
-                if (weights.y < q) {                                                              \
-                    return false;                                                                 \
-                }                                                                                 \
-                                                                                                  \
-                throughput *= f / (1.0 - q);                                                      \
-                                                                                                  \
-                ray = make_ray(ray.org, ray.dir, normal);                                         \
+                float material_pdf; /* we don't need the PDF of the sampling method */            \
+                f = sample(mat_inst, normal, ray.dir, -ray.dir, material_pdf, random);            \
             }
 
             MAT_DO_SWITCH(material)
             #undef MAT_SWITCH_LOGIC
 
-            traversal_start = (!inside && dot(ray.dir, normal) < 0.0) ? traversal.hit.z : 0U;
+            float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));
+
+            if (weights.y < q) {
+                return false;
+            }
+
+            throughput *= f / (1.0 - q);
+
+            ray = make_ray(ray.org, ray.dir, normal);
         } else {
             return false;
         }
@@ -123,8 +124,9 @@ void main() {
     // compute a good ray origin
     ray.org = real_pos - radius * ray.dir;
 
-    if (!scatter_photon(ray, random, throughput)) {
-        // prevent point from being rasterized
-        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    if (scatter_photon(ray, throughput, random)) {
+        deposit_photon(ray, throughput);
+    } else {
+        discard_photon();
     }
 }
