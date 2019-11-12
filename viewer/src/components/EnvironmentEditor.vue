@@ -5,7 +5,15 @@
       :options="environmentMaps"
       :show-labels="false"
       @input="onSelectEnvironmentMap"
-    ></multiselect>
+    />
+    <vue-slider
+      :min="0"
+      :max="1"
+      tooltip="none"
+      :interval="0.001"
+      @change="changeRotation"
+      @dragging="changeRotation"
+    />
   </div>
 </template>
 
@@ -19,6 +27,10 @@ export default class extends Vue {
   @Prop() private loadAsset!: (url: string) => Promise<void>;
 
   private sceneJson: any = null;
+
+  private changeRotation(value: number) {
+    this.scene.set_environment_rotation(value * 2.0 * Math.PI);
+  }
 
   private get environmentMap(): string | null {
     const environment: string | null = this.sceneJson.environment_map;

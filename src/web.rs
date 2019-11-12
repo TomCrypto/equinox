@@ -152,6 +152,12 @@ impl WebScene {
         self.scene.assets.remove(name);
     }
 
+    pub fn set_environment_rotation(&mut self, new_rotation: f32) {
+        if let Environment::Map { rotation, .. } = &mut *self.scene.environment {
+            *rotation = new_rotation;
+        }
+    }
+
     pub fn set_envmap(&mut self, name: &str) {
         if self.scene.environment_map.as_ref().map(String::as_str) != Some(name) {
             *self.scene.environment_map = Some(name.to_owned());
