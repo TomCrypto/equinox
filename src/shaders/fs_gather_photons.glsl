@@ -25,7 +25,7 @@ layout (std140) uniform Raster {
 } raster;
 
 vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, uint inst, vec3 normal, vec3 wo, inout float count) {
-    if (!sphere_in_cell_broadphase(radius_squared, point, cell_pos)) {
+    if (!sphere_in_cell_broadphase(sqrt(radius_squared), point, cell_pos)) {
         return vec3(0.0);
     }
 

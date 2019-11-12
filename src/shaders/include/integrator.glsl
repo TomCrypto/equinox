@@ -52,10 +52,12 @@ ivec2 hash_entry_for_cell(cell_t cell, uint index) {
                                              index >> integrator.hash_cell_col_bits);
 }
 
-bool sphere_in_cell_broadphase(float radius_squared, vec3 sphere_center, cell_t cell) {
+bool sphere_in_cell_broadphase(float radius, vec3 sphere_center, cell_t cell) {
     vec3 center = (cell + vec3(0.5)) * integrator.cell_size;
 
-    float cell_bounds_radius_squared = 3.0 / 4.0 * integrator.cell_size * integrator.cell_size;
+    float cell_bounds_radius = sqrt(3.0 / 4.0) * integrator.cell_size;
+    float radius_threshold = cell_bounds_radius + radius;
+    radius_threshold *= radius_threshold;
 
-    return dot(center - sphere_center, center - sphere_center) < radius_squared + cell_bounds_radius_squared;
+    return dot(center - sphere_center, center - sphere_center) < radius_threshold;
 }
