@@ -1,4 +1,4 @@
-use equinox::{WebDevice, WebScene};
+use equinox::{Asset, WebDevice, WebScene};
 use libflate::zlib::Decoder as ZlibDecoder;
 use png::{BitDepth, ColorType, Decoder};
 use serde::Deserialize;
@@ -119,7 +119,7 @@ fn load_scene(scene: &mut WebScene, json: &str) {
     #[derive(Deserialize)]
     struct SceneJsonData {
         json: serde_json::Value,
-        assets: Vec<String>,
+        assets: Vec<Asset>,
     }
 
     let data: SceneJsonData = serde_json::from_str(json).expect("failed to parse scene json");

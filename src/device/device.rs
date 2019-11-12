@@ -328,9 +328,18 @@ impl Device {
         })?;
 
         let assets = &scene.assets;
+        let environment = &mut scene.environment;
+
+        invalidated |= Dirty::clean(&mut scene.environment_map, |environment_map| {
+            self.update_environment_map(assets, environment_map.as_ref())?;
+
+            Dirty::dirty(environment);
+
+            Ok(())
+        })?;
 
         invalidated |= Dirty::clean(&mut scene.environment, |environment| {
-            self.update_environment(assets, environment)?;
+            self.update_environment(environment)?;
 
             Ok(())
         })?;
@@ -349,8 +358,6 @@ impl Device {
                 .create(raster.width as usize, raster.height as usize);
 
             self.samples_fbo.rebuild(&[&self.samples]);
-
-            // Configure the shaders with the desired resolutions...
 
             self.load_convolution_buffers_shader
                 .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));

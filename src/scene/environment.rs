@@ -1,24 +1,14 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct EnvironmentMap {
-    pub pixels: String,
-    #[serde(default)]
-    pub rotation: f32,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default)]
-pub struct Environment {
-    pub map: Option<EnvironmentMap>,
-    pub tint: [f32; 3],
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum Environment {
+    Solid { tint: [f32; 3] },
+    Map { tint: [f32; 3], rotation: f32 },
 }
 
 impl Default for Environment {
     fn default() -> Self {
-        Self {
-            map: None,
-            tint: [1.0; 3],
-        }
+        Self::Solid { tint: [1.0; 3] }
     }
 }

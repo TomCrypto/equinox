@@ -6,7 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
 
-use crate::{ApertureShape, EnvironmentMap, Geometry, Instance, Material, Parameter};
+use crate::{ApertureShape, Environment, Geometry, Instance, Material, Parameter};
 
 /// WASM binding for a scene.
 #[wasm_bindgen]
@@ -48,6 +48,10 @@ impl WebScene {
 
         if self.scene.display != new_scene.display {
             self.scene.display = new_scene.display;
+        }
+
+        if self.scene.environment_map != new_scene.environment_map {
+            self.scene.environment_map = new_scene.environment_map;
         }
 
         if self.scene.environment != new_scene.environment {
@@ -149,10 +153,18 @@ impl WebScene {
     }
 
     pub fn set_envmap(&mut self, name: &str) {
-        self.scene.environment.map = Some(EnvironmentMap {
-            pixels: name.to_owned(),
+        if self.scene.environment_map.as_ref().map(String::as_str) != Some(name) {
+            *self.scene.environment_map = Some(name.to_owned());
+        }
+
+        if let Environment::Map { .. } = &*self.scene.environment {
+            return; // already configured to map, nothing to do
+        }
+
+        *self.scene.environment = Environment::Map {
+            tint: [1.0; 3],
             rotation: 0.0,
-        });
+        };
     }
 
     /// Applies a camera-space translation to the camera position.

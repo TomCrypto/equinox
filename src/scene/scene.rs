@@ -5,6 +5,8 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub type Asset = String;
+
 /// # Dirty Flags
 ///
 /// For pragmatic reasons, the scene structure maintains dirty flags relative to
@@ -17,13 +19,14 @@ pub struct Scene {
     pub instance_list: Dirty<Vec<Instance>>,
     pub geometry_list: Dirty<Vec<Geometry>>,
     pub material_list: Dirty<Vec<Material>>,
+    pub environment_map: Dirty<Option<Asset>>,
     pub environment: Dirty<Environment>,
     pub display: Dirty<Display>,
     pub aperture: Dirty<Option<Aperture>>,
     pub integrator: Dirty<Integrator>,
 
     #[serde(skip)]
-    pub assets: HashMap<String, Vec<u8>>,
+    pub assets: HashMap<Asset, Vec<u8>>,
 }
 
 impl Scene {
@@ -38,6 +41,7 @@ impl Scene {
         Dirty::dirty(&mut self.geometry_list);
         Dirty::dirty(&mut self.material_list);
         Dirty::dirty(&mut self.environment);
+        Dirty::dirty(&mut self.environment_map);
         Dirty::dirty(&mut self.display);
         Dirty::dirty(&mut self.aperture);
         Dirty::dirty(&mut self.integrator);

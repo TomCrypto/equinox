@@ -2,7 +2,7 @@
 use log::{debug, info, warn};
 
 use crate::Device;
-use crate::Environment;
+use crate::{Asset, Environment};
 use half::f16;
 use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
@@ -21,21 +21,14 @@ pub struct EnvironmentData {
 }
 
 impl Device {
-    pub(crate) fn update_environment(
+    pub(crate) fn update_environment_map(
         &mut self,
-        assets: &HashMap<String, Vec<u8>>,
-        environment: &Environment,
+        assets: &HashMap<Asset, Vec<u8>>,
+        map: Option<&Asset>,
     ) -> Result<(), Error> {
-        let mut shader_data = EnvironmentData::default();
-
-        shader_data.tint[0] = environment.tint[0].max(0.0);
-        shader_data.tint[1] = environment.tint[1].max(0.0);
-        shader_data.tint[2] = environment.tint[2].max(0.0);
-
-        if let Some(map) = &environment.map {
+        if let Some(map) = map {
             let (header, data) =
-                LayoutVerified::<_, Header>::new_from_prefix(assets[&map.pixels].as_slice())
-                    .unwrap();
+                LayoutVerified::<_, Header>::new_from_prefix(assets[map].as_slice()).unwrap();
 
             if header.data_format.try_parse() != Some(DataFormat::RGBA16F) {
                 return Err(Error::new("expected RGBA16F environment map"));
@@ -53,11 +46,6 @@ impl Device {
 
             let cols = header.dimensions[0] as usize;
             let rows = header.dimensions[1] as usize;
-
-            shader_data.cols = cols as i32;
-            shader_data.rows = rows as i32;
-            shader_data.rotation = map.rotation;
-            shader_data.has_envmap = 1;
 
             let mut luminance = vec![0.0f32; cols * rows];
 
@@ -113,7 +101,31 @@ impl Device {
         } else {
             self.envmap_cond_cdf.upload(1, 1, &[0]);
             self.envmap_marg_cdf.upload(1, 1, &[0]);
-            self.envmap_texture.upload(1, 1, &[0; 4])
+            self.envmap_texture.upload(1, 1, &[0; 4]);
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn update_environment(&mut self, environment: &Environment) -> Result<(), Error> {
+        let mut shader_data = EnvironmentData::default();
+
+        match environment {
+            Environment::Map { tint, rotation } => {
+                shader_data.tint[0] = tint[0].max(0.0);
+                shader_data.tint[1] = tint[1].max(0.0);
+                shader_data.tint[2] = tint[2].max(0.0);
+                shader_data.rotation = rotation % (2.0 * std::f32::consts::PI);
+                shader_data.has_envmap = 1;
+                shader_data.cols = self.envmap_texture.cols() as i32;
+                shader_data.rows = self.envmap_texture.rows() as i32;
+            }
+            Environment::Solid { tint } => {
+                shader_data.tint[0] = tint[0].max(0.0);
+                shader_data.tint[1] = tint[1].max(0.0);
+                shader_data.tint[2] = tint[2].max(0.0);
+                shader_data.has_envmap = 0;
+            }
         }
 
         self.environment_buffer.write(&shader_data)

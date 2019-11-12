@@ -21,13 +21,13 @@ export default class extends Vue {
   private sceneJson: any = null;
 
   private get environmentMap(): string | null {
-    const environment: any | null = this.sceneJson.environment.map;
+    const environment: string | null = this.sceneJson.environment_map;
 
     if (environment === null) {
       return null;
     }
 
-    return this.getMapForUrl(environment.pixels as string);
+    return this.getMapForUrl(environment);
   }
 
   private get environmentMaps(): string[] {
