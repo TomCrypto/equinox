@@ -37,17 +37,26 @@
       {
         "geometry": 0,
         "material": 0,
-        "parameters": []
+        "parameters": [],
+        "photon_receiver": false,
+        "sample_explicit": true,
+        "visible": true
       },
       {
         "geometry": 1,
         "material": 1,
-        "parameters": []
+        "parameters": [],
+        "photon_receiver": true,
+        "sample_explicit": true,
+        "visible": true
       },
       {
         "geometry": 2,
         "material": 3,
-        "parameters": []
+        "parameters": [],
+        "photon_receiver": true,
+        "sample_explicit": true,
+        "visible": true
       }
     ],
     "geometry_list": [
@@ -88,7 +97,7 @@
             "type": "sphere",
             "radius": {
               "type": "constant",
-              "value": 1.0
+              "value": 1
             }
           }
         }
@@ -126,15 +135,15 @@
               "dimensions": [
                 {
                   "type": "constant",
-                  "value": 1.0
+                  "value": 1
                 },
                 {
                   "type": "constant",
-                  "value": 1.0
+                  "value": 1
                 },
                 {
                   "type": "constant",
-                  "value": 1.0
+                  "value": 1
                 }
               ]
             }
@@ -167,7 +176,7 @@
             "type": "sphere",
             "radius": {
               "type": "constant",
-              "value": 1.0
+              "value": 1
             }
           }
         }
@@ -191,21 +200,33 @@
         "type": "dielectric",
         "internal_refractive_index": 1.65,
         "external_refractive_index": 1,
-        "internal_extinction_coefficient": [1e-9, 1e-7, 1e-9],
+        "internal_extinction_coefficient": [1e-9, 3e-7, 1e-9],
         "external_extinction_coefficient": [0, 0, 0],
         "base_color": [1, 1, 1]
       }
     ],
+    "environment_map": null,
     "environment": {
-      "map": null,
-      "multiplier": [0, 0, 0]
+      "type": "solid",
+      "tint": [1, 1, 1]
     },
     "display": {
-      "exposure": -2,
+      "exposure": 0,
       "saturation": 1,
       "camera_response": null
     },
-    "aperture": null
+    "aperture": null,
+    "integrator": {
+      "hash_table_bits": 24,
+      "photons_per_pass": 2000000,
+      "photon_rate": 0.5,
+      "initial_search_radius": 0.01,
+      "capacity_multiplier": 10,
+      "max_hash_cell_bits": 6,
+      "alpha": 0.7,
+      "max_scatter_bounces": 8,
+      "max_gather_bounces": 8
+    }
   },
   "assets": []
 }
