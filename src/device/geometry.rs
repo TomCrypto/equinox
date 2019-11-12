@@ -130,7 +130,7 @@ impl GeometryGlslGenerator {
                 let rhs_function = self.distance_recursive(rhs, index);
 
                 format!(
-                    "return max({}, -{}",
+                    "return max({}, -{});",
                     lhs_function.call("p"),
                     rhs_function.call("p")
                 )
