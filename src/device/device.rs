@@ -445,9 +445,7 @@ impl Device {
         })?;
 
         invalidated |= Dirty::clean(&mut scene.integrator, |integrator| {
-            if integrator.hash_table_bits < 20 {
-                return Err(Error::new("hash_table_bits needs to be at least 20"));
-            }
+            Self::validate_integrator(integrator)?;
 
             // TODO: return an error if the texture is too large to create here...
             // (check against the size limits or something)
@@ -487,7 +485,7 @@ impl Device {
         self.integrator_gather_photons_shader.rebuild()?;
 
         if invalidated {
-            self.reset_integrator_state(scene)?;
+            self.reset_integrator_state(scene);
         }
 
         self.allocator.shrink_to_watermark();

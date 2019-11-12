@@ -73,7 +73,23 @@ impl Default for IntegratorState {
 }
 
 impl Device {
-    pub(crate) fn reset_integrator_state(&mut self, scene: &mut Scene) -> Result<(), Error> {
+    pub(crate) fn validate_integrator(integrator: &Integrator) -> Result<(), Error> {
+        if integrator.hash_table_bits < 20 {
+            return Err(Error::new("hash_table_bits must be 20 or more"));
+        }
+
+        if integrator.initial_search_radius <= 0.0 {
+            return Err(Error::new("photon search radius must be positive"));
+        }
+
+        if integrator.max_hash_cell_bits > 8 {
+            return Err(Error::new("max_hash_cell_bits must be 8 or less"));
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn reset_integrator_state(&mut self, scene: &mut Scene) {
         self.state.rng = ChaCha20Rng::seed_from_u64(0);
         self.state.filter_rng = Qrng::new(0);
         self.state.photon_count = 0.0;
@@ -83,7 +99,7 @@ impl Device {
         self.state.filter = scene.raster.filter;
         self.state.integrator = *scene.integrator;
 
-        Self::validate_integrator(&mut self.state.integrator)?;
+        Self::clamp_integrator_settings(&mut self.state.integrator);
 
         self.integrator_gather_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
         self.integrator_update_fbo.clear(
@@ -105,8 +121,6 @@ impl Device {
         }
 
         self.state.receivers_present = receivers_present;
-
-        Ok(())
     }
 
     pub(crate) fn prepare_integrator_pass(&self) -> IntegratorPass {
@@ -303,21 +317,11 @@ impl Device {
         (cols, rows)
     }
 
-    fn validate_integrator(integrator: &mut Integrator) -> Result<(), Error> {
+    fn clamp_integrator_settings(integrator: &mut Integrator) {
         integrator.alpha = integrator.alpha.max(0.0).min(1.0);
         integrator.photon_rate = integrator.photon_rate.max(0.05).min(0.95);
         integrator.capacity_multiplier = integrator.capacity_multiplier.max(0.0);
         integrator.max_scatter_bounces = integrator.max_scatter_bounces.max(2);
         integrator.max_gather_bounces = integrator.max_gather_bounces.max(2);
-
-        if integrator.initial_search_radius <= 0.0 {
-            return Err(Error::new("photon search radius must be positive"));
-        }
-
-        if integrator.max_hash_cell_bits > 8 {
-            return Err(Error::new("max_hash_cell_bits must be 8 or less"));
-        }
-
-        Ok(())
     }
 }

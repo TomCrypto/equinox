@@ -397,19 +397,19 @@ export default class App extends Vue {
 
       try {
         this.device.update(this.scene);
+
+        const refineTime = this.gpuTimeQueries!.timeElapsed(() => {
+          this.device.refine();
+          this.device.render();
+        });
+
+        this.gpuFrameTimeEstimator.addSample(refineTime);
+
+        if (this.mustSaveScreenshot) {
+          this.generateScreenshotZip();
+        }
       } catch (e) {
         console.error(e);
-      }
-
-      const refineTime = this.gpuTimeQueries!.timeElapsed(() => {
-        this.device.refine();
-        this.device.render();
-      });
-
-      this.gpuFrameTimeEstimator.addSample(refineTime);
-
-      if (this.mustSaveScreenshot) {
-        this.generateScreenshotZip();
       }
     }
 
