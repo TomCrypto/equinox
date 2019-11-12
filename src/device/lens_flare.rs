@@ -8,7 +8,7 @@ use crate::{VertexArray, VertexAttribute, VertexAttributeKind, VertexLayout};
 use rustfft::{num_complex::Complex, FFTplanner};
 use zerocopy::{AsBytes, FromBytes};
 
-#[repr(C)]
+#[repr(align(8), C)]
 #[derive(AsBytes, FromBytes, Debug)]
 pub struct FFTPassData {
     pub horizontal: u16,

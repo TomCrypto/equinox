@@ -3,7 +3,7 @@ use crate::Display;
 use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 
-#[repr(C)]
+#[repr(align(16), C)]
 #[derive(Debug, AsBytes, FromBytes)]
 pub struct DisplayData {
     exposure: f32,

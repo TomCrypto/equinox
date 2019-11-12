@@ -9,7 +9,7 @@ use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use zerocopy::{AsBytes, FromBytes};
 
-#[repr(C)]
+#[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Debug)]
 pub struct IntegratorData {
     rng: [u32; 2],

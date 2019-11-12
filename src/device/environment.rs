@@ -9,7 +9,7 @@ use js_sys::Error;
 use std::collections::HashMap;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
-#[repr(C)]
+#[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Debug, Default)]
 pub struct EnvironmentData {
     cols: i32,

@@ -6,7 +6,7 @@ use itertools::iproduct;
 use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 
-#[repr(C)]
+#[repr(align(16), C)]
 #[derive(Debug, Default, AsBytes, FromBytes)]
 pub struct CameraData {
     origin_plane: [[f32; 4]; 4],

@@ -3,7 +3,7 @@ use crate::Raster;
 use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 
-#[repr(C)]
+#[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Debug)]
 pub struct RasterData {
     width: f32,
