@@ -7,8 +7,18 @@ pub struct EnvironmentMap {
     pub rotation: f32,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default)]
 pub struct Environment {
     pub map: Option<EnvironmentMap>,
-    pub multiplier: [f32; 3],
+    pub tint: [f32; 3],
+}
+
+impl Default for Environment {
+    fn default() -> Self {
+        Self {
+            map: None,
+            tint: [1.0; 3],
+        }
+    }
 }

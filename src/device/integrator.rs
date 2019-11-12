@@ -33,7 +33,7 @@ pub struct IntegratorData {
     max_scatter_bounces: u32,
     max_gather_bounces: u32,
 
-    padding: [u32; 2],
+    padding: [f32; 2],
 }
 
 pub struct IntegratorPass {

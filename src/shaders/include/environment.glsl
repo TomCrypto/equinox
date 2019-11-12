@@ -10,6 +10,7 @@ layout (std140) uniform Environment {
     int rows;
     float rotation;
     int has_envmap;
+    vec3 tint;
 } environment;
 
 float inverse_transform(sampler2D texture, int y, float u, int size, out int index) {
@@ -64,7 +65,7 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
 
     pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI * 1e-3);
 
-    return value.rgb * (sin_theta * 2.0 * M_PI * M_PI * 1e-3) / value.w;
+    return environment.tint * value.rgb * (sin_theta * 2.0 * M_PI * M_PI * 1e-3) / value.w;
 }
 
 vec3 env_eval_light_image(vec3 wi, out float pdf) {
@@ -78,7 +79,7 @@ vec3 env_eval_light_image(vec3 wi, out float pdf) {
 
     pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI * 1e-3);
 
-    return value.rgb;
+    return environment.tint * value.rgb;
 }
 
 vec3 env_sample_light_solid(out vec3 wi, out float pdf, inout random_t random) {
@@ -93,13 +94,13 @@ vec3 env_sample_light_solid(out vec3 wi, out float pdf, inout random_t random) {
 
     pdf = 1.0 / M_4PI;
 
-    return vec3(1.0) * M_4PI;
+    return environment.tint * M_4PI;
 }
 
 vec3 env_eval_light_solid(vec3 wi, out float pdf) {
     pdf = 1.0 / M_4PI;
 
-    return vec3(1.0);
+    return environment.tint;
 }
 
 vec3 env_sample_light(out vec3 wi, out float pdf, inout random_t random) {

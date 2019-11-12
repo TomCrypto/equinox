@@ -16,6 +16,8 @@ pub struct EnvironmentData {
     rows: i32,
     rotation: f32,
     has_envmap: i32,
+    tint: [f32; 3],
+    padding: [f32; 1],
 }
 
 impl Device {
@@ -25,6 +27,10 @@ impl Device {
         environment: &Environment,
     ) -> Result<(), Error> {
         let mut shader_data = EnvironmentData::default();
+
+        shader_data.tint[0] = environment.tint[0].max(0.0);
+        shader_data.tint[1] = environment.tint[1].max(0.0);
+        shader_data.tint[2] = environment.tint[2].max(0.0);
 
         if let Some(map) = &environment.map {
             let (header, data) =
