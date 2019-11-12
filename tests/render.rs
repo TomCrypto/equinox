@@ -63,10 +63,10 @@ fn perform_test(
     update_device(&context, device, &mut scene);
 
     for _ in 0..test_data.samples {
-        device.refine();
+        device.refine().unwrap();
     }
 
-    device.render();
+    device.render().unwrap();
 
     let rendered_bytes = read_canvas_pixels(&context);
     let expected_bytes = read_png_pixels(test_data.png);
