@@ -17,8 +17,8 @@ layout (std140) uniform Raster {
 void deposit_photon(ray_t ray, vec3 throughput) {
     ivec2 coords = hash_entry_for_cell(cell_for_point(ray.org), uint(gl_InstanceID));
 
-    photon_major_data = vec4(     fract(ray.org / integrator.cell_size), ray.dir.x * 0.5 + 0.5);
-    photon_minor_data = vec4(ray.dir.y < 0.0 ? -throughput : throughput, ray.dir.z);
+    photon_major_data = vec4(     fract(ray.org / integrator.cell_size), -ray.dir.x);
+    photon_minor_data = vec4(ray.dir.y > 0.0 ? -throughput : throughput, -ray.dir.z);
 
     vec2 clip_space = 2.0 * (vec2(0.5) + vec2(coords)) / integrator.hash_dimensions - 1.0;
     gl_Position = vec4(clip_space, 0.0, 1.0); // put the photon into its hash table entry

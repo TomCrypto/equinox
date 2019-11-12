@@ -32,7 +32,7 @@ impl Framebuffer {
         self.handle = None;
     }
 
-    pub fn rebuild(&mut self, attachments: &[(&dyn AsAttachment, usize)]) {
+    pub fn rebuild(&mut self, attachments: &[&dyn AsAttachment]) {
         if let Err(_) | Ok(None) = self.gl.get_extension("EXT_color_buffer_float") {
             panic!("the WebGL2 extension `EXT_color_buffer_float' is unavailable");
         }
@@ -50,7 +50,7 @@ impl Framebuffer {
 
         let array = Array::new();
 
-        for (index, (attachment, level)) in attachments.iter().enumerate() {
+        for (index, attachment) in attachments.iter().enumerate() {
             let attachment_index = Context::COLOR_ATTACHMENT0 + index as u32;
 
             match attachment.as_attachment() {
@@ -60,7 +60,7 @@ impl Framebuffer {
                         attachment_index,
                         Context::TEXTURE_2D,
                         texture,
-                        *level as i32,
+                        0,
                     );
                 }
             }

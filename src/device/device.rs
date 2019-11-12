@@ -54,7 +54,7 @@ pub struct Device {
 
     pub(crate) load_convolution_buffers_shader: Shader,
 
-    pub(crate) photon_hash_table_major: Texture<RGBA8>,
+    pub(crate) photon_hash_table_major: Texture<RGBA16F>,
     pub(crate) photon_hash_table_minor: Texture<RGBA16F>,
 
     pub(crate) photon_fbo: Framebuffer,
@@ -348,7 +348,7 @@ impl Device {
             self.render
                 .create(raster.width as usize, raster.height as usize);
 
-            self.samples_fbo.rebuild(&[(&self.samples, 0)]);
+            self.samples_fbo.rebuild(&[&self.samples]);
 
             // Configure the shaders with the desired resolutions...
 
@@ -393,31 +393,29 @@ impl Device {
             self.integrator_li_count.create(render_cols, render_rows);
             self.integrator_li_range.create(render_cols, render_rows);
 
-            self.integrator_gather_fbo.rebuild(&[
-                (&self.integrator_ld_count, 0),
-                (&self.integrator_li_count, 0),
-            ]);
+            self.integrator_gather_fbo
+                .rebuild(&[&self.integrator_ld_count, &self.integrator_li_count]);
 
             self.integrator_update_fbo
-                .rebuild(&[(&self.integrator_li_range, 0)]);
+                .rebuild(&[&self.integrator_li_range]);
 
-            self.render_fbo.rebuild(&[(&self.render, 0)]);
+            self.render_fbo.rebuild(&[&self.render]);
             self.aperture_fbo.rebuild(&[
-                (&self.r_aperture_spectrum, 0),
-                (&self.g_aperture_spectrum, 0),
-                (&self.b_aperture_spectrum, 0),
+                &self.r_aperture_spectrum,
+                &self.g_aperture_spectrum,
+                &self.b_aperture_spectrum,
             ]);
 
             self.spectrum_temp1_fbo.rebuild(&[
-                (&self.rspectrum_temp1, 0),
-                (&self.gspectrum_temp1, 0),
-                (&self.bspectrum_temp1, 0),
+                &self.rspectrum_temp1,
+                &self.gspectrum_temp1,
+                &self.bspectrum_temp1,
             ]);
 
             self.spectrum_temp2_fbo.rebuild(&[
-                (&self.rspectrum_temp2, 0),
-                (&self.gspectrum_temp2, 0),
-                (&self.bspectrum_temp2, 0),
+                &self.rspectrum_temp2,
+                &self.gspectrum_temp2,
+                &self.bspectrum_temp2,
             ]);
 
             self.prepare_fft_pass_data();
@@ -455,10 +453,8 @@ impl Device {
 
             self.photon_hash_table_major.create(cols, rows);
             self.photon_hash_table_minor.create(cols, rows);
-            self.photon_fbo.rebuild(&[
-                (&self.photon_hash_table_major, 0),
-                (&self.photon_hash_table_minor, 0),
-            ]);
+            self.photon_fbo
+                .rebuild(&[&self.photon_hash_table_major, &self.photon_hash_table_minor]);
 
             Ok(())
         })?;

@@ -49,7 +49,7 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
 
             float sgn = any(lessThan(photon_throughput, vec3(0.0))) ? -1.0 : 1.0;
 
-            float nx = 2.0 * major_data.w - 1.0;
+            float nx = major_data.w;
             float nz = minor_data.w;
             float ny = sqrt(max(0.0, 1.0 - nx * nx - nz * nz)) * sgn;
 
@@ -57,7 +57,7 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
 
             float pdf;
             count += 1.0;
-            result += abs(photon_throughput) * mat_eval_brdf(material, inst, normal, -photon_direction, wo, pdf);
+            result += abs(photon_throughput) * mat_eval_brdf(material, inst, normal, photon_direction, wo, pdf);
         }
     }
 
