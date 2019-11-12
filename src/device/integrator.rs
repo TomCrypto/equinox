@@ -73,12 +73,14 @@ impl Default for IntegratorState {
 }
 
 impl Device {
-    pub(crate) fn reset_integrator_state(&mut self, scene: &mut Scene) {
+    pub(crate) fn reset_integrator_state(&mut self, scene: &mut Scene) -> Result<(), Error> {
         self.state = IntegratorState::default();
 
         self.state.aperture = (*scene.aperture).clone();
         self.state.filter = scene.raster.filter;
         self.state.integrator = *scene.integrator;
+
+        Self::validate_integrator(&mut self.state.integrator)?;
 
         self.integrator_gather_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
         self.integrator_update_fbo.clear(
@@ -91,14 +93,29 @@ impl Device {
             ],
         );
 
-        self.state.receivers_present = false;
+        let mut receivers_present = false;
 
         for instance in scene.instance_list.iter() {
             if instance.visible && instance.photon_receiver {
-                self.state.receivers_present = true;
+                receivers_present = true;
                 break;
             }
         }
+
+        if self.state.integrator.initial_search_radius == 0.0 {
+            debug!("photon search radius is zero, therefore no receivers exist");
+            self.state.receivers_present = false; // no photons can be received
+        }
+
+        if !self.state.receivers_present && receivers_present {
+            debug!("photon receivers present, enabling photon scatter pass");
+        } else if self.state.receivers_present && !receivers_present {
+            debug!("no photons receivers present, disabling photon scatter pass");
+        }
+
+        self.state.receivers_present = receivers_present;
+
+        Ok(())
     }
 
     pub(crate) fn prepare_integrator_pass(&self) -> IntegratorPass {
@@ -143,7 +160,7 @@ impl Device {
         data.rng[0] = self.state.rng.next_u32();
         data.rng[1] = self.state.rng.next_u32();
         data.current_pass = self.state.current_pass;
-        data.photon_rate = self.state.integrator.photon_rate.max(0.05).min(0.95);
+        data.photon_rate = self.state.integrator.photon_rate;
         data.photon_count = self.state.photon_count.max(1.0);
         data.sppm_alpha = self.state.integrator.alpha;
         data.cell_size = pass.cell_size;
@@ -293,5 +310,19 @@ impl Device {
         }
 
         (cols, rows)
+    }
+
+    fn validate_integrator(integrator: &mut Integrator) -> Result<(), Error> {
+        integrator.alpha = integrator.alpha.max(0.0).min(1.0);
+        integrator.photon_rate = integrator.photon_rate.max(0.05).min(0.95);
+        integrator.capacity_multiplier = integrator.capacity_multiplier.max(0.0);
+        integrator.max_scatter_bounces = integrator.max_scatter_bounces.max(2);
+        integrator.max_gather_bounces = integrator.max_gather_bounces.max(2);
+
+        if integrator.max_hash_cell_bits > 8 {
+            return Err(Error::new("max_hash_cell_bits must be 8 or less"));
+        }
+
+        Ok(())
     }
 }

@@ -487,7 +487,7 @@ impl Device {
         self.integrator_gather_photons_shader.rebuild()?;
 
         if invalidated {
-            self.reset_integrator_state(scene);
+            self.reset_integrator_state(scene)?;
         }
 
         self.allocator.shrink_to_watermark();
