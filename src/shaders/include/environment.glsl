@@ -5,6 +5,13 @@ uniform sampler2D envmap_texture;
 uniform sampler2D envmap_marg_cdf;
 uniform sampler2D envmap_cond_cdf;
 
+layout (std140) uniform Environment {
+    int cols;
+    int rows;
+    float rotation;
+    int has_envmap;
+} environment;
+
 float inverse_transform(sampler2D texture, int y, float u, int size, out int index) {
     int low = 0, high = size;
     float this_cdf, next_cdf;
@@ -42,10 +49,10 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
 
     int index;
 
-    float sampled_v = inverse_transform(envmap_marg_cdf,     0, rng.x, ENVMAP_ROWS, index);
-    float sampled_u = inverse_transform(envmap_cond_cdf, index, rng.y, ENVMAP_COLS, index);
+    float sampled_v = inverse_transform(envmap_marg_cdf,     0, rng.x, environment.rows, index);
+    float sampled_u = inverse_transform(envmap_cond_cdf, index, rng.y, environment.cols, index);
 
-    wi = equirectangular_to_direction(vec2(sampled_u, sampled_v), ENVMAP_ROTATION);
+    wi = equirectangular_to_direction(vec2(sampled_u, sampled_v), environment.rotation);
 
     vec4 value = texture(envmap_texture, vec2(sampled_u, sampled_v));
 
@@ -61,7 +68,7 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
 }
 
 vec3 env_eval_light_image(vec3 wi, out float pdf) {
-    vec4 value = texture(envmap_texture, direction_to_equirectangular(wi, ENVMAP_ROTATION));
+    vec4 value = texture(envmap_texture, direction_to_equirectangular(wi, environment.rotation));
 
     float sin_theta = sqrt(max(0.0, 1.0 - wi.y * wi.y));
 
@@ -96,17 +103,17 @@ vec3 env_eval_light_solid(vec3 wi, out float pdf) {
 }
 
 vec3 env_sample_light(out vec3 wi, out float pdf, inout random_t random) {
-#if HAS_ENVMAP
-    return env_sample_light_image(wi, pdf, random);
-#else
-    return env_sample_light_solid(wi, pdf, random);
-#endif
+    if (environment.has_envmap == 1) {
+        return env_sample_light_image(wi, pdf, random);
+    } else {
+        return env_sample_light_solid(wi, pdf, random);
+    }
 }
 
 vec3 env_eval_light(vec3 wi, out float pdf) {
-#if HAS_ENVMAP
-    return env_eval_light_image(wi, pdf);
-#else
-    return env_eval_light_solid(wi, pdf);
-#endif
+    if (environment.has_envmap == 1) {
+        return env_eval_light_image(wi, pdf);
+    } else {
+        return env_eval_light_solid(wi, pdf);
+    }
 }

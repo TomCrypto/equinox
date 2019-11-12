@@ -7,7 +7,16 @@ use half::f16;
 use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
 use std::collections::HashMap;
-use zerocopy::LayoutVerified;
+use zerocopy::{AsBytes, FromBytes, LayoutVerified};
+
+#[repr(C)]
+#[derive(AsBytes, FromBytes, Debug, Default)]
+pub struct EnvironmentData {
+    cols: i32,
+    rows: i32,
+    rotation: f32,
+    has_envmap: i32,
+}
 
 impl Device {
     pub(crate) fn update_environment(
@@ -15,17 +24,7 @@ impl Device {
         assets: &HashMap<String, Vec<u8>>,
         environment: &Environment,
     ) -> Result<(), Error> {
-        if environment.map.is_some() {
-            self.integrator_gather_photons_shader
-                .set_define("HAS_ENVMAP", 1);
-            self.integrator_scatter_photons_shader
-                .set_define("HAS_ENVMAP", 1);
-        } else {
-            self.integrator_gather_photons_shader
-                .set_define("HAS_ENVMAP", 0);
-            self.integrator_scatter_photons_shader
-                .set_define("HAS_ENVMAP", 0);
-        }
+        let mut shader_data = EnvironmentData::default();
 
         if let Some(map) = &environment.map {
             let (header, data) =
@@ -49,18 +48,10 @@ impl Device {
             let cols = header.dimensions[0] as usize;
             let rows = header.dimensions[1] as usize;
 
-            self.integrator_gather_photons_shader
-                .set_define("ENVMAP_COLS", cols);
-            self.integrator_gather_photons_shader
-                .set_define("ENVMAP_ROWS", rows);
-            self.integrator_gather_photons_shader
-                .set_define("ENVMAP_ROTATION", format!("{:+e}", map.rotation));
-            self.integrator_scatter_photons_shader
-                .set_define("ENVMAP_COLS", cols);
-            self.integrator_scatter_photons_shader
-                .set_define("ENVMAP_ROWS", rows);
-            self.integrator_scatter_photons_shader
-                .set_define("ENVMAP_ROTATION", format!("{:+e}", map.rotation));
+            shader_data.cols = cols as i32;
+            shader_data.rows = rows as i32;
+            shader_data.rotation = map.rotation;
+            shader_data.has_envmap = 1;
 
             let mut luminance = vec![0.0f32; cols * rows];
 
@@ -113,9 +104,13 @@ impl Device {
             }
 
             self.envmap_texture.upload(cols, rows, &envmap_pixels);
+        } else {
+            self.envmap_cond_cdf.upload(1, 1, &[0]);
+            self.envmap_marg_cdf.upload(1, 1, &[0]);
+            self.envmap_texture.upload(1, 1, &[0; 4])
         }
 
-        Ok(())
+        self.environment_buffer.write(&shader_data)
     }
 }
 

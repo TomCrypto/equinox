@@ -175,6 +175,7 @@ impl Device {
         command.bind(&self.instance_buffer, "Instance");
         command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.raster_buffer, "Raster");
+        command.bind(&self.environment_buffer, "Environment");
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
@@ -203,6 +204,7 @@ impl Device {
         command.bind(&self.instance_buffer, "Instance");
         command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.raster_buffer, "Raster");
+        command.bind(&self.environment_buffer, "Environment");
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");

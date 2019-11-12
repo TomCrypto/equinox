@@ -5,18 +5,18 @@
 #define cell_t vec3
 
 layout (std140) uniform Integrator {
-    uvec2 rng;                  // Random bits for the current pass
-    vec2 filter_offset;         // The camera filter offset
+    uvec2 rng;
+    vec2 filter_offset;
 
-    uint current_pass;          // The pass number, starting at 1
-    float photon_rate;          // Probability of photon being stored
-    float photon_count;         // The total number of photons fired
-    float sppm_alpha;           // The integrator's alpha parameter
+    uint current_pass;
+    float photon_rate;
+    float photon_count;
+    float sppm_alpha;
 
-    float cell_size;            // The size in world units of a hash cell
-    uint hash_cell_cols;        // The number of columns in a hash cell
-    uint hash_cell_rows;        // The number of rows in a hash cell
-    uint hash_cell_col_bits;    // The number of bits in hash_cell_cols
+    float cell_size;
+    uint hash_cell_cols;
+    uint hash_cell_rows;
+    uint hash_cell_col_bits;
 
     uint hash_cols_mask;
     uint hash_rows_mask;

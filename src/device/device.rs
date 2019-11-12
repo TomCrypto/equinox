@@ -25,6 +25,7 @@ pub struct Device {
     pub(crate) camera_buffer: UniformBuffer<CameraData>,
     pub(crate) integrator_buffer: UniformBuffer<IntegratorData>,
     pub(crate) raster_buffer: UniformBuffer<RasterData>,
+    pub(crate) environment_buffer: UniformBuffer<EnvironmentData>,
 
     pub(crate) samples: Texture<RGBA32F>,
     pub(crate) samples_fbo: Framebuffer,
@@ -130,6 +131,7 @@ impl Device {
                     "Material" => BindingPoint::UniformBlock(8),
                     "Integrator" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
+                    "Environment" => BindingPoint::UniformBlock(1),
                     "envmap_texture" => BindingPoint::Texture(1),
                     "envmap_marg_cdf" => BindingPoint::Texture(2),
                     "envmap_cond_cdf" => BindingPoint::Texture(3),
@@ -141,10 +143,6 @@ impl Device {
                     "geometry-user.glsl" => "",
                 },
                 hashmap! {
-                    "HAS_ENVMAP" => "0",
-                    "ENVMAP_COLS" => "0",
-                    "ENVMAP_ROWS" => "0",
-                    "ENVMAP_ROTATION" => "0.0",
                     "INSTANCE_DATA_COUNT" => "0",
                     "GEOMETRY_DATA_COUNT" => "0",
                     "MATERIAL_DATA_COUNT" => "0",
@@ -164,6 +162,7 @@ impl Device {
                     "Material" => BindingPoint::UniformBlock(8),
                     "Integrator" => BindingPoint::UniformBlock(2),
                     "Raster" => BindingPoint::UniformBlock(3),
+                    "Environment" => BindingPoint::UniformBlock(1),
                     "envmap_texture" => BindingPoint::Texture(1),
                     "envmap_marg_cdf" => BindingPoint::Texture(2),
                     "envmap_cond_cdf" => BindingPoint::Texture(3),
@@ -172,10 +171,6 @@ impl Device {
                     "geometry-user.glsl" => "",
                 },
                 hashmap! {
-                    "HAS_ENVMAP" => "0",
-                    "ENVMAP_COLS" => "0",
-                    "ENVMAP_ROWS" => "0",
-                    "ENVMAP_ROTATION" => "0.0",
                     "INSTANCE_DATA_COUNT" => "0",
                     "GEOMETRY_DATA_COUNT" => "0",
                     "MATERIAL_DATA_COUNT" => "0",
@@ -244,6 +239,7 @@ impl Device {
             raster_buffer: UniformBuffer::new(gl.clone()),
             display_buffer: UniformBuffer::new(gl.clone()),
             integrator_buffer: UniformBuffer::new(gl.clone()),
+            environment_buffer: UniformBuffer::new(gl.clone()),
             envmap_texture: Texture::new(gl.clone()),
             envmap_marg_cdf: Texture::new(gl.clone()),
             envmap_cond_cdf: Texture::new(gl.clone()),
@@ -564,6 +560,7 @@ impl Device {
         self.envmap_texture.invalidate();
         self.integrator_buffer.invalidate();
         self.raster_buffer.invalidate();
+        self.environment_buffer.invalidate();
         self.samples.invalidate();
         self.samples_fbo.invalidate();
         self.rspectrum_temp1.invalidate();
