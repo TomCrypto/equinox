@@ -40,5 +40,6 @@ impl Scene {
         Dirty::dirty(&mut self.environment);
         Dirty::dirty(&mut self.display);
         Dirty::dirty(&mut self.aperture);
+        Dirty::dirty(&mut self.integrator);
     }
 }
