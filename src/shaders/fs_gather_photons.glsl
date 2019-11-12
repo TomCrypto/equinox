@@ -49,7 +49,11 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
 
             float sgn = any(lessThan(photon_throughput, vec3(0.0))) ? -1.0 : 1.0;
 
-            vec3 photon_direction = vec3(major_data.w, sqrt(max(0.0, 1.0 - major_data.w * major_data.w - minor_data.w * minor_data.w)) * sgn, minor_data.w);
+            float nx = 2.0 * major_data.w - 1.0;
+            float nz = minor_data.w;
+            float ny = sqrt(max(0.0, 1.0 - nx * nx - nz * nz)) * sgn;
+
+            vec3 photon_direction = vec3(nx, ny, nz);
 
             float pdf;
             count += 1.0;

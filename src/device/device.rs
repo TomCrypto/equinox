@@ -53,16 +53,16 @@ pub struct Device {
 
     pub(crate) load_convolution_buffers_shader: Shader,
 
-    pub(crate) photon_hash_table_major: Texture<RGBA16F>,
+    pub(crate) photon_hash_table_major: Texture<RGBA8>,
     pub(crate) photon_hash_table_minor: Texture<RGBA16F>,
 
     pub(crate) photon_fbo: Framebuffer,
 
     pub(crate) integrator_scatter_photons_shader: Shader,
 
-    pub(crate) integrator_ld_count: Texture<RGBA32F>, // TODO: can this not be 16F? ...
+    pub(crate) integrator_ld_count: Texture<RGBA32F>,
     pub(crate) integrator_li_count: Texture<RGBA16F>,
-    pub(crate) integrator_li_range: Texture<RGBA32F>, // TODO: try to make 16F as well
+    pub(crate) integrator_li_range: Texture<RGBA32F>,
 
     pub(crate) integrator_gather_fbo: Framebuffer,
     pub(crate) integrator_update_fbo: Framebuffer,
