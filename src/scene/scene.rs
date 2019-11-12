@@ -46,4 +46,17 @@ impl Scene {
         Dirty::dirty(&mut self.aperture);
         Dirty::dirty(&mut self.integrator);
     }
+
+    pub fn has_photon_receivers(&self) -> bool {
+        self.instance_list
+            .iter()
+            .filter(|instance| instance.visible && instance.photon_receiver)
+            .any(|instance| {
+                if let Some(material) = self.material_list.get(instance.material) {
+                    !material.has_delta_bsdf()
+                } else {
+                    false
+                }
+            })
+    }
 }

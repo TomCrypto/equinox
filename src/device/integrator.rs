@@ -67,14 +67,17 @@ impl Default for IntegratorState {
             integrator: Integrator::default(),
             photon_count: 0.0,
             current_pass: 0,
-            receivers_present: false,
+            receivers_present: true,
         }
     }
 }
 
 impl Device {
     pub(crate) fn reset_integrator_state(&mut self, scene: &mut Scene) -> Result<(), Error> {
-        self.state = IntegratorState::default();
+        self.state.rng = ChaCha20Rng::seed_from_u64(0);
+        self.state.filter_rng = Qrng::new(0);
+        self.state.photon_count = 0.0;
+        self.state.current_pass = 0;
 
         self.state.aperture = (*scene.aperture).clone();
         self.state.filter = scene.raster.filter;
@@ -93,24 +96,12 @@ impl Device {
             ],
         );
 
-        let mut receivers_present = false;
-
-        for instance in scene.instance_list.iter() {
-            if instance.visible && instance.photon_receiver {
-                receivers_present = true;
-                break;
-            }
-        }
-
-        if self.state.integrator.initial_search_radius == 0.0 {
-            debug!("photon search radius is zero, therefore no receivers exist");
-            self.state.receivers_present = false; // no photons can be received
-        }
+        let receivers_present = scene.has_photon_receivers();
 
         if !self.state.receivers_present && receivers_present {
-            debug!("photon receivers present, enabling photon scatter pass");
+            info!("photon receivers present, enabling photon scatter pass");
         } else if self.state.receivers_present && !receivers_present {
-            debug!("no photons receivers present, disabling photon scatter pass");
+            info!("no photons receivers present, disabling photon scatter pass");
         }
 
         self.state.receivers_present = receivers_present;
@@ -318,6 +309,10 @@ impl Device {
         integrator.capacity_multiplier = integrator.capacity_multiplier.max(0.0);
         integrator.max_scatter_bounces = integrator.max_scatter_bounces.max(2);
         integrator.max_gather_bounces = integrator.max_gather_bounces.max(2);
+
+        if integrator.initial_search_radius <= 0.0 {
+            return Err(Error::new("photon search radius must be positive"));
+        }
 
         if integrator.max_hash_cell_bits > 8 {
             return Err(Error::new("max_hash_cell_bits must be 8 or less"));
