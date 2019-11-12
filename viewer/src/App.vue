@@ -395,7 +395,11 @@ export default class App extends Vue {
 
       this.scene.set_raster_dimensions(this.canvas.width, this.canvas.height);
 
-      this.device.update(this.scene);
+      try {
+        this.device.update(this.scene);
+      } catch (e) {
+        console.error(e);
+      }
 
       const refineTime = this.gpuTimeQueries!.timeElapsed(() => {
         this.device.refine();
