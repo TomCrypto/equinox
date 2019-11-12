@@ -24,11 +24,7 @@ void deposit_photon(ray_t ray, vec3 throughput) {
     gl_Position = vec4(clip_space, 0.0, 1.0); // put the photon into its hash table entry
 }
 
-void discard_photon() {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-}
-
-bool scatter_photon(inout ray_t ray, inout vec3 throughput, random_t random) {
+void scatter_photon(inout ray_t ray, inout vec3 throughput, random_t random) {
     for (uint bounce = 0U; bounce < integrator.max_scatter_bounces; ++bounce) {
         traversal_t traversal = traverse_scene(ray, 0U);
 
@@ -54,8 +50,8 @@ bool scatter_photon(inout ray_t ray, inout vec3 throughput, random_t random) {
                 throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
                                                                                                   \
                 if (is_receiver && weights.x < integrator.photon_rate) {                          \
-                    throughput /= integrator.photon_rate;                                         \
-                    return true; /* deposit the photon */                                         \
+                    deposit_photon(ray, throughput / integrator.photon_rate);                     \
+                    return; /* rasterize this photon into the photon table */                     \
                 }                                                                                 \
                                                                                                   \
                 throughput /= is_receiver ? 1.0 - integrator.photon_rate : 1.0;                   \
@@ -70,18 +66,16 @@ bool scatter_photon(inout ray_t ray, inout vec3 throughput, random_t random) {
             float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));
 
             if (weights.y < q) {
-                return false;
+                return;
             }
 
             throughput *= f / (1.0 - q);
 
             ray = make_ray(ray.org, ray.dir, normal);
         } else {
-            return false;
+            return;
         }
     }
-
-    return false;
 }
 
 void main() {
@@ -124,9 +118,8 @@ void main() {
     // compute a good ray origin
     ray.org = real_pos - radius * ray.dir;
 
-    if (scatter_photon(ray, throughput, random)) {
-        deposit_photon(ray, throughput);
-    } else {
-        discard_photon();
-    }
+    gl_PointSize = 1.0;
+    gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
+
+    scatter_photon(ray, throughput, random);
 }

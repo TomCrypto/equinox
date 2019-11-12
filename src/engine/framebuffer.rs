@@ -37,6 +37,10 @@ impl Framebuffer {
             panic!("the WebGL2 extension `EXT_color_buffer_float' is unavailable");
         }
 
+        if let Err(_) | Ok(None) = self.gl.get_extension("EXT_float_blend") {
+            panic!("the WebGL2 extension `EXT_float_blend' is unavailable");
+        }
+
         assert!(!attachments.is_empty());
 
         if let Some(framebuffer_handle) = &self.handle {
