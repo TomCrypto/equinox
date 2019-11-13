@@ -34,6 +34,18 @@ impl<T: AsBytes + FromBytes> UniformBuffer<[T]> {
 
         Ok(())
     }
+
+    pub fn max_len(&self) -> usize {
+        self.maximum_size() / size_of::<T>()
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
 }
 
 impl<T: AsBytes + FromBytes> UniformBuffer<T> {
@@ -70,10 +82,6 @@ impl<T: ?Sized> UniformBuffer<T> {
         self.handle = None;
     }
 
-    pub fn element_count(&self) -> usize {
-        self.len
-    }
-
     fn create_and_allocate(&mut self, size: usize) -> Result<(), Error> {
         if size > self.maximum_size() {
             return Err(Error::new("UBO size limit exceeded"));
@@ -99,8 +107,7 @@ impl<T: ?Sized> UniformBuffer<T> {
             .get_parameter(Context::MAX_UNIFORM_BLOCK_SIZE)
             .unwrap()
             .as_f64()
-            .unwrap() as usize
-            * 4)
+            .unwrap() as usize)
     }
 }
 

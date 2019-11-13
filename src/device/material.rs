@@ -96,13 +96,8 @@ fn write_material_parameters(material: &Material, parameters: &mut [MaterialPara
 
 impl Device {
     pub(crate) fn update_materials(&mut self, materials: &[Material]) -> Result<(), Error> {
-        let mut block_count = 0;
-
-        for material in materials {
-            block_count += material_parameter_block_count(material);
-        }
-
-        let parameters: &mut [MaterialParameter] = self.allocator.allocate(block_count);
+        let parameters: &mut [MaterialParameter] =
+            self.allocator.allocate(self.material_buffer.max_len());
         let mut start = 0;
 
         for material in materials {
@@ -115,9 +110,9 @@ impl Device {
 
         self.material_buffer.write_array(&parameters)?;
         self.integrator_gather_photons_shader
-            .set_define("MATERIAL_DATA_COUNT", self.material_buffer.element_count());
+            .set_define("MATERIAL_DATA_LEN", self.material_buffer.len());
         self.integrator_scatter_photons_shader
-            .set_define("MATERIAL_DATA_COUNT", self.material_buffer.element_count());
+            .set_define("MATERIAL_DATA_LEN", self.material_buffer.len());
 
         Ok(())
     }

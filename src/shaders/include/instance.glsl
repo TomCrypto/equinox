@@ -12,7 +12,7 @@ struct BvhNode {
 };
 
 layout (std140) uniform Instance {
-    BvhNode data[INSTANCE_DATA_COUNT];
+    BvhNode data[INSTANCE_DATA_LEN];
 } instance_buffer;
 
 void get_scene_bbox(out vec3 bbmin, out vec3 bbmax) {

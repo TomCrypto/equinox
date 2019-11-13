@@ -61,15 +61,15 @@ impl Device {
 
         let node_count = HierarchyBuilder::node_count_for_leaves(instance_info.len());
 
-        let mut nodes = self.allocator.allocate(node_count);
+        let nodes = self.allocator.allocate(self.instance_buffer.max_len());
 
-        HierarchyBuilder::new(&mut nodes).build(&mut instance_info);
+        HierarchyBuilder::new(&mut nodes[..node_count]).build(&mut instance_info);
 
         self.instance_buffer.write_array(&nodes)?;
         self.integrator_gather_photons_shader
-            .set_define("INSTANCE_DATA_COUNT", self.instance_buffer.element_count());
+            .set_define("INSTANCE_DATA_LEN", self.instance_buffer.len());
         self.integrator_scatter_photons_shader
-            .set_define("INSTANCE_DATA_COUNT", self.instance_buffer.element_count());
+            .set_define("INSTANCE_DATA_LEN", self.instance_buffer.len());
 
         if instance_info.is_empty() {
             self.integrator_gather_photons_shader
@@ -87,13 +87,8 @@ impl Device {
         // the parameter array are coherent and that all fields are nicely packed into
         // individual vec4 elements. Out-of-bounds parameter indices are checked here.
 
-        let geometry_parameter_count: usize = instance_list
-            .iter()
-            .filter(|inst| inst.visible)
-            .map(|inst| (inst.parameters.len() + 3) / 4)
-            .sum();
-
-        let params: &mut [GeometryParameter] = self.allocator.allocate(geometry_parameter_count);
+        let params: &mut [GeometryParameter] =
+            self.allocator.allocate(self.geometry_buffer.max_len());
         let mut offset = 0;
 
         for instance in instance_list {
@@ -120,9 +115,9 @@ impl Device {
 
         self.geometry_buffer.write_array(&params)?;
         self.integrator_gather_photons_shader
-            .set_define("GEOMETRY_DATA_COUNT", self.geometry_buffer.element_count());
+            .set_define("GEOMETRY_DATA_LEN", self.geometry_buffer.len());
         self.integrator_scatter_photons_shader
-            .set_define("GEOMETRY_DATA_COUNT", self.geometry_buffer.element_count());
+            .set_define("GEOMETRY_DATA_LEN", self.geometry_buffer.len());
 
         Ok(())
     }

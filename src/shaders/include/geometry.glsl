@@ -1,5 +1,5 @@
 layout (std140) uniform Geometry {
-    vec4 data[GEOMETRY_DATA_COUNT];
+    vec4 data[GEOMETRY_DATA_LEN];
 } geometry_buffer;
 
 bool geo_intersect(uint geometry, uint inst, ray_t ray, inout vec2 range);
