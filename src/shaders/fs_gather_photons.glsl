@@ -39,6 +39,8 @@ vec3 get_photon(vec3 cell_pos, vec3 point, uint material, uint inst, vec3 normal
                 continue;
             }
 
+            float kernel_r = distance(point, photon_position) / integrator.search_radius;
+
             vec4 minor_data = texelFetch(photon_table_minor, coords + ivec2(x, y), 0);
 
             vec3 photon_throughput = minor_data.xyz;
@@ -49,10 +51,13 @@ vec3 get_photon(vec3 cell_pos, vec3 point, uint material, uint inst, vec3 normal
             float nz = minor_data.w;
             float ny = sqrt(max(0.0, 1.0 - nx * nx - nz * nz)) * sgn;
 
-            vec3 photon_direction = vec3(nx, ny, nz);
+            vec3 photon_wi = vec3(nx, ny, nz);
+
+            float weight = sin(M_PI * (0.5 + kernel_r * 0.5));
+            weight *= weight;
 
             float pdf;
-            result += abs(photon_throughput) * mat_eval_brdf(material, inst, normal, photon_direction, wo, pdf);
+            result += weight * abs(photon_throughput) * mat_eval_brdf(material, inst, normal, photon_wi, wo, pdf);
         }
     }
 
@@ -218,9 +223,8 @@ vec3 gather_photons(ray_t ray, random_t random) {
 
                 vec3 li = throughput * gather_photons_in_sphere(ray.org, -ray.dir, normal, material, mat_inst);
 
-                // TODO: nicer-shaped kernel?
-
-                radiance += li / (integrator.photons_for_pass * M_PI * integrator.search_radius * integrator.search_radius);
+                // this factor comes from the integral of the kernel over the disk of radius R
+                radiance += li / (integrator.photons_for_pass * 0.148679 * M_2PI * integrator.search_radius * integrator.search_radius);
                 return radiance;
             }
 
@@ -246,6 +250,5 @@ void main() {
     ray_t ray;
     evaluate_primary_ray(random, ray.org, ray.dir);
 
-    radiance_estimate.rgb = gather_photons(ray, random);
-    radiance_estimate.a = 1.0; // normalization factor
+    radiance_estimate = vec4(gather_photons(ray, random), 1.0);
 }
