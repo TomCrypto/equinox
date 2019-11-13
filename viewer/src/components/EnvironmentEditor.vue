@@ -109,6 +109,30 @@ export default class extends Vue {
     {
       name: "Old Outdoor Theater (4K)",
       url: "assets/old_outdoor_theater_4k.raw"
+    },
+    {
+      name: "Blue Lagoon Night (4K)",
+      url: "assets/blue_lagoon_night_4k.raw"
+    },
+    {
+      name: "Blue Lagoon Night (8K)",
+      url: "assets/blue_lagoon_night_8k.raw"
+    },
+    {
+      name: "Cinema Lobby (4K)",
+      url: "assets/cinema_lobby_4k.raw"
+    },
+    {
+      name: "Cinema Lobby (8K)",
+      url: "assets/cinema_lobby_8k.raw"
+    },
+    {
+      name: "Moonless Golf (4K)",
+      url: "assets/moonless_golf_4k.raw"
+    },
+    {
+      name: "Moonless Golf (8K)",
+      url: "assets/moonless_golf_8k.raw"
     }
   ];
 }

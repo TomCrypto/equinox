@@ -112,6 +112,10 @@ impl Device {
 
         match environment {
             Environment::Map { tint, rotation } => {
+                if self.envmap_texture.cols() == 1 || self.envmap_texture.rows() == 1 {
+                    return Err(Error::new("no environment map asset specified"));
+                }
+
                 shader_data.tint[0] = tint[0].max(0.0);
                 shader_data.tint[1] = tint[1].max(0.0);
                 shader_data.tint[2] = tint[2].max(0.0);
