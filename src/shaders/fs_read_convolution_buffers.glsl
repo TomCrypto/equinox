@@ -1,7 +1,7 @@
 // #define CONV_DIMS            vec2      <dimensions of the entire convolution buffer>
 // #define IMAGE_DIMS           vec2      <dimensions of the output image to read out>
 
-out vec3 target;
+out vec4 target;
 
 uniform sampler2D r_conv_buffer;
 uniform sampler2D g_conv_buffer;
@@ -27,5 +27,7 @@ void main() {
     float g = texture(g_conv_buffer, p).r * NORMALIZATION;
     float b = texture(b_conv_buffer, p).r * NORMALIZATION;
 
-    target = vec3(r, g, b) + texelFetch(source, ivec2(gl_FragCoord.xy - 0.5), 0).rgb * WEIGHT;
+    vec4 value = texelFetch(source, ivec2(gl_FragCoord.xy - 0.5), 0);
+
+    target = vec4(vec3(r, g, b) + value.rgb / value.a * WEIGHT, 1.0);
 }

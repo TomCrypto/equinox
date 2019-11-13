@@ -27,9 +27,6 @@ pub struct Device {
     pub(crate) raster_buffer: UniformBuffer<RasterData>,
     pub(crate) environment_buffer: UniformBuffer<EnvironmentData>,
 
-    pub(crate) samples: Texture<RGBA32F>,
-    pub(crate) samples_fbo: Framebuffer,
-
     // Complex-valued spectrums for each render channel
     pub(crate) rspectrum_temp1: Texture<RG32F>,
     pub(crate) gspectrum_temp1: Texture<RG32F>,
@@ -59,18 +56,11 @@ pub struct Device {
 
     pub(crate) photon_fbo: Framebuffer,
 
-    pub(crate) integrator_scatter_photons_shader: Shader,
-
-    pub(crate) integrator_ld_count: Texture<RGBA32F>,
-    pub(crate) integrator_li_count: Texture<RGBA16F>,
-    pub(crate) integrator_li_range: Texture<RGBA32F>,
+    pub(crate) integrator_radiance_estimate: Texture<RGBA32F>,
 
     pub(crate) integrator_gather_fbo: Framebuffer,
-    pub(crate) integrator_update_fbo: Framebuffer,
 
-    pub(crate) integrator_estimate_radiance_shader: Shader,
-    pub(crate) integrator_update_estimates_shader: Shader,
-
+    pub(crate) integrator_scatter_photons_shader: Shader,
     pub(crate) integrator_gather_photons_shader: Shader,
 
     pub(crate) allocator: Allocator,
@@ -87,38 +77,9 @@ impl Device {
             allocator: Allocator::new(),
             gl: gl.clone(),
 
-            integrator_ld_count: Texture::new(gl.clone()),
-            integrator_li_count: Texture::new(gl.clone()),
-            integrator_li_range: Texture::new(gl.clone()),
+            integrator_radiance_estimate: Texture::new(gl.clone()),
 
             integrator_gather_fbo: Framebuffer::new(gl.clone()),
-            integrator_update_fbo: Framebuffer::new(gl.clone()),
-
-            integrator_update_estimates_shader: Shader::new(
-                gl.clone(),
-                shaders::VS_FULLSCREEN,
-                shaders::FS_UPDATE_ESTIMATES,
-                hashmap! {
-                    "Integrator" => BindingPoint::UniformBlock(0),
-                    "ld_count_tex" => BindingPoint::Texture(0),
-                    "li_count_tex" => BindingPoint::Texture(1),
-                },
-                hashmap! {},
-                hashmap! {},
-            ),
-
-            integrator_estimate_radiance_shader: Shader::new(
-                gl.clone(),
-                shaders::VS_FULLSCREEN,
-                shaders::FS_ESTIMATE_RADIANCE,
-                hashmap! {
-                    "Integrator" => BindingPoint::UniformBlock(0),
-                    "ld_count_tex" => BindingPoint::Texture(0),
-                    "li_range_tex" => BindingPoint::Texture(1),
-                },
-                hashmap! {},
-                hashmap! {},
-            ),
 
             integrator_gather_photons_shader: Shader::new(
                 gl.clone(),
@@ -126,18 +87,17 @@ impl Device {
                 shaders::FS_GATHER_PHOTONS,
                 hashmap! {
                     "Camera" => BindingPoint::UniformBlock(0),
-                    "Instance" => BindingPoint::UniformBlock(4),
-                    "Geometry" => BindingPoint::UniformBlock(7),
-                    "Material" => BindingPoint::UniformBlock(8),
-                    "Integrator" => BindingPoint::UniformBlock(2),
-                    "Raster" => BindingPoint::UniformBlock(3),
-                    "Environment" => BindingPoint::UniformBlock(1),
-                    "envmap_texture" => BindingPoint::Texture(1),
-                    "envmap_marg_cdf" => BindingPoint::Texture(2),
-                    "envmap_cond_cdf" => BindingPoint::Texture(3),
-                    "li_range_tex" => BindingPoint::Texture(4),
-                    "photon_table_major" => BindingPoint::Texture(5),
-                    "photon_table_minor" => BindingPoint::Texture(6),
+                    "Instance" => BindingPoint::UniformBlock(1),
+                    "Geometry" => BindingPoint::UniformBlock(2),
+                    "Material" => BindingPoint::UniformBlock(3),
+                    "Integrator" => BindingPoint::UniformBlock(4),
+                    "Raster" => BindingPoint::UniformBlock(5),
+                    "Environment" => BindingPoint::UniformBlock(6),
+                    "envmap_texture" => BindingPoint::Texture(0),
+                    "envmap_marg_cdf" => BindingPoint::Texture(1),
+                    "envmap_cond_cdf" => BindingPoint::Texture(2),
+                    "photon_table_major" => BindingPoint::Texture(3),
+                    "photon_table_minor" => BindingPoint::Texture(4),
                 },
                 hashmap! {
                     "geometry-user.glsl" => "",
@@ -157,15 +117,15 @@ impl Device {
                 shaders::VS_SCATTER_PHOTONS,
                 shaders::FS_SCATTER_PHOTONS,
                 hashmap! {
-                    "Instance" => BindingPoint::UniformBlock(4),
-                    "Geometry" => BindingPoint::UniformBlock(7),
-                    "Material" => BindingPoint::UniformBlock(8),
-                    "Integrator" => BindingPoint::UniformBlock(2),
-                    "Raster" => BindingPoint::UniformBlock(3),
-                    "Environment" => BindingPoint::UniformBlock(1),
-                    "envmap_texture" => BindingPoint::Texture(1),
-                    "envmap_marg_cdf" => BindingPoint::Texture(2),
-                    "envmap_cond_cdf" => BindingPoint::Texture(3),
+                    "Instance" => BindingPoint::UniformBlock(0),
+                    "Geometry" => BindingPoint::UniformBlock(1),
+                    "Material" => BindingPoint::UniformBlock(2),
+                    "Integrator" => BindingPoint::UniformBlock(3),
+                    "Raster" => BindingPoint::UniformBlock(4),
+                    "Environment" => BindingPoint::UniformBlock(5),
+                    "envmap_texture" => BindingPoint::Texture(0),
+                    "envmap_marg_cdf" => BindingPoint::Texture(1),
+                    "envmap_cond_cdf" => BindingPoint::Texture(2),
                 },
                 hashmap! {
                     "geometry-user.glsl" => "",
@@ -243,7 +203,6 @@ impl Device {
             envmap_texture: Texture::new(gl.clone()),
             envmap_marg_cdf: Texture::new(gl.clone()),
             envmap_cond_cdf: Texture::new(gl.clone()),
-            samples_fbo: Framebuffer::new(gl.clone()),
             rspectrum_temp1: Texture::new(gl.clone()),
             gspectrum_temp1: Texture::new(gl.clone()),
             bspectrum_temp1: Texture::new(gl.clone()),
@@ -259,7 +218,6 @@ impl Device {
             spectrum_temp1_fbo: Framebuffer::new(gl.clone()),
             spectrum_temp2_fbo: Framebuffer::new(gl.clone()),
             photon_fbo: Framebuffer::new(gl.clone()),
-            samples: Texture::new(gl.clone()),
             device_lost: true,
             state: IntegratorState::default(),
         })
@@ -351,13 +309,8 @@ impl Device {
                 return Err(Error::new("raster dimensions must be nonzero"));
             }
 
-            self.samples
-                .create(raster.width as usize, raster.height as usize);
-
             self.render
                 .create(raster.width as usize, raster.height as usize);
-
-            self.samples_fbo.rebuild(&[&self.samples]);
 
             self.load_convolution_buffers_shader
                 .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
@@ -396,15 +349,11 @@ impl Device {
             let render_cols = raster.width as usize;
             let render_rows = raster.height as usize;
 
-            self.integrator_ld_count.create(render_cols, render_rows);
-            self.integrator_li_count.create(render_cols, render_rows);
-            self.integrator_li_range.create(render_cols, render_rows);
+            self.integrator_radiance_estimate
+                .create(render_cols, render_rows);
 
             self.integrator_gather_fbo
-                .rebuild(&[&self.integrator_ld_count, &self.integrator_li_count]);
-
-            self.integrator_update_fbo
-                .rebuild(&[&self.integrator_li_range]);
+                .rebuild(&[&self.integrator_radiance_estimate]);
 
             self.render_fbo.rebuild(&[&self.render]);
             self.aperture_fbo.rebuild(&[
@@ -475,14 +424,12 @@ impl Device {
 
         self.present_program.rebuild()?;
 
-        self.integrator_estimate_radiance_shader.rebuild()?;
-        self.integrator_update_estimates_shader.rebuild()?;
+        self.integrator_scatter_photons_shader.rebuild()?;
+        self.integrator_gather_photons_shader.rebuild()?;
 
         self.read_convolution_buffers_shader.rebuild()?;
         self.fft_shader.rebuild()?;
         self.load_convolution_buffers_shader.rebuild()?;
-        self.integrator_scatter_photons_shader.rebuild()?;
-        self.integrator_gather_photons_shader.rebuild()?;
 
         if invalidated {
             self.reset_integrator_state(scene);
@@ -504,8 +451,6 @@ impl Device {
         self.update_integrator_state(&pass)?;
         self.scatter_photons(&pass);
         self.gather_photons();
-        self.update_estimates();
-        self.estimate_radiance();
 
         Ok(())
     }
@@ -525,12 +470,17 @@ impl Device {
         if self.state.aperture.is_some() {
             command.bind(&self.render, "samples");
         } else {
-            command.bind(&self.samples, "samples");
+            command.bind(&self.integrator_radiance_estimate, "samples");
         }
 
         command.bind(&self.display_buffer, "Display");
 
-        command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
+        command.set_viewport(
+            0,
+            0,
+            self.integrator_radiance_estimate.cols() as i32,
+            self.integrator_radiance_estimate.rows() as i32,
+        );
 
         command.set_canvas_framebuffer();
 
@@ -549,8 +499,6 @@ impl Device {
         self.read_convolution_buffers_shader.invalidate();
         self.fft_shader.invalidate();
         self.load_convolution_buffers_shader.invalidate();
-        self.integrator_scatter_photons_shader.invalidate();
-        self.integrator_gather_photons_shader.invalidate();
         self.camera_buffer.invalidate();
         self.geometry_buffer.invalidate();
         self.material_buffer.invalidate();
@@ -562,8 +510,6 @@ impl Device {
         self.integrator_buffer.invalidate();
         self.raster_buffer.invalidate();
         self.environment_buffer.invalidate();
-        self.samples.invalidate();
-        self.samples_fbo.invalidate();
         self.rspectrum_temp1.invalidate();
         self.gspectrum_temp1.invalidate();
         self.bspectrum_temp1.invalidate();
@@ -586,15 +532,12 @@ impl Device {
         self.photon_fbo.invalidate();
         self.aperture_fbo.invalidate();
 
-        self.integrator_ld_count.invalidate();
-        self.integrator_li_count.invalidate();
-        self.integrator_li_range.invalidate();
+        self.integrator_radiance_estimate.invalidate();
 
         self.integrator_gather_fbo.invalidate();
-        self.integrator_update_fbo.invalidate();
 
-        self.integrator_estimate_radiance_shader.invalidate();
-        self.integrator_update_estimates_shader.invalidate();
+        self.integrator_scatter_photons_shader.invalidate();
+        self.integrator_gather_photons_shader.invalidate();
 
         scene.dirty_all_fields();
         self.device_lost = false;

@@ -13,7 +13,7 @@ layout (std140) uniform Integrator {
     float photon_count;
     float sppm_alpha;
 
-    float cell_size;
+    float search_radius;
     uint hash_cell_cols;
     uint hash_cell_rows;
     uint hash_cell_col_bits;
@@ -25,10 +25,16 @@ layout (std140) uniform Integrator {
 
     uint max_scatter_bounces;
     uint max_gather_bounces;
+
+    float photons_for_pass;
 } integrator;
 
+float integrator_cell_size() {
+    return integrator.search_radius * 2.0;
+}
+
 cell_t cell_for_point(vec3 point) {
-    return floor(point / integrator.cell_size);
+    return floor(point / integrator_cell_size());
 }
 
 uint internal_hash_cell_key(uvec3 key, uvec2 seed) {
@@ -50,14 +56,4 @@ ivec2 hash_entry_for_cell(cell_t cell) {
 ivec2 hash_entry_for_cell(cell_t cell, uint index) {
     return hash_entry_for_cell(cell) + ivec2(index & (integrator.hash_cell_cols - 1U),
                                              index >> integrator.hash_cell_col_bits);
-}
-
-bool sphere_in_cell_broadphase(float radius, vec3 sphere_center, cell_t cell) {
-    vec3 center = (cell + vec3(0.5)) * integrator.cell_size;
-
-    float cell_bounds_radius = sqrt(3.0 / 4.0) * integrator.cell_size;
-    float radius_threshold = cell_bounds_radius + radius;
-    radius_threshold *= radius_threshold;
-
-    return dot(center - sphere_center, center - sphere_center) < radius_threshold;
 }

@@ -71,15 +71,16 @@ vec3 camera_response(uint curve, vec3 x) {
 
 void main() {
     vec4 value = texelFetch(samples, ivec2(gl_FragCoord.xy - 0.5), 0);
+    value.rgb /= value.a;
 
     // For debugging purposes only
 
-    if (any(isnan(value.xyz))) {
+    if (any(isnan(value.rgb))) {
         color = vec4(1.0, 0.0, 1.0, 1.0);
         return;
     }
 
-    if (any(isinf(value.xyz))) {
+    if (any(isinf(value.rgb))) {
         color = vec4(0.0, 0.0, 1.0, 1.0);
         return;
     }

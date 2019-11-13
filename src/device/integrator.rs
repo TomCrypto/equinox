@@ -20,7 +20,7 @@ pub struct IntegratorData {
     photon_count: f32,
     sppm_alpha: f32,
 
-    cell_size: f32,
+    search_radius: f32,
     hash_cell_cols: u32,
     hash_cell_rows: u32,
     hash_cell_col_bits: u32,
@@ -33,13 +33,15 @@ pub struct IntegratorData {
     max_scatter_bounces: u32,
     max_gather_bounces: u32,
 
-    padding: [f32; 2],
+    photons_for_pass: f32,
+
+    padding: [f32; 1],
 }
 
 pub struct IntegratorPass {
     pub n: usize,
     pub m: usize,
-    pub cell_size: f32,
+    pub search_radius: f32,
 }
 
 #[derive(Debug)]
@@ -53,6 +55,7 @@ pub struct IntegratorState {
 
     pub(crate) current_pass: u32,
     pub(crate) photon_count: f32,
+    pub(crate) kernel_radii: KernelRadiusSequence,
 
     pub(crate) receivers_present: bool,
 }
@@ -65,6 +68,7 @@ impl Default for IntegratorState {
             filter: RasterFilter::default(),
             aperture: None,
             integrator: Integrator::default(),
+            kernel_radii: KernelRadiusSequence::default(),
             photon_count: 0.0,
             current_pass: 0,
             receivers_present: true,
@@ -101,16 +105,12 @@ impl Device {
 
         Self::clamp_integrator_settings(&mut self.state.integrator);
 
-        self.integrator_gather_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
-        self.integrator_update_fbo.clear(
-            0,
-            [
-                0.0,
-                0.0,
-                0.0,
-                self.state.integrator.initial_search_radius.powi(2),
-            ],
+        self.state.kernel_radii = KernelRadiusSequence::new(
+            self.state.integrator.initial_search_radius,
+            self.state.integrator.alpha,
         );
+
+        self.integrator_gather_fbo.clear(0, [0.0, 0.0, 0.0, 0.0]);
 
         let receivers_present = scene.has_photon_receivers();
 
@@ -123,11 +123,8 @@ impl Device {
         self.state.receivers_present = receivers_present;
     }
 
-    pub(crate) fn prepare_integrator_pass(&self) -> IntegratorPass {
-        let k = (1.0 - self.state.integrator.alpha) / 2.0;
-
-        let search_radius = self.state.integrator.initial_search_radius
-            * (1.0 + self.state.current_pass as f32).powf(-k);
+    pub(crate) fn prepare_integrator_pass(&mut self) -> IntegratorPass {
+        let search_radius = self.state.kernel_radii.next_radius();
 
         let cell_size = 2.0 * search_radius;
 
@@ -138,7 +135,11 @@ impl Device {
 
         let (n, m) = self.calculate_photon_batch(self.state.integrator.photons_per_pass, target);
 
-        IntegratorPass { n, m, cell_size }
+        IntegratorPass {
+            n,
+            m,
+            search_radius,
+        }
     }
 
     pub(crate) fn update_integrator_state(&mut self, pass: &IntegratorPass) -> Result<(), Error> {
@@ -168,7 +169,7 @@ impl Device {
         data.photon_rate = self.state.integrator.photon_rate;
         data.photon_count = self.state.photon_count.max(1.0);
         data.sppm_alpha = self.state.integrator.alpha;
-        data.cell_size = pass.cell_size;
+        data.search_radius = pass.search_radius;
         data.hash_cell_cols = hash_cell_cols as u32;
         data.hash_cell_rows = hash_cell_rows as u32;
         data.hash_cell_col_bits = (hash_cell_cols - 1).count_ones();
@@ -176,6 +177,7 @@ impl Device {
         data.hash_dimensions[1] = self.photon_hash_table_major.rows() as f32;
         data.max_scatter_bounces = self.state.integrator.max_scatter_bounces;
         data.max_gather_bounces = self.state.integrator.max_gather_bounces;
+        data.photons_for_pass = (pass.n * pass.m) as f32;
 
         data.hash_cols_mask =
             ((self.photon_hash_table_major.cols() - 1) & !(hash_cell_cols - 1)) as u32;
@@ -230,7 +232,6 @@ impl Device {
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
-        command.bind(&self.integrator_li_range, "li_range_tex");
         command.bind(&self.photon_hash_table_major, "photon_table_major");
         command.bind(&self.photon_hash_table_minor, "photon_table_minor");
 
@@ -238,45 +239,14 @@ impl Device {
 
         self.integrator_gather_fbo.clear(1, [0.0; 4]);
 
-        command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
+        command.set_viewport(
+            0,
+            0,
+            self.integrator_radiance_estimate.cols() as i32,
+            self.integrator_radiance_estimate.rows() as i32,
+        );
 
         command.set_blend_mode(BlendMode::Add);
-
-        command.unset_vertex_array();
-        command.draw_triangles(0, 1);
-    }
-
-    pub(crate) fn update_estimates(&mut self) {
-        if !self.state.receivers_present {
-            return;
-        }
-
-        let command = self.integrator_update_estimates_shader.begin_draw();
-
-        command.bind(&self.integrator_buffer, "Integrator");
-        command.bind(&self.integrator_ld_count, "ld_count_tex");
-        command.bind(&self.integrator_li_count, "li_count_tex");
-
-        command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
-
-        command.set_framebuffer(&self.integrator_update_fbo);
-
-        command.set_blend_mode(BlendMode::UpdateEstimate);
-
-        command.unset_vertex_array();
-        command.draw_triangles(0, 1);
-    }
-
-    pub(crate) fn estimate_radiance(&mut self) {
-        let command = self.integrator_estimate_radiance_shader.begin_draw();
-
-        command.bind(&self.integrator_buffer, "Integrator");
-        command.bind(&self.integrator_ld_count, "ld_count_tex");
-        command.bind(&self.integrator_li_range, "li_range_tex");
-
-        command.set_viewport(0, 0, self.samples.cols() as i32, self.samples.rows() as i32);
-
-        command.set_framebuffer(&self.samples_fbo);
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
@@ -323,5 +293,38 @@ impl Device {
         integrator.capacity_multiplier = integrator.capacity_multiplier.max(0.0);
         integrator.max_scatter_bounces = integrator.max_scatter_bounces.max(2);
         integrator.max_gather_bounces = integrator.max_gather_bounces.max(2);
+    }
+}
+
+/// Sequence of radii for the photon kernel.
+///
+/// This struct returns an appropriate search radius to use during the radiance
+/// estimation pass of the photon mapping algorithm. It will decrease over time
+/// at the correct rate to ensure the estimator's variance converges to zero.
+#[derive(Debug, Default)]
+pub struct KernelRadiusSequence {
+    initial: f32,
+    alpha: f32,
+    product: f32,
+    iters: f32,
+}
+
+impl KernelRadiusSequence {
+    pub fn new(initial: f32, alpha: f32) -> Self {
+        Self {
+            initial,
+            alpha,
+            product: 1.0,
+            iters: 1.0,
+        }
+    }
+
+    pub fn next_radius(&mut self) -> f32 {
+        let radius = self.initial * (self.product / self.iters).sqrt();
+
+        self.product *= (self.iters + self.alpha) / self.iters;
+        self.iters += 1.0;
+
+        radius
     }
 }

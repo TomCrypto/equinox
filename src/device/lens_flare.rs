@@ -73,7 +73,7 @@ fn bilinear_interpolation(psf: &[f32], width: usize, height: usize, mut x: f32, 
 
 impl Device {
     pub(crate) fn render_lens_flare(&mut self) {
-        let mut location = self.load_into_convolution_buffers(&self.samples);
+        let mut location = self.load_into_convolution_buffers(&self.integrator_radiance_estimate);
         self.perform_convolution(&mut location);
         self.load_convolved_render_from_convolution_buffers(&mut location);
     }
@@ -569,7 +569,7 @@ impl Device {
         command.bind(self.source_g_buffer(*location), "g_conv_buffer");
         command.bind(self.source_b_buffer(*location), "b_conv_buffer");
 
-        command.bind(&self.samples, "source");
+        command.bind(&self.integrator_radiance_estimate, "source");
 
         command.set_framebuffer(&self.render_fbo);
 

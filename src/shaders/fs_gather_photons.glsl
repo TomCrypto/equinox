@@ -7,12 +7,10 @@
 #include <environment.glsl>
 #include <integrator.glsl>
 
-uniform sampler2D li_range_tex;
 uniform sampler2D photon_table_major;
 uniform sampler2D photon_table_minor;
 
-layout(location = 0) out vec4 ld_count;
-layout(location = 1) out vec4 li_count;
+layout(location = 0) out vec4 radiance_estimate;
 
 layout (std140) uniform Camera {
     vec4 origin_plane[4];
@@ -24,10 +22,8 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, uint inst, vec3 normal, vec3 wo, inout float count) {
-    if (!sphere_in_cell_broadphase(sqrt(radius_squared), point, cell_pos)) {
-        return vec3(0.0);
-    }
+vec3 get_photon(vec3 cell_pos, vec3 point, uint material, uint inst, vec3 normal, vec3 wo) {
+    float radius_squared = integrator.search_radius * integrator.search_radius;
 
     ivec2 coords = hash_entry_for_cell(cell_pos);
 
@@ -37,7 +33,7 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
         for (uint x = 0U; x < integrator.hash_cell_cols; ++x) {
             vec4 major_data = texelFetch(photon_table_major, coords + ivec2(x, y), 0);
 
-            vec3 photon_position = (cell_pos + major_data.xyz) * integrator.cell_size;
+            vec3 photon_position = (cell_pos + major_data.xyz) * integrator_cell_size();
 
             if (dot(point - photon_position, point - photon_position) > radius_squared) {
                 continue;
@@ -56,7 +52,6 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
             vec3 photon_direction = vec3(nx, ny, nz);
 
             float pdf;
-            count += 1.0;
             result += abs(photon_throughput) * mat_eval_brdf(material, inst, normal, photon_direction, wo, pdf);
         }
     }
@@ -64,26 +59,22 @@ vec3 get_photon(vec3 cell_pos, vec3 point, float radius_squared, uint material, 
     return result;
 }
 
-vec3 gather_photons_in_sphere(float radius_squared, vec3 position, vec3 wo, vec3 normal, uint material, uint inst, out float count) {
-    if (radius_squared == 0.0) {
-        return vec3(0.0);
-    }
-
-    vec3 cell_pos = floor(position / integrator.cell_size);
-    vec3 in_pos = fract(position / integrator.cell_size);
+vec3 gather_photons_in_sphere(vec3 position, vec3 wo, vec3 normal, uint material, uint inst) {
+    vec3 cell_pos = floor(position / integrator_cell_size());
+    vec3 in_pos = fract(position / integrator_cell_size());
 
     vec3 dir = sign(in_pos - vec3(0.5));
 
     vec3 accumulation = vec3(0.0);
 
-    accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 0.0), position, radius_squared, material, inst, normal, wo, count);
-    accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 1.0), position, radius_squared, material, inst, normal, wo, count);
-    accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 0.0), position, radius_squared, material, inst, normal, wo, count);
-    accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 1.0), position, radius_squared, material, inst, normal, wo, count);
-    accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 0.0), position, radius_squared, material, inst, normal, wo, count);
-    accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 1.0), position, radius_squared, material, inst, normal, wo, count);
-    accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 0.0), position, radius_squared, material, inst, normal, wo, count);
-    accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 1.0), position, radius_squared, material, inst, normal, wo, count);
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 0.0), position, material, inst, normal, wo);
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 0.0, 1.0), position, material, inst, normal, wo);
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 0.0), position, material, inst, normal, wo);
+    accumulation += get_photon(cell_pos + dir * vec3(0.0, 1.0, 1.0), position, material, inst, normal, wo);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 0.0), position, material, inst, normal, wo);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 0.0, 1.0), position, material, inst, normal, wo);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 0.0), position, material, inst, normal, wo);
+    accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 1.0), position, material, inst, normal, wo);
 
     return accumulation;
 }
@@ -149,12 +140,10 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, random_t random) {
-    float radius_squared = texelFetch(li_range_tex, ivec2(gl_FragCoord - 0.5), 0).w;
-    radius_squared = min(radius_squared, pow(integrator.cell_size * 0.5, 2.0));
-
+vec3 gather_photons(ray_t ray, random_t random) {
     float light_pdf, material_pdf;
     vec3 throughput = vec3(1.0);
+    vec3 radiance = vec3(0.0);
 
     bool mis = false;
 
@@ -200,7 +189,7 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, random
                 float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));
 
                 if (rand_uniform_float(random) < q) {
-                    return;
+                    return radiance;
                 }
 
                 float adjustment = 1.0 / (1.0 - q);
@@ -211,7 +200,7 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, random
 
             if (light_pdf != 0.0 && mis_material_pdf != 0.0) {
                 if (!is_ray_occluded(make_ray(ray.org, mis_wi, normal), 1.0 / 0.0)) {
-                    ld += mis_f * light * power_heuristic(light_pdf, mis_material_pdf);
+                    radiance += mis_f * light * power_heuristic(light_pdf, mis_material_pdf);
                 }
             }
 
@@ -223,12 +212,16 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, random
                     if (!is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
                         vec3 light = env_eval_light(wi, light_pdf);
 
-                        ld += throughput * f * light * power_heuristic(material_pdf, light_pdf);
+                        radiance += throughput * f * light * power_heuristic(material_pdf, light_pdf);
                     }
                 }
 
-                li = throughput * gather_photons_in_sphere(radius_squared, ray.org, -ray.dir, normal, material, mat_inst, count);
-                return;
+                vec3 li = throughput * gather_photons_in_sphere(ray.org, -ray.dir, normal, material, mat_inst);
+
+                // TODO: nicer-shaped kernel?
+
+                radiance += li / (integrator.photons_for_pass * M_PI * integrator.search_radius * integrator.search_radius);
+                return radiance;
             }
 
             ray = make_ray(ray.org, wi, normal);
@@ -238,11 +231,13 @@ void gather_photons(out vec3 ld, out vec3 li, out float count, ray_t ray, random
 
             vec3 light = env_eval_light(ray.dir, light_pdf);
 
-            ld += throughput * light * (mis ? power_heuristic(material_pdf, light_pdf) : 1.0);
+            radiance += throughput * light * (mis ? power_heuristic(material_pdf, light_pdf) : 1.0);
 
-            return;
+            return radiance;
         }
     }
+
+    return radiance;
 }
 
 void main() {
@@ -251,9 +246,6 @@ void main() {
     ray_t ray;
     evaluate_primary_ray(random, ray.org, ray.dir);
 
-    float count; // number of photons gathered at the visible point
-    gather_photons(ld_count.rgb, li_count.rgb, count, ray, random);
-
-    ld_count.a = count;
-    li_count.a = count;
+    radiance_estimate.rgb = gather_photons(ray, random);
+    radiance_estimate.a = 1.0; // normalization factor
 }

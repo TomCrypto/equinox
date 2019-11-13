@@ -363,15 +363,6 @@ impl<'a> DrawCommand<'a> {
                 self.shader.gl.blend_equation(Context::FUNC_ADD);
                 self.shader.gl.blend_func(Context::ONE, Context::ONE);
             }
-            BlendMode::UpdateEstimate => {
-                self.shader.gl.blend_equation(Context::FUNC_ADD);
-                self.shader.gl.blend_func_separate(
-                    Context::SRC_ALPHA,
-                    Context::SRC_ALPHA,
-                    Context::ZERO,
-                    Context::SRC_ALPHA,
-                );
-            }
         }
     }
 
@@ -437,10 +428,7 @@ impl<'a> DrawCommand<'a> {
     }
 }
 
-// TODO: rename these to be more implementation-agnostic
-
 pub enum BlendMode {
     Accumulate { weight: f32 },
     Add,
-    UpdateEstimate,
 }
