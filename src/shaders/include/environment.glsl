@@ -55,7 +55,7 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
 
     wi = equirectangular_to_direction(vec2(sampled_u, sampled_v), environment.rotation);
 
-    vec4 value = texture(envmap_texture, vec2(sampled_u, sampled_v));
+    vec4 value = textureLod(envmap_texture, vec2(sampled_u, sampled_v), 0.0);
 
     float sin_theta = sin(sampled_v * M_PI);
 
@@ -69,7 +69,7 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
 }
 
 vec3 env_eval_light_image(vec3 wi, out float pdf) {
-    vec4 value = texture(envmap_texture, direction_to_equirectangular(wi, environment.rotation));
+    vec4 value = textureLod(envmap_texture, direction_to_equirectangular(wi, environment.rotation), 0.0);
 
     float sin_theta = sqrt(max(0.0, 1.0 - wi.y * wi.y));
 

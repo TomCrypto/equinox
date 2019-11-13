@@ -23,9 +23,9 @@ void main() {
     p += 0.5 / CONV_DIMS;
 
     // Normalize the output data from the FFT -> IFFT step
-    float r = texture(r_conv_buffer, p).r * NORMALIZATION;
-    float g = texture(g_conv_buffer, p).r * NORMALIZATION;
-    float b = texture(b_conv_buffer, p).r * NORMALIZATION;
+    float r = textureLod(r_conv_buffer, p, 0.0).r * NORMALIZATION;
+    float g = textureLod(g_conv_buffer, p, 0.0).r * NORMALIZATION;
+    float b = textureLod(b_conv_buffer, p, 0.0).r * NORMALIZATION;
 
     vec4 value = texelFetch(source, ivec2(gl_FragCoord.xy - 0.5), 0);
 

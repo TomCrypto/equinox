@@ -12,7 +12,7 @@ void main() {
         vec2 p = (1.0 - 1.0 / IMAGE_DIMS) * (gl_FragCoord.xy - 0.5) / (CONV_DIMS / 2.0 - 1.0);
         p += 0.5 / IMAGE_DIMS;
 
-        vec4 value = texture(image, p);
+        vec4 value = textureLod(image, p, 0.0);
 
         vec3 texel = value.rgb / value.a;
         r_conv_buffer = vec2(texel.r, 0.0);
