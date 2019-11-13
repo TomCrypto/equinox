@@ -59,7 +59,7 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout random_t random) {
 
     float sin_theta = sin(sampled_v * M_PI);
 
-    if (sin_theta == 0.0) {
+    if (sin_theta == 0.0 || value.w == 0.0) {
         return pdf = 0.0, vec3(0.0);
     }
 
@@ -73,7 +73,7 @@ vec3 env_eval_light_image(vec3 wi, out float pdf) {
 
     float sin_theta = sqrt(max(0.0, 1.0 - wi.y * wi.y));
 
-    if (sin_theta == 0.0) {
+    if (sin_theta == 0.0 || value.w == 0.0) {
         return pdf = 0.0, vec3(0.0);
     }
 
