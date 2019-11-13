@@ -78,45 +78,43 @@ void scatter_photon(inout ray_t ray, inout vec3 throughput, random_t random) {
     }
 }
 
-void main() {
-    random_t random = rand_initialize_from_seed(uvec2(gl_VertexID, gl_InstanceID) + integrator.rng);
-
-    ray_t ray;
-
-    // pick a random ray target in the scene's bounding box
-    vec3 bbmin, bbmax;
+ray_t generate_photon_ray(out vec3 throughput, inout random_t random) {
+    vec3 bbmin, bbmax, wi;
 
     get_scene_bbox(bbmin, bbmax);
 
-    // pick a random incident ray direction, importance-sampled
     float unused_pdf;
-    vec3 throughput = env_sample_light(ray.dir, unused_pdf, random);
-    ray.dir = -ray.dir;
+    throughput = env_sample_light(wi, unused_pdf, random);
+    wi = -wi;
 
-    // TODO: better sampling for this, maybe using an ellipse or something to better fit the AABB
+    vec3 coords = ceil(-wi);
 
-    // find the bounding sphere for the scene
-    float radius = max(bbmax.x - bbmin.x, max(bbmax.y - bbmin.y, bbmax.z - bbmin.z)) / 2.0 * sqrt(3.0);
+    float x_area = (bbmax.y - bbmin.y) * (bbmax.z - bbmin.z) * abs(wi.x);
+    float y_area = (bbmax.x - bbmin.x) * (bbmax.z - bbmin.z) * abs(wi.y);
+    float z_area = (bbmax.x - bbmin.x) * (bbmax.y - bbmin.y) * abs(wi.z);
 
-    // adjust PDF
-    throughput *= M_PI * radius * radius;
+    float area = x_area + y_area + z_area;
+    throughput *= area; // division by PDF
 
-    // generate a random "upwards" vector in the unit disk
-    vec2 rng1 = rand_uniform_vec2(random);
+    float w = rand_uniform_float(random) * area;
+    vec2 surface_uv = rand_uniform_vec2(random);
 
-    float r = sqrt(rng1.x) * radius;
-    float a = rng1.y * M_2PI;
+    if (w < x_area) {
+        coords.yz = surface_uv;
+    } else if (w < x_area + y_area) {
+        coords.xz = surface_uv;
+    } else {
+        coords.xy = surface_uv;
+    }
 
-    float px = r * cos(a);
-    float py = r * sin(a);
+    return ray_t(mix(bbmin, bbmax, coords), wi);
+}
 
-    vec3 base_pos = vec3(px, 0.0, py);
-    
-    // rotate it to be aligned with the ray direction
-    vec3 real_pos = rotate(base_pos, ray.dir);
+void main() {
+    random_t random = rand_initialize_from_seed(uvec2(gl_VertexID, gl_InstanceID) + integrator.rng);
 
-    // compute a good ray origin
-    ray.org = real_pos - radius * ray.dir;
+    vec3 throughput; // measure photon path contribution
+    ray_t ray = generate_photon_ray(throughput, random);
 
     gl_PointSize = 1.0;
     gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
