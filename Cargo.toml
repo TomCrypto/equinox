@@ -4,6 +4,7 @@ edition = "2018"
 version = "0.4.1"
 build = "build.rs"
 license = "MIT"
+publish = false
 repository = "https://github.com/TomCrypto/equinox"
 authors = ["Thomas Bénéteau <thomas@bitwise.me>"]
 description = "WebGL2 real-time photon mapper"
