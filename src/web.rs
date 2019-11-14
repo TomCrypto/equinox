@@ -41,47 +41,7 @@ impl WebScene {
     /// This method will attempt to dirty the least amount of scene data
     /// possible, so it won't necessarily always dirty the entire scene.
     pub fn set_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
-        let new_scene: Scene = from_json(json)?;
-
-        if self.scene.camera != new_scene.camera {
-            self.scene.camera = new_scene.camera;
-        }
-
-        if self.scene.display != new_scene.display {
-            self.scene.display = new_scene.display;
-        }
-
-        if self.scene.environment_map != new_scene.environment_map {
-            self.scene.environment_map = new_scene.environment_map;
-        }
-
-        if self.scene.environment != new_scene.environment {
-            self.scene.environment = new_scene.environment;
-        }
-
-        if self.scene.geometry_list != new_scene.geometry_list {
-            self.scene.geometry_list = new_scene.geometry_list;
-        }
-
-        if self.scene.material_list != new_scene.material_list {
-            self.scene.material_list = new_scene.material_list;
-        }
-
-        if self.scene.raster != new_scene.raster {
-            self.scene.raster = new_scene.raster;
-        }
-
-        if self.scene.instance_list != new_scene.instance_list {
-            self.scene.instance_list = new_scene.instance_list;
-        }
-
-        if self.scene.aperture != new_scene.aperture {
-            self.scene.aperture = new_scene.aperture;
-        }
-
-        if self.scene.integrator != new_scene.integrator {
-            self.scene.integrator = new_scene.integrator;
-        }
+        self.scene.patch_from_other(from_json(json)?);
 
         Ok(())
     }

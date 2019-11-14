@@ -47,6 +47,52 @@ impl Scene {
         Dirty::dirty(&mut self.integrator);
     }
 
+    /// Patches this scene to be equal to another scene.
+    ///
+    /// Scene contents which are identical between the two scenes will not be
+    /// modified, so the method will avoid dirtying as many fields as it can.
+    pub fn patch_from_other(&mut self, other: Self) {
+        if self.camera != other.camera {
+            self.camera = other.camera;
+        }
+
+        if self.display != other.display {
+            self.display = other.display;
+        }
+
+        if self.environment_map != other.environment_map {
+            self.environment_map = other.environment_map;
+        }
+
+        if self.environment != other.environment {
+            self.environment = other.environment;
+        }
+
+        if self.geometry_list != other.geometry_list {
+            self.geometry_list = other.geometry_list;
+        }
+
+        if self.material_list != other.material_list {
+            self.material_list = other.material_list;
+        }
+
+        if self.raster != other.raster {
+            self.raster = other.raster;
+        }
+
+        if self.instance_list != other.instance_list {
+            self.instance_list = other.instance_list;
+        }
+
+        if self.aperture != other.aperture {
+            self.aperture = other.aperture;
+        }
+
+        if self.integrator != other.integrator {
+            self.integrator = other.integrator;
+        }
+    }
+
     pub fn has_photon_receivers(&self) -> bool {
         self.instance_list
             .iter()
