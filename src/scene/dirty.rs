@@ -29,8 +29,8 @@ impl<T> Dirty<T> {
 
     /// Marks the value as clean and returns whether it was dirty.
     ///
-    /// The `update` callback is invoked if the value was dirty. If the callback
-    /// fails by returning an error, the value remains dirty to try again later.
+    /// The `update` callback is invoked if the value is dirty. If the callback
+    /// fails by returning an error, the value will remain dirty and unchanged.
     pub fn clean(
         this: &mut Self,
         update: impl FnOnce(&T) -> Result<(), Error>,
@@ -43,6 +43,20 @@ impl<T> Dirty<T> {
         this.is_clean = true;
 
         Ok(true)
+    }
+}
+
+impl<T: Clone + PartialEq> Dirty<T> {
+    /// Allows mutating the value and dirties it if it was changed.
+    pub fn modify(this: &mut Self, callback: impl FnOnce(&mut T)) {
+        let mut modified = this.inner.clone();
+
+        callback(&mut modified);
+
+        if this.inner != modified {
+            this.inner = modified;
+            this.is_clean = false;
+        }
     }
 }
 

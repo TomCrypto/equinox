@@ -1,6 +1,6 @@
-use crate::{Device, Scene};
+use crate::{Device, Dirty, Scene};
 use cgmath::prelude::*;
-use cgmath::{Basis3, Vector3};
+use cgmath::Basis3;
 use js_sys::{Array, Error};
 use maplit::btreemap;
 use serde::{de::DeserializeOwned, Serialize};
@@ -96,13 +96,10 @@ impl WebScene {
     }
 
     pub fn set_raster_dimensions(&mut self, width: u32, height: u32) {
-        if self.scene.raster.width != width {
-            self.scene.raster.width = width;
-        }
-
-        if self.scene.raster.height != height {
-            self.scene.raster.height = height;
-        }
+        Dirty::modify(&mut self.scene.raster, |raster| {
+            raster.width = width;
+            raster.height = height;
+        });
     }
 
     pub fn insert_asset(&mut self, name: &str, data: &[u8]) {
@@ -114,24 +111,28 @@ impl WebScene {
     }
 
     pub fn set_environment_rotation(&mut self, new_rotation: f32) {
-        if let Environment::Map { rotation, .. } = &mut *self.scene.environment {
-            *rotation = new_rotation;
-        }
+        Dirty::modify(&mut self.scene.environment, |environment| {
+            if let Environment::Map { rotation, .. } = environment {
+                *rotation = new_rotation;
+            }
+        });
     }
 
     pub fn set_envmap(&mut self, name: &str) {
-        if self.scene.environment_map.as_ref().map(String::as_str) != Some(name) {
-            *self.scene.environment_map = Some(name.to_owned());
-        }
+        Dirty::modify(&mut self.scene.environment_map, |environment_map| {
+            *environment_map = Some(name.to_owned());
+        });
 
-        if let Environment::Map { .. } = &*self.scene.environment {
-            return; // already configured to map, nothing to do
-        }
-
-        *self.scene.environment = Environment::Map {
-            tint: [1.0; 3],
-            rotation: 0.0,
-        };
+        Dirty::modify(&mut self.scene.environment, |environment| {
+            if let Environment::Map { .. } = environment {
+                // do nothing; we're already in map mode
+            } else {
+                *environment = Environment::Map {
+                    tint: [1.0; 3],
+                    rotation: 0.0,
+                };
+            }
+        });
     }
 
     /// Applies a camera-space translation to the camera position.
@@ -139,23 +140,15 @@ impl WebScene {
         let xfm =
             Basis3::look_at(self.scene.camera.direction, self.scene.camera.up_vector).invert();
 
-        self.scene.camera.position += xfm.rotate_vector(Vector3::new(dx, dy, dz));
+        Dirty::modify(&mut self.scene.camera, |camera| {
+            camera.position += xfm.rotate_vector([dx, dy, dz].into());
+        });
     }
 
     pub fn set_camera_direction(&mut self, x: f32, y: f32, z: f32) {
-        self.scene.camera.direction = Vector3::new(x, y, z);
-    }
-
-    pub fn orient_camera(&mut self, phi: f32, theta: f32) {
-        let new_vector = Vector3::new(
-            phi.cos() * theta.sin(),
-            theta.cos(),
-            phi.sin() * theta.sin(),
-        );
-
-        let change = cgmath::Quaternion::between_vectors(Vector3::new(0.0, 1.0, 0.0), new_vector);
-
-        self.scene.camera.direction = change.rotate_vector(self.scene.camera.direction);
+        Dirty::modify(&mut self.scene.camera, |camera| {
+            camera.direction = [x, y, z].into();
+        });
     }
 
     /// Sets the scene to a default scene.
