@@ -35,7 +35,7 @@
       {
         "geometry": 0,
         "material": 0,
-        "parameters": [],
+        "parameters": {},
         "photon_receiver": false,
         "sample_explicit": true,
         "visible": true
@@ -43,7 +43,7 @@
       {
         "geometry": 1,
         "material": 1,
-        "parameters": [],
+        "parameters": {},
         "photon_receiver": true,
         "sample_explicit": true,
         "visible": true
@@ -51,7 +51,7 @@
       {
         "geometry": 2,
         "material": 2,
-        "parameters": [],
+        "parameters": {},
         "photon_receiver": true,
         "sample_explicit": true,
         "visible": true
@@ -59,7 +59,7 @@
       {
         "geometry": 3,
         "material": 3,
-        "parameters": [],
+        "parameters": {},
         "photon_receiver": true,
         "sample_explicit": true,
         "visible": true
@@ -68,122 +68,46 @@
     "geometry_list": [
       {
         "type": "plane",
-        "width": {
-          "type": "constant",
-          "value": 1
-        },
-        "length": {
-          "type": "constant",
-          "value": 1
-        }
+        "width": 1,
+        "length": 1
       },
       {
         "type": "translate",
-        "translation": [
-          {
-            "type": "constant",
-            "value": 0
-          },
-          {
-            "type": "constant",
-            "value": 0.51
-          },
-          {
-            "type": "constant",
-            "value": 0
-          }
-        ],
+        "translation": [0, 0.51, 0],
         "f": {
           "type": "scale",
-          "factor": {
-            "type": "constant",
-            "value": 0.5
-          },
+          "factor": 0.5,
           "f": {
             "type": "sphere",
-            "radius": {
-              "type": "constant",
-              "value": 1
-            }
+            "radius": 1
           }
         }
       },
       {
         "type": "translate",
-        "translation": [
-          {
-            "type": "constant",
-            "value": 0.6
-          },
-          {
-            "type": "constant",
-            "value": 0.151
-          },
-          {
-            "type": "constant",
-            "value": 0.55
-          }
-        ],
+        "translation": [0.6, 0.151, 0.55],
         "f": {
           "type": "round",
-          "radius": {
-            "type": "constant",
-            "value": 0.05
-          },
+          "radius": 0.05,
           "f": {
             "type": "scale",
-            "factor": {
-              "type": "constant",
-              "value": 0.1
-            },
+            "factor": 0.1,
             "f": {
               "type": "cuboid",
-              "dimensions": [
-                {
-                  "type": "constant",
-                  "value": 1
-                },
-                {
-                  "type": "constant",
-                  "value": 1
-                },
-                {
-                  "type": "constant",
-                  "value": 1
-                }
-              ]
+              "dimensions": [1, 1, 1]
             }
           }
         }
       },
       {
         "type": "translate",
-        "translation": [
-          {
-            "type": "constant",
-            "value": -0.6
-          },
-          {
-            "type": "constant",
-            "value": 0.151
-          },
-          {
-            "type": "constant",
-            "value": -0.75
-          }
-        ],
+        "translation": [-0.6, 0.151, -0.75],
         "f": {
           "type": "scale",
-          "factor": {
-            "type": "constant",
-            "value": 0.15
-          },
+          "factor": 0.15,
           "f": {
             "type": "sphere",
-            "radius": {
-              "type": "constant",
-              "value": 1
-            }
+            "radius": 1
           }
         }
       }
@@ -191,58 +115,30 @@
     "material_list": [
       {
         "type": "phong",
-        "albedo": [
-          0.75,
-          0.75,
-          0.75
-        ],
+        "albedo": [0.75, 0.75, 0.75],
         "shininess": 900
       },
       {
         "type": "ideal-reflection",
-        "reflectance": [
-          0.9,
-          0.9,
-          0.9
-        ]
+        "reflectance": [0.9, 0.9, 0.9]
       },
       {
         "type": "lambertian",
-        "albedo": [
-          0.9,
-          0.1,
-          0.1
-        ]
+        "albedo": [0.9, 0.1, 0.1]
       },
       {
         "type": "dielectric",
         "internal_refractive_index": 1.65,
         "external_refractive_index": 1,
-        "internal_extinction_coefficient": [
-          1e-7,
-          1e-7,
-          1e-7
-        ],
-        "external_extinction_coefficient": [
-          0,
-          0,
-          0
-        ],
-        "base_color": [
-          1,
-          1,
-          1
-        ]
+        "internal_extinction_coefficient": [1e-7, 1e-7, 1e-7],
+        "external_extinction_coefficient": [0, 0, 0],
+        "base_color": [1, 1, 1]
       }
     ],
     "environment_map": "assets/blue_grotto_4k.raw",
     "environment": {
       "type": "map",
-      "tint": [
-        1,
-        1,
-        1
-      ],
+      "tint": [1, 1, 1],
       "rotation": 0
     },
     "display": {
@@ -263,7 +159,5 @@
       "max_gather_bounces": 8
     }
   },
-  "assets": [
-    "assets/blue_grotto_4k.raw"
-  ]
+  "assets": ["assets/blue_grotto_4k.raw"]
 }
