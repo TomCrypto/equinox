@@ -1,22 +1,23 @@
 use crate::BoundingBox;
 use cgmath::Point3;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Parameter
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(tag = "type", rename_all = "kebab-case")]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(untagged)]
 pub enum Parameter {
     /// Fixed value across all instances.
-    Constant { value: f32 },
-    /// Reference into a parameter array.
-    Symbolic { index: usize },
+    Constant(f32),
+    /// Reference into a parameter table.
+    Symbolic(String),
 }
 
 impl Parameter {
-    pub fn value(&self, symbolic_values: &[f32]) -> Option<f32> {
+    pub fn value(&self, symbolic_values: &BTreeMap<String, f32>) -> Option<f32> {
         match self {
-            Self::Constant { value } => Some(*value),
-            Self::Symbolic { index } => symbolic_values.get(*index).copied(),
+            Self::Constant(number) => Some(*number),
+            Self::Symbolic(symbol) => symbolic_values.get(symbol).copied(),
         }
     }
 }
@@ -94,9 +95,9 @@ impl Geometry {
         }
     }
 
-    /// Returns the estimated bounding box for an instance of this geometry, or
-    /// `None` if a symbolic parameter was out of bounds of the provided array.
-    pub fn bounding_box(&self, symbolic_values: &[f32]) -> Option<BoundingBox> {
+    /// Returns an estimated bounding box for an instance of this geometry, or
+    /// `None` if a symbolic parameter was not present in the parameter table.
+    pub fn bounding_box(&self, symbolic_values: &BTreeMap<String, f32>) -> Option<BoundingBox> {
         match self {
             Self::Sphere { radius } => {
                 let radius = radius.value(symbolic_values)?;

@@ -79,7 +79,7 @@ impl GeometryGlslGenerator {
     }
 
     // In the methods below, the parameters must be evaluated in the same order used
-    // when renumbering the parameter array further below in `renumber_parameters`.
+    // when renumbering the parameter table further below in `renumber_parameters`.
 
     fn distance_recursive(&mut self, geometry: &Geometry, index: &mut usize) -> DistanceFn {
         let code = match geometry {
@@ -240,8 +240,8 @@ impl GeometryGlslGenerator {
 
     fn lookup_parameter(&self, parameter: &Parameter, index: &mut usize) -> String {
         match parameter {
-            Parameter::Constant { value } => format!("{:+e}", value),
-            Parameter::Symbolic { .. } => self.lookup_symbolic_parameter(index),
+            Parameter::Constant(number) => format!("{:+e}", number),
+            Parameter::Symbolic(_) => self.lookup_symbolic_parameter(index),
         }
     }
 
@@ -301,9 +301,9 @@ impl GeometryGlslGenerator {
     }
 }
 
-/// Returns a vector of all symbolic parameter indices in the order they are
-/// encountered in the geometry. The returned order is always deterministic.
-pub(crate) fn renumber_parameters(geometry: &Geometry) -> Vec<usize> {
+/// Returns a vector of all symbolic parameter values in the order they are
+/// encountered in the geometry. The resulting order will be deterministic.
+pub(crate) fn renumber_parameters(geometry: &Geometry) -> Vec<String> {
     let mut parameters = vec![];
 
     renumber_parameters_recursive(geometry, &mut parameters);
@@ -311,13 +311,13 @@ pub(crate) fn renumber_parameters(geometry: &Geometry) -> Vec<usize> {
     parameters
 }
 
-fn add_parameter(parameters: &mut Vec<usize>, parameter: &Parameter) {
-    if let Parameter::Symbolic { index } = parameter {
-        parameters.push(*index);
+fn add_parameter(parameters: &mut Vec<String>, parameter: &Parameter) {
+    if let Parameter::Symbolic(symbol) = parameter {
+        parameters.push(symbol.clone());
     }
 }
 
-fn renumber_parameters_recursive(geometry: &Geometry, parameters: &mut Vec<usize>) {
+fn renumber_parameters_recursive(geometry: &Geometry, parameters: &mut Vec<String>) {
     match geometry {
         Geometry::Sphere { radius } => {
             add_parameter(parameters, radius);

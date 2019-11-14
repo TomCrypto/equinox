@@ -2,6 +2,7 @@ use crate::{Device, Scene};
 use cgmath::prelude::*;
 use cgmath::{Basis3, Vector3};
 use js_sys::{Array, Error};
+use maplit::btreemap;
 use serde::{de::DeserializeOwned, Serialize};
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
@@ -205,18 +206,18 @@ impl WebScene {
         // have proper types whereas doing it in the front-end would require JSON.
 
         self.scene.geometry_list.push(Geometry::Plane {
-            width: Parameter::Constant { value: 3.0 },
-            length: Parameter::Constant { value: 3.0 },
+            width: Parameter::Constant(3.0),
+            length: Parameter::Constant(3.0),
         });
 
         self.scene.geometry_list.push(Geometry::Translate {
             translation: [
-                Parameter::Symbolic { index: 0 },
-                Parameter::Symbolic { index: 1 },
-                Parameter::Symbolic { index: 2 },
+                Parameter::Symbolic("x".to_owned()),
+                Parameter::Symbolic("y".to_owned()),
+                Parameter::Symbolic("z".to_owned()),
             ],
             f: Box::new(Geometry::Sphere {
-                radius: Parameter::Constant { value: 0.799 },
+                radius: Parameter::Constant(0.799),
             }),
         });
 
@@ -255,7 +256,7 @@ impl WebScene {
         self.scene.instance_list.push(Instance {
             geometry: 0,
             material: 1,
-            parameters: vec![],
+            parameters: btreemap! {},
             photon_receiver: true,
             sample_explicit: true,
             visible: true,
@@ -264,7 +265,7 @@ impl WebScene {
         self.scene.instance_list.push(Instance {
             geometry: 1,
             material: 5,
-            parameters: vec![0.0, 0.8, 0.0],
+            parameters: btreemap! {"x".to_owned() => 0.0, "y".to_owned() => 0.8, "z".to_owned() => 0.0 },
             photon_receiver: true,
             sample_explicit: true,
             visible: true,
@@ -273,7 +274,7 @@ impl WebScene {
         self.scene.instance_list.push(Instance {
             geometry: 1,
             material: 2,
-            parameters: vec![-2.0, 0.8, 0.0],
+            parameters: btreemap! { "x".to_owned() => -2.0, "y".to_owned() => 0.8, "z".to_owned() => 0.0 },
             photon_receiver: true,
             sample_explicit: true,
             visible: true,

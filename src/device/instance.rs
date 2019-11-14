@@ -84,7 +84,7 @@ impl Device {
         }
 
         // This implements parameter renumbering to ensure that all memory accesses in
-        // the parameter array are coherent and that all fields are nicely packed into
+        // the parameter table are coherent and that all fields are nicely packed into
         // individual vec4 elements. Out-of-bounds parameter indices are checked here.
 
         let params: &mut [GeometryParameter] =
@@ -104,8 +104,8 @@ impl Device {
 
             for (data, indices) in izip!(region, indices.chunks(4)) {
                 for i in 0..4 {
-                    if let Some(&index) = indices.get(i) {
-                        data.0[i] = instance.parameters[index];
+                    if let Some(symbol) = indices.get(i) {
+                        data.0[i] = instance.parameters[symbol];
                     } else {
                         data.0[i] = 0.0; // unused vec4 padding
                     }
