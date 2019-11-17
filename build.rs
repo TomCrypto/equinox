@@ -34,9 +34,9 @@ fn preprocess_shaders(dir: &str, ext: &str, include_path: &str) -> Result<()> {
             let mut name = path.file_stem().unwrap().to_str().unwrap().to_owned();
             name.make_ascii_uppercase(); // try to follow Rust's style conventions
 
-            write!(
+            writeln!(
                 generated_file,
-                "\n/// GLSL source for the `{}` shader file.\n",
+                "\n/// GLSL source for the `{}` shader file.",
                 path.display(),
             )
             .unwrap();
@@ -56,12 +56,7 @@ fn preprocess_shaders(dir: &str, ext: &str, include_path: &str) -> Result<()> {
                 bytes.push_str(&format!("{}, ", byte));
             }
 
-            write!(
-                generated_file,
-                "pub const {}: &[u8] = &[{}];\n",
-                name, bytes,
-            )
-            .unwrap();
+            writeln!(generated_file, "pub const {}: &[u8] = &[{}];", name, bytes).unwrap();
         }
     }
 
@@ -126,7 +121,7 @@ fn preprocess(
             let header = captures.get(1).unwrap().as_str();
 
             if vec_contains(processed, &header) {
-                write!(shader, "\n").unwrap();
+                writeln!(shader, "").unwrap();
                 continue; // already included
             }
 
@@ -157,9 +152,9 @@ fn preprocess(
                 placeholder,
             )?;
 
-            write!(shader, "{}\n// __POS__ {}:{}\n", included, name, index + 2).unwrap();
+            writeln!(shader, "{}\n// __POS__ {}:{}", included, name, index + 2).unwrap();
         } else {
-            write!(shader, "{}\n", line).unwrap();
+            writeln!(shader, "{}", line).unwrap();
         }
     }
 
