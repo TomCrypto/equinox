@@ -349,6 +349,8 @@ pub struct R16F;
 pub struct RGBA16F;
 #[derive(Debug)]
 pub struct D24S8;
+#[derive(Debug)]
+pub struct RGB10A2;
 
 impl TextureFormat for RGBA32UI {
     type Data = u32;
@@ -556,6 +558,18 @@ impl TextureFormat for D24S8 {
     const GL_INTERNAL_FORMAT: u32 = Context::DEPTH24_STENCIL8;
     const GL_FORMAT: u32 = Context::DEPTH_STENCIL;
     const GL_TYPE: u32 = Context::UNSIGNED_INT_24_8;
+}
+
+impl TextureFormat for RGB10A2 {
+    type Data = u32;
+
+    type Compressed = False;
+    type Filterable = True;
+    type Renderable = Color;
+
+    const GL_INTERNAL_FORMAT: u32 = Context::RGB10_A2;
+    const GL_FORMAT: u32 = Context::RGBA;
+    const GL_TYPE: u32 = Context::UNSIGNED_INT_2_10_10_10_REV;
 }
 
 // SAFETY: the objects returned by these methods are immediately fed into WebGL
