@@ -353,26 +353,35 @@ impl Device {
                 .create(render_cols, render_rows);
 
             self.integrator_gather_fbo
-                .rebuild(&[&self.integrator_radiance_estimate]);
+                .rebuild(&[&self.integrator_radiance_estimate], None)?;
 
-            self.render_fbo.rebuild(&[&self.render]);
-            self.aperture_fbo.rebuild(&[
-                &self.r_aperture_spectrum,
-                &self.g_aperture_spectrum,
-                &self.b_aperture_spectrum,
-            ]);
+            self.render_fbo.rebuild(&[&self.render], None)?;
+            self.aperture_fbo.rebuild(
+                &[
+                    &self.r_aperture_spectrum,
+                    &self.g_aperture_spectrum,
+                    &self.b_aperture_spectrum,
+                ],
+                None,
+            )?;
 
-            self.spectrum_temp1_fbo.rebuild(&[
-                &self.rspectrum_temp1,
-                &self.gspectrum_temp1,
-                &self.bspectrum_temp1,
-            ]);
+            self.spectrum_temp1_fbo.rebuild(
+                &[
+                    &self.rspectrum_temp1,
+                    &self.gspectrum_temp1,
+                    &self.bspectrum_temp1,
+                ],
+                None,
+            )?;
 
-            self.spectrum_temp2_fbo.rebuild(&[
-                &self.rspectrum_temp2,
-                &self.gspectrum_temp2,
-                &self.bspectrum_temp2,
-            ]);
+            self.spectrum_temp2_fbo.rebuild(
+                &[
+                    &self.rspectrum_temp2,
+                    &self.gspectrum_temp2,
+                    &self.bspectrum_temp2,
+                ],
+                None,
+            )?;
 
             self.prepare_fft_pass_data();
 
@@ -407,8 +416,10 @@ impl Device {
 
             self.photon_hash_table_major.create(cols, rows);
             self.photon_hash_table_minor.create(cols, rows);
-            self.photon_fbo
-                .rebuild(&[&self.photon_hash_table_major, &self.photon_hash_table_minor]);
+            self.photon_fbo.rebuild(
+                &[&self.photon_hash_table_major, &self.photon_hash_table_minor],
+                None,
+            )?;
 
             Ok(())
         })?;

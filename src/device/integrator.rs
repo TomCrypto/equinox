@@ -296,7 +296,7 @@ impl Device {
     }
 }
 
-/// Sequence of radii for the photon kernel.
+/// Sequence of radii for the photon gather kernel.
 ///
 /// This struct returns an appropriate search radius to use during the radiance
 /// estimation pass of the photon mapping algorithm. It will decrease over time

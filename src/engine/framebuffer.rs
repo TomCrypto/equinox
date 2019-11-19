@@ -1,16 +1,14 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use js_sys::Array;
+use crate::{Color, DepthStencil, RenderTarget};
+use js_sys::{Array, Error};
 use web_sys::{WebGl2RenderingContext as Context, WebGlFramebuffer, WebGlTexture};
 
-#[derive(Debug)]
-pub enum Attachment<'a> {
-    Texture(Option<&'a WebGlTexture>),
-}
-
 pub trait AsAttachment {
-    fn as_attachment(&self) -> Attachment;
+    type Target: RenderTarget;
+
+    fn as_attachment(&self) -> Option<&WebGlTexture>;
 }
 
 #[derive(Debug)]
@@ -32,13 +30,17 @@ impl Framebuffer {
         self.handle = None;
     }
 
-    pub fn rebuild(&mut self, attachments: &[&dyn AsAttachment]) {
+    pub fn rebuild(
+        &mut self,
+        attachments: &[&dyn AsAttachment<Target = Color>],
+        depth_stencil: Option<&dyn AsAttachment<Target = DepthStencil>>,
+    ) -> Result<(), Error> {
         if let Err(_) | Ok(None) = self.gl.get_extension("EXT_color_buffer_float") {
-            panic!("the WebGL2 extension `EXT_color_buffer_float' is unavailable");
+            return Err(Error::new("extension `EXT_color_buffer_float' missing"));
         }
 
         if let Err(_) | Ok(None) = self.gl.get_extension("EXT_float_blend") {
-            panic!("the WebGL2 extension `EXT_float_blend' is unavailable");
+            return Err(Error::new("extension `EXT_float_blend' missing"));
         }
 
         assert!(!attachments.is_empty());
@@ -57,22 +59,30 @@ impl Framebuffer {
         for (index, attachment) in attachments.iter().enumerate() {
             let attachment_index = Context::COLOR_ATTACHMENT0 + index as u32;
 
-            match attachment.as_attachment() {
-                Attachment::Texture(texture) => {
-                    self.gl.framebuffer_texture_2d(
-                        Context::DRAW_FRAMEBUFFER,
-                        attachment_index,
-                        Context::TEXTURE_2D,
-                        texture,
-                        0,
-                    );
-                }
-            }
+            self.gl.framebuffer_texture_2d(
+                Context::DRAW_FRAMEBUFFER,
+                attachment_index,
+                Context::TEXTURE_2D,
+                attachment.as_attachment(),
+                0,
+            );
 
             array.push(&attachment_index.into());
         }
 
+        if let Some(depth_stencil) = depth_stencil {
+            self.gl.framebuffer_texture_2d(
+                Context::DRAW_FRAMEBUFFER,
+                Context::DEPTH_STENCIL_ATTACHMENT,
+                Context::TEXTURE_2D,
+                depth_stencil.as_attachment(),
+                0,
+            );
+        }
+
         self.gl.draw_buffers(&array);
+
+        Ok(())
     }
 
     pub fn clear(&self, attachment: usize, color: [f32; 4]) {
@@ -81,6 +91,14 @@ impl Framebuffer {
 
         self.gl
             .clear_bufferfv_with_f32_array(Context::COLOR, attachment as i32, &color);
+    }
+
+    pub fn clear_depth_stencil(&self, depth: f32, stencil: u8) {
+        self.gl
+            .bind_framebuffer(Context::DRAW_FRAMEBUFFER, self.handle.as_ref());
+
+        self.gl
+            .clear_bufferfi(Context::DEPTH_STENCIL, 0, depth, stencil as i32);
     }
 }
 

@@ -321,8 +321,10 @@ impl<'a> DrawCommand<'a> {
     fn new(shader: &'a Shader) -> Self {
         shader.gl.use_program(shader.handle.as_ref());
 
-        shader.gl.disable(Context::SCISSOR_TEST);
         shader.gl.disable(Context::BLEND);
+        shader.gl.disable(Context::DEPTH_TEST);
+        shader.gl.disable(Context::SCISSOR_TEST);
+        shader.gl.disable(Context::STENCIL_TEST);
         shader.gl.viewport(0, 0, 0, 0);
 
         Self { shader }

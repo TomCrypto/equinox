@@ -1,10 +1,10 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::engine::{AsAttachment, AsBindTarget, Attachment, BindTarget};
+use crate::engine::{AsAttachment, AsBindTarget, BindTarget};
 use js_sys::Object;
 use std::marker::PhantomData;
-use web_sys::{WebGl2RenderingContext as Context, WebGlTexture};
+use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer, WebGlTexture};
 
 pub trait Boolean {
     const VALUE: bool;
@@ -20,11 +20,24 @@ impl Boolean for False {
     const VALUE: bool = false;
 }
 
+pub trait RenderTarget {}
+
+pub struct Color;
+pub struct DepthStencil;
+pub struct NotRenderable;
+
+impl RenderTarget for Color {}
+impl RenderTarget for DepthStencil {}
+
+pub trait AsPixelSource {
+    fn as_pixel_source(&self) -> Option<&WebGlBuffer>;
+}
+
 #[derive(Debug)]
 pub struct Texture<T> {
     gl: Context,
 
-    handle: Option<WebGlTexture>,
+    pub handle: Option<WebGlTexture>,
     layout: (usize, usize, usize),
     format: PhantomData<T>,
 }
@@ -166,6 +179,7 @@ impl<T: TextureFormat<Filterable = True, Compressed = False>> Texture<T> {
 
         assert_eq!(level_slices.len(), mip_levels);
 
+        self.gl.bind_buffer(Context::PIXEL_UNPACK_BUFFER, None);
         self.gl
             .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
 
@@ -190,8 +204,7 @@ impl<T: TextureFormat<Filterable = True, Compressed = False>> Texture<T> {
     }
 
     pub fn gen_mipmaps(&mut self) {
-        self.gl
-            .hint(Context::GENERATE_MIPMAP_HINT, Context::FASTEST);
+        self.gl.hint(Context::GENERATE_MIPMAP_HINT, Context::NICEST);
         self.gl
             .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
         self.gl.generate_mipmap(Context::TEXTURE_2D);
@@ -236,6 +249,7 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
 
         assert_eq!(level_slices.len(), 1);
 
+        self.gl.bind_buffer(Context::PIXEL_UNPACK_BUFFER, None);
         self.gl
             .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
 
@@ -253,11 +267,35 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
             )
             .unwrap();
     }
+
+    pub fn copy_from(&mut self, source: &dyn AsPixelSource) {
+        self.gl
+            .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
+
+        self.gl
+            .bind_buffer(Context::PIXEL_UNPACK_BUFFER, source.as_pixel_source());
+
+        self.gl
+            .tex_sub_image_2d_with_i32_and_i32_and_u32_and_type_and_i32(
+                Context::TEXTURE_2D,
+                0,
+                0,
+                0,
+                self.cols() as i32,
+                self.rows() as i32,
+                T::GL_FORMAT,
+                T::GL_TYPE,
+                0,
+            )
+            .expect("texSubImage2D with a PBO source cannot fail");
+    }
 }
 
-impl<'a, T: TextureFormat<Renderable = True>> AsAttachment for Texture<T> {
-    fn as_attachment(&self) -> Attachment {
-        Attachment::Texture(self.handle.as_ref())
+impl<T: TextureFormat> AsAttachment for Texture<T> {
+    type Target = T::Renderable;
+
+    fn as_attachment(&self) -> Option<&WebGlTexture> {
+        self.handle.as_ref()
     }
 }
 
@@ -280,13 +318,15 @@ pub trait TextureFormat {
 
     type Filterable: Boolean;
     type Compressed: Boolean;
-    type Renderable: Boolean;
+    type Renderable: RenderTarget;
 
     const GL_INTERNAL_FORMAT: u32;
     const GL_FORMAT: u32;
     const GL_TYPE: u32;
 
-    fn parse(cols: usize, rows: usize, levels: usize, data: &[Self::Data]) -> Vec<Object>;
+    fn parse(_cols: usize, _rows: usize, _levels: usize, _data: &[Self::Data]) -> Vec<Object> {
+        unimplemented!("texture data upload is not yet implemented for this texture format")
+    }
 }
 
 #[derive(Debug)]
@@ -302,42 +342,24 @@ pub struct RG32F;
 #[derive(Debug)]
 pub struct RGBA8;
 #[derive(Debug)]
+pub struct R8;
+#[derive(Debug)]
 pub struct R16F;
 #[derive(Debug)]
 pub struct RGBA16F;
+#[derive(Debug)]
+pub struct D24S8;
 
 impl TextureFormat for RGBA32UI {
     type Data = u32;
 
     type Compressed = False;
     type Filterable = False;
-    type Renderable = True;
+    type Renderable = Color;
 
     const GL_INTERNAL_FORMAT: u32 = Context::RGBA32UI;
     const GL_FORMAT: u32 = Context::RGBA_INTEGER;
     const GL_TYPE: u32 = Context::UNSIGNED_INT;
-
-    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
-        let mut views = Vec::with_capacity(levels);
-
-        for level in 0..levels {
-            let level_cols = (cols / (1 << level)).max(1);
-            let level_rows = (rows / (1 << level)).max(1);
-            let level_size = level_cols * level_rows * 4;
-
-            assert!(data.len() >= level_size);
-
-            let (level_data, remaining) = data.split_at(level_size);
-
-            views.push(unsafe_helpers::u32_slice_to_uint32_array(level_data).into());
-
-            data = remaining;
-        }
-
-        assert!(data.is_empty());
-
-        views
-    }
 }
 
 impl TextureFormat for RGBA32F {
@@ -345,33 +367,11 @@ impl TextureFormat for RGBA32F {
 
     type Compressed = False;
     type Filterable = True;
-    type Renderable = True;
+    type Renderable = Color;
 
     const GL_INTERNAL_FORMAT: u32 = Context::RGBA32F;
     const GL_FORMAT: u32 = Context::RGBA;
     const GL_TYPE: u32 = Context::FLOAT;
-
-    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
-        let mut views = Vec::with_capacity(levels);
-
-        for level in 0..levels {
-            let level_cols = (cols / (1 << level)).max(1);
-            let level_rows = (rows / (1 << level)).max(1);
-            let level_size = level_cols * level_rows * 4;
-
-            assert!(data.len() >= level_size);
-
-            let (level_data, remaining) = data.split_at(level_size);
-
-            views.push(unsafe_helpers::f32_slice_to_float32_array(level_data).into());
-
-            data = remaining;
-        }
-
-        assert!(data.is_empty());
-
-        views
-    }
 }
 
 impl TextureFormat for R32F {
@@ -379,33 +379,11 @@ impl TextureFormat for R32F {
 
     type Compressed = False;
     type Filterable = True;
-    type Renderable = True;
+    type Renderable = Color;
 
     const GL_INTERNAL_FORMAT: u32 = Context::R32F;
     const GL_FORMAT: u32 = Context::RED;
     const GL_TYPE: u32 = Context::FLOAT;
-
-    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
-        let mut views = Vec::with_capacity(levels);
-
-        for level in 0..levels {
-            let level_cols = (cols / (1 << level)).max(1);
-            let level_rows = (rows / (1 << level)).max(1);
-            let level_size = level_cols * level_rows;
-
-            assert!(data.len() >= level_size);
-
-            let (level_data, remaining) = data.split_at(level_size);
-
-            views.push(unsafe_helpers::f32_slice_to_float32_array(level_data).into());
-
-            data = remaining;
-        }
-
-        assert!(data.is_empty());
-
-        views
-    }
 }
 
 impl TextureFormat for R32UI {
@@ -413,33 +391,11 @@ impl TextureFormat for R32UI {
 
     type Compressed = False;
     type Filterable = False;
-    type Renderable = True;
+    type Renderable = Color;
 
     const GL_INTERNAL_FORMAT: u32 = Context::R32UI;
     const GL_FORMAT: u32 = Context::RED;
     const GL_TYPE: u32 = Context::UNSIGNED_INT;
-
-    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
-        let mut views = Vec::with_capacity(levels);
-
-        for level in 0..levels {
-            let level_cols = (cols / (1 << level)).max(1);
-            let level_rows = (rows / (1 << level)).max(1);
-            let level_size = level_cols * level_rows;
-
-            assert!(data.len() >= level_size);
-
-            let (level_data, remaining) = data.split_at(level_size);
-
-            views.push(unsafe_helpers::u32_slice_to_uint32_array(level_data).into());
-
-            data = remaining;
-        }
-
-        assert!(data.is_empty());
-
-        views
-    }
 }
 
 impl TextureFormat for RG32F {
@@ -447,7 +403,7 @@ impl TextureFormat for RG32F {
 
     type Compressed = False;
     type Filterable = True;
-    type Renderable = True;
+    type Renderable = Color;
 
     const GL_INTERNAL_FORMAT: u32 = Context::RG32F;
     const GL_FORMAT: u32 = Context::RG;
@@ -481,7 +437,7 @@ impl TextureFormat for RGBA8 {
 
     type Compressed = False;
     type Filterable = True;
-    type Renderable = True;
+    type Renderable = Color;
 
     const GL_INTERNAL_FORMAT: u32 = Context::RGBA8;
     const GL_FORMAT: u32 = Context::RGBA;
@@ -510,12 +466,24 @@ impl TextureFormat for RGBA8 {
     }
 }
 
+impl TextureFormat for R8 {
+    type Data = u8;
+
+    type Compressed = False;
+    type Filterable = True;
+    type Renderable = Color;
+
+    const GL_INTERNAL_FORMAT: u32 = Context::R8;
+    const GL_FORMAT: u32 = Context::RED;
+    const GL_TYPE: u32 = Context::UNSIGNED_BYTE;
+}
+
 impl TextureFormat for R16F {
     type Data = u16;
 
     type Compressed = False;
     type Filterable = True;
-    type Renderable = True;
+    type Renderable = Color;
 
     const GL_INTERNAL_FORMAT: u32 = Context::R16F;
     const GL_FORMAT: u32 = Context::RED;
@@ -549,7 +517,7 @@ impl TextureFormat for RGBA16F {
 
     type Compressed = False;
     type Filterable = True;
-    type Renderable = True;
+    type Renderable = Color;
 
     const GL_INTERNAL_FORMAT: u32 = Context::RGBA16F;
     const GL_FORMAT: u32 = Context::RGBA;
@@ -578,20 +546,28 @@ impl TextureFormat for RGBA16F {
     }
 }
 
+impl TextureFormat for D24S8 {
+    type Data = u32;
+
+    type Compressed = False;
+    type Filterable = False;
+    type Renderable = DepthStencil;
+
+    const GL_INTERNAL_FORMAT: u32 = Context::DEPTH24_STENCIL8;
+    const GL_FORMAT: u32 = Context::DEPTH_STENCIL;
+    const GL_TYPE: u32 = Context::UNSIGNED_INT_24_8;
+}
+
 // SAFETY: the objects returned by these methods are immediately fed into WebGL
 // APIs to upload some data to a WebGL resource and are not held onto. There is
 // no reallocation happening in between, so the `view` requirements are upheld.
 
 #[allow(unsafe_code)]
 mod unsafe_helpers {
-    use js_sys::{Float32Array, Uint16Array, Uint32Array, Uint8Array};
+    use js_sys::{Float32Array, Uint16Array, Uint8Array};
 
     pub fn f32_slice_to_float32_array(slice: &[f32]) -> Float32Array {
         unsafe { Float32Array::view(slice) }
-    }
-
-    pub fn u32_slice_to_uint32_array(slice: &[u32]) -> Uint32Array {
-        unsafe { Uint32Array::view(slice) }
     }
 
     pub fn u8_slice_to_uint8_array(slice: &[u8]) -> Uint8Array {
