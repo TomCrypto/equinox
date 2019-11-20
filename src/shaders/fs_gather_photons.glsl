@@ -7,8 +7,9 @@
 #include <environment.glsl>
 #include <integrator.glsl>
 
-uniform sampler2D photon_table_major;
-uniform sampler2D photon_table_minor;
+uniform sampler2D photon_table_pos;
+uniform sampler2D photon_table_dir;
+uniform sampler2D photon_table_sum;
 
 layout(location = 0) out vec4 radiance_estimate;
 
@@ -31,27 +32,22 @@ vec3 get_photon(vec3 cell_pos, vec3 point, uint material, uint inst, vec3 normal
 
     for (uint y = 0U; y < integrator.hash_cell_rows; ++y) {
         for (uint x = 0U; x < integrator.hash_cell_cols; ++x) {
-            vec4 major_data = texelFetch(photon_table_major, coords + ivec2(x, y), 0);
+            vec3 photon_throughput = 1e5 * texelFetch(photon_table_sum, coords + ivec2(x, y), 0).rgb;
 
-            vec3 photon_position = (cell_pos + major_data.xyz) * integrator_cell_size();
+            if (photon_throughput == vec3(0.0)) {
+                continue;
+            }
+
+            vec3 pos_data = texelFetch(photon_table_pos, coords + ivec2(x, y), 0).rgb;
+            vec3 photon_wi = 2.0 * texelFetch(photon_table_dir, coords + ivec2(x, y), 0).rgb - 1.0;
+
+            vec3 photon_position = (cell_pos + pos_data) * integrator_cell_size();
 
             if (dot(point - photon_position, point - photon_position) > radius_squared) {
                 continue;
             }
 
             float kernel_r = distance(point, photon_position) / integrator.search_radius;
-
-            vec4 minor_data = texelFetch(photon_table_minor, coords + ivec2(x, y), 0);
-
-            vec3 photon_throughput = minor_data.xyz;
-
-            float sgn = any(lessThan(photon_throughput, vec3(0.0))) ? -1.0 : 1.0;
-
-            float nx = major_data.w;
-            float nz = minor_data.w;
-            float ny = sqrt(max(0.0, 1.0 - nx * nx - nz * nz)) * sgn;
-
-            vec3 photon_wi = vec3(nx, ny, nz);
 
             float weight = sin(M_PI * (0.5 + kernel_r * 0.5));
             weight *= weight;

@@ -297,6 +297,10 @@ impl<T: TextureFormat> AsAttachment for Texture<T> {
     fn as_attachment(&self) -> Option<&WebGlTexture> {
         self.handle.as_ref()
     }
+
+    fn attachment_dimensions(&self) -> (usize, usize) {
+        (self.cols(), self.rows())
+    }
 }
 
 impl<T: TextureFormat> AsBindTarget for Texture<T> {

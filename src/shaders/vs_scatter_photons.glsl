@@ -1,5 +1,6 @@
-out vec4 photon_major_data;
-out vec4 photon_minor_data;
+out vec3 photon_pos_data;
+out vec3 photon_dir_data;
+out vec3 photon_sum_data;
 
 #include <common.glsl>
 #include <random.glsl>
@@ -17,8 +18,9 @@ layout (std140) uniform Raster {
 void deposit_photon(ray_t ray, vec3 throughput) {
     ivec2 coords = hash_entry_for_cell(cell_for_point(ray.org), uint(gl_InstanceID));
 
-    photon_major_data = vec4(   fract(ray.org / integrator_cell_size()), -ray.dir.x);
-    photon_minor_data = vec4(ray.dir.y > 0.0 ? -throughput : throughput, -ray.dir.z);
+    photon_pos_data = fract(ray.org / integrator_cell_size());
+    photon_dir_data = 0.5 - 0.5 * ray.dir;
+    photon_sum_data = throughput * 1e-5;
 
     vec2 clip_space = 2.0 * (vec2(0.5) + vec2(coords)) / integrator.hash_dimensions - 1.0;
     gl_Position = vec4(clip_space, 0.0, 1.0); // put the photon into its hash table entry

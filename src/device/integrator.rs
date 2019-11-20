@@ -173,16 +173,16 @@ impl Device {
         data.hash_cell_cols = hash_cell_cols as u32;
         data.hash_cell_rows = hash_cell_rows as u32;
         data.hash_cell_col_bits = (hash_cell_cols - 1).count_ones();
-        data.hash_dimensions[0] = self.photon_hash_table_major.cols() as f32;
-        data.hash_dimensions[1] = self.photon_hash_table_major.rows() as f32;
+        data.hash_dimensions[0] = self.integrator_scatter_fbo.cols() as f32;
+        data.hash_dimensions[1] = self.integrator_scatter_fbo.rows() as f32;
         data.max_scatter_bounces = self.state.integrator.max_scatter_bounces;
         data.max_gather_bounces = self.state.integrator.max_gather_bounces;
         data.photons_for_pass = (pass.n * pass.m) as f32;
 
         data.hash_cols_mask =
-            ((self.photon_hash_table_major.cols() - 1) & !(hash_cell_cols - 1)) as u32;
+            ((self.integrator_scatter_fbo.cols() - 1) & !(hash_cell_cols - 1)) as u32;
         data.hash_rows_mask =
-            ((self.photon_hash_table_major.rows() - 1) & !(hash_cell_rows - 1)) as u32;
+            ((self.integrator_scatter_fbo.rows() - 1) & !(hash_cell_rows - 1)) as u32;
 
         self.integrator_buffer.write(&data)
     }
@@ -191,6 +191,8 @@ impl Device {
         if !self.state.receivers_present {
             return;
         }
+
+        self.integrator_scatter_fbo.clear(2, [0.0; 4]);
 
         let command = self.integrator_scatter_photons_shader.begin_draw();
 
@@ -207,13 +209,12 @@ impl Device {
         command.set_viewport(
             0,
             0,
-            self.photon_hash_table_major.cols() as i32,
-            self.photon_hash_table_minor.rows() as i32,
+            self.integrator_scatter_fbo.cols() as i32,
+            self.integrator_scatter_fbo.rows() as i32,
         );
 
-        command.set_framebuffer(&self.photon_fbo);
-        self.photon_fbo.clear(0, [1e20; 4]);
-        self.photon_fbo.clear(1, [1e20; 4]);
+        command.set_framebuffer(&self.integrator_scatter_fbo);
+        command.set_blend_mode(BlendMode::AlphaPredicatedAdd);
 
         command.unset_vertex_array();
         command.draw_points_instanced(pass.n, pass.m);
@@ -232,8 +233,9 @@ impl Device {
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
-        command.bind(&self.photon_hash_table_major, "photon_table_major");
-        command.bind(&self.photon_hash_table_minor, "photon_table_minor");
+        command.bind(&self.integrator_photon_table_pos, "photon_table_pos");
+        command.bind(&self.integrator_photon_table_dir, "photon_table_dir");
+        command.bind(&self.integrator_photon_table_sum, "photon_table_sum");
 
         command.set_framebuffer(&self.integrator_gather_fbo);
 
@@ -242,8 +244,8 @@ impl Device {
         command.set_viewport(
             0,
             0,
-            self.integrator_radiance_estimate.cols() as i32,
-            self.integrator_radiance_estimate.rows() as i32,
+            self.integrator_gather_fbo.cols() as i32,
+            self.integrator_gather_fbo.rows() as i32,
         );
 
         command.set_blend_mode(BlendMode::Add);

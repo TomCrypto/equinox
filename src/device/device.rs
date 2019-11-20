@@ -51,13 +51,13 @@ pub struct Device {
 
     pub(crate) load_convolution_buffers_shader: Shader,
 
-    pub(crate) photon_hash_table_major: Texture<RGBA16F>,
-    pub(crate) photon_hash_table_minor: Texture<RGBA16F>,
-
-    pub(crate) photon_fbo: Framebuffer,
+    pub(crate) integrator_photon_table_pos: Texture<RGB10A2>,
+    pub(crate) integrator_photon_table_dir: Texture<RGB10A2>,
+    pub(crate) integrator_photon_table_sum: Texture<RGBA16F>,
 
     pub(crate) integrator_radiance_estimate: Texture<RGBA32F>,
 
+    pub(crate) integrator_scatter_fbo: Framebuffer,
     pub(crate) integrator_gather_fbo: Framebuffer,
 
     pub(crate) integrator_scatter_photons_shader: Shader,
@@ -96,8 +96,9 @@ impl Device {
                     "envmap_texture" => BindingPoint::Texture(0),
                     "envmap_marg_cdf" => BindingPoint::Texture(1),
                     "envmap_cond_cdf" => BindingPoint::Texture(2),
-                    "photon_table_major" => BindingPoint::Texture(3),
-                    "photon_table_minor" => BindingPoint::Texture(4),
+                    "photon_table_pos" => BindingPoint::Texture(3),
+                    "photon_table_dir" => BindingPoint::Texture(4),
+                    "photon_table_sum" => BindingPoint::Texture(5),
                 },
                 hashmap! {
                     "geometry-user.glsl" => "",
@@ -109,8 +110,9 @@ impl Device {
                     "INSTANCE_DATA_PRESENT" => "0",
                 },
             ),
-            photon_hash_table_major: Texture::new(gl.clone()),
-            photon_hash_table_minor: Texture::new(gl.clone()),
+            integrator_photon_table_pos: Texture::new(gl.clone()),
+            integrator_photon_table_dir: Texture::new(gl.clone()),
+            integrator_photon_table_sum: Texture::new(gl.clone()),
             fft_pass_data: VertexArray::new(gl.clone()),
             integrator_scatter_photons_shader: Shader::new(
                 gl.clone(),
@@ -217,7 +219,7 @@ impl Device {
             aperture_fbo: Framebuffer::new(gl.clone()),
             spectrum_temp1_fbo: Framebuffer::new(gl.clone()),
             spectrum_temp2_fbo: Framebuffer::new(gl.clone()),
-            photon_fbo: Framebuffer::new(gl.clone()),
+            integrator_scatter_fbo: Framebuffer::new(gl.clone()),
             device_lost: true,
             state: IntegratorState::default(),
         })
@@ -414,10 +416,15 @@ impl Device {
             let cols = 2usize.pow(col_bits);
             let rows = 2usize.pow(row_bits);
 
-            self.photon_hash_table_major.create(cols, rows);
-            self.photon_hash_table_minor.create(cols, rows);
-            self.photon_fbo.rebuild(
-                &[&self.photon_hash_table_major, &self.photon_hash_table_minor],
+            self.integrator_photon_table_pos.create(cols, rows);
+            self.integrator_photon_table_dir.create(cols, rows);
+            self.integrator_photon_table_sum.create(cols, rows);
+            self.integrator_scatter_fbo.rebuild(
+                &[
+                    &self.integrator_photon_table_pos,
+                    &self.integrator_photon_table_dir,
+                    &self.integrator_photon_table_sum,
+                ],
                 None,
             )?;
 
@@ -489,8 +496,8 @@ impl Device {
         command.set_viewport(
             0,
             0,
-            self.integrator_radiance_estimate.cols() as i32,
-            self.integrator_radiance_estimate.rows() as i32,
+            self.integrator_gather_fbo.cols() as i32,
+            self.integrator_gather_fbo.rows() as i32,
         );
 
         command.set_canvas_framebuffer();
@@ -538,9 +545,10 @@ impl Device {
         self.spectrum_temp1_fbo.invalidate();
         self.spectrum_temp2_fbo.invalidate();
         self.render_fbo.invalidate();
-        self.photon_hash_table_major.invalidate();
-        self.photon_hash_table_minor.invalidate();
-        self.photon_fbo.invalidate();
+        self.integrator_photon_table_pos.invalidate();
+        self.integrator_photon_table_dir.invalidate();
+        self.integrator_photon_table_sum.invalidate();
+        self.integrator_scatter_fbo.invalidate();
         self.aperture_fbo.invalidate();
 
         self.integrator_radiance_estimate.invalidate();

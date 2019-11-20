@@ -365,6 +365,10 @@ impl<'a> DrawCommand<'a> {
                 self.shader.gl.blend_equation(Context::FUNC_ADD);
                 self.shader.gl.blend_func(Context::ONE, Context::ONE);
             }
+            BlendMode::AlphaPredicatedAdd => {
+                self.shader.gl.blend_equation(Context::FUNC_ADD);
+                self.shader.gl.blend_func(Context::ONE, Context::SRC_ALPHA);
+            }
         }
     }
 
@@ -433,4 +437,5 @@ impl<'a> DrawCommand<'a> {
 pub enum BlendMode {
     Accumulate { weight: f32 },
     Add,
+    AlphaPredicatedAdd,
 }

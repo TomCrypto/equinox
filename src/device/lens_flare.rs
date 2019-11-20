@@ -573,7 +573,12 @@ impl Device {
 
         command.set_framebuffer(&self.render_fbo);
 
-        command.set_viewport(0, 0, self.render.cols() as i32, self.render.rows() as i32);
+        command.set_viewport(
+            0,
+            0,
+            self.render_fbo.cols() as i32,
+            self.render_fbo.rows() as i32,
+        );
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
