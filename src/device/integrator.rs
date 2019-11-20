@@ -128,10 +128,10 @@ impl Device {
 
         let cell_size = 2.0 * search_radius;
 
-        let target = ((self.state.integrator.capacity_multiplier / cell_size.powi(2)).round()
-            as usize)
-            .min(self.state.integrator.photons_per_pass)
-            .max(1);
+        let target = (self.state.integrator.capacity_multiplier / cell_size.powi(2))
+            .min(self.state.integrator.photons_per_pass as f32)
+            .max(1.0)
+            .round() as usize;
 
         let (n, m) = self.calculate_photon_batch(self.state.integrator.photons_per_pass, target);
 
