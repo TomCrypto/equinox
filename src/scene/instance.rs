@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Instance {
-    pub geometry: usize,
-    pub material: usize,
+    pub geometry: String,
+    pub material: String,
     #[serde(default)]
     pub parameters: BTreeMap<String, f32>,
     #[serde(default = "true_default")]

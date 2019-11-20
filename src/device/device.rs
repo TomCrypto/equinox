@@ -251,7 +251,7 @@ impl Device {
 
             let mut geometry_functions = vec![];
 
-            for geometry in geometries {
+            for geometry in geometries.values() {
                 geometry_functions.push((
                     generator.add_distance_function(geometry),
                     generator.add_normal_function(geometry),

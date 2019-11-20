@@ -51,50 +51,6 @@ impl WebScene {
         self.scene.assets.keys().map(JsValue::from).collect()
     }
 
-    /// Deletes a geometry by index safely without corrupting the scene.
-    ///
-    /// Any instance using this geometry will be deleted, and any instance
-    /// using a geometry after the deleted one will be adjusted as needed.
-    pub fn delete_geometry(&mut self, index: usize) -> bool {
-        if self.scene.geometry_list.len() < index {
-            self.scene.geometry_list.remove(index);
-        } else {
-            return false;
-        }
-
-        self.scene.instance_list.retain(|i| i.geometry != index);
-
-        for instance in self.scene.instance_list.iter_mut() {
-            if instance.geometry > index {
-                instance.geometry -= 1;
-            }
-        }
-
-        true
-    }
-
-    /// Deletes a material by index safely without corrupting the scene.
-    ///
-    /// Any instance using this material will be deleted, and any instance
-    /// using a material after the deleted one will be adjusted as needed.
-    pub fn delete_material(&mut self, index: usize) -> bool {
-        if self.scene.material_list.len() >= index {
-            self.scene.material_list.remove(index);
-        } else {
-            return false;
-        }
-
-        self.scene.instance_list.retain(|i| i.material != index);
-
-        for instance in self.scene.instance_list.iter_mut() {
-            if instance.material > index {
-                instance.material -= 1;
-            }
-        }
-
-        true
-    }
-
     pub fn set_raster_dimensions(&mut self, width: u32, height: u32) {
         Dirty::modify(&mut self.scene.raster, |raster| {
             raster.width = width;
@@ -158,136 +114,107 @@ impl WebScene {
         // Set up an "interesting" default scene below. We do this here because we
         // have proper types whereas doing it in the front-end would require JSON.
 
-        self.scene.geometry_list.push(Geometry::Plane {
-            width: Parameter::Constant(3.0),
-            length: Parameter::Constant(3.0),
-        });
+        self.scene.geometry_list.insert(
+            "plane".to_owned(),
+            Geometry::Plane {
+                width: Parameter::Constant(3.0),
+                length: Parameter::Constant(3.0),
+            },
+        );
 
-        self.scene.geometry_list.push(Geometry::Translate {
-            translation: [
-                Parameter::Symbolic("x".to_owned()),
-                Parameter::Symbolic("y".to_owned()),
-                Parameter::Symbolic("z".to_owned()),
-            ],
-            f: Box::new(Geometry::Sphere {
-                radius: Parameter::Constant(0.799),
-            }),
-        });
+        self.scene.geometry_list.insert(
+            "sphere".to_owned(),
+            Geometry::Translate {
+                translation: [
+                    Parameter::Symbolic("x".to_owned()),
+                    Parameter::Symbolic("y".to_owned()),
+                    Parameter::Symbolic("z".to_owned()),
+                ],
+                f: Box::new(Geometry::Sphere {
+                    radius: Parameter::Constant(0.799),
+                }),
+            },
+        );
 
-        self.scene.material_list.push(Material::Phong {
-            albedo: [0.9, 0.9, 0.9],
-            shininess: 20.0,
-        });
+        self.scene.material_list.insert(
+            "phong".to_owned(),
+            Material::Phong {
+                albedo: [0.9, 0.9, 0.9],
+                shininess: 20.0,
+            },
+        );
 
-        self.scene.material_list.push(Material::Lambertian {
-            albedo: [0.9, 0.6, 0.2],
-        });
+        self.scene.material_list.insert(
+            "lambertian".to_owned(),
+            Material::Lambertian {
+                albedo: [0.9, 0.6, 0.2],
+            },
+        );
 
-        self.scene.material_list.push(Material::OrenNayar {
-            albedo: [0.1, 0.7, 0.7],
-            roughness: 1.0,
-        });
+        self.scene.material_list.insert(
+            "diffuse1".to_owned(),
+            Material::OrenNayar {
+                albedo: [0.1, 0.7, 0.7],
+                roughness: 1.0,
+            },
+        );
 
-        self.scene.material_list.push(Material::Phong {
-            albedo: [0.3, 0.9, 0.7],
-            shininess: 700.0,
-        });
+        self.scene.material_list.insert(
+            "phong2".to_owned(),
+            Material::Phong {
+                albedo: [0.3, 0.9, 0.7],
+                shininess: 700.0,
+            },
+        );
 
-        self.scene.material_list.push(Material::Dielectric {
-            internal_refractive_index: 2.2,
-            external_refractive_index: 1.0,
-            internal_extinction_coefficient: [1.0, 1.0, 1.0],
-            external_extinction_coefficient: [0.0, 0.0, 0.0],
-            base_color: [0.560, 0.570, 0.580],
-        });
+        self.scene.material_list.insert(
+            "glass1".to_owned(),
+            Material::Dielectric {
+                internal_refractive_index: 2.2,
+                external_refractive_index: 1.0,
+                internal_extinction_coefficient: [1.0, 1.0, 1.0],
+                external_extinction_coefficient: [0.0, 0.0, 0.0],
+                base_color: [0.560, 0.570, 0.580],
+            },
+        );
 
-        self.scene.material_list.push(Material::IdealRefraction {
-            transmittance: [0.0, 1.0, 0.0],
-            refractive_index: 1.3,
-        });
+        self.scene.material_list.insert(
+            "glass2".to_owned(),
+            Material::IdealRefraction {
+                transmittance: [0.0, 1.0, 0.0],
+                refractive_index: 1.3,
+            },
+        );
 
-        self.scene.instance_list.push(Instance {
-            geometry: 0,
-            material: 1,
-            parameters: btreemap! {},
-            photon_receiver: true,
-            sample_explicit: true,
-            visible: true,
-        });
+        self.scene.instance_list.insert(
+            "ground".to_owned(),
+            Instance {
+                geometry: "plane".to_owned(),
+                material: "lambertian".to_owned(),
+                parameters: btreemap! {},
+                photon_receiver: true,
+                sample_explicit: true,
+                visible: true,
+            },
+        );
 
-        self.scene.instance_list.push(Instance {
-            geometry: 1,
-            material: 5,
+        self.scene.instance_list.insert("glass-sphere".to_owned(), Instance {
+            geometry: "sphere".to_owned(),
+            material: "glass2".to_owned(),
             parameters: btreemap! {"x".to_owned() => 0.0, "y".to_owned() => 0.8, "z".to_owned() => 0.0 },
             photon_receiver: true,
             sample_explicit: true,
             visible: true,
         });
 
-        self.scene.instance_list.push(Instance {
-            geometry: 1,
-            material: 2,
+        self.scene.instance_list.insert("diffuse-sphere".to_owned(), Instance {
+            geometry: "sphere".to_owned(),
+            material: "diffuse1".to_owned(),
             parameters: btreemap! { "x".to_owned() => -2.0, "y".to_owned() => 0.8, "z".to_owned() => 0.0 },
             photon_receiver: true,
             sample_explicit: true,
             visible: true,
-        }); /*
-
-            self.scene.instance_list.push(Instance {
-                geometry: 1,
-                material: 3,
-                parameters: vec![2.0, 0.8, 0.0],
-                allow_mis: true,
-            });
-
-            self.scene.instance_list.push(Instance {
-                geometry: 1,
-                material: 4,
-                parameters: vec![-4.0, 0.8, 0.0],
-                allow_mis: true,
-            });
-
-            self.scene.instance_list.push(Instance {
-                geometry: 1,
-                material: 5,
-                parameters: vec![4.0, 0.8, 0.0],
-                allow_mis: true,
-            });
-
-            self.scene.instance_list.push(Instance {
-                geometry: 1,
-                material: 1,
-                parameters: vec![0.0, 0.8, 4.0],
-                allow_mis: false,
-            });
-
-            self.scene.instance_list.push(Instance {
-                geometry: 1,
-                material: 2,
-                parameters: vec![-2.0, 0.8, 4.0],
-                allow_mis: false,
-            });
-
-            self.scene.instance_list.push(Instance {
-                geometry: 1,
-                material: 3,
-                parameters: vec![2.0, 0.8, 4.0],
-                allow_mis: false,
-            });
-
-            self.scene.instance_list.push(Instance {
-                geometry: 1,
-                material: 4,
-                parameters: vec![-4.0, 0.8, 4.0],
-                allow_mis: false,
-            });
-
-            self.scene.instance_list.push(Instance {
-                geometry: 1,
-                material: 5,
-                parameters: vec![4.0, 0.8, 4.0],
-                allow_mis: false,
-            });*/
+        });
 
         self.scene.camera.position.x = 0.0;
         self.scene.camera.position.y = 7.5;

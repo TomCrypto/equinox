@@ -9,37 +9,43 @@ use crate::{Geometry, Instance, Material};
 use itertools::izip;
 use js_sys::Error;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::mem::swap;
 use zerocopy::{AsBytes, FromBytes};
 
 impl Device {
     pub(crate) fn update_instances(
         &mut self,
-        geometry_list: &[Geometry],
-        material_list: &[Material],
-        instance_list: &[Instance],
+        geometry_list: &BTreeMap<String, Geometry>,
+        material_list: &BTreeMap<String, Material>,
+        instance_list: &BTreeMap<String, Instance>,
     ) -> Result<(), Error> {
         // update the instance BVH
 
-        let mut material_start = vec![];
+        let mut material_start = BTreeMap::new();
+        let mut geometry_index = BTreeMap::new();
         let mut count = 0;
 
-        for material in material_list {
-            material_start.push(count);
+        for (name, material) in material_list {
+            material_start.insert(name.to_owned(), count);
 
             count += material_parameter_block_count(material) as u16;
+        }
+
+        for (index, name) in geometry_list.keys().enumerate() {
+            geometry_index.insert(name.to_owned(), index);
         }
 
         let mut instance_info = Vec::with_capacity(instance_list.len());
         let mut geometry_start = 0;
 
-        for instance in instance_list {
+        for instance in instance_list.values() {
             if !instance.visible {
                 continue;
             }
 
-            let geometry = &geometry_list[instance.geometry];
-            let material = &material_list[instance.material];
+            let geometry = &geometry_list[&instance.geometry];
+            let material = &material_list[&instance.material];
 
             let bbox = geometry
                 .bounding_box(&instance.parameters)
@@ -50,10 +56,10 @@ impl Device {
                 cost: geometry.evaluation_cost(),
                 photon_receiver: instance.photon_receiver && !material.has_delta_bsdf(),
                 sample_explicit: instance.sample_explicit && !material.has_delta_bsdf(),
-                geometry: instance.geometry as u16,
+                geometry: geometry_index[&instance.geometry] as u16,
                 geo_inst: geometry_start,
                 material: material_index(material),
-                mat_inst: material_start[instance.material],
+                mat_inst: material_start[&instance.material],
             });
 
             geometry_start += (instance.parameters.len() as u16 + 3) / 4;
@@ -91,12 +97,12 @@ impl Device {
             self.allocator.allocate(self.geometry_buffer.max_len());
         let mut offset = 0;
 
-        for instance in instance_list {
+        for instance in instance_list.values() {
             if !instance.visible {
                 continue;
             }
 
-            let indices = renumber_parameters(&geometry_list[instance.geometry]);
+            let indices = renumber_parameters(&geometry_list[&instance.geometry]);
             let block_count = (indices.len() + 3) / 4;
 
             let region = &mut params[offset..offset + block_count];

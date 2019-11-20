@@ -4,6 +4,7 @@ use log::{debug, info, warn};
 use crate::Device;
 use crate::Material;
 use js_sys::Error;
+use std::collections::BTreeMap;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
@@ -95,12 +96,15 @@ fn write_material_parameters(material: &Material, parameters: &mut [MaterialPara
 }
 
 impl Device {
-    pub(crate) fn update_materials(&mut self, materials: &[Material]) -> Result<(), Error> {
+    pub(crate) fn update_materials(
+        &mut self,
+        materials: &BTreeMap<String, Material>,
+    ) -> Result<(), Error> {
         let parameters: &mut [MaterialParameter] =
             self.allocator.allocate(self.material_buffer.max_len());
         let mut start = 0;
 
-        for material in materials {
+        for material in materials.values() {
             let count = material_parameter_block_count(material);
 
             write_material_parameters(material, &mut parameters[start..start + count]);

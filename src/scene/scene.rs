@@ -3,7 +3,7 @@ use crate::{
 };
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 pub type Asset = String;
 
@@ -16,9 +16,9 @@ pub type Asset = String;
 pub struct Scene {
     pub camera: Dirty<Camera>,
     pub raster: Dirty<Raster>,
-    pub instance_list: Dirty<Vec<Instance>>,
-    pub geometry_list: Dirty<Vec<Geometry>>,
-    pub material_list: Dirty<Vec<Material>>,
+    pub instance_list: Dirty<BTreeMap<String, Instance>>,
+    pub geometry_list: Dirty<BTreeMap<String, Geometry>>,
+    pub material_list: Dirty<BTreeMap<String, Material>>,
     pub environment_map: Dirty<Option<Asset>>,
     pub environment: Dirty<Environment>,
     pub display: Dirty<Display>,
@@ -95,10 +95,10 @@ impl Scene {
 
     pub fn has_photon_receivers(&self) -> bool {
         self.instance_list
-            .iter()
+            .values()
             .filter(|instance| instance.visible && instance.photon_receiver)
             .any(|instance| {
-                if let Some(material) = self.material_list.get(instance.material) {
+                if let Some(material) = self.material_list.get(&instance.material) {
                     !material.has_delta_bsdf()
                 } else {
                     false
