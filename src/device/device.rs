@@ -390,6 +390,9 @@ impl Device {
             Ok(())
         })?;
 
+        // this shader needs to be ready for aperture filter preprocessing
+        self.fft_shader.rebuild()?;
+
         let assets = &scene.assets;
 
         invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
@@ -446,7 +449,6 @@ impl Device {
         self.integrator_gather_photons_shader.rebuild()?;
 
         self.read_convolution_buffers_shader.rebuild()?;
-        self.fft_shader.rebuild()?;
         self.load_convolution_buffers_shader.rebuild()?;
 
         if invalidated {
