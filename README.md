@@ -1,6 +1,6 @@
 # Equinox
 
-Equinox is a WebGL2 stochastic progressive photon mapper written in modern Rust targeting WebAssembly. Its goal is to provide me with an efficient testbed to play around with new computer graphics ideas and generate pretty renders. The renderer itself is almost completely safe Rust, denying unsafe code by default; there are a couple documented unsafe blocks to avoid large and unnecessary copies in a few places.
+Equinox is a WebGL2 stochastic progressive photon mapper written in modern Rust targeting WebAssembly. Its goal is to provide me with an efficient testbed to play around with new computer graphics ideas and generate pretty renders. The renderer itself is completely safe Rust and forbids unsafe code.
 
 The graphics back-end will be upgraded to WebGPU when this technology matures, in the meantime it is WebGL2-only. The rationale for this is simple: the photon mapping algorithm is compute-intensive enough that you need a reasonably fast GPU to achieve interactivity, and therefore probably also have support for WebGL2. I also expect good speedups from WebGPU, a number of features require compute-shader functionality which is currently poorly emulated with fragment shaders.
 

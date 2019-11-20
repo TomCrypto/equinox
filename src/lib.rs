@@ -1,6 +1,6 @@
 //! The Equinox stochastic photon mapper, see the README for more information.
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 macro_rules! export {
     [$( $module:ident ),+ $(,)?] => {

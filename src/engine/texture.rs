@@ -2,7 +2,7 @@
 use log::{debug, info, warn};
 
 use crate::engine::{AsAttachment, AsBindTarget, BindTarget};
-use js_sys::Object;
+use js_sys::{Float32Array, Object, Uint16Array, Uint8Array};
 use std::marker::PhantomData;
 use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer, WebGlTexture};
 
@@ -427,7 +427,7 @@ impl TextureFormat for RG32F {
 
             let (level_data, remaining) = data.split_at(level_size);
 
-            views.push(unsafe_helpers::f32_slice_to_float32_array(level_data).into());
+            views.push(Float32Array::from(level_data).into());
 
             data = remaining;
         }
@@ -461,7 +461,7 @@ impl TextureFormat for RGBA8 {
 
             let (level_data, remaining) = data.split_at(level_size);
 
-            views.push(unsafe_helpers::u8_slice_to_uint8_array(level_data).into());
+            views.push(Uint8Array::from(level_data).into());
 
             data = remaining;
         }
@@ -507,7 +507,7 @@ impl TextureFormat for R16F {
 
             let (level_data, remaining) = data.split_at(level_size);
 
-            views.push(unsafe_helpers::u16_slice_to_uint16_array(level_data).into());
+            views.push(Uint16Array::from(level_data).into());
 
             data = remaining;
         }
@@ -541,7 +541,7 @@ impl TextureFormat for RGBA16F {
 
             let (level_data, remaining) = data.split_at(level_size);
 
-            views.push(unsafe_helpers::u16_slice_to_uint16_array(level_data).into());
+            views.push(Uint16Array::from(level_data).into());
 
             data = remaining;
         }
@@ -574,25 +574,4 @@ impl TextureFormat for RGB10A2 {
     const GL_INTERNAL_FORMAT: u32 = Context::RGB10_A2;
     const GL_FORMAT: u32 = Context::RGBA;
     const GL_TYPE: u32 = Context::UNSIGNED_INT_2_10_10_10_REV;
-}
-
-// SAFETY: the objects returned by these methods are immediately fed into WebGL
-// APIs to upload some data to a WebGL resource and are not held onto. There is
-// no reallocation happening in between, so the `view` requirements are upheld.
-
-#[allow(unsafe_code)]
-mod unsafe_helpers {
-    use js_sys::{Float32Array, Uint16Array, Uint8Array};
-
-    pub fn f32_slice_to_float32_array(slice: &[f32]) -> Float32Array {
-        unsafe { Float32Array::view(slice) }
-    }
-
-    pub fn u8_slice_to_uint8_array(slice: &[u8]) -> Uint8Array {
-        unsafe { Uint8Array::view(slice) }
-    }
-
-    pub fn u16_slice_to_uint16_array(slice: &[u16]) -> Uint16Array {
-        unsafe { Uint16Array::view(slice) }
-    }
 }
