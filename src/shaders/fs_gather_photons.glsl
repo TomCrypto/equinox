@@ -29,6 +29,9 @@ vec3 get_photon(vec3 cell_pos, vec3 point, uint material, uint inst, vec3 normal
     ivec2 coords = hash_entry_for_cell(cell_pos);
 
     vec3 result = vec3(0.0);
+    float unused_pdf;
+
+    float kernel_normalization = 1.0 / (0.148679 * M_2PI * radius_squared);
 
     for (uint y = 0U; y < integrator.hash_cell_rows; ++y) {
         for (uint x = 0U; x < integrator.hash_cell_cols; ++x) {
@@ -47,13 +50,16 @@ vec3 get_photon(vec3 cell_pos, vec3 point, uint material, uint inst, vec3 normal
                 continue;
             }
 
-            float kernel_r = distance(point, photon_position) / integrator.search_radius;
+            float r = distance(point, photon_position) / integrator.search_radius;
 
-            float weight = sin(M_PI * (0.5 + kernel_r * 0.5));
-            weight *= weight;
+            photon_throughput *= pow(sin(M_PI * (0.5 + r * 0.5)), 2.0) * kernel_normalization;
 
-            float pdf;
-            result += weight * abs(photon_throughput) * mat_eval_brdf(material, inst, normal, photon_wi, wo, pdf);
+            #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
+                result += photon_throughput * eval(inst, normal, photon_wi, wo, unused_pdf);      \
+            }
+
+            MAT_DO_SWITCH(material)
+            #undef MAT_SWITCH_LOGIC
         }
     }
 
@@ -217,10 +223,9 @@ vec3 gather_photons(ray_t ray, random_t random) {
                     }
                 }
 
-                vec3 li = throughput * gather_photons_in_sphere(ray.org, -ray.dir, normal, material, mat_inst);
+                vec3 li = gather_photons_in_sphere(ray.org, -ray.dir, normal, material, mat_inst);
+                radiance += li / integrator.photons_for_pass; // normalize the photon contribution
 
-                // this factor comes from the integral of the kernel over the disk of radius R
-                radiance += li / (integrator.photons_for_pass * 0.148679 * M_2PI * integrator.search_radius * integrator.search_radius);
                 return radiance;
             }
 

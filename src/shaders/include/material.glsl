@@ -282,25 +282,6 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
     return vec3(MAT_OREN_NAYAR_ALBEDO) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
 }
 
-vec3 mat_eval_brdf(uint material, uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf) {
-    switch (material & 0x3fffU) {
-        case 0U:
-            return mat_lambertian_eval_brdf(inst, normal, wi, wo, pdf);
-        case 1U:
-            return mat_ideal_reflection_eval_brdf(inst, normal, wi, wo, pdf);
-        case 2U:
-            return mat_phong_eval_brdf(inst, normal, wi, wo, pdf);
-        case 3U:
-            return mat_ideal_refraction_eval_brdf(inst, normal, wi, wo, pdf);
-        case 4U:
-            return mat_dielectric_eval_brdf(inst, normal, wi, wo, pdf);
-        case 5U:
-            return mat_oren_nayar_eval_brdf(inst, normal, wi, wo, pdf);
-        default:
-            return vec3(0.0);
-    }
-}
-
 #define MAT_IS_RECEIVER(material) \
     ((material & 0x8000U) != 0U)
 
