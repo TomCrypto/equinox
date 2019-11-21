@@ -8,6 +8,10 @@ layout (std140) uniform Camera {
     vec4 aperture_settings;
 } camera;
 
+layout (std140) uniform Raster {
+    vec4 dimensions;
+} raster;
+
 vec2 evaluate_circular_aperture_uv(inout quasi_t quasi) {
     float u1 = quasi_sample(quasi);
     float u2 = quasi_sample(quasi);

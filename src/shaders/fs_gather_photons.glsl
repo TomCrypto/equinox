@@ -14,10 +14,6 @@ uniform sampler2D photon_table_sum;
 
 layout(location = 0) out vec4 radiance_estimate;
 
-layout (std140) uniform Raster {
-    vec4 dimensions;
-} raster;
-
 vec3 get_photon(vec3 cell_pos, vec3 point, uint material, uint inst, vec3 normal, vec3 wo) {
     float radius_squared = integrator.search_radius * integrator.search_radius;
 

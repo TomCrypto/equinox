@@ -331,7 +331,7 @@ impl Device {
     }
 
     fn populate_quasi_buffer(buffer: &mut [SamplerDimensionAlpha]) {
-        let phi = Self::compute_phi(buffer.len() as f64);
+        let phi = Self::weyl_sequence_phi(buffer.len() as f64);
 
         for (i, value) in buffer.iter_mut().enumerate() {
             let alpha = (1.0 / phi).powi((1 + i) as i32);
@@ -345,16 +345,19 @@ impl Device {
         }
     }
 
-    fn compute_phi(d: f64) -> f64 {
-        let mut x = 2.0;
-
+    fn weyl_sequence_phi(d: f64) -> f64 {
         let q = 1.0 / (d + 1.0);
+        let mut phi: f64 = 2.0;
 
-        for _ in 0..1000 {
-            x = (1.0f64 + x).powf(q);
+        loop {
+            let succ = (1.0 + phi).powf(q);
+
+            if succ != phi {
+                phi = succ;
+            } else {
+                return phi;
+            }
         }
-
-        x
     }
 }
 
