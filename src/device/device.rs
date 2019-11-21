@@ -42,7 +42,7 @@ pub struct Device {
     pub(crate) b_aperture_spectrum: Texture<RG32F>,
 
     // Final convolved render output (real-valued)
-    pub(crate) render: Texture<RGBA32F>,
+    pub(crate) render: Texture<RGBA16F>,
 
     pub(crate) fft_pass_data: VertexArray<[FFTPassData]>,
 
