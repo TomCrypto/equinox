@@ -13,7 +13,10 @@ pub struct Integrator {
     pub photon_rate: f32,
 
     #[default(0.05)]
-    pub initial_search_radius: f32,
+    pub max_search_radius: f32,
+
+    #[default(0.01)]
+    pub min_search_radius: f32,
 
     #[default(1.0)]
     pub capacity_multiplier: f32,

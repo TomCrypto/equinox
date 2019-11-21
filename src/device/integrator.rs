@@ -88,8 +88,12 @@ impl Device {
             return Err(Error::new("hash_table_bits must be 20 or more"));
         }
 
-        if integrator.initial_search_radius <= 0.0 {
-            return Err(Error::new("photon search radius must be positive"));
+        if integrator.max_search_radius <= 0.0 {
+            return Err(Error::new("max_search_radius must be positive"));
+        }
+
+        if integrator.min_search_radius <= 0.0 {
+            return Err(Error::new("min_search_radius must be positive"));
         }
 
         if integrator.max_hash_cell_bits > 8 {
@@ -136,7 +140,8 @@ impl Device {
         Self::clamp_integrator_settings(&mut self.state.integrator);
 
         self.state.kernel_radii = KernelRadiusSequence::new(
-            self.state.integrator.initial_search_radius,
+            self.state.integrator.max_search_radius,
+            self.state.integrator.min_search_radius,
             self.state.integrator.alpha,
         );
 
@@ -368,16 +373,18 @@ impl Device {
 /// at the correct rate to ensure the estimator's variance converges to zero.
 #[derive(Debug, Default)]
 pub struct KernelRadiusSequence {
-    initial: f32,
+    max: f32,
+    min: f32,
     alpha: f32,
     product: f32,
     iters: f32,
 }
 
 impl KernelRadiusSequence {
-    pub fn new(initial: f32, alpha: f32) -> Self {
+    pub fn new(max: f32, min: f32, alpha: f32) -> Self {
         Self {
-            initial,
+            max,
+            min,
             alpha,
             product: 1.0,
             iters: 1.0,
@@ -385,7 +392,7 @@ impl KernelRadiusSequence {
     }
 
     pub fn next_radius(&mut self) -> f32 {
-        let radius = self.initial * (self.product / self.iters).sqrt();
+        let radius = (self.max * (self.product / self.iters).sqrt()).max(self.min);
 
         self.product *= (self.iters + self.alpha) / self.iters;
         self.iters += 1.0;
