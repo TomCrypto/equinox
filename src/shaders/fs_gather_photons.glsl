@@ -22,31 +22,25 @@ vec3 get_photon(vec3 cell_pos, vec3 point, uint material, uint inst, vec3 normal
     vec3 result = vec3(0.0);
     float unused_pdf;
 
-    float kernel_normalization = 1.0 / (0.148679 * M_2PI * radius_squared);
-
     for (uint y = 0U; y < integrator.hash_cell_rows; ++y) {
         for (uint x = 0U; x < integrator.hash_cell_cols; ++x) {
-            vec3 photon_throughput = 1e5 * texelFetch(photon_table_sum, coords + ivec2(x, y), 0).rgb;
+            vec3 throughput = 1e5 * texelFetch(photon_table_sum, coords + ivec2(x, y), 0).rgb;
 
-            if (photon_throughput == vec3(0.0)) {
+            if (throughput == vec3(0.0)) {
                 continue;
             }
 
             vec3 pos_data = texelFetch(photon_table_pos, coords + ivec2(x, y), 0).rgb;
-            vec3 photon_wi = 2.0 * texelFetch(photon_table_dir, coords + ivec2(x, y), 0).rgb - 1.0;
+            vec3 wi = 2.0 * texelFetch(photon_table_dir, coords + ivec2(x, y), 0).rgb - 1.0;
 
-            vec3 photon_position = (cell_pos + pos_data) * integrator_cell_size();
+            vec3 position = (cell_pos + pos_data) * integrator_cell_size();
 
-            if (dot(point - photon_position, point - photon_position) > radius_squared) {
+            if (dot(point - position, point - position) > radius_squared) {
                 continue;
             }
 
-            float r = distance(point, photon_position) / integrator.search_radius;
-
-            photon_throughput *= pow(sin(M_PI * (0.5 + r * 0.5)), 2.0) * kernel_normalization;
-
             #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
-                result += photon_throughput * eval(inst, normal, photon_wi, wo, unused_pdf);      \
+                result += throughput * eval(inst, normal, wi, wo, unused_pdf);                    \
             }
 
             MAT_DO_SWITCH(material)
@@ -74,7 +68,7 @@ vec3 gather_photons_in_sphere(vec3 position, vec3 wo, vec3 normal, uint material
     accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 0.0), position, material, inst, normal, wo);
     accumulation += get_photon(cell_pos + dir * vec3(1.0, 1.0, 1.0), position, material, inst, normal, wo);
 
-    return accumulation;
+    return accumulation / (M_PI * integrator.search_radius * integrator.search_radius);
 }
 
 vec3 gather_photons(ray_t ray, quasi_t quasi) {
