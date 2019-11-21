@@ -97,10 +97,7 @@ impl Device {
             let lo = alpha_u64 as u32;
             let hi = (alpha_u64 >> 32) as u32;
 
-            let lolo = lo & 0xffff;
-            let lohi = lo >> 16;
-
-            value.alpha = [lo, hi, lolo, lohi];
+            value.alpha = [lo, hi, lo & 0xffff, lo >> 16];
         }
     }
 
