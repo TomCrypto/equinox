@@ -37,13 +37,13 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
 
             uint material = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
-            
-            vec2 weights = quasi_sample_vec2(quasi);
 
             // Note surfaces will NEVER receive first bounce photons. The "sample explicit" flag
             // is purely an optimization meant for when a surface cannot directly see any light.
 
             bool is_receiver = MAT_IS_RECEIVER(material) && (bounce != 0U);
+
+            float deposit_weight = is_receiver ? quasi_sample(quasi) : 0.0;
 
             bool inside = dot(ray.dir, normal) > 0.0;
             vec3 f;
@@ -51,15 +51,15 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
             #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
                 throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
                                                                                                   \
-                if (is_receiver && weights.x < integrator.photon_rate) {                          \
+                if (is_receiver && deposit_weight < integrator.photon_rate) {                     \
                     deposit_photon(ray, throughput / integrator.photon_rate);                     \
                     return; /* rasterize this photon into the photon table */                     \
                 }                                                                                 \
                                                                                                   \
                 throughput /= is_receiver ? 1.0 - integrator.photon_rate : 1.0;                   \
                                                                                                   \
-                float unused_pdf; /* we don't need the PDF of the sampling method */              \
-                f = sample(mat_inst, normal, ray.dir, -ray.dir, unused_pdf, quasi);            \
+                float unused_pdf; /* we don't use the PDF of the sampling method */               \
+                f = sample(mat_inst, normal, ray.dir, -ray.dir, unused_pdf, quasi);               \
             }
 
             MAT_DO_SWITCH(material)
@@ -67,7 +67,7 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
 
             float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));
 
-            if (weights.y < q) {
+            if (quasi_sample(quasi) < q) {
                 return;
             }
 
@@ -98,8 +98,11 @@ ray_t generate_photon_ray(out vec3 throughput, inout quasi_t quasi) {
     float area = x_area + y_area + z_area;
     throughput *= area; // division by PDF
 
-    float w = quasi_sample_float(quasi) * area;
-    vec2 surface_uv = quasi_sample_vec2(quasi);
+    float w = quasi_sample(quasi) * area;
+    vec2 surface_uv; // pick point on AABB side
+    
+    surface_uv.s = quasi_sample(quasi);
+    surface_uv.t = quasi_sample(quasi);
 
     if (w < x_area) {
         coords.yz = surface_uv;
@@ -116,7 +119,7 @@ void main() {
     // TODO: bake the scaling factor elsewhere
     uint seed = uint(gl_VertexID) * integrator.hash_cell_cols * integrator.hash_cell_rows + uint(gl_InstanceID);
 
-    quasi_t quasi = quasi_init(sampler_decorrelate(seed), integrator.current_pass);
+    quasi_t quasi = quasi_init(decorrelate_sample(seed), integrator.current_pass);
 
     vec3 throughput; // measure photon path contribution
     ray_t ray = generate_photon_ray(throughput, quasi);

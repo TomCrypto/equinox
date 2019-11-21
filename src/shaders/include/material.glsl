@@ -50,12 +50,13 @@ vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out floa
 }
 
 vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout quasi_t quasi) {
-    vec2 rng = quasi_sample_vec2(quasi);
+    float u1 = quasi_sample(quasi);
+    float u2 = quasi_sample(quasi);
 
-    float r = sqrt(rng.x);
-    float phi = M_2PI * rng.y;
+    float r = sqrt(u1);
+    float phi = M_2PI * u2;
 
-    wi = rotate(vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi)), normal);
+    wi = rotate(vec3(r * cos(phi), sqrt(1.0 - u1), r * sin(phi)), normal);
 
     float wi_n = dot(wi, normal);
 
@@ -146,10 +147,11 @@ vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf
 }
 
 vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout quasi_t quasi) {
-    vec2 rng = quasi_sample_vec2(quasi);
+    float u1 = quasi_sample(quasi);
+    float u2 = quasi_sample(quasi);
 
-    float phi = M_2PI * rng.x;
-    float theta = acos(pow(rng.y, 1.0 / (MAT_PHONG_EXPONENT + 1.0)));
+    float phi = M_2PI * u1;
+    float theta = acos(pow(u2, 1.0 / (MAT_PHONG_EXPONENT + 1.0)));
 
     vec3 ideal = reflect(-wo, normal);
 
@@ -217,7 +219,7 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
         float tp = 1.0 / (n1 * cosT + n2 * cosI); // p-polarized fresnel
         float t = 2.0 * (ts * ts + tp * tp) * (n1 * cosI) * (n2 * cosT);
 
-        if (quasi_sample_float(quasi) < t) {
+        if (quasi_sample(quasi) < t) {
             wi = (eta * cosI - cosT) * normal - eta * wo;
         } else {
             wi = reflect(-wo, normal);
@@ -264,12 +266,13 @@ vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out floa
 }
 
 vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout quasi_t quasi) {
-    vec2 rng = quasi_sample_vec2(quasi);
+    float u1 = quasi_sample(quasi);
+    float u2 = quasi_sample(quasi);
 
-    float r = sqrt(rng.x);
-    float phi = M_2PI * rng.y;
+    float r = sqrt(u1);
+    float phi = M_2PI * u2;
 
-    wi = rotate(vec3(r * cos(phi), sqrt(1.0 - rng.x), r * sin(phi)), normal);
+    wi = rotate(vec3(r * cos(phi), sqrt(1.0 - u1), r * sin(phi)), normal);
 
     float wi_n = dot(wi, normal);
     float wo_n = dot(wo, normal);

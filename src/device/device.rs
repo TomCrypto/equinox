@@ -26,7 +26,8 @@ pub struct Device {
     pub(crate) integrator_buffer: UniformBuffer<IntegratorData>,
     pub(crate) raster_buffer: UniformBuffer<RasterData>,
     pub(crate) environment_buffer: UniformBuffer<EnvironmentData>,
-    pub(crate) sampler_buffer: UniformBuffer<[SamplerDimensionAlpha]>,
+    pub(crate) gather_quasi_buffer: UniformBuffer<[SamplerDimensionAlpha]>,
+    pub(crate) scatter_quasi_buffer: UniformBuffer<[SamplerDimensionAlpha]>,
 
     // Complex-valued spectrums for each render channel
     pub(crate) rspectrum_temp1: Texture<RG32F>,
@@ -203,7 +204,8 @@ impl Device {
             geometry_buffer: UniformBuffer::new(gl.clone()),
             material_buffer: UniformBuffer::new(gl.clone()),
             instance_buffer: UniformBuffer::new(gl.clone()),
-            sampler_buffer: UniformBuffer::new(gl.clone()),
+            gather_quasi_buffer: UniformBuffer::new(gl.clone()),
+            scatter_quasi_buffer: UniformBuffer::new(gl.clone()),
             raster_buffer: UniformBuffer::new(gl.clone()),
             display_buffer: UniformBuffer::new(gl.clone()),
             integrator_buffer: UniformBuffer::new(gl.clone()),
@@ -558,7 +560,8 @@ impl Device {
         self.integrator_photon_table_sum.invalidate();
         self.integrator_scatter_fbo.invalidate();
         self.aperture_fbo.invalidate();
-        self.sampler_buffer.invalidate();
+        self.gather_quasi_buffer.invalidate();
+        self.scatter_quasi_buffer.invalidate();
 
         self.integrator_radiance_estimate.invalidate();
 

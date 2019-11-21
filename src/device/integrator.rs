@@ -83,23 +83,8 @@ impl Default for IntegratorState {
 }
 
 impl Device {
-    pub(crate) fn update_integrator(&mut self, integrator: &Integrator) -> Result<(), Error> {
-        if integrator.hash_table_bits < 20 {
-            return Err(Error::new("hash_table_bits must be 20 or more"));
-        }
-
-        if integrator.initial_search_radius <= 0.0 {
-            return Err(Error::new("photon search radius must be positive"));
-        }
-
-        if integrator.max_hash_cell_bits > 8 {
-            return Err(Error::new("max_hash_cell_bits must be 8 or less"));
-        }
-
-        // TODO: hardcoded dimension for now
-        let weyl_data: &mut [SamplerDimensionAlpha] =
-            self.allocator.allocate(self.sampler_buffer.max_len());
-        let d = 64; // weyl_data.len();
+    fn populate_quasi_buffer(buffer: &mut [SamplerDimensionAlpha]) {
+        let d = buffer.len();
 
         let phi = Self::compute_phi(d as f64);
 
@@ -114,15 +99,48 @@ impl Device {
             let lolo = lo & 0xffff;
             let lohi = lo >> 16;
 
-            weyl_data[63 - q].alpha = [lo, hi, lolo, lohi];
+            buffer[q].alpha = [lo, hi, lolo, lohi];
+        }
+    }
+
+    pub(crate) fn update_integrator(&mut self, integrator: &Integrator) -> Result<(), Error> {
+        if integrator.hash_table_bits < 20 {
+            return Err(Error::new("hash_table_bits must be 20 or more"));
         }
 
-        self.integrator_gather_photons_shader
-            .set_define("SAMPLER_MAX_DIMENSIONS", d);
-        self.integrator_scatter_photons_shader
-            .set_define("SAMPLER_MAX_DIMENSIONS", d);
+        if integrator.initial_search_radius <= 0.0 {
+            return Err(Error::new("photon search radius must be positive"));
+        }
 
-        self.sampler_buffer.write_array(weyl_data)
+        if integrator.max_hash_cell_bits > 8 {
+            return Err(Error::new("max_hash_cell_bits must be 8 or less"));
+        }
+
+        if integrator.max_gather_bounces > 100 {
+            return Err(Error::new("max_gather_bounces must be 100 or less"));
+        }
+
+        if integrator.max_scatter_bounces > 100 {
+            return Err(Error::new("max_scatter_bounces must be 100 or less"));
+        }
+
+        let gather_dimensions = 2 + 5 * integrator.max_gather_bounces as usize;
+        let scatter_dimensions = 5 + 4 * integrator.max_scatter_bounces as usize;
+
+        let quasi_buffer: &mut [SamplerDimensionAlpha] =
+            self.allocator.allocate(self.gather_quasi_buffer.max_len());
+
+        Self::populate_quasi_buffer(&mut quasi_buffer[..gather_dimensions]);
+        self.gather_quasi_buffer.write_array(quasi_buffer)?;
+        Self::populate_quasi_buffer(&mut quasi_buffer[..scatter_dimensions]);
+        self.scatter_quasi_buffer.write_array(quasi_buffer)?;
+
+        self.integrator_gather_photons_shader
+            .set_define("SAMPLER_MAX_DIMENSIONS", quasi_buffer.len());
+        self.integrator_scatter_photons_shader
+            .set_define("SAMPLER_MAX_DIMENSIONS", quasi_buffer.len());
+
+        Ok(())
     }
 
     pub(crate) fn reset_integrator_state(&mut self, scene: &mut Scene) {
@@ -235,7 +253,7 @@ impl Device {
         command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.environment_buffer, "Environment");
-        command.bind(&self.sampler_buffer, "QuasiSampler");
+        command.bind(&self.scatter_quasi_buffer, "QuasiSampler");
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
@@ -264,7 +282,7 @@ impl Device {
         command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.environment_buffer, "Environment");
-        command.bind(&self.sampler_buffer, "QuasiSampler");
+        command.bind(&self.gather_quasi_buffer, "QuasiSampler");
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");

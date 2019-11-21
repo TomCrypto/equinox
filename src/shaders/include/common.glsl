@@ -87,68 +87,24 @@ float power_heuristic(float f, float g) {
     return f / (f + g);
 }
 
-bool unpack_visible_point(vec4 data1, vec4 data2, vec4 data3, out vec3 position, out vec3 direction,
-                          out vec3 normal, out vec3 throughput, out uint material, out uint inst) {
-    uint mat_info = floatBitsToUint(data1.w);
+// Feeds an input value through a keyed pseudorandom permutation, to decorrelate
+// a correlated sequence; this can suppress visual artifacts when used properly.
+uint decorrelate_sample(uint x, uint key) {
+    x ^= key;
+    x ^= x >> 17U;
+    x ^= x >> 10U;
+    x *= 0xb36534e5U;
+    x ^= x >> 12U;
+    x ^= x >> 21U;
+    x *= 0x93fc4795U;
+    x ^= 0xdf6e307fU;
+    x ^= x >> 17U;
+    x *= 1U | key >> 18U;
 
-    throughput = data2.xyz;
-    
-    if (mat_info == 0xffffffffU) {
-        return false;
-    }
-
-    position = data1.xyz;
-    material = mat_info & 0xffffU;
-    inst = mat_info >> 16U;
-
-    direction.xz = data3.xy;
-    normal.xz = data3.zw;
-
-    direction.y = sqrt(max(0.0, 1.0 - direction.x * direction.x - direction.z * direction.z));
-    normal.y = sqrt(max(0.0, 1.0 - normal.x * normal.x - normal.z * normal.z));
-
-    int signs = int(data2.w);
-
-    if ((signs & 0x1) != 0) {
-        direction.y = -direction.y;
-    }
-
-    if ((signs & 0x2) != 0) {
-        normal.y = -normal.y;
-    }
-
-    return true;
+    return x;
 }
 
-void pack_visible_point(vec3 position, vec3 direction, vec3 normal, vec3 throughput, vec3 radiance,
-                        uint material, uint inst, out vec4 data1, out vec4 data2, out vec4 data3, out vec4 data4) {
-    data1.xyz = position;
-    data2.xyz = throughput;
-    data1.w = uintBitsToFloat(material | (inst << 16));
-
-    int signs = 0;
-
-    if (direction.y < 0.0) {
-        signs |= 0x1;
-    }
-
-    if (normal.y < 0.0) {
-        signs |= 0x2;
-    }
-
-    data2.w = float(signs);
-
-    data3.xy = direction.xz;
-    data3.zw = normal.xz;
-    
-    data4.rgb = radiance;
-}
-
-void pack_invalid_visible_point(vec3 radiance, out vec4 data1, out vec4 data2, out vec4 data3, out vec4 data4) {
-    data1.xyz = vec3(0.0);
-    data1.w = uintBitsToFloat(0xffffffffU);
-    data2.xyz = vec3(0.0);
-    data2.w = 0.0;
-    data3 = vec4(0.0);
-    data4.rgb = radiance;
+uint decorrelate_sample(uint x) {
+    // pass in a default key when not given one
+    return decorrelate_sample(x, 0xa8f4c2c1U);
 }

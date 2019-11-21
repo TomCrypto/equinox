@@ -38,9 +38,9 @@ cell_t cell_for_point(vec3 point) {
 ivec2 hash_entry_for_cell(cell_t cell) {
     uvec3 inputs = floatBitsToUint(cell);
 
-    uint index = sampler_decorrelate(inputs.x, integrator.hash_key.x)
-               ^ sampler_decorrelate(inputs.y, integrator.hash_key.y)
-               ^ sampler_decorrelate(inputs.z, integrator.hash_key.z);
+    uint index = decorrelate_sample(inputs.x, integrator.hash_key.x)
+               ^ decorrelate_sample(inputs.y, integrator.hash_key.y)
+               ^ decorrelate_sample(inputs.z, integrator.hash_key.z);
 
     return ivec2(index & integrator.hash_cols_mask, (index >> 16U) & integrator.hash_rows_mask);
 }

@@ -47,12 +47,13 @@ float inverse_transform(sampler2D texture, int y, float u, int size, out int ind
 }
 
 vec3 env_sample_light_image(out vec3 wi, out float pdf, inout quasi_t quasi) {
-    vec2 rng = quasi_sample_vec2(quasi);
+    float u1 = quasi_sample(quasi);
+    float u2 = quasi_sample(quasi);
 
     int index;
 
-    float sampled_v = inverse_transform(envmap_marg_cdf,     0, rng.x, environment.rows, index);
-    float sampled_u = inverse_transform(envmap_cond_cdf, index, rng.y, environment.cols, index);
+    float sampled_v = inverse_transform(envmap_marg_cdf,     0, u1, environment.rows, index);
+    float sampled_u = inverse_transform(envmap_cond_cdf, index, u2, environment.cols, index);
 
     wi = equirectangular_to_direction(vec2(sampled_u, sampled_v), environment.rotation);
 
@@ -84,14 +85,15 @@ vec3 env_eval_light_image(vec3 wi, out float pdf) {
 }
 
 vec3 env_sample_light_solid(out vec3 wi, out float pdf, inout quasi_t quasi) {
-    vec2 rng = quasi_sample_vec2(quasi);
+    float u1 = quasi_sample(quasi);
+    float u2 = quasi_sample(quasi);
 
-    rng.x = 2.0 * rng.x - 1.0;
+    u1 = 2.0 * u1 - 1.0;
 
-    float r = sqrt(1.0 - rng.x * rng.x);
-    float phi = M_2PI * rng.y;
+    float r = sqrt(1.0 - u1 * u1);
+    float phi = M_2PI * u2;
 
-    wi = vec3(cos(phi) * r, rng.x, sin(phi) * r);
+    wi = vec3(cos(phi) * r, u1, sin(phi) * r);
 
     pdf = 1.0 / M_4PI;
 

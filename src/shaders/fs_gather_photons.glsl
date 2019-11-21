@@ -89,20 +89,22 @@ vec3 gather_photons_in_sphere(vec3 position, vec3 wo, vec3 normal, uint material
 // Begin camera stuff
 
 vec2 evaluate_circular_aperture_uv(inout quasi_t quasi) {
-    vec2 uv = quasi_sample_vec2(quasi);
+    float u1 = quasi_sample(quasi);
+    float u2 = quasi_sample(quasi);
 
-    float a = uv.s * M_2PI;
+    float a = u1 * M_2PI;
 
-    return sqrt(uv.t) * vec2(cos(a), sin(a));
+    return sqrt(u2) * vec2(cos(a), sin(a));
 }
 
 vec2 evaluate_polygon_aperture_uv(inout quasi_t quasi) {
-    vec2 uv = quasi_sample_vec2(quasi);
+    float u1 = quasi_sample(quasi);
+    float u2 = quasi_sample(quasi);
 
-    float corner = floor(uv.s * camera.aperture_settings.y);
+    float corner = floor(u1 * camera.aperture_settings.y);
 
-    float u = 1.0 - sqrt(uv.s * camera.aperture_settings.y - corner);
-    float v = uv.t * (1.0 - u);
+    float u = 1.0 - sqrt(u1 * camera.aperture_settings.y - corner);
+    float v = u2 * (1.0 - u);
 
     float a = M_PI * camera.aperture_settings.w;
 
@@ -186,7 +188,7 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
                           * abs(dot(mis_wi, normal)) * throughput;                                \
                 }                                                                                 \
                                                                                                   \
-                f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, quasi);               \
+                f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, quasi);                  \
             }
 
             MAT_DO_SWITCH(material)
@@ -195,7 +197,7 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
             if (!is_receiver) {
                 float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));
 
-                if (quasi_sample_float(quasi) < q) {
+                if (quasi_sample(quasi) < q) {
                     return radiance;
                 }
 
@@ -248,7 +250,7 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
 void main() {
     uint seed = (uint(gl_FragCoord.x) << 16U) + uint(gl_FragCoord.y);
 
-    quasi_t quasi = quasi_init(sampler_decorrelate(seed), integrator.current_pass);
+    quasi_t quasi = quasi_init(decorrelate_sample(seed), integrator.current_pass);
 
     ray_t ray;
     evaluate_primary_ray(ray.org, ray.dir, quasi);
