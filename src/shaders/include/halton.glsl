@@ -6,7 +6,7 @@ struct weyl_t {
 // TODO: apply UBO size optimization later?
 
 layout (std140) uniform Weyl {
-    uvec4 alpha[64];
+    uvec4 alpha[SAMPLER_MAX_DIMENSIONS];
 } weyl;
 
 weyl_t weyl_init(uint lo, uint hi) {

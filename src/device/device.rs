@@ -110,6 +110,7 @@ impl Device {
                     "GEOMETRY_DATA_LEN" => "0",
                     "MATERIAL_DATA_LEN" => "0",
                     "INSTANCE_DATA_PRESENT" => "0",
+                    "SAMPLER_MAX_DIMENSIONS" => "0"
                 },
             ),
             integrator_photon_table_pos: Texture::new(gl.clone()),
@@ -140,6 +141,7 @@ impl Device {
                     "GEOMETRY_DATA_LEN" => "0",
                     "MATERIAL_DATA_LEN" => "0",
                     "INSTANCE_DATA_PRESENT" => "0",
+                    "SAMPLER_MAX_DIMENSIONS" => "0"
                 },
             ),
             load_convolution_buffers_shader: Shader::new(
@@ -412,7 +414,7 @@ impl Device {
         })?;
 
         invalidated |= Dirty::clean(&mut scene.integrator, |integrator| {
-            Self::validate_integrator(integrator)?;
+            self.update_integrator(integrator)?;
 
             // TODO: return an error if the texture is too large to create here...
             // (check against the size limits or something)

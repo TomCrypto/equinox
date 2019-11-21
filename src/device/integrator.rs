@@ -18,7 +18,7 @@ pub struct WeylData {
 #[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Debug)]
 pub struct IntegratorData {
-    rng: [u32; 4],
+    hash_key: [u32; 4],
     filter_offset: [f32; 2],
 
     current_pass: u32,
@@ -83,7 +83,7 @@ impl Default for IntegratorState {
 }
 
 impl Device {
-    pub(crate) fn validate_integrator(integrator: &Integrator) -> Result<(), Error> {
+    pub(crate) fn update_integrator(&mut self, integrator: &Integrator) -> Result<(), Error> {
         if integrator.hash_table_bits < 20 {
             return Err(Error::new("hash_table_bits must be 20 or more"));
         }
@@ -96,7 +96,32 @@ impl Device {
             return Err(Error::new("max_hash_cell_bits must be 8 or less"));
         }
 
-        Ok(())
+        // TODO: hardcoded dimension for now
+        let weyl_data: &mut [WeylData] = self.allocator.allocate(self.weyl_buffer.max_len());
+        let d = 64; // weyl_data.len();
+
+        let phi = Self::compute_phi(d as f64);
+
+        for q in 0..d {
+            let alpha = (1.0 / phi).powi((1 + q) as i32);
+
+            let alpha_u64: u64 = (alpha * 18446744073709551616.0) as u64;
+
+            let lo = alpha_u64 as u32;
+            let hi = (alpha_u64 >> 32) as u32;
+
+            let lolo = lo & 0xffff;
+            let lohi = lo >> 16;
+
+            weyl_data[63 - q].alpha = [lo, hi, lolo, lohi];
+        }
+
+        self.integrator_gather_photons_shader
+            .set_define("SAMPLER_MAX_DIMENSIONS", d);
+        self.integrator_scatter_photons_shader
+            .set_define("SAMPLER_MAX_DIMENSIONS", d);
+
+        self.weyl_buffer.write_array(weyl_data)
     }
 
     pub(crate) fn reset_integrator_state(&mut self, scene: &mut Scene) {
@@ -169,10 +194,9 @@ impl Device {
 
         data.filter_offset[0] = 4.0 * self.state.filter.importance_sample(x) - 2.0;
         data.filter_offset[1] = 4.0 * self.state.filter.importance_sample(y) - 2.0;
-        data.rng[0] = self.state.rng.next_u32();
-        data.rng[1] = self.state.rng.next_u32();
-        data.rng[2] = self.state.rng.next_u32();
-        data.rng[3] = self.state.rng.next_u32();
+        data.hash_key[0] = self.state.rng.next_u32();
+        data.hash_key[1] = self.state.rng.next_u32();
+        data.hash_key[2] = self.state.rng.next_u32();
         data.current_pass = self.state.current_pass;
         data.photon_rate = self.state.integrator.photon_rate;
         data.photon_count = self.state.photon_count.max(1.0);
@@ -192,37 +216,7 @@ impl Device {
         data.hash_rows_mask =
             ((self.integrator_scatter_fbo.rows() - 1) & !(hash_cell_rows - 1)) as u32;
 
-        self.integrator_buffer.write(data)?;
-
-        // TODO: move this to an "update" stage rather than being in the main render
-        // loop
-
-        // TODO: hardcoded dimension for now
-        let weyl_data: &mut [WeylData] = self.allocator.allocate(64);
-        let d = weyl_data.len();
-
-        let phi = Self::compute_phi(d as f64);
-
-        for q in 0..d {
-            let alpha = (1.0 / phi).powi((1 + q) as i32);
-
-            let alpha_u64: u64 = (alpha * 18446744073709551616.0) as u64;
-
-            let lo = alpha_u64 as u32;
-            let hi = (alpha_u64 >> 32) as u32;
-
-            let lolo = lo & 0xffff;
-            let lohi = lo >> 16;
-
-            if self.state.current_pass == 1 {
-                info!("alpha {} lolo = {}", q, lolo);
-                info!("alpha {} lohi = {}", q, lohi);
-            }
-
-            weyl_data[63 - q].alpha = [lo, hi, lolo, lohi];
-        }
-
-        self.weyl_buffer.write_array(weyl_data)
+        self.integrator_buffer.write(data)
     }
 
     pub(crate) fn scatter_photons(&mut self, pass: &IntegratorPass) {
