@@ -3,13 +3,13 @@ out vec3 photon_dir_data;
 out vec3 photon_sum_data;
 
 #include <common.glsl>
-#include <halton.glsl>
 
 #include <geometry.glsl>
 #include <instance.glsl>
 #include <material.glsl>
 #include <environment.glsl>
 #include <integrator.glsl>
+#include <quasi.glsl>
 
 layout (std140) uniform Raster {
     vec4 dimensions;
@@ -26,7 +26,7 @@ void deposit_photon(ray_t ray, vec3 throughput) {
     gl_Position = vec4(clip_space, 0.0, 1.0); // put the photon into its hash table entry
 }
 
-void scatter_photon(ray_t ray, vec3 throughput, weyl_t weyl) {
+void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
     for (uint bounce = 0U; bounce < integrator.max_scatter_bounces; ++bounce) {
         traversal_t traversal = traverse_scene(ray, 0U);
 
@@ -38,7 +38,7 @@ void scatter_photon(ray_t ray, vec3 throughput, weyl_t weyl) {
             uint material = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
             
-            vec2 weights = weyl_sample_vec2(weyl);
+            vec2 weights = quasi_sample_vec2(quasi);
 
             // Note surfaces will NEVER receive first bounce photons. The "sample explicit" flag
             // is purely an optimization meant for when a surface cannot directly see any light.
@@ -59,7 +59,7 @@ void scatter_photon(ray_t ray, vec3 throughput, weyl_t weyl) {
                 throughput /= is_receiver ? 1.0 - integrator.photon_rate : 1.0;                   \
                                                                                                   \
                 float unused_pdf; /* we don't need the PDF of the sampling method */              \
-                f = sample(mat_inst, normal, ray.dir, -ray.dir, unused_pdf, weyl);                \
+                f = sample(mat_inst, normal, ray.dir, -ray.dir, unused_pdf, quasi);            \
             }
 
             MAT_DO_SWITCH(material)
@@ -80,13 +80,13 @@ void scatter_photon(ray_t ray, vec3 throughput, weyl_t weyl) {
     }
 }
 
-ray_t generate_photon_ray(out vec3 throughput, inout weyl_t weyl) {
+ray_t generate_photon_ray(out vec3 throughput, inout quasi_t quasi) {
     vec3 bbmin, bbmax, wi;
 
     get_scene_bbox(bbmin, bbmax);
 
     float unused_pdf;
-    throughput = env_sample_light(wi, unused_pdf, weyl);
+    throughput = env_sample_light(wi, unused_pdf, quasi);
     wi = -wi;
 
     vec3 coords = ceil(-wi);
@@ -98,8 +98,8 @@ ray_t generate_photon_ray(out vec3 throughput, inout weyl_t weyl) {
     float area = x_area + y_area + z_area;
     throughput *= area; // division by PDF
 
-    float w = weyl_sample(weyl) * area;
-    vec2 surface_uv = weyl_sample_vec2(weyl);
+    float w = quasi_sample_float(quasi) * area;
+    vec2 surface_uv = quasi_sample_vec2(quasi);
 
     if (w < x_area) {
         coords.yz = surface_uv;
@@ -116,13 +116,13 @@ void main() {
     // TODO: bake the scaling factor elsewhere
     uint seed = uint(gl_VertexID) * integrator.hash_cell_cols * integrator.hash_cell_rows + uint(gl_InstanceID);
 
-    weyl_t weyl = weyl_init(sampler_decorrelate(seed), integrator.current_pass);
+    quasi_t quasi = quasi_init(sampler_decorrelate(seed), integrator.current_pass);
 
     vec3 throughput; // measure photon path contribution
-    ray_t ray = generate_photon_ray(throughput, weyl);
+    ray_t ray = generate_photon_ray(throughput, quasi);
 
     gl_PointSize = 1.0;
     gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
 
-    scatter_photon(ray, throughput, weyl);
+    scatter_photon(ray, throughput, quasi);
 }

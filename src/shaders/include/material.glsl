@@ -1,5 +1,6 @@
 #include <common.glsl>
-#include <halton.glsl>
+
+#include <quasi.glsl>
 
 layout (std140) uniform Material {
     vec4 data[MATERIAL_DATA_LEN];
@@ -48,8 +49,8 @@ vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out floa
     return vec3(MAT_LAMBERTIAN_ALBEDO / M_PI);
 }
 
-vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout weyl_t weyl) {
-    vec2 rng = weyl_sample_vec2(weyl);
+vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout quasi_t quasi) {
+    vec2 rng = quasi_sample_vec2(quasi);
 
     float r = sqrt(rng.x);
     float phi = M_2PI * rng.y;
@@ -81,7 +82,7 @@ vec3 mat_ideal_reflection_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, ou
     return pdf = 0.0, vec3(0.0);
 }
 
-vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout weyl_t weyl) {
+vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout quasi_t quasi) {
     pdf = 1.0;
     wi = reflect(-wo, normal);
 
@@ -100,7 +101,7 @@ vec3 mat_ideal_refraction_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, ou
     return vec3(0.0);
 }
 
-vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout weyl_t weyl) {
+vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout quasi_t quasi) {
     pdf = 1.0;
 
     if (dot(wo, normal) >= 0.0) {
@@ -144,8 +145,8 @@ vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out float pdf
     return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / M_2PI * cos_alpha / wi_n;
 }
 
-vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout weyl_t weyl) {
-    vec2 rng = weyl_sample_vec2(weyl);
+vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout quasi_t quasi) {
+    vec2 rng = quasi_sample_vec2(quasi);
 
     float phi = M_2PI * rng.x;
     float theta = acos(pow(rng.y, 1.0 / (MAT_PHONG_EXPONENT + 1.0)));
@@ -185,7 +186,7 @@ vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out floa
     return pdf = 0.0, vec3(0.0);
 }
 
-vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout weyl_t weyl) {
+vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout quasi_t quasi) {
     pdf = 1.0;
 
     float n1, n2, cosI = dot(wo, normal);
@@ -216,7 +217,7 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, ou
         float tp = 1.0 / (n1 * cosT + n2 * cosI); // p-polarized fresnel
         float t = 2.0 * (ts * ts + tp * tp) * (n1 * cosI) * (n2 * cosT);
 
-        if (weyl_sample(weyl) < t) {
+        if (quasi_sample_float(quasi) < t) {
             wi = (eta * cosI - cosT) * normal - eta * wo;
         } else {
             wi = reflect(-wo, normal);
@@ -262,8 +263,8 @@ vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, out floa
     return vec3(MAT_OREN_NAYAR_ALBEDO / M_PI) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
 }
 
-vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout weyl_t weyl) {
-    vec2 rng = weyl_sample_vec2(weyl);
+vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, out float pdf, inout quasi_t quasi) {
+    vec2 rng = quasi_sample_vec2(quasi);
 
     float r = sqrt(rng.x);
     float phi = M_2PI * rng.y;

@@ -1,5 +1,6 @@
 #include <common.glsl>
-#include <halton.glsl>
+
+#include <quasi.glsl>
 
 uniform sampler2D envmap_texture;
 uniform sampler2D envmap_marg_cdf;
@@ -45,8 +46,8 @@ float inverse_transform(sampler2D texture, int y, float u, int size, out int ind
     return (float(index) + du) / float(size);
 }
 
-vec3 env_sample_light_image(out vec3 wi, out float pdf, inout weyl_t weyl) {
-    vec2 rng = weyl_sample_vec2(weyl);
+vec3 env_sample_light_image(out vec3 wi, out float pdf, inout quasi_t quasi) {
+    vec2 rng = quasi_sample_vec2(quasi);
 
     int index;
 
@@ -82,8 +83,8 @@ vec3 env_eval_light_image(vec3 wi, out float pdf) {
     return environment.tint * value.rgb;
 }
 
-vec3 env_sample_light_solid(out vec3 wi, out float pdf, inout weyl_t weyl) {
-    vec2 rng = weyl_sample_vec2(weyl);
+vec3 env_sample_light_solid(out vec3 wi, out float pdf, inout quasi_t quasi) {
+    vec2 rng = quasi_sample_vec2(quasi);
 
     rng.x = 2.0 * rng.x - 1.0;
 
@@ -103,11 +104,11 @@ vec3 env_eval_light_solid(vec3 wi, out float pdf) {
     return environment.tint;
 }
 
-vec3 env_sample_light(out vec3 wi, out float pdf, inout weyl_t weyl) {
+vec3 env_sample_light(out vec3 wi, out float pdf, inout quasi_t quasi) {
     if (environment.has_envmap == 1) {
-        return env_sample_light_image(wi, pdf, weyl);
+        return env_sample_light_image(wi, pdf, quasi);
     } else {
-        return env_sample_light_solid(wi, pdf, weyl);
+        return env_sample_light_solid(wi, pdf, quasi);
     }
 }
 

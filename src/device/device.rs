@@ -16,7 +16,6 @@ pub struct Device {
     pub(crate) geometry_buffer: UniformBuffer<[GeometryParameter]>,
     pub(crate) material_buffer: UniformBuffer<[MaterialParameter]>,
     pub(crate) instance_buffer: UniformBuffer<[SceneInstanceNode]>,
-    pub(crate) weyl_buffer: UniformBuffer<[WeylData]>,
 
     pub(crate) envmap_marg_cdf: Texture<R16F>,
     pub(crate) envmap_cond_cdf: Texture<R16F>,
@@ -27,6 +26,7 @@ pub struct Device {
     pub(crate) integrator_buffer: UniformBuffer<IntegratorData>,
     pub(crate) raster_buffer: UniformBuffer<RasterData>,
     pub(crate) environment_buffer: UniformBuffer<EnvironmentData>,
+    pub(crate) sampler_buffer: UniformBuffer<[SamplerDimensionAlpha]>,
 
     // Complex-valued spectrums for each render channel
     pub(crate) rspectrum_temp1: Texture<RG32F>,
@@ -94,7 +94,7 @@ impl Device {
                     "Integrator" => BindingPoint::UniformBlock(4),
                     "Raster" => BindingPoint::UniformBlock(5),
                     "Environment" => BindingPoint::UniformBlock(6),
-                    "Weyl" => BindingPoint::UniformBlock(7),
+                    "QuasiSampler" => BindingPoint::UniformBlock(7),
                     "envmap_texture" => BindingPoint::Texture(0),
                     "envmap_marg_cdf" => BindingPoint::Texture(1),
                     "envmap_cond_cdf" => BindingPoint::Texture(2),
@@ -128,7 +128,7 @@ impl Device {
                     "Integrator" => BindingPoint::UniformBlock(3),
                     "Raster" => BindingPoint::UniformBlock(4),
                     "Environment" => BindingPoint::UniformBlock(5),
-                    "Weyl" => BindingPoint::UniformBlock(6),
+                    "QuasiSampler" => BindingPoint::UniformBlock(6),
                     "envmap_texture" => BindingPoint::Texture(0),
                     "envmap_marg_cdf" => BindingPoint::Texture(1),
                     "envmap_cond_cdf" => BindingPoint::Texture(2),
@@ -203,7 +203,7 @@ impl Device {
             geometry_buffer: UniformBuffer::new(gl.clone()),
             material_buffer: UniformBuffer::new(gl.clone()),
             instance_buffer: UniformBuffer::new(gl.clone()),
-            weyl_buffer: UniformBuffer::new(gl.clone()),
+            sampler_buffer: UniformBuffer::new(gl.clone()),
             raster_buffer: UniformBuffer::new(gl.clone()),
             display_buffer: UniformBuffer::new(gl.clone()),
             integrator_buffer: UniformBuffer::new(gl.clone()),
@@ -558,7 +558,7 @@ impl Device {
         self.integrator_photon_table_sum.invalidate();
         self.integrator_scatter_fbo.invalidate();
         self.aperture_fbo.invalidate();
-        self.weyl_buffer.invalidate();
+        self.sampler_buffer.invalidate();
 
         self.integrator_radiance_estimate.invalidate();
 

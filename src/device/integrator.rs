@@ -11,7 +11,7 @@ use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Debug)]
-pub struct WeylData {
+pub struct SamplerDimensionAlpha {
     alpha: [u32; 4],
 }
 
@@ -97,7 +97,8 @@ impl Device {
         }
 
         // TODO: hardcoded dimension for now
-        let weyl_data: &mut [WeylData] = self.allocator.allocate(self.weyl_buffer.max_len());
+        let weyl_data: &mut [SamplerDimensionAlpha] =
+            self.allocator.allocate(self.sampler_buffer.max_len());
         let d = 64; // weyl_data.len();
 
         let phi = Self::compute_phi(d as f64);
@@ -121,7 +122,7 @@ impl Device {
         self.integrator_scatter_photons_shader
             .set_define("SAMPLER_MAX_DIMENSIONS", d);
 
-        self.weyl_buffer.write_array(weyl_data)
+        self.sampler_buffer.write_array(weyl_data)
     }
 
     pub(crate) fn reset_integrator_state(&mut self, scene: &mut Scene) {
@@ -234,7 +235,7 @@ impl Device {
         command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.environment_buffer, "Environment");
-        command.bind(&self.weyl_buffer, "Weyl");
+        command.bind(&self.sampler_buffer, "QuasiSampler");
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
@@ -263,7 +264,7 @@ impl Device {
         command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.environment_buffer, "Environment");
-        command.bind(&self.weyl_buffer, "Weyl");
+        command.bind(&self.sampler_buffer, "QuasiSampler");
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");

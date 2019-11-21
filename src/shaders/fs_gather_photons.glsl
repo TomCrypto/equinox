@@ -1,11 +1,11 @@
 #include <common.glsl>
-#include <halton.glsl>
 
 #include <geometry.glsl>
 #include <instance.glsl>
 #include <material.glsl>
 #include <environment.glsl>
 #include <integrator.glsl>
+#include <quasi.glsl>
 
 uniform sampler2D photon_table_pos;
 uniform sampler2D photon_table_dir;
@@ -88,16 +88,16 @@ vec3 gather_photons_in_sphere(vec3 position, vec3 wo, vec3 normal, uint material
 
 // Begin camera stuff
 
-vec2 evaluate_circular_aperture_uv(inout weyl_t weyl) {
-    vec2 uv = weyl_sample_vec2(weyl);
+vec2 evaluate_circular_aperture_uv(inout quasi_t quasi) {
+    vec2 uv = quasi_sample_vec2(quasi);
 
     float a = uv.s * M_2PI;
 
     return sqrt(uv.t) * vec2(cos(a), sin(a));
 }
 
-vec2 evaluate_polygon_aperture_uv(inout weyl_t weyl) {
-    vec2 uv = weyl_sample_vec2(weyl);
+vec2 evaluate_polygon_aperture_uv(inout quasi_t quasi) {
+    vec2 uv = quasi_sample_vec2(quasi);
 
     float corner = floor(uv.s * camera.aperture_settings.y);
 
@@ -115,10 +115,10 @@ vec2 evaluate_polygon_aperture_uv(inout weyl_t weyl) {
     return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
 }
 
-vec2 evaluate_aperture_uv(inout weyl_t weyl) {
+vec2 evaluate_aperture_uv(inout quasi_t quasi) {
     switch (int(camera.aperture_settings.x)) {
-        case 0: return evaluate_circular_aperture_uv(weyl);
-        case 1: return evaluate_polygon_aperture_uv(weyl);       
+        case 0: return evaluate_circular_aperture_uv(quasi);
+        case 1: return evaluate_polygon_aperture_uv(quasi);       
     }
 
     return vec2(0.0);
@@ -128,11 +128,11 @@ vec3 bilinear(vec4 p[4], vec2 uv) {
     return mix(mix(p[0].xyz, p[1].xyz, uv.x), mix(p[2].xyz, p[3].xyz, uv.x), uv.y);
 }
 
-void evaluate_primary_ray(out vec3 pos, out vec3 dir, inout weyl_t weyl) {
+void evaluate_primary_ray(out vec3 pos, out vec3 dir, inout quasi_t quasi) {
     vec2 raster_uv = (gl_FragCoord.xy + integrator.filter_offset) * raster.dimensions.w;
     raster_uv.x -= (raster.dimensions.x * raster.dimensions.w - 1.0) * 0.5;
 
-    vec3 origin = bilinear(camera.origin_plane, evaluate_aperture_uv(weyl) * 0.5 + 0.5);
+    vec3 origin = bilinear(camera.origin_plane, evaluate_aperture_uv(quasi) * 0.5 + 0.5);
 
     // TODO: this isn't quite right; this generates a flat focal plane but it should be curved
     // (to be equidistant to the lens)
@@ -147,7 +147,7 @@ void evaluate_primary_ray(out vec3 pos, out vec3 dir, inout weyl_t weyl) {
 
 // End camera stuff
 
-vec3 gather_photons(ray_t ray, weyl_t weyl) {
+vec3 gather_photons(ray_t ray, quasi_t quasi) {
     float light_pdf, material_pdf;
     vec3 throughput = vec3(1.0);
     vec3 radiance = vec3(0.0);
@@ -176,7 +176,7 @@ vec3 gather_photons(ray_t ray, weyl_t weyl) {
             float mis_material_pdf;
 
             light_pdf = 0.0;
-            vec3 light = mis ? env_sample_light(mis_wi, light_pdf, weyl) : vec3(0.0);
+            vec3 light = mis ? env_sample_light(mis_wi, light_pdf, quasi) : vec3(0.0);
 
             #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
                 throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
@@ -186,7 +186,7 @@ vec3 gather_photons(ray_t ray, weyl_t weyl) {
                           * abs(dot(mis_wi, normal)) * throughput;                                \
                 }                                                                                 \
                                                                                                   \
-                f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, weyl);                   \
+                f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, quasi);               \
             }
 
             MAT_DO_SWITCH(material)
@@ -195,7 +195,7 @@ vec3 gather_photons(ray_t ray, weyl_t weyl) {
             if (!is_receiver) {
                 float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));
 
-                if (weyl_sample(weyl) < q) {
+                if (quasi_sample_float(quasi) < q) {
                     return radiance;
                 }
 
@@ -248,10 +248,10 @@ vec3 gather_photons(ray_t ray, weyl_t weyl) {
 void main() {
     uint seed = (uint(gl_FragCoord.x) << 16U) + uint(gl_FragCoord.y);
 
-    weyl_t weyl = weyl_init(sampler_decorrelate(seed), integrator.current_pass);
+    quasi_t quasi = quasi_init(sampler_decorrelate(seed), integrator.current_pass);
 
     ray_t ray;
-    evaluate_primary_ray(ray.org, ray.dir, weyl);
+    evaluate_primary_ray(ray.org, ray.dir, quasi);
 
-    radiance_estimate = vec4(gather_photons(ray, weyl), 1.0);
+    radiance_estimate = vec4(gather_photons(ray, quasi), 1.0);
 }
