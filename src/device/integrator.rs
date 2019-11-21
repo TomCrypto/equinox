@@ -83,13 +83,14 @@ impl Default for IntegratorState {
 }
 
 impl Device {
+    // TODO: multi-precision arithmetic here
     fn populate_quasi_buffer(buffer: &mut [SamplerDimensionAlpha]) {
         let d = buffer.len();
 
         let phi = Self::compute_phi(d as f64);
 
-        for q in 0..d {
-            let alpha = (1.0 / phi).powi((1 + q) as i32);
+        for (i, value) in buffer.iter_mut().enumerate() {
+            let alpha = (1.0 / phi).powi((1 + i) as i32);
 
             let alpha_u64: u64 = (alpha * 18446744073709551616.0) as u64;
 
@@ -99,7 +100,7 @@ impl Device {
             let lolo = lo & 0xffff;
             let lohi = lo >> 16;
 
-            buffer[q].alpha = [lo, hi, lolo, lohi];
+            value.alpha = [lo, hi, lolo, lohi];
         }
     }
 
