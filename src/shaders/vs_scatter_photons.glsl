@@ -116,7 +116,6 @@ ray_t generate_photon_ray(out vec3 throughput, inout quasi_t quasi) {
 }
 
 void main() {
-    // TODO: bake the scaling factor elsewhere
     uint seed = uint(gl_VertexID) * integrator.hash_cell_cols * integrator.hash_cell_rows + uint(gl_InstanceID);
 
     quasi_t quasi = quasi_init(decorrelate_sample(seed), integrator.current_pass);

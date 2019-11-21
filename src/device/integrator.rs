@@ -83,24 +83,6 @@ impl Default for IntegratorState {
 }
 
 impl Device {
-    // TODO: multi-precision arithmetic here
-    fn populate_quasi_buffer(buffer: &mut [SamplerDimensionAlpha]) {
-        let d = buffer.len();
-
-        let phi = Self::compute_phi(d as f64);
-
-        for (i, value) in buffer.iter_mut().enumerate() {
-            let alpha = (1.0 / phi).powi((1 + i) as i32);
-
-            let alpha_u64: u64 = (alpha * 18446744073709551616.0) as u64;
-
-            let lo = alpha_u64 as u32;
-            let hi = (alpha_u64 >> 32) as u32;
-
-            value.alpha = [lo, hi, lo & 0xffff, lo >> 16];
-        }
-    }
-
     pub(crate) fn update_integrator(&mut self, integrator: &Integrator) -> Result<(), Error> {
         if integrator.hash_table_bits < 20 {
             return Err(Error::new("hash_table_bits must be 20 or more"));
@@ -346,6 +328,24 @@ impl Device {
         integrator.capacity_multiplier = integrator.capacity_multiplier.max(0.0);
         integrator.max_scatter_bounces = integrator.max_scatter_bounces.max(2);
         integrator.max_gather_bounces = integrator.max_gather_bounces.max(2);
+    }
+
+    // TODO: multi-precision arithmetic here
+    fn populate_quasi_buffer(buffer: &mut [SamplerDimensionAlpha]) {
+        let d = buffer.len();
+
+        let phi = Self::compute_phi(d as f64);
+
+        for (i, value) in buffer.iter_mut().enumerate() {
+            let alpha = (1.0 / phi).powi((1 + i) as i32);
+
+            let alpha_u64: u64 = (alpha * 18446744073709551616.0) as u64;
+
+            let lo = alpha_u64 as u32;
+            let hi = (alpha_u64 >> 32) as u32;
+
+            value.alpha = [lo, hi, lo & 0xffff, lo >> 16];
+        }
     }
 
     fn compute_phi(d: f64) -> f64 {
