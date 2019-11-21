@@ -18,7 +18,7 @@ pub struct WeylData {
 #[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Debug)]
 pub struct IntegratorData {
-    rng: [u32; 2],
+    rng: [u32; 4],
     filter_offset: [f32; 2],
 
     current_pass: u32,
@@ -41,7 +41,7 @@ pub struct IntegratorData {
 
     photons_for_pass: f32,
 
-    padding: [f32; 1],
+    padding: [f32; 3],
 }
 
 pub struct IntegratorPass {
@@ -171,6 +171,8 @@ impl Device {
         data.filter_offset[1] = 4.0 * self.state.filter.importance_sample(y) - 2.0;
         data.rng[0] = self.state.rng.next_u32();
         data.rng[1] = self.state.rng.next_u32();
+        data.rng[2] = self.state.rng.next_u32();
+        data.rng[3] = self.state.rng.next_u32();
         data.current_pass = self.state.current_pass;
         data.photon_rate = self.state.integrator.photon_rate;
         data.photon_count = self.state.photon_count.max(1.0);

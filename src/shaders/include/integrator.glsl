@@ -1,11 +1,9 @@
 #include <common.glsl>
 
-#include <random.glsl>
-
 #define cell_t vec3
 
 layout (std140) uniform Integrator {
-    uvec2 rng;
+    uvec4 rng; // rename to hash_key, also this can just be a vec3 (but who cares)
     vec2 filter_offset;
 
     uint current_pass;
@@ -37,18 +35,12 @@ cell_t cell_for_point(vec3 point) {
     return floor(point / integrator_cell_size());
 }
 
-uint internal_hash_cell_key(uvec3 key, uvec2 seed) {
-    uvec2 state = key.xy ^ seed;
-
-    _rand_mix_mini(state);
-    state ^= key.z ^ seed;
-    _rand_mix_mini(state);
-
-    return state.x ^ state.y;
-}
-
 ivec2 hash_entry_for_cell(cell_t cell) {
-    uint index = internal_hash_cell_key(floatBitsToUint(cell), integrator.rng);
+    uvec3 inputs = floatBitsToUint(cell);
+
+    uint index = sampler_decorrelate(inputs.x, integrator.rng.x)
+               ^ sampler_decorrelate(inputs.y, integrator.rng.y)
+               ^ sampler_decorrelate(inputs.z, integrator.rng.z);
 
     return ivec2(index & integrator.hash_cols_mask, (index >> 16U) & integrator.hash_rows_mask);
 }

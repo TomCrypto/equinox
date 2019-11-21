@@ -1,5 +1,4 @@
 #include <common.glsl>
-#include <random.glsl>
 #include <halton.glsl>
 
 layout (std140) uniform Material {

@@ -1,5 +1,4 @@
 #include <common.glsl>
-#include <random.glsl>
 #include <halton.glsl>
 
 #include <geometry.glsl>
@@ -247,21 +246,9 @@ vec3 gather_photons(ray_t ray, weyl_t weyl) {
 }
 
 void main() {
-    // halton_t halton = halton_init(integrator.current_pass + uint(gl_FragCoord.x) * 17U + uint(gl_FragCoord.y) * 53U);
-
-    // random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy - 0.5));
-
-    // weyl_t weyl = weyl_init(integrator.current_pass, uint(gl_FragCoord.x - 0.5) * 1000000U + 256U * uint(gl_FragCoord.y - 0.5));
-
     uint seed = (uint(gl_FragCoord.x) << 16U) + uint(gl_FragCoord.y);
-    seed *= 0x71A9C593U;
-    seed ^= 0x182938DDU;
-    seed *= 0x120AB8CFU;
-    seed ^= 0x19284919U;
 
-    weyl_t weyl = weyl_init(seed, integrator.current_pass);
-
-    // random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + integrator.rng);
+    weyl_t weyl = weyl_init(sampler_decorrelate(seed), integrator.current_pass);
 
     ray_t ray;
     evaluate_primary_ray(ray.org, ray.dir, weyl);

@@ -10,30 +10,19 @@ layout (std140) uniform Weyl {
 } weyl;
 
 weyl_t weyl_init(uint lo, uint hi) {
-    uint lolo = lo & 0xffffU;
-    uint lohi = lo >> 16U;
-
-    return weyl_t(uvec4(lo, hi, lolo, lohi), 0U);
-}
-
-float internal_weyl_computation(uvec4 s, uvec4 a) {
-    /*uint carry = (a.lohi * s.lolo) >> 16U + (a.lolo * s.lohi) >> 16U + a.lohi * s.lohi;
-    
-    uint value = carry + a.lo * s.hi + a.hi * s.lo;*/
-
-    uint carry = ((a.w * s.z) >> 16U) + ((a.z * s.w) >> 16U) + a.w * s.w;
-    
-    uint value = carry + a.x * s.y + a.y * s.x;
-
-    return fract(0.5 + float(value) / 4294967296.0);
-}
-
-float weyl_sample_direct(uint dimension, uvec4 state) {
-    return internal_weyl_computation(state, weyl.alpha[dimension & 63U]);
+    return weyl_t(uvec4(lo, hi, lo & 0xffffU, lo >> 16U), 0U);
 }
 
 float weyl_sample(inout weyl_t state) {
-    return weyl_sample_direct(state.dim++, state.state);
+    uvec4 alpha = weyl.alpha[state.dim++];
+
+    uint product = (alpha.z * state.state.w >> 16U)
+                 + (alpha.w * state.state.z >> 16U)
+                 +  alpha.x * state.state.y
+                 +  alpha.y * state.state.x
+                 +  alpha.w * state.state.w;
+
+    return fract(0.5 + float(product) * (1.0 / 4294967296.0));
 }
 
 vec2 weyl_sample_vec2(inout weyl_t state) {
@@ -41,4 +30,26 @@ vec2 weyl_sample_vec2(inout weyl_t state) {
     float u2 = weyl_sample(state);
 
     return vec2(u1, u2);
+}
+
+// Feeds an input value through a keyed pseudorandom permutation, to decorrelate
+// a correlated sequence; this can suppress visual artifacts when used properly.
+uint sampler_decorrelate(uint x, uint key) {
+    x ^= key;
+    x ^= x >> 17U;
+    x ^= x >> 10U;
+    x *= 0xb36534e5U;
+    x ^= x >> 12U;
+    x ^= x >> 21U;
+    x *= 0x93fc4795U;
+    x ^= 0xdf6e307fU;
+    x ^= x >> 17U;
+    x *= 1U | key >> 18U;
+
+    return x;
+}
+
+uint sampler_decorrelate(uint x) {
+    // pass in a default key when not given one
+    return sampler_decorrelate(x, 0xa8f4c2c1U);
 }

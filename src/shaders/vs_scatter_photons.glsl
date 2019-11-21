@@ -3,7 +3,6 @@ out vec3 photon_dir_data;
 out vec3 photon_sum_data;
 
 #include <common.glsl>
-#include <random.glsl>
 #include <halton.glsl>
 
 #include <geometry.glsl>
@@ -114,17 +113,10 @@ ray_t generate_photon_ray(out vec3 throughput, inout weyl_t weyl) {
 }
 
 void main() {
-    // random_t random = rand_initialize_from_seed(uvec2(gl_VertexID, gl_InstanceID));
     // TODO: bake the scaling factor elsewhere
     uint seed = uint(gl_VertexID) * integrator.hash_cell_cols * integrator.hash_cell_rows + uint(gl_InstanceID);
-    seed *= 0x71A9C593U;
-    seed ^= 0x182938DDU;
-    seed *= 0x120AB8CFU;
-    seed ^= 0x19284919U;
 
-    // weyl_t weyl = weyl_init(integrator.current_pass, uint(gl_VertexID) * 256U + uint(gl_InstanceID));
-
-    weyl_t weyl = weyl_init(seed, integrator.current_pass);
+    weyl_t weyl = weyl_init(sampler_decorrelate(seed), integrator.current_pass);
 
     vec3 throughput; // measure photon path contribution
     ray_t ray = generate_photon_ray(throughput, weyl);

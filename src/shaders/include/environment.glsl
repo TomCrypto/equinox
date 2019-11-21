@@ -1,5 +1,4 @@
 #include <common.glsl>
-#include <random.glsl>
 #include <halton.glsl>
 
 uniform sampler2D envmap_texture;
