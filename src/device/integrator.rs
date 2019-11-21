@@ -336,7 +336,8 @@ impl Device {
         for (i, value) in buffer.iter_mut().enumerate() {
             let alpha = (1.0 / phi).powi((1 + i) as i32);
 
-            let alpha_u64: u64 = (alpha * 18446744073709551616.0) as u64;
+            // scale the alpha value by 2^64 to go into the fixed-point domain
+            let alpha_u64: u64 = (alpha * 18_446_744_073_709_551_616.0) as u64;
 
             let lo = alpha_u64 as u32;
             let hi = (alpha_u64 >> 32) as u32;
@@ -345,6 +346,7 @@ impl Device {
         }
     }
 
+    #[allow(clippy::float_cmp)]
     fn weyl_sequence_phi(d: f64) -> f64 {
         let q = 1.0 / (d + 1.0);
         let mut phi: f64 = 2.0;
