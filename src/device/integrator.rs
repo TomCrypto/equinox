@@ -272,8 +272,6 @@ impl Device {
 
         command.set_framebuffer(&self.integrator_gather_fbo);
 
-        self.integrator_gather_fbo.clear(1, [0.0; 4]);
-
         command.set_viewport(
             0,
             0,
