@@ -53,9 +53,8 @@ vec3 get_photon(vec3 cell_pos, vec3 point, uint material, uint inst, vec3 normal
 
 vec3 gather_photons_in_sphere(vec3 position, vec3 wo, vec3 normal, uint material, uint inst) {
     vec3 cell_pos = floor(position / integrator_cell_size());
-    vec3 in_pos = fract(position / integrator_cell_size());
 
-    vec3 dir = sign(in_pos - vec3(0.5));
+    vec3 dir = sign(fract(position / integrator_cell_size()) - vec3(0.5));
 
     vec3 accumulation = vec3(0.0);
 
