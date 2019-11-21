@@ -11,6 +11,12 @@ use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Debug)]
+pub struct WeylData {
+    alpha: [u32; 4],
+}
+
+#[repr(align(16), C)]
+#[derive(AsBytes, FromBytes, Debug)]
 pub struct IntegratorData {
     rng: [u32; 2],
     filter_offset: [f32; 2],
@@ -184,7 +190,37 @@ impl Device {
         data.hash_rows_mask =
             ((self.integrator_scatter_fbo.rows() - 1) & !(hash_cell_rows - 1)) as u32;
 
-        self.integrator_buffer.write(&data)
+        self.integrator_buffer.write(data)?;
+
+        // TODO: move this to an "update" stage rather than being in the main render
+        // loop
+
+        // TODO: hardcoded dimension for now
+        let weyl_data: &mut [WeylData] = self.allocator.allocate(64);
+        let d = weyl_data.len();
+
+        let phi = Self::compute_phi(d as f64);
+
+        for q in 0..d {
+            let alpha = (1.0 / phi).powi((1 + q) as i32);
+
+            let alpha_u64: u64 = (alpha * 18446744073709551616.0) as u64;
+
+            let lo = alpha_u64 as u32;
+            let hi = (alpha_u64 >> 32) as u32;
+
+            let lolo = lo & 0xffff;
+            let lohi = lo >> 16;
+
+            if self.state.current_pass == 1 {
+                info!("alpha {} lolo = {}", q, lolo);
+                info!("alpha {} lohi = {}", q, lohi);
+            }
+
+            weyl_data[63 - q].alpha = [lo, hi, lolo, lohi];
+        }
+
+        self.weyl_buffer.write_array(weyl_data)
     }
 
     pub(crate) fn scatter_photons(&mut self, pass: &IntegratorPass) {
@@ -202,6 +238,7 @@ impl Device {
         command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.environment_buffer, "Environment");
+        command.bind(&self.weyl_buffer, "Weyl");
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
@@ -230,6 +267,7 @@ impl Device {
         command.bind(&self.integrator_buffer, "Integrator");
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.environment_buffer, "Environment");
+        command.bind(&self.weyl_buffer, "Weyl");
         command.bind(&self.envmap_texture, "envmap_texture");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
@@ -295,6 +333,18 @@ impl Device {
         integrator.capacity_multiplier = integrator.capacity_multiplier.max(0.0);
         integrator.max_scatter_bounces = integrator.max_scatter_bounces.max(2);
         integrator.max_gather_bounces = integrator.max_gather_bounces.max(2);
+    }
+
+    fn compute_phi(d: f64) -> f64 {
+        let mut x = 2.0;
+
+        let q = 1.0 / (d + 1.0);
+
+        for _ in 0..1000 {
+            x = (1.0f64 + x).powf(q);
+        }
+
+        x
     }
 }
 

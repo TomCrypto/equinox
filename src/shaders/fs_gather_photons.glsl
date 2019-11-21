@@ -1,5 +1,6 @@
 #include <common.glsl>
 #include <random.glsl>
+#include <halton.glsl>
 
 #include <geometry.glsl>
 #include <instance.glsl>
@@ -88,16 +89,16 @@ vec3 gather_photons_in_sphere(vec3 position, vec3 wo, vec3 normal, uint material
 
 // Begin camera stuff
 
-vec2 evaluate_circular_aperture_uv(inout random_t random) {
-    vec2 uv = rand_uniform_vec2(random);
+vec2 evaluate_circular_aperture_uv(inout weyl_t weyl) {
+    vec2 uv = weyl_sample_vec2(weyl);
 
     float a = uv.s * M_2PI;
 
     return sqrt(uv.t) * vec2(cos(a), sin(a));
 }
 
-vec2 evaluate_polygon_aperture_uv(inout random_t random) {
-    vec2 uv = rand_uniform_vec2(random);
+vec2 evaluate_polygon_aperture_uv(inout weyl_t weyl) {
+    vec2 uv = weyl_sample_vec2(weyl);
 
     float corner = floor(uv.s * camera.aperture_settings.y);
 
@@ -115,10 +116,10 @@ vec2 evaluate_polygon_aperture_uv(inout random_t random) {
     return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
 }
 
-vec2 evaluate_aperture_uv(inout random_t random) {
+vec2 evaluate_aperture_uv(inout weyl_t weyl) {
     switch (int(camera.aperture_settings.x)) {
-        case 0: return evaluate_circular_aperture_uv(random);
-        case 1: return evaluate_polygon_aperture_uv(random);       
+        case 0: return evaluate_circular_aperture_uv(weyl);
+        case 1: return evaluate_polygon_aperture_uv(weyl);       
     }
 
     return vec2(0.0);
@@ -128,11 +129,11 @@ vec3 bilinear(vec4 p[4], vec2 uv) {
     return mix(mix(p[0].xyz, p[1].xyz, uv.x), mix(p[2].xyz, p[3].xyz, uv.x), uv.y);
 }
 
-void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
+void evaluate_primary_ray(out vec3 pos, out vec3 dir, inout weyl_t weyl) {
     vec2 raster_uv = (gl_FragCoord.xy + integrator.filter_offset) * raster.dimensions.w;
     raster_uv.x -= (raster.dimensions.x * raster.dimensions.w - 1.0) * 0.5;
 
-    vec3 origin = bilinear(camera.origin_plane, evaluate_aperture_uv(random) * 0.5 + 0.5);
+    vec3 origin = bilinear(camera.origin_plane, evaluate_aperture_uv(weyl) * 0.5 + 0.5);
 
     // TODO: this isn't quite right; this generates a flat focal plane but it should be curved
     // (to be equidistant to the lens)
@@ -147,7 +148,7 @@ void evaluate_primary_ray(inout random_t random, out vec3 pos, out vec3 dir) {
 
 // End camera stuff
 
-vec3 gather_photons(ray_t ray, random_t random) {
+vec3 gather_photons(ray_t ray, weyl_t weyl) {
     float light_pdf, material_pdf;
     vec3 throughput = vec3(1.0);
     vec3 radiance = vec3(0.0);
@@ -176,7 +177,7 @@ vec3 gather_photons(ray_t ray, random_t random) {
             float mis_material_pdf;
 
             light_pdf = 0.0;
-            vec3 light = mis ? env_sample_light(mis_wi, light_pdf, random) : vec3(0.0);
+            vec3 light = mis ? env_sample_light(mis_wi, light_pdf, weyl) : vec3(0.0);
 
             #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
                 throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
@@ -186,7 +187,7 @@ vec3 gather_photons(ray_t ray, random_t random) {
                           * abs(dot(mis_wi, normal)) * throughput;                                \
                 }                                                                                 \
                                                                                                   \
-                f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, random);                 \
+                f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, weyl);                   \
             }
 
             MAT_DO_SWITCH(material)
@@ -195,7 +196,7 @@ vec3 gather_photons(ray_t ray, random_t random) {
             if (!is_receiver) {
                 float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));
 
-                if (rand_uniform_float(random) < q) {
+                if (weyl_sample(weyl) < q) {
                     return radiance;
                 }
 
@@ -246,10 +247,24 @@ vec3 gather_photons(ray_t ray, random_t random) {
 }
 
 void main() {
-    random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + integrator.rng);
+    // halton_t halton = halton_init(integrator.current_pass + uint(gl_FragCoord.x) * 17U + uint(gl_FragCoord.y) * 53U);
+
+    // random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy - 0.5));
+
+    // weyl_t weyl = weyl_init(integrator.current_pass, uint(gl_FragCoord.x - 0.5) * 1000000U + 256U * uint(gl_FragCoord.y - 0.5));
+
+    uint seed = (uint(gl_FragCoord.x) << 16U) + uint(gl_FragCoord.y);
+    seed *= 0x71A9C593U;
+    seed ^= 0x182938DDU;
+    seed *= 0x120AB8CFU;
+    seed ^= 0x19284919U;
+
+    weyl_t weyl = weyl_init(seed, integrator.current_pass);
+
+    // random_t random = rand_initialize_from_seed(uvec2(gl_FragCoord.xy) + integrator.rng);
 
     ray_t ray;
-    evaluate_primary_ray(random, ray.org, ray.dir);
+    evaluate_primary_ray(ray.org, ray.dir, weyl);
 
-    radiance_estimate = vec4(gather_photons(ray, random), 1.0);
+    radiance_estimate = vec4(gather_photons(ray, weyl), 1.0);
 }
