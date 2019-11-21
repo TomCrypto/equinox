@@ -99,7 +99,7 @@ ray_t generate_photon_ray(out vec3 throughput, inout quasi_t quasi) {
     throughput *= area; // division by PDF
 
     float w = quasi_sample(quasi) * area;
-    vec2 surface_uv; // pick point on AABB side
+    vec2 surface_uv; // get surface point
     
     surface_uv.s = quasi_sample(quasi);
     surface_uv.t = quasi_sample(quasi);

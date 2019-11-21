@@ -330,11 +330,8 @@ impl Device {
         integrator.max_gather_bounces = integrator.max_gather_bounces.max(2);
     }
 
-    // TODO: multi-precision arithmetic here
     fn populate_quasi_buffer(buffer: &mut [SamplerDimensionAlpha]) {
-        let d = buffer.len();
-
-        let phi = Self::compute_phi(d as f64);
+        let phi = Self::compute_phi(buffer.len() as f64);
 
         for (i, value) in buffer.iter_mut().enumerate() {
             let alpha = (1.0 / phi).powi((1 + i) as i32);
