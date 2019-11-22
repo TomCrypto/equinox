@@ -95,8 +95,12 @@ export default class App extends Vue {
   private keys: { [x: string]: boolean } = {};
   private theta: number = Math.PI / 2;
   private phi: number = -Math.PI / 2;
+  private thetaChange: number = 0;
+  private phiChange: number = 0;
   private movementSpeed: number = 0.1;
   private mouseMoved: boolean = false;
+  private thetaEstimator = new MovingWindowEstimator(10);
+  private phiEstimator = new MovingWindowEstimator(10);
 
   private captured: boolean = false;
 
@@ -192,16 +196,8 @@ export default class App extends Vue {
       this.theta = Math.acos(direction.y);
     }
 
-    this.phi += -event.movementX * 0.001;
-    this.theta += event.movementY * 0.001;
-
-    if (this.theta > Math.PI - 0.01) {
-      this.theta = Math.PI - 0.01;
-    }
-
-    if (this.theta < 0.01) {
-      this.theta = 0.01;
-    }
+    this.phiChange += -event.movementX * 0.001;
+    this.thetaChange += event.movementY * 0.001;
 
     this.mouseMoved = true;
   }
@@ -385,7 +381,15 @@ export default class App extends Vue {
         );
       }
 
+      this.thetaEstimator.addSample(this.thetaChange);
+      this.phiEstimator.addSample(this.phiChange);
+      this.thetaChange = 0;
+      this.phiChange = 0;
+
       if (this.mouseMoved) {
+        this.theta += this.thetaEstimator.average();
+        this.phi += this.phiEstimator.average();
+
         let x = Math.sin(this.theta) * Math.cos(this.phi);
         let z = Math.sin(this.theta) * Math.sin(this.phi);
         let y = Math.cos(this.theta);
