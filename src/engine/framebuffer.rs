@@ -105,6 +105,23 @@ impl Framebuffer {
             );
         }
 
+        match self.gl.check_framebuffer_status(Context::DRAW_FRAMEBUFFER) {
+            Context::FRAMEBUFFER_COMPLETE => { /* rebuild successful */ }
+            Context::FRAMEBUFFER_UNSUPPORTED => {
+                return Err(Error::new("framebuffer unsupported by this context"))
+            }
+            Context::FRAMEBUFFER_INCOMPLETE_ATTACHMENT => {
+                panic!("framebuffer incomplete: invalid attachment")
+            }
+            Context::FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT => {
+                panic!("framebuffer incomplete: missing attachment")
+            }
+            Context::FRAMEBUFFER_INCOMPLETE_DIMENSIONS => {
+                panic!("framebuffer incomplete: invalid dimensions")
+            }
+            _ => unreachable!("unknown framebuffer status"),
+        }
+
         self.gl.draw_buffers(&array);
         self.cols = cols;
         self.rows = rows;
