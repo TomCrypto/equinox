@@ -174,6 +174,7 @@ impl Device {
         data.hash_key[0] = self.state.rng.next_u32();
         data.hash_key[1] = self.state.rng.next_u32();
         data.hash_key[2] = self.state.rng.next_u32();
+        data.hash_key[3] = 0;
         data.current_pass = self.state.current_pass;
         data.photon_rate = self.state.integrator.photon_rate;
         data.photon_count = self.state.photon_count.max(1.0);

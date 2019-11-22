@@ -33,39 +33,39 @@
         "type": "blackman-harris"
       }
     },
-    "instance_list": [
-      {
-        "geometry": 0,
-        "material": 0,
+    "instance_list": {
+      "0": {
+        "geometry": "0",
+        "material": "0",
         "parameters": {},
         "photon_receiver": false,
         "sample_explicit": true,
         "visible": true
       },
-      {
-        "geometry": 1,
-        "material": 1,
+      "1": {
+        "geometry": "1",
+        "material": "1",
         "parameters": {},
         "photon_receiver": true,
         "sample_explicit": true,
         "visible": true
       },
-      {
-        "geometry": 2,
-        "material": 3,
+      "2": {
+        "geometry": "2",
+        "material": "2",
         "parameters": {},
         "photon_receiver": true,
         "sample_explicit": true,
         "visible": true
       }
-    ],
-    "geometry_list": [
-      {
+    },
+    "geometry_list": {
+      "0": {
         "type": "plane",
         "width": 1,
         "length": 1
       },
-      {
+      "1": {
         "type": "translate",
         "translation": [0, 0.51, 0],
         "f": {
@@ -77,7 +77,7 @@
           }
         }
       },
-      {
+      "2": {
         "type": "translate",
         "translation": [0.6, 0.151, 0.55],
         "f": {
@@ -92,35 +92,19 @@
             }
           }
         }
-      },
-      {
-        "type": "translate",
-        "translation": [-0.6, 0.151, -0.75],
-        "f": {
-          "type": "scale",
-          "factor": 0.15,
-          "f": {
-            "type": "sphere",
-            "radius": 1
-          }
-        }
       }
-    ],
-    "material_list": [
-      {
+    },
+    "material_list": {
+      "0": {
         "type": "phong",
         "albedo": [0.75, 0.75, 0.75],
         "shininess": 10
       },
-      {
+      "1": {
         "type": "ideal-reflection",
         "reflectance": [0.6, 0.7, 1]
       },
-      {
-        "type": "lambertian",
-        "albedo": [0.9, 0.1, 0.1]
-      },
-      {
+      "2": {
         "type": "dielectric",
         "internal_refractive_index": 1.65,
         "external_refractive_index": 1,
@@ -128,7 +112,7 @@
         "external_extinction_coefficient": [0, 0, 0],
         "base_color": [1, 1, 1]
       }
-    ],
+    },
     "environment_map": null,
     "environment": {
       "type": "solid",
@@ -141,13 +125,12 @@
     },
     "aperture": null,
     "integrator": {
-      "hash_table_bits": 24,
+      "hash_table_bits": 20,
       "photons_per_pass": 2000000,
       "photon_rate": 0.5,
-      "initial_search_radius": 0.01,
-      "capacity_multiplier": 10,
-      "max_hash_cell_bits": 6,
-      "alpha": 0.7,
+      "max_search_radius": 0.01,
+      "min_search_radius": 0.01,
+      "alpha": 1,
       "max_scatter_bounces": 8,
       "max_gather_bounces": 8
     }
