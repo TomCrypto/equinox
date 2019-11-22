@@ -7,6 +7,7 @@
       v-on:mouseup="leaveCapture()"
       v-on:mouseleave="leaveCapture()"
       v-on:mousemove="moveCamera($event)"
+      v-on:wheel="onMouseWheel($event.deltaY)"
       v-on:keydown="pressKey($event.key)"
       v-on:keyup="releaseKey($event.key)"
       v-on:keypress="onKeyPress($event)"
@@ -94,6 +95,7 @@ export default class App extends Vue {
   private keys: { [x: string]: boolean } = {};
   private theta: number = Math.PI / 2;
   private phi: number = -Math.PI / 2;
+  private movementSpeed: number = 0.1;
   private mouseMoved: boolean = false;
 
   private captured: boolean = false;
@@ -259,6 +261,10 @@ export default class App extends Vue {
     // ...
   }
 
+  private onMouseWheel(amount: number) {
+    this.movementSpeed *= Math.pow(1.1, amount / 64);
+  }
+
   get contextVendor(): string {
     return this.context === null ? "unknown" : getWebGlVendor(this.context!);
   }
@@ -372,7 +378,11 @@ export default class App extends Vue {
       }
 
       if (forward != 0 || upwards != 0 || sideways != 0) {
-        this.scene.move_camera(sideways * 0.15, upwards * 0.15, forward * 0.15);
+        this.scene.move_camera(
+          sideways * this.movementSpeed,
+          upwards * this.movementSpeed,
+          forward * this.movementSpeed
+        );
       }
 
       if (this.mouseMoved) {
