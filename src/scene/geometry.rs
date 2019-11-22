@@ -1,5 +1,6 @@
 use crate::BoundingBox;
-use cgmath::Point3;
+use cgmath::prelude::*;
+use cgmath::{Matrix3, Point3, Rad, Vector3};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -56,10 +57,11 @@ pub enum Geometry {
         factor: Parameter,
         f: Box<Geometry>,
     },
-    /*Rotate {
-        rotation: [Parameter; 4], // quaternion
+    Rotate {
+        axis: [Parameter; 3],
+        angle: Parameter,
         f: Box<Geometry>,
-    },*/
+    },
     Translate {
         translation: [Parameter; 3],
         f: Box<Geometry>,
@@ -89,6 +91,7 @@ impl Geometry {
             Self::Subtraction { lhs, rhs } => lhs.evaluation_cost() + rhs.evaluation_cost() + 0.25,
             Self::Onion { f, .. } => f.evaluation_cost() + 0.25,
             Self::Scale { f, .. } => f.evaluation_cost() + 1.0,
+            Self::Rotate { f, .. } => f.evaluation_cost() + 2.0,
             Self::Translate { f, .. } => f.evaluation_cost() + 0.25,
             Self::Round { f, .. } => f.evaluation_cost() + 0.25,
             Self::ForceNumericalNormals { f } => f.evaluation_cost(),
@@ -172,6 +175,21 @@ impl Geometry {
                 max *= factor.value(symbolic_values)?;
 
                 Some(BoundingBox { min, max })
+            }
+            Self::Rotate { axis, angle, f } => {
+                let rotation_axis: Vector3<f32> = [
+                    axis[0].value(symbolic_values)?,
+                    axis[1].value(symbolic_values)?,
+                    axis[2].value(symbolic_values)?,
+                ]
+                .into();
+
+                let rotation = Matrix3::from_axis_angle(
+                    rotation_axis.normalize(),
+                    Rad(angle.value(symbolic_values)?),
+                );
+
+                Some(f.bounding_box(symbolic_values)?.transform(rotation))
             }
             Self::Translate { translation, f } => {
                 let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;

@@ -161,6 +161,32 @@ impl GeometryGlslGenerator {
                     function.call("p / s")
                 )
             }
+            Geometry::Rotate { axis, angle, f } => {
+                let kx = self.lookup_parameter(&axis[0], index);
+                let ky = self.lookup_parameter(&axis[1], index);
+                let kz = self.lookup_parameter(&axis[2], index);
+                let theta = self.lookup_parameter(angle, index);
+
+                let function = self.distance_recursive(f, index);
+
+                format!(
+                    r#"
+                    vec3 k = normalize(vec3({}, {}, {}));
+                    float theta = -{};
+                    float cosTheta = cos(theta);
+                    float sinTheta = sin(theta);
+
+                    p = p * cosTheta + cross(k, p) * sinTheta + k * dot(k, p) * (1.0 - cosTheta);
+
+                    return {};
+                "#,
+                    kx,
+                    ky,
+                    kz,
+                    theta,
+                    function.call("p")
+                )
+            }
             Geometry::Translate { translation, f } => {
                 let tx = self.lookup_parameter(&translation[0], index);
                 let ty = self.lookup_parameter(&translation[1], index);
@@ -219,6 +245,33 @@ impl GeometryGlslGenerator {
                 Some(format!(
                     "return {};",
                     function.call(format!("p - {}", translation))
+                ))
+            }
+            Geometry::Rotate { axis, angle, f } => {
+                let kx = self.lookup_parameter(&axis[0], index);
+                let ky = self.lookup_parameter(&axis[1], index);
+                let kz = self.lookup_parameter(&axis[2], index);
+                let theta = self.lookup_parameter(angle, index);
+
+                let function = self.normal_recursive(f, index)?;
+
+                Some(format!(
+                    r#"
+                    vec3 k = normalize(vec3({}, {}, {}));
+                    float theta = -{};
+                    float cosTheta = cos(theta);
+                    float sinTheta = sin(theta);
+
+                    p = p * cosTheta + cross(k, p) * sinTheta + k * dot(k, p) * (1.0 - cosTheta);
+                    vec3 n = {};
+
+                    return n * cosTheta - cross(k, n) * sinTheta + k * dot(k, n) * (1.0 - cosTheta);
+                "#,
+                    kx,
+                    ky,
+                    kz,
+                    theta,
+                    function.call("p")
                 ))
             }
             Geometry::Scale { factor, f } => {
@@ -382,6 +435,14 @@ fn renumber_parameters_recursive(geometry: &Geometry, parameters: &mut Vec<Strin
         }
         Geometry::Scale { factor, f } => {
             add_parameter(parameters, factor);
+
+            renumber_parameters_recursive(f, parameters);
+        }
+        Geometry::Rotate { axis, angle, f } => {
+            add_parameter(parameters, &axis[0]);
+            add_parameter(parameters, &axis[1]);
+            add_parameter(parameters, &axis[2]);
+            add_parameter(parameters, angle);
 
             renumber_parameters_recursive(f, parameters);
         }
