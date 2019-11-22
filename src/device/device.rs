@@ -322,40 +322,6 @@ impl Device {
             self.render
                 .create(raster.width as usize, raster.height as usize);
 
-            self.load_convolution_buffers_shader
-                .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
-
-            self.load_convolution_buffers_shader.set_define(
-                "IMAGE_DIMS",
-                format!(
-                    "vec2({:+e}, {:+e})",
-                    raster.width as f32, raster.height as f32
-                ),
-            );
-
-            self.read_convolution_buffers_shader
-                .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
-
-            self.read_convolution_buffers_shader.set_define(
-                "IMAGE_DIMS",
-                format!(
-                    "vec2({:+e}, {:+e})",
-                    raster.width as f32, raster.height as f32
-                ),
-            );
-
-            self.rspectrum_temp1.create(2048, 1024);
-            self.gspectrum_temp1.create(2048, 1024);
-            self.bspectrum_temp1.create(2048, 1024);
-
-            self.rspectrum_temp2.create(2048, 1024);
-            self.gspectrum_temp2.create(2048, 1024);
-            self.bspectrum_temp2.create(2048, 1024);
-
-            self.r_aperture_spectrum.create(2048, 1024);
-            self.g_aperture_spectrum.create(2048, 1024);
-            self.b_aperture_spectrum.create(2048, 1024);
-
             let render_cols = raster.width as usize;
             let render_rows = raster.height as usize;
 
@@ -366,34 +332,28 @@ impl Device {
                 .rebuild(&[&self.integrator_radiance_estimate], None)?;
 
             self.render_fbo.rebuild(&[&self.render], None)?;
-            self.aperture_fbo.rebuild(
-                &[
-                    &self.r_aperture_spectrum,
-                    &self.g_aperture_spectrum,
-                    &self.b_aperture_spectrum,
-                ],
-                None,
-            )?;
 
-            self.spectrum_temp1_fbo.rebuild(
-                &[
-                    &self.rspectrum_temp1,
-                    &self.gspectrum_temp1,
-                    &self.bspectrum_temp1,
-                ],
-                None,
-            )?;
+            self.load_convolution_buffers_shader.set_define(
+                "IMAGE_DIMS",
+                format!(
+                    "vec2({:+e}, {:+e})",
+                    raster.width as f32, raster.height as f32
+                ),
+            );
 
-            self.spectrum_temp2_fbo.rebuild(
-                &[
-                    &self.rspectrum_temp2,
-                    &self.gspectrum_temp2,
-                    &self.bspectrum_temp2,
-                ],
-                None,
-            )?;
+            self.read_convolution_buffers_shader.set_define(
+                "IMAGE_DIMS",
+                format!(
+                    "vec2({:+e}, {:+e})",
+                    raster.width as f32, raster.height as f32
+                ),
+            );
 
-            self.prepare_fft_pass_data();
+            self.load_convolution_buffers_shader
+                .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
+
+            self.read_convolution_buffers_shader
+                .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
 
             Ok(())
         })?;
@@ -405,6 +365,47 @@ impl Device {
 
         invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
             if let Some(aperture) = aperture {
+                self.rspectrum_temp1.create(2048, 1024);
+                self.gspectrum_temp1.create(2048, 1024);
+                self.bspectrum_temp1.create(2048, 1024);
+
+                self.rspectrum_temp2.create(2048, 1024);
+                self.gspectrum_temp2.create(2048, 1024);
+                self.bspectrum_temp2.create(2048, 1024);
+
+                self.r_aperture_spectrum.create(2048, 1024);
+                self.g_aperture_spectrum.create(2048, 1024);
+                self.b_aperture_spectrum.create(2048, 1024);
+
+                self.aperture_fbo.rebuild(
+                    &[
+                        &self.r_aperture_spectrum,
+                        &self.g_aperture_spectrum,
+                        &self.b_aperture_spectrum,
+                    ],
+                    None,
+                )?;
+
+                self.spectrum_temp1_fbo.rebuild(
+                    &[
+                        &self.rspectrum_temp1,
+                        &self.gspectrum_temp1,
+                        &self.bspectrum_temp1,
+                    ],
+                    None,
+                )?;
+
+                self.spectrum_temp2_fbo.rebuild(
+                    &[
+                        &self.rspectrum_temp2,
+                        &self.gspectrum_temp2,
+                        &self.bspectrum_temp2,
+                    ],
+                    None,
+                )?;
+
+                self.prepare_fft_pass_data();
+
                 self.preprocess_filter(
                     &assets[&aperture.aperture_texels],
                     aperture.aperture_width as usize,
