@@ -67,9 +67,12 @@
     },
     "geometry_list": {
       "0": {
-        "type": "plane",
-        "width": 1,
-        "length": 1
+        "type": "translate",
+        "translation": [0, -0.01, 0],
+        "f": {
+          "type": "cuboid",
+          "dimensions": [1, 0.01, 1]
+        }
       },
       "1": {
         "type": "translate",

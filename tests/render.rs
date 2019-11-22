@@ -42,8 +42,8 @@ macro_rules! render_scene {
     };
 }
 
-render_scene!(default_scene, samples: 265);
-render_scene!(pink_glass, samples: 210);
+render_scene!(default_scene, samples: 250);
+render_scene!(pink_glass, samples: 239);
 
 struct TestData {
     name: &'static str,
