@@ -27,6 +27,10 @@ export class WebGlTimeElapsedQuery {
 
   public constructor(private readonly context: WebGL2RenderingContext) {
     this.extension = context.getExtension("EXT_disjoint_timer_query_webgl2");
+
+    this.context.canvas.addEventListener("webglcontextrestored", () => {
+      this.extension = context.getExtension("EXT_disjoint_timer_query_webgl2");
+    });
   }
 
   public clear() {
@@ -36,12 +40,6 @@ export class WebGlTimeElapsedQuery {
   }
 
   public timeElapsed(operation: () => void): number | null {
-    if (this.extension === null) {
-      this.extension = this.context.getExtension(
-        "EXT_disjoint_timer_query_webgl2"
-      );
-    }
-
     if (this.extension === null) {
       operation();
       return null;
