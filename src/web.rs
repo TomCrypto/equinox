@@ -115,10 +115,13 @@ impl WebScene {
         // have proper types whereas doing it in the front-end would require JSON.
 
         self.scene.geometry_list.insert(
-            "plane".to_owned(),
-            Geometry::Plane {
-                width: Parameter::Constant(3.0),
-                length: Parameter::Constant(3.0),
+            "ground".to_owned(),
+            Geometry::Cuboid {
+                dimensions: [
+                    Parameter::Constant(3.0),
+                    Parameter::Constant(0.01),
+                    Parameter::Constant(3.0),
+                ],
             },
         );
 
@@ -189,7 +192,7 @@ impl WebScene {
         self.scene.instance_list.insert(
             "ground".to_owned(),
             Instance {
-                geometry: "plane".to_owned(),
+                geometry: "ground".to_owned(),
                 material: "lambertian".to_owned(),
                 parameters: btreemap! {},
                 photon_receiver: true,
@@ -201,7 +204,7 @@ impl WebScene {
         self.scene.instance_list.insert("glass-sphere".to_owned(), Instance {
             geometry: "sphere".to_owned(),
             material: "glass2".to_owned(),
-            parameters: btreemap! {"x".to_owned() => 0.0, "y".to_owned() => 0.8, "z".to_owned() => 0.0 },
+            parameters: btreemap! {"x".to_owned() => 0.0, "y".to_owned() => 0.81, "z".to_owned() => 0.0 },
             photon_receiver: true,
             sample_explicit: true,
             visible: true,
@@ -210,7 +213,7 @@ impl WebScene {
         self.scene.instance_list.insert("diffuse-sphere".to_owned(), Instance {
             geometry: "sphere".to_owned(),
             material: "diffuse1".to_owned(),
-            parameters: btreemap! { "x".to_owned() => -2.0, "y".to_owned() => 0.8, "z".to_owned() => 0.0 },
+            parameters: btreemap! { "x".to_owned() => -2.0, "y".to_owned() => 0.81, "z".to_owned() => 0.0 },
             photon_receiver: true,
             sample_explicit: true,
             visible: true,

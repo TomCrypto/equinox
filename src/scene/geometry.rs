@@ -31,10 +31,6 @@ pub enum Geometry {
     Cuboid {
         dimensions: [Parameter; 3],
     },
-    Plane {
-        width: Parameter,
-        length: Parameter,
-    },
     InfiniteRepetition {
         f: Box<Geometry>,
         period: [Parameter; 3],
@@ -79,7 +75,7 @@ impl Geometry {
     /// the arbitrary measure that the evaluation cost of the unit sphere is 1.
     pub fn evaluation_cost(&self) -> f32 {
         match self {
-            Self::Sphere { .. } | Self::Plane { .. } => 1.0,
+            Self::Sphere { .. } => 1.0,
             Self::Cuboid { .. } => 1.5,
             Self::InfiniteRepetition { f, .. } => 0.5 + f.evaluation_cost(),
             Self::Union { children } => children.iter().map(|x| 0.25 + x.evaluation_cost()).sum(),
@@ -115,15 +111,6 @@ impl Geometry {
                 Some(BoundingBox {
                     min: [-dim_x, -dim_y, -dim_z].into(),
                     max: [dim_x, dim_y, dim_z].into(),
-                })
-            }
-            Self::Plane { width, length } => {
-                let width = width.value(symbolic_values)?;
-                let length = length.value(symbolic_values)?;
-
-                Some(BoundingBox {
-                    min: Point3::new(-width, 0.0, -length),
-                    max: Point3::new(width, 0.0, length),
                 })
             }
             // TODO: this is wrong (also we should bound repetition anyway)

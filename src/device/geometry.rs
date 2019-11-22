@@ -101,12 +101,6 @@ impl GeometryGlslGenerator {
                     dim_x, dim_y, dim_z
                 )
             }
-            Geometry::Plane { width, length } => {
-                let _ = self.lookup_parameter(&width, index);
-                let _ = self.lookup_parameter(&length, index);
-
-                "return p.y;".to_owned()
-            }
             Geometry::InfiniteRepetition { f, period } => {
                 let period_x = self.lookup_parameter(&period[0], index);
                 let period_y = self.lookup_parameter(&period[1], index);
@@ -182,7 +176,6 @@ impl GeometryGlslGenerator {
     fn normal_recursive(&mut self, geometry: &Geometry, index: &mut usize) -> Option<NormalFn> {
         let code = match geometry {
             Geometry::Sphere { .. } => Some("return normalize(p);".to_owned()),
-            Geometry::Plane { .. } => Some("return vec3(0.0, 1.0, 0.0);".to_owned()),
             Geometry::Translate { translation, f } => {
                 let tx = self.lookup_parameter(&translation[0], index);
                 let ty = self.lookup_parameter(&translation[1], index);
@@ -326,10 +319,6 @@ fn renumber_parameters_recursive(geometry: &Geometry, parameters: &mut Vec<Strin
             add_parameter(parameters, &dimensions[0]);
             add_parameter(parameters, &dimensions[1]);
             add_parameter(parameters, &dimensions[2]);
-        }
-        Geometry::Plane { width, length } => {
-            add_parameter(parameters, width);
-            add_parameter(parameters, length);
         }
         Geometry::InfiniteRepetition { f, period } => {
             add_parameter(parameters, &period[0]);
