@@ -1,11 +1,10 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::renumber_parameters;
-use crate::BoundingBox;
-use crate::Device;
-use crate::{material_index, material_parameter_block_count};
-use crate::{Geometry, Instance, Material};
+use crate::{
+    material_index, material_parameter_block_count, renumber_parameters, BoundingBox, Device,
+    Geometry, Instance, Material,
+};
 use itertools::izip;
 use js_sys::Error;
 use std::cmp::Ordering;

@@ -1,5 +1,4 @@
-use crate::Device;
-use crate::Display;
+use crate::{Device, Display};
 use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 

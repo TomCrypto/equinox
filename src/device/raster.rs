@@ -1,5 +1,4 @@
-use crate::Device;
-use crate::Raster;
+use crate::{Device, Raster};
 use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 

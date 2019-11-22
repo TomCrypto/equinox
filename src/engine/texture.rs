@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::engine::{AsAttachment, AsBindTarget, BindTarget};
+use crate::{AsAttachment, AsBindTarget, BindTarget};
 use js_sys::{Float32Array, Object, Uint16Array, Uint8Array};
 use std::marker::PhantomData;
 use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer, WebGlTexture};

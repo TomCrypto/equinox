@@ -1,8 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::Device;
-use crate::{Asset, Environment};
+use crate::{Asset, Device, Environment};
 use half::f16;
 use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;

@@ -1,5 +1,4 @@
-use crate::Device;
-use crate::{ApertureShape, Camera};
+use crate::{ApertureShape, Camera, Device};
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Point3};
 use itertools::iproduct;

@@ -3,10 +3,10 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::Device;
-use crate::Framebuffer;
-use crate::{Texture, RG32F, RGBA32F};
-use crate::{VertexArray, VertexAttribute, VertexAttributeKind, VertexLayout};
+use crate::{
+    Device, Framebuffer, Texture, VertexArray, VertexAttribute, VertexAttributeKind, VertexLayout,
+    RG32F, RGBA32F,
+};
 use rustfft::{num_complex::Complex, FFTplanner};
 use zerocopy::{AsBytes, FromBytes};
 

@@ -1,8 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::Device;
-use crate::Material;
+use crate::{Device, Material};
 use js_sys::Error;
 use std::collections::BTreeMap;
 use zerocopy::{AsBytes, FromBytes};
