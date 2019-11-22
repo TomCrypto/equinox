@@ -20,7 +20,7 @@ void deposit_photon(ray_t ray, vec3 throughput) {
 
     photon_pos_data = ray.org;
     photon_dir_data = 0.5 - 0.5 * ray.dir;
-    photon_sum_data = throughput * 1e-5;
+    photon_sum_data = throughput / 65536.0;
 
     vec2 clip_space = 2.0 * (vec2(0.5) + vec2(coords)) / integrator.hash_dimensions - 1.0;
     gl_Position = vec4(clip_space, 0.0, 1.0); // put the photon into its hash table entry

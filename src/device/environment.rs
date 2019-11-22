@@ -73,7 +73,7 @@ impl Device {
             self.envmap_marg_cdf.upload(rows, 1, &half_data[..rows]);
 
             // Pack the per-pixel PDF into the alpha channel of the envmap pixel data. To
-            // avoid getting clipped by the FP16 limit, use a 1e-3 multiplier on the PDF.
+            // avoid getting clipped by the very low FP16 limit, divide this PDF by 1024.
 
             let mut envmap_pixels = pixels.to_vec();
 
@@ -91,7 +91,7 @@ impl Device {
                         1.0 - luminance[y * cols + x]
                     };
 
-                    let pdf = marg_pdf * cond_pdf * 1e-3 * (rows as f32) * (cols as f32);
+                    let pdf = marg_pdf * cond_pdf * (rows as f32) * (cols as f32) / 1024.0;
                     envmap_pixels[4 * (y * cols + x) + 3] = f16::from_f32(pdf).to_bits();
                 }
             }

@@ -58,6 +58,7 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout quasi_t quasi) {
     wi = equirectangular_to_direction(vec2(sampled_u, sampled_v), environment.rotation);
 
     vec4 value = textureLod(envmap_texture, vec2(sampled_u, sampled_v), 0.0);
+    value.w *= 1024.0;
 
     float sin_theta = sin(sampled_v * M_PI);
 
@@ -65,13 +66,14 @@ vec3 env_sample_light_image(out vec3 wi, out float pdf, inout quasi_t quasi) {
         return pdf = 0.0, vec3(0.0);
     }
 
-    pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI * 1e-3);
+    pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI);
 
-    return environment.tint * value.rgb * (sin_theta * 2.0 * M_PI * M_PI * 1e-3) / value.w;
+    return environment.tint * value.rgb * (sin_theta * 2.0 * M_PI * M_PI) / value.w;
 }
 
 vec3 env_eval_light_image(vec3 wi, out float pdf) {
     vec4 value = textureLod(envmap_texture, direction_to_equirectangular(wi, environment.rotation), 0.0);
+    value.w *= 1024.0;
 
     float sin_theta = sqrt(max(0.0, 1.0 - wi.y * wi.y));
 
@@ -79,7 +81,7 @@ vec3 env_eval_light_image(vec3 wi, out float pdf) {
         return pdf = 0.0, vec3(0.0);
     }
 
-    pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI * 1e-3);
+    pdf = value.w / (sin_theta * 2.0 * M_PI * M_PI);
 
     return environment.tint * value.rgb;
 }

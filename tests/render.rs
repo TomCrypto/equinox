@@ -42,7 +42,7 @@ macro_rules! render_scene {
     };
 }
 
-render_scene!(default_scene, samples: 246);
+render_scene!(default_scene, samples: 238);
 render_scene!(pink_glass, samples: 239);
 
 struct TestData {
