@@ -152,16 +152,10 @@ impl Device {
     }
 
     pub(crate) fn prepare_integrator_pass(&mut self) -> IntegratorPass {
-        let search_radius = self.state.kernel_radii.next_radius();
-
-        let cell_size = 2.0 * search_radius;
-
-        let n = (self.state.integrator.capacity_multiplier / cell_size.powi(2))
-            .min(self.state.integrator.photons_per_pass as f32)
-            .max(1.0)
-            .round() as usize;
-
-        IntegratorPass { n, search_radius }
+        IntegratorPass {
+            n: self.state.integrator.photons_per_pass,
+            search_radius: self.state.kernel_radii.next_radius(),
+        }
     }
 
     pub(crate) fn update_integrator_state(&mut self, pass: &IntegratorPass) -> Result<(), Error> {
@@ -269,7 +263,6 @@ impl Device {
     fn clamp_integrator_settings(integrator: &mut Integrator) {
         integrator.alpha = integrator.alpha.max(0.0).min(1.0);
         integrator.photon_rate = integrator.photon_rate.max(0.05).min(0.95);
-        integrator.capacity_multiplier = integrator.capacity_multiplier.max(0.0);
         integrator.max_scatter_bounces = integrator.max_scatter_bounces.max(2);
         integrator.max_gather_bounces = integrator.max_gather_bounces.max(2);
     }

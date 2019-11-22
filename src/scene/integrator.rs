@@ -18,9 +18,6 @@ pub struct Integrator {
     #[default(0.01)]
     pub min_search_radius: f32,
 
-    #[default(1.0)]
-    pub capacity_multiplier: f32,
-
     #[default(0.7)]
     pub alpha: f32,
 
