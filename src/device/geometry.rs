@@ -88,6 +88,22 @@ impl GeometryGlslGenerator {
 
                 format!("return length(p) - {};", radius)
             }
+            Geometry::Ellipsoid { radius } => {
+                let radius_x = self.lookup_parameter(&radius[0], index);
+                let radius_y = self.lookup_parameter(&radius[1], index);
+                let radius_z = self.lookup_parameter(&radius[2], index);
+
+                format!(
+                    r#"
+                vec3 r = vec3({}, {}, {});
+
+                p /= r; float k0 = length(p);
+                p /= r; float k1 = length(p);
+
+                return k0 * (k0 - 1.0) / k1;"#,
+                    radius_x, radius_y, radius_z
+                )
+            }
             Geometry::Cuboid { dimensions } => {
                 let dim_x = self.lookup_parameter(&dimensions[0], index);
                 let dim_y = self.lookup_parameter(&dimensions[1], index);
@@ -175,7 +191,24 @@ impl GeometryGlslGenerator {
 
     fn normal_recursive(&mut self, geometry: &Geometry, index: &mut usize) -> Option<NormalFn> {
         let code = match geometry {
-            Geometry::Sphere { .. } => Some("return normalize(p);".to_owned()),
+            Geometry::Sphere { radius } => {
+                let _ = self.lookup_parameter(radius, index);
+
+                Some("return normalize(p);".to_owned())
+            }
+            Geometry::Ellipsoid { radius } => {
+                let radius_x = self.lookup_parameter(&radius[0], index);
+                let radius_y = self.lookup_parameter(&radius[1], index);
+                let radius_z = self.lookup_parameter(&radius[2], index);
+
+                Some(format!(
+                    r#"
+                vec3 r = vec3({}, {}, {});
+
+                return normalize(p / (r * r));"#,
+                    radius_x, radius_y, radius_z
+                ))
+            }
             Geometry::Translate { translation, f } => {
                 let tx = self.lookup_parameter(&translation[0], index);
                 let ty = self.lookup_parameter(&translation[1], index);
@@ -191,9 +224,14 @@ impl GeometryGlslGenerator {
                 ))
             }
             Geometry::Scale { factor, f } => {
-                let _ = self.lookup_parameter(factor, index);
+                let scale = self.lookup_parameter(factor, index);
 
-                return self.normal_recursive(f, index);
+                let function = self.normal_recursive(f, index)?;
+
+                Some(format!(
+                    "return {};",
+                    function.call(format!("p / {}", scale))
+                ))
             }
             _ => None,
         };
@@ -314,6 +352,11 @@ fn renumber_parameters_recursive(geometry: &Geometry, parameters: &mut Vec<Strin
     match geometry {
         Geometry::Sphere { radius } => {
             add_parameter(parameters, radius);
+        }
+        Geometry::Ellipsoid { radius } => {
+            add_parameter(parameters, &radius[0]);
+            add_parameter(parameters, &radius[1]);
+            add_parameter(parameters, &radius[2]);
         }
         Geometry::Cuboid { dimensions } => {
             add_parameter(parameters, &dimensions[0]);

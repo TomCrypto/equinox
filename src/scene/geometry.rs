@@ -28,6 +28,9 @@ pub enum Geometry {
     Sphere {
         radius: Parameter,
     },
+    Ellipsoid {
+        radius: [Parameter; 3],
+    },
     Cuboid {
         dimensions: [Parameter; 3],
     },
@@ -76,6 +79,7 @@ impl Geometry {
     pub fn evaluation_cost(&self) -> f32 {
         match self {
             Self::Sphere { .. } => 1.0,
+            Self::Ellipsoid { .. } => 1.0,
             Self::Cuboid { .. } => 1.5,
             Self::InfiniteRepetition { f, .. } => 0.5 + f.evaluation_cost(),
             Self::Union { children } => children.iter().map(|x| 0.25 + x.evaluation_cost()).sum(),
@@ -101,6 +105,16 @@ impl Geometry {
                 Some(BoundingBox {
                     min: [-radius; 3].into(),
                     max: [radius; 3].into(),
+                })
+            }
+            Self::Ellipsoid { radius } => {
+                let radius_x = radius[0].value(symbolic_values)?;
+                let radius_y = radius[1].value(symbolic_values)?;
+                let radius_z = radius[2].value(symbolic_values)?;
+
+                Some(BoundingBox {
+                    min: [-radius_x, -radius_y, -radius_z].into(),
+                    max: [radius_x, radius_y, radius_z].into(),
                 })
             }
             Self::Cuboid { dimensions } => {
