@@ -387,8 +387,8 @@ export default class App extends Vue {
       this.phiChange = 0;
 
       if (this.mouseMoved) {
-        this.theta += this.thetaEstimator.average();
-        this.phi += this.phiEstimator.average();
+        this.theta += this.thetaEstimator.average()!;
+        this.phi += this.phiEstimator.average()!;
 
         let x = Math.sin(this.theta) * Math.cos(this.phi);
         let z = Math.sin(this.theta) * Math.sin(this.phi);
