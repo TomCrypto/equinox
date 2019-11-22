@@ -471,10 +471,6 @@ pub struct DistanceFn {
 }
 
 impl DistanceFn {
-    pub fn name(&self) -> String {
-        format!("geo_distance_{}", self.id)
-    }
-
     pub fn call(&self, point: impl Display) -> String {
         format!("{}(inst, {})", self.name(), point)
     }
@@ -486,6 +482,10 @@ impl DistanceFn {
             self.body
         )
     }
+
+    fn name(&self) -> String {
+        format!("geo_distance_{}", self.id)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -495,10 +495,6 @@ pub struct NormalFn {
 }
 
 impl NormalFn {
-    pub fn name(&self) -> String {
-        format!("geo_normal_{}", self.id)
-    }
-
     pub fn call(&self, point: impl Display) -> String {
         format!("{}(inst, {})", self.name(), point)
     }
@@ -509,5 +505,9 @@ impl NormalFn {
             self.name(),
             self.body
         )
+    }
+
+    fn name(&self) -> String {
+        format!("geo_normal_{}", self.id)
     }
 }
