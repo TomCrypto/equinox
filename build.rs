@@ -10,7 +10,7 @@ use std::io::{ErrorKind, Result};
 use std::path::{Path, PathBuf};
 
 fn main() {
-    if let Err(err) = preprocess_shaders("src/shaders", "glsl", "include") {
+    if let Err(err) = preprocess_shaders("src/shader", "glsl", "include") {
         panic!("error: failed to preprocess GLSL shader files: {}", err);
     }
 }
@@ -36,7 +36,7 @@ fn preprocess_shaders(dir: &str, ext: &str, include_path: &str) -> Result<()> {
 
             writeln!(
                 generated_file,
-                "\n/// GLSL source for the `{}` shader file.",
+                "\n/// GLSL source for the `{}` shader.",
                 path.display(),
             )
             .unwrap();

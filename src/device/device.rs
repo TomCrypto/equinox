@@ -85,8 +85,8 @@ impl Device {
 
             integrator_gather_photons_shader: Shader::new(
                 gl.clone(),
-                shaders::VS_FULLSCREEN,
-                shaders::FS_GATHER_PHOTONS,
+                shader::VS_FULLSCREEN,
+                shader::FS_GATHER_PHOTONS,
                 hashmap! {
                     "Camera" => BindingPoint::UniformBlock(0),
                     "Instance" => BindingPoint::UniformBlock(1),
@@ -120,8 +120,8 @@ impl Device {
             fft_pass_data: VertexArray::new(gl.clone()),
             integrator_scatter_photons_shader: Shader::new(
                 gl.clone(),
-                shaders::VS_SCATTER_PHOTONS,
-                shaders::FS_SCATTER_PHOTONS,
+                shader::VS_SCATTER_PHOTONS,
+                shader::FS_SCATTER_PHOTONS,
                 hashmap! {
                     "Instance" => BindingPoint::UniformBlock(0),
                     "Geometry" => BindingPoint::UniformBlock(1),
@@ -147,8 +147,8 @@ impl Device {
             ),
             load_convolution_buffers_shader: Shader::new(
                 gl.clone(),
-                shaders::VS_FULLSCREEN,
-                shaders::FS_LOAD_CONVOLUTION_BUFFERS,
+                shader::VS_FULLSCREEN,
+                shader::FS_LOAD_CONVOLUTION_BUFFERS,
                 hashmap! {
                     "image" => BindingPoint::Texture(0),
                 },
@@ -160,8 +160,8 @@ impl Device {
             ),
             fft_shader: Shader::new(
                 gl.clone(),
-                shaders::VS_FFT_PASS,
-                shaders::FS_FFT_PASS,
+                shader::VS_FFT_PASS,
+                shader::FS_FFT_PASS,
                 hashmap! {
                     "r_conv_buffer" => BindingPoint::Texture(0),
                     "g_conv_buffer" => BindingPoint::Texture(1),
@@ -175,8 +175,8 @@ impl Device {
             ),
             read_convolution_buffers_shader: Shader::new(
                 gl.clone(),
-                shaders::VS_FULLSCREEN,
-                shaders::FS_READ_CONVOLUTION_BUFFERS,
+                shader::VS_FULLSCREEN,
+                shader::FS_READ_CONVOLUTION_BUFFERS,
                 hashmap! {
                     "r_conv_buffer" => BindingPoint::Texture(0),
                     "g_conv_buffer" => BindingPoint::Texture(1),
@@ -191,8 +191,8 @@ impl Device {
             ),
             present_program: Shader::new(
                 gl.clone(),
-                shaders::VS_FULLSCREEN,
-                shaders::PRESENT,
+                shader::VS_FULLSCREEN,
+                shader::FS_PRESENT,
                 hashmap! {
                     "samples" => BindingPoint::Texture(0),
                     "Display" => BindingPoint::UniformBlock(0),
