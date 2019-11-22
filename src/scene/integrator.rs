@@ -3,7 +3,7 @@ use smart_default::SmartDefault;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, SmartDefault, Serialize)]
 pub struct Integrator {
-    #[default(24)]
+    #[default(20)]
     pub hash_table_bits: u32,
 
     #[default(400_000)]
@@ -20,9 +20,6 @@ pub struct Integrator {
 
     #[default(1.0)]
     pub capacity_multiplier: f32,
-
-    #[default(6)]
-    pub max_hash_cell_bits: u32,
 
     #[default(0.7)]
     pub alpha: f32,

@@ -27,9 +27,7 @@ pub struct IntegratorData {
     sppm_alpha: f32,
 
     search_radius: f32,
-    hash_cell_cols: u32,
-    hash_cell_rows: u32,
-    hash_cell_col_bits: u32,
+    photons_for_pass: f32,
 
     hash_cols_mask: u32,
     hash_rows_mask: u32,
@@ -39,14 +37,11 @@ pub struct IntegratorData {
     max_scatter_bounces: u32,
     max_gather_bounces: u32,
 
-    photons_for_pass: f32,
-
-    padding: [f32; 3],
+    padding: [f32; 2],
 }
 
 pub struct IntegratorPass {
     pub n: usize,
-    pub m: usize,
     pub search_radius: f32,
 }
 
@@ -84,8 +79,8 @@ impl Default for IntegratorState {
 
 impl Device {
     pub(crate) fn update_integrator(&mut self, integrator: &Integrator) -> Result<(), Error> {
-        if integrator.hash_table_bits < 20 {
-            return Err(Error::new("hash_table_bits must be 20 or more"));
+        if integrator.hash_table_bits < 16 {
+            return Err(Error::new("hash_table_bits must be 16 or more"));
         }
 
         if integrator.max_search_radius <= 0.0 {
@@ -94,10 +89,6 @@ impl Device {
 
         if integrator.min_search_radius <= 0.0 {
             return Err(Error::new("min_search_radius must be positive"));
-        }
-
-        if integrator.max_hash_cell_bits > 8 {
-            return Err(Error::new("max_hash_cell_bits must be 8 or less"));
         }
 
         if integrator.max_gather_bounces > 100 {
@@ -133,6 +124,9 @@ impl Device {
         self.state.photon_count = 0.0;
         self.state.current_pass = 0;
 
+        // ignore the first (0, 0) sample from the sequence
+        let _ = self.state.filter_rng.next::<(f32, f32)>();
+
         self.state.aperture = (*scene.aperture).clone();
         self.state.filter = scene.raster.filter;
         self.state.integrator = *scene.integrator;
@@ -163,36 +157,22 @@ impl Device {
 
         let cell_size = 2.0 * search_radius;
 
-        let target = (self.state.integrator.capacity_multiplier / cell_size.powi(2))
+        let n = (self.state.integrator.capacity_multiplier / cell_size.powi(2))
             .min(self.state.integrator.photons_per_pass as f32)
             .max(1.0)
             .round() as usize;
 
-        let (n, m) = self.calculate_photon_batch(self.state.integrator.photons_per_pass, target);
-
-        IntegratorPass {
-            n,
-            m,
-            search_radius,
-        }
+        IntegratorPass { n, search_radius }
     }
 
     pub(crate) fn update_integrator_state(&mut self, pass: &IntegratorPass) -> Result<(), Error> {
         self.state.current_pass += 1;
 
         if self.state.receivers_present {
-            self.state.photon_count += (pass.n * pass.m) as f32;
+            self.state.photon_count += (pass.n) as f32;
         }
 
-        let (hash_cell_cols, hash_cell_rows) = Self::get_hash_cell_dimensions(pass.m);
-
-        // we need to ignore the first (0, 0) sample from the sequence
-        let (mut x, mut y) = self.state.filter_rng.next::<(f32, f32)>();
-
-        if x == 0.0 && y == 0.0 {
-            x = 0.5;
-            y = 0.5;
-        }
+        let (x, y) = self.state.filter_rng.next::<(f32, f32)>();
 
         let data: &mut IntegratorData = self.allocator.allocate_one();
 
@@ -206,19 +186,13 @@ impl Device {
         data.photon_count = self.state.photon_count.max(1.0);
         data.sppm_alpha = self.state.integrator.alpha;
         data.search_radius = pass.search_radius;
-        data.hash_cell_cols = hash_cell_cols as u32;
-        data.hash_cell_rows = hash_cell_rows as u32;
-        data.hash_cell_col_bits = (hash_cell_cols - 1).count_ones();
+        data.photons_for_pass = (pass.n) as f32;
         data.hash_dimensions[0] = self.integrator_scatter_fbo.cols() as f32;
         data.hash_dimensions[1] = self.integrator_scatter_fbo.rows() as f32;
         data.max_scatter_bounces = self.state.integrator.max_scatter_bounces;
         data.max_gather_bounces = self.state.integrator.max_gather_bounces;
-        data.photons_for_pass = (pass.n * pass.m) as f32;
-
-        data.hash_cols_mask =
-            ((self.integrator_scatter_fbo.cols() - 1) & !(hash_cell_cols - 1)) as u32;
-        data.hash_rows_mask =
-            ((self.integrator_scatter_fbo.rows() - 1) & !(hash_cell_rows - 1)) as u32;
+        data.hash_cols_mask = (self.integrator_scatter_fbo.cols() - 1) as u32;
+        data.hash_rows_mask = (self.integrator_scatter_fbo.rows() - 1) as u32;
 
         self.integrator_buffer.write(data)
     }
@@ -254,7 +228,7 @@ impl Device {
         command.set_blend_mode(BlendMode::AlphaPredicatedAdd);
 
         command.unset_vertex_array();
-        command.draw_points_instanced(pass.n, pass.m);
+        command.draw_points(0, pass.n);
     }
 
     pub(crate) fn gather_photons(&mut self) {
@@ -288,41 +262,6 @@ impl Device {
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
-    }
-
-    fn calculate_photon_batch(&self, max_load: usize, target: usize) -> (usize, usize) {
-        let mut best_n = 0;
-        let mut best_m = 0;
-
-        for s in 0..=self.state.integrator.max_hash_cell_bits {
-            let m = 1 << s;
-            let n = (max_load / m).min(target);
-
-            if n * m > best_n * best_m {
-                best_n = n;
-                best_m = m;
-            }
-        }
-
-        (best_n, best_m)
-    }
-
-    fn get_hash_cell_dimensions(mut m: usize) -> (usize, usize) {
-        let mut cols = 1;
-        let mut rows = 1;
-
-        while m != 1 {
-            if m >= 4 {
-                cols *= 2;
-                rows *= 2;
-                m /= 4;
-            } else {
-                cols *= 2;
-                m /= 2;
-            }
-        }
-
-        (cols, rows)
     }
 
     fn clamp_integrator_settings(integrator: &mut Integrator) {

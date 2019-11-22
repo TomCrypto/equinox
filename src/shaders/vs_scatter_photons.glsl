@@ -16,7 +16,7 @@ layout (std140) uniform Raster {
 } raster;
 
 void deposit_photon(ray_t ray, vec3 throughput) {
-    ivec2 coords = hash_entry_for_cell(cell_for_point(ray.org), uint(gl_InstanceID));
+    ivec2 coords = hash_entry_for_cell(cell_for_point(ray.org));
 
     photon_pos_data = fract(ray.org / integrator_cell_size());
     photon_dir_data = 0.5 - 0.5 * ray.dir;
@@ -116,9 +116,7 @@ ray_t generate_photon_ray(out vec3 throughput, inout quasi_t quasi) {
 }
 
 void main() {
-    uint seed = uint(gl_VertexID) * integrator.hash_cell_cols * integrator.hash_cell_rows + uint(gl_InstanceID);
-
-    quasi_t quasi = quasi_init(decorrelate_sample(seed), integrator.current_pass);
+    quasi_t quasi = quasi_init(decorrelate_sample(uint(gl_VertexID)), integrator.current_pass);
 
     vec3 throughput; // measure photon path contribution
     ray_t ray = generate_photon_ray(throughput, quasi);
