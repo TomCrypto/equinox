@@ -17,16 +17,11 @@ layout(location = 0) out vec4 radiance_estimate;
 vec3 get_photon(cell_t cell, vec3 point, uint material, uint inst, vec3 normal, vec3 wo) {
     ivec2 coords = hash_entry_for_cell(cell);
 
-    vec3 throughput = 1e5 * texelFetch(photon_table_sum, coords, 0).rgb;
-
-    if (throughput == vec3(0.0)) {
-        return vec3(0.0);
-    }
-
-    vec3 position = (cell + texelFetch(photon_table_pos, coords, 0).rgb) * integrator.cell_size;
+    vec3 position = texelFetch(photon_table_pos, coords, 0).rgb;
 
     if (dot(point - position, point - position) <= integrator.search_radius_squared) {
         vec3 wi = 2.0 * texelFetch(photon_table_dir, coords, 0).rgb - 1.0;
+        vec3 throughput = 1e5 * texelFetch(photon_table_sum, coords, 0).rgb;
 
         #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                      \
             float unused_pdf;                                                                     \

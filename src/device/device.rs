@@ -53,7 +53,7 @@ pub struct Device {
 
     pub(crate) load_convolution_buffers_shader: Shader,
 
-    pub(crate) integrator_photon_table_pos: Texture<RGB10A2>,
+    pub(crate) integrator_photon_table_pos: Texture<RGBA32F>,
     pub(crate) integrator_photon_table_dir: Texture<RGB10A2>,
     pub(crate) integrator_photon_table_sum: Texture<RGBA16F>,
 
@@ -111,7 +111,7 @@ impl Device {
                     "GEOMETRY_DATA_LEN" => "0",
                     "MATERIAL_DATA_LEN" => "0",
                     "INSTANCE_DATA_PRESENT" => "0",
-                    "SAMPLER_MAX_DIMENSIONS" => "0"
+                    "SAMPLER_MAX_DIMENSIONS" => "0",
                 },
             ),
             integrator_photon_table_pos: Texture::new(gl.clone()),
@@ -142,7 +142,7 @@ impl Device {
                     "GEOMETRY_DATA_LEN" => "0",
                     "MATERIAL_DATA_LEN" => "0",
                     "INSTANCE_DATA_PRESENT" => "0",
-                    "SAMPLER_MAX_DIMENSIONS" => "0"
+                    "SAMPLER_MAX_DIMENSIONS" => "0",
                 },
             ),
             load_convolution_buffers_shader: Shader::new(
@@ -430,6 +430,7 @@ impl Device {
             self.integrator_photon_table_pos.create(cols, rows);
             self.integrator_photon_table_dir.create(cols, rows);
             self.integrator_photon_table_sum.create(cols, rows);
+
             self.integrator_scatter_fbo.rebuild(
                 &[
                     &self.integrator_photon_table_pos,
@@ -555,6 +556,7 @@ impl Device {
         self.spectrum_temp1_fbo.invalidate();
         self.spectrum_temp2_fbo.invalidate();
         self.render_fbo.invalidate();
+
         self.integrator_photon_table_pos.invalidate();
         self.integrator_photon_table_dir.invalidate();
         self.integrator_photon_table_sum.invalidate();

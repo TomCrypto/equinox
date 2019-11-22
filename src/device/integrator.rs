@@ -1,8 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::BlendMode;
-use crate::{Aperture, Device, Integrator, RasterFilter, Scene};
+use crate::{Aperture, BlendMode, Device, Integrator, RasterFilter, Scene};
 use js_sys::Error;
 use quasirandom::Qrng;
 use rand::{RngCore, SeedableRng};
@@ -204,6 +203,7 @@ impl Device {
             return;
         }
 
+        self.integrator_scatter_fbo.clear(0, [std::f32::NAN; 4]);
         self.integrator_scatter_fbo.clear(2, [0.0; 4]);
 
         let command = self.integrator_scatter_photons_shader.begin_draw();
