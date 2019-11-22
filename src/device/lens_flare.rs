@@ -1,3 +1,5 @@
+#![allow(clippy::all)] // this feature is on hold for the moment
+
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
