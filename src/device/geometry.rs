@@ -97,10 +97,8 @@ impl GeometryGlslGenerator {
                     r#"
                 vec3 r = vec3({}, {}, {});
 
-                p /= r; float k0 = length(p);
-                p /= r; float k1 = length(p);
-
-                return k0 * (k0 - 1.0) / k1;"#,
+                return (length(p / r) - 1.0) * min(min(r.x, r.y), r.z);
+                "#,
                     radius_x, radius_y, radius_z
                 )
             }
