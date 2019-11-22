@@ -18,7 +18,7 @@ layout (std140) uniform Raster {
 void deposit_photon(ray_t ray, vec3 throughput) {
     ivec2 coords = hash_entry_for_cell(cell_for_point(ray.org));
 
-    photon_pos_data = fract(ray.org / integrator_cell_size());
+    photon_pos_data = fract(ray.org / integrator.cell_size);
     photon_dir_data = 0.5 - 0.5 * ray.dir;
     photon_sum_data = throughput * 1e-5;
 

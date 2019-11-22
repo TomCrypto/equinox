@@ -15,9 +15,7 @@ uniform sampler2D photon_table_sum;
 layout(location = 0) out vec4 radiance_estimate;
 
 vec3 get_photon(cell_t cell, vec3 point, uint material, uint inst, vec3 normal, vec3 wo) {
-    float radius_squared = integrator.search_radius * integrator.search_radius;
-
-    ivec2 coords = hash_entry_for_cell(cell_pos);
+    ivec2 coords = hash_entry_for_cell(cell);
 
     vec3 throughput = 1e5 * texelFetch(photon_table_sum, coords, 0).rgb;
 
@@ -25,30 +23,27 @@ vec3 get_photon(cell_t cell, vec3 point, uint material, uint inst, vec3 normal, 
         return vec3(0.0);
     }
 
-    vec3 pos_data = texelFetch(photon_table_pos, coords, 0).rgb;
-    vec3 wi = 2.0 * texelFetch(photon_table_dir, coords, 0).rgb - 1.0;
+    vec3 position = (cell + texelFetch(photon_table_pos, coords, 0).rgb) * integrator.cell_size;
 
-    vec3 position = (cell_pos + pos_data) * integrator_cell_size();
+    if (dot(point - position, point - position) <= integrator.search_radius_squared) {
+        vec3 wi = 2.0 * texelFetch(photon_table_dir, coords, 0).rgb - 1.0;
 
-    if (dot(point - position, point - position) > radius_squared) {
-        return vec3(0.0);
+        #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                      \
+            float unused_pdf;                                                                     \
+            return throughput * eval(inst, normal, wi, wo, unused_pdf);                           \
+        }
+
+        MAT_DO_SWITCH(material)
+        #undef MAT_SWITCH_LOGIC
     }
-
-    #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                          \
-        float unused_pdf;                                                                         \
-        return throughput * eval(inst, normal, wi, wo, unused_pdf);                               \
-    }
-
-    MAT_DO_SWITCH(material)
-    #undef MAT_SWITCH_LOGIC
 
     return vec3(0.0);
 }
 
 vec3 gather_photons_in_sphere(vec3 point, vec3 wo, vec3 normal, uint material, uint inst) {
-    cell_t cell = cell_for_point(point / integrator_cell_size());
+    cell_t cell = cell_for_point(point);
 
-    vec3 d = sign(fract(point / integrator_cell_size()) - vec3(0.5));
+    vec3 d = sign(fract(point / integrator.cell_size) - vec3(0.5));
 
     vec3 estimate = vec3(0.0);
 
@@ -61,7 +56,7 @@ vec3 gather_photons_in_sphere(vec3 point, vec3 wo, vec3 normal, uint material, u
     estimate += get_photon(cell + vec3(d.x, d.y, 0.0), point, material, inst, normal, wo);
     estimate += get_photon(cell + vec3(d.x, d.y, d.z), point, material, inst, normal, wo);
 
-    return estimate / (M_PI * integrator.search_radius * integrator.search_radius);
+    return estimate / (M_PI * integrator.search_radius_squared);
 }
 
 vec3 gather_photons(ray_t ray, quasi_t quasi) {

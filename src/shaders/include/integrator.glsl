@@ -12,7 +12,9 @@ layout (std140) uniform Integrator {
     float sppm_alpha;
 
     float search_radius;
+    float search_radius_squared;
     float photons_for_pass;
+    float cell_size;
 
     uint hash_cols_mask;
     uint hash_rows_mask;
@@ -23,12 +25,8 @@ layout (std140) uniform Integrator {
     uint max_gather_bounces;
 } integrator;
 
-float integrator_cell_size() {
-    return integrator.search_radius * 2.0;
-}
-
 cell_t cell_for_point(vec3 point) {
-    return floor(point / integrator_cell_size());
+    return floor(point / integrator.cell_size);
 }
 
 ivec2 hash_entry_for_cell(cell_t cell) {

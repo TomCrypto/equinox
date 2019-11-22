@@ -27,7 +27,9 @@ pub struct IntegratorData {
     sppm_alpha: f32,
 
     search_radius: f32,
+    search_radius_squared: f32,
     photons_for_pass: f32,
+    cell_size: f32,
 
     hash_cols_mask: u32,
     hash_rows_mask: u32,
@@ -36,8 +38,6 @@ pub struct IntegratorData {
 
     max_scatter_bounces: u32,
     max_gather_bounces: u32,
-
-    padding: [f32; 2],
 }
 
 pub struct IntegratorPass {
@@ -186,7 +186,9 @@ impl Device {
         data.photon_count = self.state.photon_count.max(1.0);
         data.sppm_alpha = self.state.integrator.alpha;
         data.search_radius = pass.search_radius;
+        data.search_radius_squared = pass.search_radius * pass.search_radius;
         data.photons_for_pass = (pass.n) as f32;
+        data.cell_size = 2.0 * pass.search_radius;
         data.hash_dimensions[0] = self.integrator_scatter_fbo.cols() as f32;
         data.hash_dimensions[1] = self.integrator_scatter_fbo.rows() as f32;
         data.max_scatter_bounces = self.state.integrator.max_scatter_bounces;
