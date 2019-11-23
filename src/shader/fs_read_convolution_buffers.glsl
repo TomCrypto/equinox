@@ -1,5 +1,5 @@
-// #define CONV_DIMS            vec2      <dimensions of the entire convolution buffer>
-// #define IMAGE_DIMS           vec2      <dimensions of the output image to read out>
+// requires-define CONV_DIMS            <dimensions of the entire convolution buffer>
+// requires-define IMAGE_DIMS           <dimensions of the output image to write out>
 
 out vec4 target;
 

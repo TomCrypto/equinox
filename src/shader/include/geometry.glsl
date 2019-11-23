@@ -1,3 +1,5 @@
+// requires-define GEOMETRY_DATA_LEN
+
 layout (std140) uniform Geometry {
     vec4 data[GEOMETRY_DATA_LEN];
 } geometry_buffer;

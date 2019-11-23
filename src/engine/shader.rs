@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, error, info, warn};
 
-use crate::Framebuffer;
+use crate::{shader::ShaderInfo, Framebuffer};
 use crypto::rc4::Rc4;
 use crypto::symmetriccipher::SynchronousStreamCipher;
 use js_sys::Error;
@@ -14,7 +14,7 @@ use web_sys::{
 
 #[derive(Clone, Copy, Debug)]
 pub enum BindingPoint {
-    Texture(u32),
+    TextureUnit(u32),
     UniformBlock(u32),
 }
 
@@ -23,8 +23,8 @@ pub struct Shader {
     gl: Context,
     invalidated: bool,
     handle: Option<WebGlProgram>,
-    vertex: &'static [u8],
-    fragment: &'static [u8],
+    vertex: &'static ShaderInfo,
+    fragment: &'static ShaderInfo,
 
     binds: HashMap<&'static str, BindingPoint>,
 
@@ -42,24 +42,40 @@ fn decrypt_shader(ciphertext: &[u8]) -> String {
     String::from_utf8(output).unwrap()
 }
 
+fn merge_sort_dedup(lhs: &[&'static str], rhs: &[&'static str]) -> Vec<&'static str> {
+    let mut vec = Vec::with_capacity(lhs.len() + rhs.len());
+
+    vec.extend_from_slice(lhs);
+    vec.extend_from_slice(rhs);
+    vec.sort_unstable();
+    vec.dedup();
+    vec
+}
+
 impl Shader {
-    pub fn new(
-        gl: Context,
-        vertex: &'static [u8],
-        fragment: &'static [u8],
-        binds: HashMap<&'static str, BindingPoint>,
-        default_headers: HashMap<&'static str, &str>,
-        default_defines: HashMap<&'static str, &str>,
-    ) -> Self {
+    pub fn new(gl: Context, vertex: &'static ShaderInfo, fragment: &'static ShaderInfo) -> Self {
         let mut headers = HashMap::new();
         let mut defines = HashMap::new();
 
-        for (k, v) in default_headers {
-            headers.insert(k, v.to_owned());
+        for key in merge_sort_dedup(vertex.defines, fragment.defines) {
+            defines.insert(key, String::new());
         }
 
-        for (k, v) in default_defines {
-            defines.insert(k, v.to_owned());
+        for key in merge_sort_dedup(vertex.headers, fragment.headers) {
+            headers.insert(key, String::new());
+        }
+
+        let mut binds = HashMap::new();
+
+        let uniform_blocks = merge_sort_dedup(vertex.uniform_blocks, fragment.uniform_blocks);
+        let texture_units = merge_sort_dedup(vertex.texture_units, fragment.texture_units);
+
+        for (index, &key) in uniform_blocks.iter().enumerate() {
+            binds.insert(key, BindingPoint::UniformBlock(index as u32));
+        }
+
+        for (index, &key) in texture_units.iter().enumerate() {
+            binds.insert(key, BindingPoint::TextureUnit(index as u32));
         }
 
         Self {
@@ -113,8 +129,12 @@ impl Shader {
 
         self.invalidated = false;
 
-        let vert = self.compile_shader(Context::VERTEX_SHADER, &decrypt_shader(self.vertex))?;
-        let frag = self.compile_shader(Context::FRAGMENT_SHADER, &decrypt_shader(self.fragment))?;
+        let vert =
+            self.compile_shader(Context::VERTEX_SHADER, &decrypt_shader(self.vertex.code))?;
+        let frag = self.compile_shader(
+            Context::FRAGMENT_SHADER,
+            &decrypt_shader(self.fragment.code),
+        )?;
 
         if let (Some(vert), Some(frag)) = (&vert, &frag) {
             self.handle = self.link_program(vert, frag)?;
@@ -132,7 +152,7 @@ impl Shader {
 
             for (&name, &binding_point) in &self.binds {
                 match binding_point {
-                    BindingPoint::Texture(slot) => {
+                    BindingPoint::TextureUnit(slot) => {
                         let location = self.gl.get_uniform_location(program, name);
 
                         if let Some(location) = location {
@@ -422,7 +442,7 @@ impl<'a> DrawCommand<'a> {
     }
 
     fn bind_texture(&self, handle: Option<&WebGlTexture>, slot: &str) {
-        if let Some(&BindingPoint::Texture(slot)) = self.shader.binds.get(slot) {
+        if let Some(&BindingPoint::TextureUnit(slot)) = self.shader.binds.get(slot) {
             self.shader.gl.active_texture(Context::TEXTURE0 + slot);
             self.shader.gl.bind_texture(Context::TEXTURE_2D, handle);
         } else {

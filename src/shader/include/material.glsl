@@ -1,3 +1,5 @@
+// requires-define MATERIAL_DATA_LEN
+
 #include <common.glsl>
 
 #include <quasi.glsl>

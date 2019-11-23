@@ -1,11 +1,13 @@
-struct quasi_t {
-    uvec4 state;
-    uint dim;
-};
+// requires-define SAMPLER_MAX_DIMENSIONS
 
 layout (std140) uniform QuasiSampler {
     uvec4 alpha[SAMPLER_MAX_DIMENSIONS];
 } quasi_buffer;
+
+struct quasi_t {
+    uvec4 state;
+    uint dim;
+};
 
 quasi_t quasi_init(uint lo, uint hi) {
     return quasi_t(uvec4(lo, hi, lo & 0xffffU, lo >> 16U), 0U);

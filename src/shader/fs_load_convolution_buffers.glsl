@@ -1,5 +1,5 @@
-// #define CONV_DIMS            vec2      <dimensions of the entire convolution buffer>
-// #define IMAGE_DIMS           vec2      <dimensions of the source image to load in>
+// requires-define CONV_DIMS            <dimensions of the entire convolution buffer>
+// requires-define IMAGE_DIMS           <dimensions of the source image to load in>
 
 layout(location = 0) out vec2 r_conv_buffer;
 layout(location = 1) out vec2 g_conv_buffer;

@@ -1,5 +1,4 @@
 use js_sys::Error;
-use maplit::hashmap;
 use web_sys::WebGl2RenderingContext as Context;
 
 use crate::*;
@@ -82,34 +81,8 @@ impl Device {
 
             integrator_gather_photons_shader: Shader::new(
                 gl.clone(),
-                shader::VS_FULLSCREEN,
-                shader::FS_GATHER_PHOTONS,
-                hashmap! {
-                    "Camera" => BindingPoint::UniformBlock(0),
-                    "Instance" => BindingPoint::UniformBlock(1),
-                    "Geometry" => BindingPoint::UniformBlock(2),
-                    "Material" => BindingPoint::UniformBlock(3),
-                    "Integrator" => BindingPoint::UniformBlock(4),
-                    "Raster" => BindingPoint::UniformBlock(5),
-                    "Environment" => BindingPoint::UniformBlock(6),
-                    "QuasiSampler" => BindingPoint::UniformBlock(7),
-                    "envmap_texture" => BindingPoint::Texture(0),
-                    "envmap_marg_cdf" => BindingPoint::Texture(1),
-                    "envmap_cond_cdf" => BindingPoint::Texture(2),
-                    "photon_table_pos" => BindingPoint::Texture(3),
-                    "photon_table_dir" => BindingPoint::Texture(4),
-                    "photon_table_sum" => BindingPoint::Texture(5),
-                },
-                hashmap! {
-                    "geometry-user.glsl" => "",
-                },
-                hashmap! {
-                    "INSTANCE_DATA_LEN" => "0",
-                    "GEOMETRY_DATA_LEN" => "0",
-                    "MATERIAL_DATA_LEN" => "0",
-                    "INSTANCE_DATA_PRESENT" => "0",
-                    "SAMPLER_MAX_DIMENSIONS" => "0",
-                },
+                &shader::VS_FULLSCREEN,
+                &shader::FS_GATHER_PHOTONS,
             ),
             integrator_photon_table_pos: Texture::new(gl.clone()),
             integrator_photon_table_dir: Texture::new(gl.clone()),
@@ -117,86 +90,21 @@ impl Device {
             fft_pass_data: VertexArray::new(gl.clone()),
             integrator_scatter_photons_shader: Shader::new(
                 gl.clone(),
-                shader::VS_SCATTER_PHOTONS,
-                shader::FS_SCATTER_PHOTONS,
-                hashmap! {
-                    "Instance" => BindingPoint::UniformBlock(0),
-                    "Geometry" => BindingPoint::UniformBlock(1),
-                    "Material" => BindingPoint::UniformBlock(2),
-                    "Integrator" => BindingPoint::UniformBlock(3),
-                    "Raster" => BindingPoint::UniformBlock(4),
-                    "Environment" => BindingPoint::UniformBlock(5),
-                    "QuasiSampler" => BindingPoint::UniformBlock(6),
-                    "envmap_texture" => BindingPoint::Texture(0),
-                    "envmap_marg_cdf" => BindingPoint::Texture(1),
-                    "envmap_cond_cdf" => BindingPoint::Texture(2),
-                },
-                hashmap! {
-                    "geometry-user.glsl" => "",
-                },
-                hashmap! {
-                    "INSTANCE_DATA_LEN" => "0",
-                    "GEOMETRY_DATA_LEN" => "0",
-                    "MATERIAL_DATA_LEN" => "0",
-                    "INSTANCE_DATA_PRESENT" => "0",
-                    "SAMPLER_MAX_DIMENSIONS" => "0",
-                },
+                &shader::VS_SCATTER_PHOTONS,
+                &shader::FS_SCATTER_PHOTONS,
             ),
             load_convolution_buffers_shader: Shader::new(
                 gl.clone(),
-                shader::VS_FULLSCREEN,
-                shader::FS_LOAD_CONVOLUTION_BUFFERS,
-                hashmap! {
-                    "image" => BindingPoint::Texture(0),
-                },
-                hashmap! {},
-                hashmap! {
-                    "CONV_DIMS" => "vec2(0.0, 0.0)",
-                    "IMAGE_DIMS" => "vec2(0.0, 0.0)",
-                },
+                &shader::VS_FULLSCREEN,
+                &shader::FS_LOAD_CONVOLUTION_BUFFERS,
             ),
-            fft_shader: Shader::new(
-                gl.clone(),
-                shader::VS_FFT_PASS,
-                shader::FS_FFT_PASS,
-                hashmap! {
-                    "r_conv_buffer" => BindingPoint::Texture(0),
-                    "g_conv_buffer" => BindingPoint::Texture(1),
-                    "b_conv_buffer" => BindingPoint::Texture(2),
-                    "r_conv_filter" => BindingPoint::Texture(3),
-                    "g_conv_filter" => BindingPoint::Texture(4),
-                    "b_conv_filter" => BindingPoint::Texture(5),
-                },
-                hashmap! {},
-                hashmap! {},
-            ),
+            fft_shader: Shader::new(gl.clone(), &shader::VS_FFT_PASS, &shader::FS_FFT_PASS),
             read_convolution_buffers_shader: Shader::new(
                 gl.clone(),
-                shader::VS_FULLSCREEN,
-                shader::FS_READ_CONVOLUTION_BUFFERS,
-                hashmap! {
-                    "r_conv_buffer" => BindingPoint::Texture(0),
-                    "g_conv_buffer" => BindingPoint::Texture(1),
-                    "b_conv_buffer" => BindingPoint::Texture(2),
-                    "source" => BindingPoint::Texture(3),
-                },
-                hashmap! {},
-                hashmap! {
-                    "CONV_DIMS" => "vec2(0.0, 0.0)",
-                    "IMAGE_DIMS" => "vec2(0.0, 0.0)",
-                },
+                &shader::VS_FULLSCREEN,
+                &shader::FS_READ_CONVOLUTION_BUFFERS,
             ),
-            present_program: Shader::new(
-                gl.clone(),
-                shader::VS_FULLSCREEN,
-                shader::FS_PRESENT,
-                hashmap! {
-                    "samples" => BindingPoint::Texture(0),
-                    "Display" => BindingPoint::UniformBlock(0),
-                },
-                hashmap! {},
-                hashmap! {},
-            ),
+            present_program: Shader::new(gl.clone(), &shader::VS_FULLSCREEN, &shader::FS_PRESENT),
             camera_buffer: UniformBuffer::new(gl.clone()),
             geometry_buffer: UniformBuffer::new(gl.clone()),
             material_buffer: UniformBuffer::new(gl.clone()),

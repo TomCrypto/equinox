@@ -1,3 +1,6 @@
+// requires-define INSTANCE_DATA_LEN
+// requires-define INSTANCE_DATA_PRESENT
+
 #include <geometry.glsl>
 
 struct BvhNode {
