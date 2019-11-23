@@ -6,7 +6,7 @@ use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
-#[derive(Debug, Default, AsBytes, FromBytes)]
+#[derive(AsBytes, FromBytes, Debug, Default)]
 pub struct CameraData {
     origin_plane: [[f32; 4]; 4],
     target_plane: [[f32; 4]; 4],
@@ -15,7 +15,7 @@ pub struct CameraData {
 
 impl Device {
     pub(crate) fn update_camera(&mut self, camera: &Camera) -> Result<(), Error> {
-        let data: &mut CameraData = self.allocator.allocate_one();
+        let mut data = CameraData::default();
 
         let fov_tan = camera.film_height / (2.0 * camera.focal_length);
 
@@ -51,7 +51,7 @@ impl Device {
 
         data.aperture_settings = aperture_settings(&camera.aperture);
 
-        self.camera_buffer.write(data)
+        self.camera_buffer.write(&data)
     }
 }
 

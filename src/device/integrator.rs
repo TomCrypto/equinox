@@ -9,13 +9,13 @@ use rand_chacha::ChaCha20Rng;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
-#[derive(AsBytes, FromBytes, Debug)]
+#[derive(AsBytes, FromBytes, Clone, Copy, Debug, Default)]
 pub struct SamplerDimensionAlpha {
     alpha: [u32; 4],
 }
 
 #[repr(align(16), C)]
-#[derive(AsBytes, FromBytes, Debug)]
+#[derive(AsBytes, FromBytes, Debug, Default)]
 pub struct IntegratorData {
     hash_key: [u32; 4],
     filter_offset: [f32; 2],
@@ -101,13 +101,13 @@ impl Device {
         let gather_dimensions = 2 + 5 * integrator.max_gather_bounces as usize;
         let scatter_dimensions = 5 + 4 * integrator.max_scatter_bounces as usize;
 
-        let quasi_buffer: &mut [SamplerDimensionAlpha] =
-            self.allocator.allocate(self.gather_quasi_buffer.max_len());
+        let mut quasi_buffer =
+            vec![SamplerDimensionAlpha::default(); self.gather_quasi_buffer.max_len()];
 
         Self::populate_quasi_buffer(&mut quasi_buffer[..gather_dimensions]);
-        self.gather_quasi_buffer.write_array(quasi_buffer)?;
+        self.gather_quasi_buffer.write_array(&quasi_buffer)?;
         Self::populate_quasi_buffer(&mut quasi_buffer[..scatter_dimensions]);
-        self.scatter_quasi_buffer.write_array(quasi_buffer)?;
+        self.scatter_quasi_buffer.write_array(&quasi_buffer)?;
 
         self.integrator_gather_photons_shader
             .set_define("SAMPLER_MAX_DIMENSIONS", quasi_buffer.len());
@@ -167,7 +167,7 @@ impl Device {
 
         let (x, y) = self.state.filter_rng.next::<(f32, f32)>();
 
-        let data: &mut IntegratorData = self.allocator.allocate_one();
+        let mut data = IntegratorData::default();
 
         data.filter_offset[0] = 4.0 * self.state.filter.importance_sample(x) - 2.0;
         data.filter_offset[1] = 4.0 * self.state.filter.importance_sample(y) - 2.0;
@@ -190,7 +190,7 @@ impl Device {
         data.hash_cols_mask = (self.integrator_scatter_fbo.cols() - 1) as u32;
         data.hash_rows_mask = (self.integrator_scatter_fbo.rows() - 1) as u32;
 
-        self.integrator_buffer.write(data)
+        self.integrator_buffer.write(&data)
     }
 
     pub(crate) fn scatter_photons(&mut self, pass: &IntegratorPass) {

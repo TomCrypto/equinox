@@ -66,7 +66,7 @@ impl Device {
 
         let node_count = HierarchyBuilder::node_count_for_leaves(instance_info.len());
 
-        let nodes = self.allocator.allocate(self.instance_buffer.max_len());
+        let mut nodes = vec![SceneInstanceNode::default(); self.instance_buffer.max_len()];
 
         HierarchyBuilder::new(&mut nodes[..node_count]).build(&mut instance_info);
 
@@ -92,8 +92,7 @@ impl Device {
         // the parameter table are coherent and that all fields are nicely packed into
         // individual vec4 elements. Out-of-bounds parameter indices are checked here.
 
-        let params: &mut [GeometryParameter] =
-            self.allocator.allocate(self.geometry_buffer.max_len());
+        let mut params = vec![GeometryParameter::default(); self.geometry_buffer.max_len()];
         let mut offset = 0;
 
         for instance in instance_list.values() {
@@ -129,11 +128,11 @@ impl Device {
 }
 
 #[repr(align(16), C)]
-#[derive(AsBytes, FromBytes, Debug)]
+#[derive(AsBytes, FromBytes, Clone, Copy, Debug, Default)]
 pub struct GeometryParameter([f32; 4]);
 
 #[repr(align(32), C)]
-#[derive(AsBytes, FromBytes, Debug, Default)]
+#[derive(AsBytes, FromBytes, Clone, Copy, Debug, Default)]
 pub struct SceneInstanceNode {
     min: [f32; 3],
     word1: u32,

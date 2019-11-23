@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
-#[derive(AsBytes, FromBytes, Debug)]
+#[derive(AsBytes, FromBytes, Clone, Copy, Debug, Default)]
 pub struct MaterialParameter([f32; 4]);
 
 pub(crate) fn material_index(material: &Material) -> u16 {
@@ -99,8 +99,7 @@ impl Device {
         &mut self,
         materials: &BTreeMap<String, Material>,
     ) -> Result<(), Error> {
-        let parameters: &mut [MaterialParameter] =
-            self.allocator.allocate(self.material_buffer.max_len());
+        let mut parameters = vec![MaterialParameter::default(); self.material_buffer.max_len()];
         let mut start = 0;
 
         for material in materials.values() {

@@ -4,7 +4,6 @@
 #![forbid(dead_code, unsafe_code)]
 
 mod device {
-    pub mod allocator;
     pub mod camera;
     pub mod device;
     pub mod display;
@@ -41,8 +40,8 @@ mod scene {
 }
 
 pub use device::{
-    allocator::*, camera::*, device::*, display::*, environment::*, geometry::*, instance::*,
-    integrator::*, lens_flare::*, material::*, raster::*,
+    camera::*, device::*, display::*, environment::*, geometry::*, instance::*, integrator::*,
+    lens_flare::*, material::*, raster::*,
 };
 pub use engine::{framebuffer::*, shader::*, texture::*, uniform_buffer::*, vertex_array::*};
 pub use scene::{

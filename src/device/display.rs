@@ -3,7 +3,7 @@ use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
-#[derive(Debug, AsBytes, FromBytes)]
+#[derive(AsBytes, FromBytes, Debug, Default)]
 pub struct DisplayData {
     exposure: f32,
     saturation: f32,
@@ -14,7 +14,7 @@ pub struct DisplayData {
 
 impl Device {
     pub(crate) fn update_display(&mut self, display: &Display) -> Result<(), Error> {
-        let data: &mut DisplayData = self.allocator.allocate_one();
+        let mut data = DisplayData::default();
 
         data.exposure = (2.0f32).powf(display.exposure);
         data.saturation = display.saturation.max(0.0).min(1.0);
@@ -31,6 +31,6 @@ impl Device {
             data.has_camera_response = 0;
         }
 
-        self.display_buffer.write(data)
+        self.display_buffer.write(&data)
     }
 }

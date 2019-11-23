@@ -56,13 +56,13 @@ impl Device {
                 marg_cdf.push(pdf_to_cdf(&mut luminance[y * cols..(y + 1) * cols]));
             }
 
-            let half_data: &mut [u16] = self.allocator.allocate(cols * rows);
+            let mut half_data = vec![0; cols * rows];
 
             for (fp16, &fp32) in half_data.iter_mut().zip(&luminance) {
                 *fp16 = f16::from_f32(fp32).to_bits();
             }
 
-            self.envmap_cond_cdf.upload(cols, rows, half_data);
+            self.envmap_cond_cdf.upload(cols, rows, &half_data);
 
             pdf_to_cdf(&mut marg_cdf);
 

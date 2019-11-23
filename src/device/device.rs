@@ -65,8 +65,6 @@ pub struct Device {
     pub(crate) integrator_scatter_photons_shader: Shader,
     pub(crate) integrator_gather_photons_shader: Shader,
 
-    pub(crate) allocator: Allocator,
-
     device_lost: bool,
 
     pub(crate) state: IntegratorState,
@@ -76,7 +74,6 @@ impl Device {
     /// Creates a new device using a WebGL2 context.
     pub fn new(gl: &Context) -> Result<Self, Error> {
         Ok(Self {
-            allocator: Allocator::new(),
             gl: gl.clone(),
 
             integrator_radiance_estimate: Texture::new(gl.clone()),
@@ -464,8 +461,6 @@ impl Device {
         if invalidated {
             self.reset_integrator_state(scene);
         }
-
-        self.allocator.shrink_to_watermark();
 
         Ok(invalidated)
     }
