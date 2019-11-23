@@ -390,6 +390,14 @@ export default class App extends Vue {
         this.theta += this.thetaEstimator.average()!;
         this.phi += this.phiEstimator.average()!;
 
+        if (this.theta > Math.PI - 0.01) {
+          this.theta = Math.PI - 0.01;
+        }
+
+        if (this.theta < 0.01) {
+          this.theta = 0.01;
+        }
+
         let x = Math.sin(this.theta) * Math.cos(this.phi);
         let z = Math.sin(this.theta) * Math.sin(this.phi);
         let y = Math.cos(this.theta);
