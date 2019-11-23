@@ -196,6 +196,9 @@ impl Shader {
 
             self.gl.link_program(program);
 
+            self.gl.delete_shader(Some(vert));
+            self.gl.delete_shader(Some(frag));
+
             if let Some(error) = self.get_program_link_error(program) {
                 error!("{}", error);
                 return Err(Error::new("failed to link shader program"));
