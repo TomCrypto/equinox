@@ -111,9 +111,18 @@ impl Geometry {
                 })
             }
             Self::Ellipsoid { radius } => {
-                let radius_x = radius[0].value(symbolic_values)?;
-                let radius_y = radius[1].value(symbolic_values)?;
-                let radius_z = radius[2].value(symbolic_values)?;
+                let mut radius_x = radius[0].value(symbolic_values)?;
+                let mut radius_y = radius[1].value(symbolic_values)?;
+                let mut radius_z = radius[2].value(symbolic_values)?;
+
+                // TODO: we need to do this to account for the fact that this SDF is a bound, is
+                // there a better way to implement this or are we stuck with this approximation?
+
+                let min_radius = radius_x.min(radius_y).min(radius_z);
+
+                radius_x *= radius_x / min_radius;
+                radius_y *= radius_y / min_radius;
+                radius_z *= radius_z / min_radius;
 
                 Some(BoundingBox {
                     min: [-radius_x, -radius_y, -radius_z].into(),

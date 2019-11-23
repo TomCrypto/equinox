@@ -148,7 +148,7 @@ impl GeometryGlslGenerator {
 
                 let function = self.distance_recursive(f, index);
 
-                format!("return abs({}) - {};", function.call("p"), thickness,)
+                format!("return abs({}) - {};", function.call("p"), thickness)
             }
             Geometry::Scale { factor, f } => {
                 let factor = self.lookup_parameter(factor, index);
