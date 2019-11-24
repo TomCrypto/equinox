@@ -572,12 +572,14 @@ body {
 .canvas-panel {
   float: left;
 
-  width: calc(50% - 8px);
-  height: calc(100vh - 8px);
+  width: calc(50% - 2px);
+  height: 100vh;
 
   position: relative;
-  border: 4px solid #1a1a1a;
-  border-radius: 12px;
+  border: 0;
+  border-right: 2px;
+  border-style: solid;
+  border-color: #5a5a5a;
   margin: 0;
   outline: none;
   padding: 0px;
