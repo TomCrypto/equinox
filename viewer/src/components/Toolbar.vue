@@ -2,7 +2,7 @@
   <div class="toolbar">
     <button
       class="toggle-fullscreen"
-      title="Enter or leave fullscreen mode"
+      title="Toggle fullscreen mode"
       v-on:click="onToggleFullscreen()"
     />
 
@@ -80,11 +80,19 @@ export default class extends Vue {
   box-shadow: inset 0px 0px 10px #c1c1c1;
 }
 
-.scene-json {
-  background-image: url("../assets/scene-json.png");
+.toggle-fullscreen {
+  background-image: url("../assets/toggle-fullscreen.png");
 }
 
-.save-screenshot {
-  background-image: url("../assets/save-screenshot.png");
+.lock-camera {
+  background-image: url("../assets/lock-camera.png");
+}
+
+.unlock-camera {
+  background-image: url("../assets/unlock-camera.png");
+}
+
+.save-render {
+  background-image: url("../assets/save-render.png");
 }
 </style>

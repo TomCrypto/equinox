@@ -14,7 +14,6 @@
       v-on:keyup="releaseKey($event.key)"
       v-on:keypress="onKeyPress($event)"
       v-on:contextmenu="$event.preventDefault()"
-      v-on:dblclick="enterFullscreen()"
     />
 
     <StatusBar
@@ -30,6 +29,8 @@
       :gpuFrameTime="gpuFrameTime"
       :syncInterval="syncInterval"
     />
+
+    <Toolbar :on-save-render="onSaveRender" :on-toggle-fullscreen="toggleFullscreen" />
   </div>
 </template>
 
@@ -37,6 +38,7 @@
 import { Component, Prop, Vue } from "vue-property-decorator";
 import { WebScene, WebDevice } from "equinox";
 import StatusBar from "@/components/StatusBar.vue";
+import Toolbar from "@/components/Toolbar.vue";
 import LoadingOverlay from "@/components/LoadingOverlay.vue";
 import localforage from "localforage";
 import Zip from "jszip";
@@ -50,7 +52,8 @@ import MovingWindowEstimator from "../helpers/minimum_window";
 
 @Component({
   components: {
-    StatusBar
+    StatusBar,
+    Toolbar
   }
 })
 export default class extends Vue {
@@ -172,8 +175,16 @@ export default class extends Vue {
   private mustSaveScreenshot: boolean = false;
   private screenshot: Blob | null = null;
 
-  private enterFullscreen() {
-    this.$el.requestFullscreen();
+  private toggleFullscreen() {
+    if (document.fullscreenElement === null) {
+      this.$el.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
+
+  private onSaveRender() {
+    this.generateScreenshotZip();
   }
 
   private loseContext() {
@@ -380,10 +391,6 @@ export default class extends Vue {
         });
 
         this.gpuFrameTimeEstimator.addSample(refineTime);
-
-        if (this.mustSaveScreenshot) {
-          this.generateScreenshotZip();
-        }
       } catch (e) {
         console.error(e);
       }
@@ -438,7 +445,6 @@ export default class extends Vue {
   right: 0;
   margin: 0;
   outline: none;
-  z-index: 0;
 }
 
 .status-bar {
