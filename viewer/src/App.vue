@@ -1,24 +1,20 @@
 <template>
   <div id="app">
     <div class="canvas-panel">
-      <div class="canvas-container">
-        <!-- canvas placeholder -->
-        <canvas
-          ref="canvas"
-          tabindex="0"
-          v-on:mousedown="enterCapture()"
-          v-on:mouseup="leaveCapture()"
-          v-on:mouseleave="leaveCapture()"
-          v-on:mousemove="moveCamera($event)"
-          v-on:wheel="onMouseWheel($event.deltaY)"
-          v-on:keydown="pressKey($event.key)"
-          v-on:keyup="releaseKey($event.key)"
-          v-on:keypress="onKeyPress($event)"
-          v-on:contextmenu="$event.preventDefault()"
-        />
-      </div>
-
-      <div class="changelog">sup</div>
+      <!-- TOOD: this should be an actual component -->
+      <canvas
+        ref="canvas"
+        tabindex="0"
+        v-on:mousedown="enterCapture()"
+        v-on:mouseup="leaveCapture()"
+        v-on:mouseleave="leaveCapture()"
+        v-on:mousemove="moveCamera($event)"
+        v-on:wheel="onMouseWheel($event.deltaY)"
+        v-on:keydown="pressKey($event.key)"
+        v-on:keyup="releaseKey($event.key)"
+        v-on:keypress="onKeyPress($event)"
+        v-on:contextmenu="$event.preventDefault()"
+      />
     </div>
     <div class="editor-panel">
       <EditorContainer
@@ -42,7 +38,9 @@
           <p>(code editor here)</p>
         </template>
         <template slot="tab-head-blah">Environment</template>
-        <template slot="tab-panel-blah"></template>
+        <template slot="tab-panel-blah">
+          <EnvironmentEditor :scene="scene" :load-asset="load_asset" />
+        </template>
       </EditorContainer>
     </div>
     <!--<canvas
@@ -99,8 +97,6 @@
       :render="screenshot"
       :on-close="downloadOverlayClosed"
     />
-
-    <EnvironmentEditor v-if="showEnvironmentEditor" :scene="scene" :load-asset="load_asset" />
   </div>
 </template>
 
@@ -574,29 +570,18 @@ body {
 }
 
 .canvas-panel {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
   float: left;
-  width: 50%;
-  height: 100vh;
-  flex: 1;
-}
 
-.canvas-container {
-  padding: 0px;
-  background-color: black;
-  width: calc(100% - 8x);
-  height: calc(50% - 8px);
+  width: calc(50% - 8px);
+  height: calc(100vh - 8px);
+
   position: relative;
   border: 4px solid #1a1a1a;
   border-radius: 12px;
   margin: 0;
   outline: none;
-}
-
-.changelog {
-  flex: 1;
+  padding: 0px;
+  background-color: black;
 }
 
 .editor-panel {
@@ -610,13 +595,13 @@ body {
 
 canvas {
   position: absolute;
-  top: 0;
+  top: 50%;
   bottom: 0;
-  left: 50%;
+  left: 0%;
   right: 0;
-  transform: translateX(-50%);
-  width: 50%;
-  height: 100%;
+  transform: translateY(-50%);
+  width: 100%;
+  height: 50%;
   margin: 0;
   outline: none;
 }
