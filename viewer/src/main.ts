@@ -4,6 +4,15 @@ import localforage from "localforage";
 import Multiselect from "vue-multiselect";
 import VueSlider from "vue-slider-component";
 import "vue-slider-component/theme/default.css";
+import "codemirror";
+import "codemirror/lib/codemirror.css";
+import "codemirror/theme/monokai.css";
+import "codemirror/addon/lint/lint.css";
+import "codemirror/addon/lint/lint";
+import "codemirror/addon/lint/json-lint";
+import "codemirror/mode/javascript/javascript";
+
+(window as any).jsonlint = require("jsonlint-mod");
 
 Vue.component("multiselect", Multiselect);
 Vue.component("VueSlider", VueSlider);

@@ -14,17 +14,7 @@
       >
         <template slot="tab-head-advanced">Advanced Editor</template>
         <template slot="tab-panel-advanced">
-          <p>
-            Obtain full control by directly editing the scene's underlying representation. Note that
-            some changes (especially changing the geometry modifier stack and changing non-symbolic
-            parameters) may trigger shader rebuilds which can take a few seconds.
-          </p>
-          <p>
-            On Windows, shader builds can be very slow due to the ANGLE GLSL to HLSL conversion. It
-            is recommended to switch to native OpenGL if possible.
-          </p>
-          <hr />
-          <p>(code editor here)</p>
+          <AdvancedEditor :scene="scene" :on-update-scene="updateScene" />
         </template>
         <template slot="tab-head-environment">Environment</template>
         <template slot="tab-panel-environment">
@@ -45,11 +35,13 @@ import LoadingOverlay from "@/components/LoadingOverlay.vue";
 import EnvironmentEditor from "@/components/EnvironmentEditor.vue";
 import EditorContainer from "@/components/EditorContainer.vue";
 import DocumentationEditor from "@/components/DocumentationEditor.vue";
+import AdvancedEditor from "@/components/AdvancedEditor.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
 import pako from "pako";
 import MovingWindowEstimator from "./helpers/minimum_window";
 import CanvasContainer from "@/components/CanvasContainer.vue";
+import CodeMirror from "codemirror";
 
 @Component({
   components: {
@@ -57,7 +49,8 @@ import CanvasContainer from "@/components/CanvasContainer.vue";
     EnvironmentEditor,
     EditorContainer,
     DocumentationEditor,
-    CanvasContainer
+    CanvasContainer,
+    AdvancedEditor
   }
 })
 export default class App extends Vue {
