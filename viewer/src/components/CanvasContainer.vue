@@ -39,10 +39,7 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 import { WebScene, WebDevice } from "equinox";
 import StatusBar from "@/components/StatusBar.vue";
 import Toolbar from "@/components/Toolbar.vue";
-import LoadingOverlay from "@/components/LoadingOverlay.vue";
-import localforage from "localforage";
 import Zip from "jszip";
-import pako from "pako";
 import FileSaver from "file-saver";
 import {
   getWebGlVendor,

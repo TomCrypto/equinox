@@ -41,33 +41,19 @@
 
 <script lang="ts">
 import { Component, Prop, Vue } from "vue-property-decorator";
-import StatusBar from "@/components/StatusBar.vue";
 import LoadingOverlay from "@/components/LoadingOverlay.vue";
-import Toolbar from "@/components/Toolbar.vue";
-import JsonEditor from "@/components/JsonEditor.vue";
-import DownloadOverlay from "@/components/DownloadOverlay.vue";
 import EnvironmentEditor from "@/components/EnvironmentEditor.vue";
 import EditorContainer from "@/components/EditorContainer.vue";
 import DocumentationEditor from "@/components/DocumentationEditor.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
-import Zip from "jszip";
 import pako from "pako";
-import {
-  getWebGlVendor,
-  getWebGlRenderer,
-  WebGlTimeElapsedQuery
-} from "./helpers/webgl_info";
 import MovingWindowEstimator from "./helpers/minimum_window";
 import CanvasContainer from "@/components/CanvasContainer.vue";
 
 @Component({
   components: {
-    StatusBar,
-    Toolbar,
     LoadingOverlay,
-    JsonEditor,
-    DownloadOverlay,
     EnvironmentEditor,
     EditorContainer,
     DocumentationEditor,
@@ -77,8 +63,7 @@ import CanvasContainer from "@/components/CanvasContainer.vue";
 export default class App extends Vue {
   @Prop() private equinox!: typeof import("equinox");
 
-  private scene!: WebScene;
-  private device!: WebDevice;
+  private scene = new this.equinox.WebScene();
 
   private editorTabsAbove = ["environment"];
   private editorTabsBelow = ["documentation", "advanced"];
@@ -117,6 +102,7 @@ export default class App extends Vue {
     }
   }
 
+  // TODO: move to the advanced editor (just need a load_asset dependency)
   private async updateScene(json: object, assets: string[]): Promise<boolean> {
     const oldAssets = this.scene.assets();
     const promises = [];
@@ -146,7 +132,7 @@ export default class App extends Vue {
   }
 
   created() {
-    this.scene = new this.equinox.WebScene();
+    // TODO: load a default asset-less prefab from inside JS
     this.scene.set_default_scene();
   }
 }
