@@ -24,8 +24,8 @@
         :tabs-below="editorTabsBelow"
         :defaultTab="defaultEditorTab"
       >
-        <template slot="tab-head-test">Advanced Editor</template>
-        <template slot="tab-panel-test">
+        <template slot="tab-head-advanced">Advanced Editor</template>
+        <template slot="tab-panel-advanced">
           <p>
             Obtain full control by directly editing the scene's underlying representation. Note that
             some changes (especially changing the geometry modifier stack and changing non-symbolic
@@ -38,54 +38,13 @@
           <hr />
           <p>(code editor here)</p>
         </template>
-        <template slot="tab-head-blah">Environment</template>
-        <template slot="tab-panel-blah">
+        <template slot="tab-head-environment">Environment</template>
+        <template slot="tab-panel-environment">
           <EnvironmentEditor :scene="scene" :load-asset="load_asset" />
         </template>
         <template slot="tab-head-documentation">Documentation</template>
         <template slot="tab-panel-documentation">
-          <h2>Shortcuts</h2>
-          <table style="width:100%">
-            <tr>
-              <td>Toggle renderer status bar</td>
-              <td>Shift + O</td>
-            </tr>
-            <tr>
-              <td>Force WebGL context loss (for debugging)</td>
-              <td>Shift + K</td>
-            </tr>
-            <tr>
-              <td>Restore force-lost WebGL context (for debugging)</td>
-              <td>Shift + L</td>
-            </tr>
-          </table>
-          <h2>Camera Controls</h2>
-          <p>
-            All camera interaction is done when the cursor is captured by left- or right-clicking
-            on the canvas.
-          </p>
-          <table style="width:100%">
-            <tr>
-              <td>Look around</td>
-              <td>Mouse movement</td>
-            </tr>
-            <tr>
-              <td>Basic movement</td>
-              <td>WASD</td>
-            </tr>
-            <tr>
-              <td>Pan upwards</td>
-              <td>Q</td>
-            </tr>
-            <tr>
-              <td>Pan downwards</td>
-              <td>Z</td>
-            </tr>
-            <tr>
-              <td>Adjust movement speed</td>
-              <td>Scroll Wheel</td>
-            </tr>
-          </table>
+          <DocumentationEditor />
         </template>
       </EditorContainer>
     </div>
@@ -142,6 +101,7 @@ import JsonEditor from "@/components/JsonEditor.vue";
 import DownloadOverlay from "@/components/DownloadOverlay.vue";
 import EnvironmentEditor from "@/components/EnvironmentEditor.vue";
 import EditorContainer from "@/components/EditorContainer.vue";
+import DocumentationEditor from "@/components/DocumentationEditor.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
 import Zip from "jszip";
@@ -161,7 +121,8 @@ import MovingWindowEstimator from "./helpers/minimum_window";
     JsonEditor,
     DownloadOverlay,
     EnvironmentEditor,
-    EditorContainer
+    EditorContainer,
+    DocumentationEditor
   }
 })
 export default class App extends Vue {
@@ -197,9 +158,9 @@ export default class App extends Vue {
 
   private isEditingJson: boolean = false;
 
-  private editorTabsAbove = ["blah"];
-  private editorTabsBelow = ["test", "documentation"];
-  private defaultEditorTab = "test";
+  private editorTabsAbove = ["environment"];
+  private editorTabsBelow = ["documentation", "advanced"];
+  private defaultEditorTab = "documentation";
 
   private extension: WEBGL_lose_context | null = null;
   private showEnvironmentEditor: boolean = false;
