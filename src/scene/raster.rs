@@ -57,9 +57,9 @@ impl RasterFilter {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, SmartDefault)]
 pub struct Raster {
-    #[default(150)]
+    #[default(1280)]
     pub width: u32,
-    #[default(150)]
+    #[default(720)]
     pub height: u32,
     pub filter: RasterFilter,
 }

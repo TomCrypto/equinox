@@ -1,21 +1,9 @@
 <template>
   <div id="app">
     <div class="canvas-panel">
-      <!-- TOOD: this should be an actual component -->
-      <canvas
-        ref="canvas"
-        tabindex="0"
-        v-on:mousedown="enterCapture()"
-        v-on:mouseup="leaveCapture()"
-        v-on:mouseleave="leaveCapture()"
-        v-on:mousemove="moveCamera($event)"
-        v-on:wheel="onMouseWheel($event.deltaY)"
-        v-on:keydown="pressKey($event.key)"
-        v-on:keyup="releaseKey($event.key)"
-        v-on:keypress="onKeyPress($event)"
-        v-on:contextmenu="$event.preventDefault()"
-        v-on:dblclick="enterFullscreen()"
-      />
+      <CanvasContainer :equinox="equinox" :scene="scene" />
+
+      <LoadingOverlay :loading-count="loadingCount" :downloading-count="downloadingCount" />
     </div>
     <div class="editor-panel">
       <EditorContainer
@@ -49,14 +37,14 @@
       </EditorContainer>
     </div>
 
-    <JsonEditor
+    <!--<JsonEditor
       v-if="isEditingJson"
       :payload="sceneJson()"
       :on-update-scene="updateScene"
       :on-close="closeEditor"
     />
 
-    <!--<Toolbar
+    <Toolbar
       :on-save-screenshot="saveScreenshot"
       :on-edit-json="editJson"
       :on-edit-environment="editEnvironment"
@@ -78,17 +66,13 @@
     />
     -->
 
-    <LoadingOverlay
-      v-if="canvas !== null"
-      :loading-count="loadingCount"
-      :downloading-count="downloadingCount"
-    />
-
+    <!--
     <DownloadOverlay
       v-if="screenshot !== null"
       :render="screenshot"
       :on-close="downloadOverlayClosed"
     />
+    -->
   </div>
 </template>
 
@@ -112,6 +96,7 @@ import {
   WebGlTimeElapsedQuery
 } from "./helpers/webgl_info";
 import MovingWindowEstimator from "./helpers/minimum_window";
+import CanvasContainer from "@/components/CanvasContainer.vue";
 
 @Component({
   components: {
@@ -122,7 +107,8 @@ import MovingWindowEstimator from "./helpers/minimum_window";
     DownloadOverlay,
     EnvironmentEditor,
     EditorContainer,
-    DocumentationEditor
+    DocumentationEditor,
+    CanvasContainer
   }
 })
 export default class App extends Vue {
@@ -131,137 +117,40 @@ export default class App extends Vue {
   private scene!: WebScene;
   private device!: WebDevice;
 
-  private keys: { [x: string]: boolean } = {};
-  private theta: number = Math.PI / 2;
-  private phi: number = -Math.PI / 2;
-  private thetaChange: number = 0;
-  private phiChange: number = 0;
-  private movementSpeed: number = 0.1;
-  private mouseMoved: boolean = false;
-  private thetaEstimator = new MovingWindowEstimator(10);
-  private phiEstimator = new MovingWindowEstimator(10);
-
-  private captured: boolean = false;
-
-  private cpuFrameTimeEstimator = new MovingWindowEstimator(30);
-  private gpuFrameTimeEstimator = new MovingWindowEstimator(30);
-  private syncIntervalEstimator = new MovingWindowEstimator(30);
-
-  private cpuFrameTime: number | null = null;
-  private gpuFrameTime: number | null = null;
-  private syncInterval: number | null = null;
-
-  private gpuTimeQueries: WebGlTimeElapsedQuery | null = null;
-
-  private loadingCount: number = 0;
-  private downloadingCount: number = 0;
-
-  private isEditingJson: boolean = false;
-
   private editorTabsAbove = ["environment"];
   private editorTabsBelow = ["documentation", "advanced"];
   private defaultEditorTab = "documentation";
 
-  private extension: WEBGL_lose_context | null = null;
-  private showEnvironmentEditor: boolean = false;
+  private loadingCount: number = 0;
+  private downloadingCount: number = 0;
 
-  private isContextLost: boolean = false;
-
-  private mustSaveScreenshot: boolean = false;
-  private screenshot: Blob | null = null;
-
-  private enterFullscreen() {
-    this.canvas.requestFullscreen();
-    console.log("requestFullscreen");
+  async load_asset(url: string) {
+    const data = await this.fetch_asset_data(url);
+    this.scene.insert_asset(url, new Uint8Array(data));
   }
 
-  private loseContext() {
-    if (this.extension !== null) {
-      this.extension.loseContext();
-    }
-  }
+  async fetch_asset_data(url: string): Promise<ArrayBuffer> {
+    this.loadingCount += 1;
 
-  private restoreContext() {
-    if (this.extension !== null) {
-      this.extension.restoreContext();
-    }
-  }
+    try {
+      let data = (await localforage.getItem(url)) as Blob | null;
 
-  private pressKey(key: string) {
-    if (!this.captured) {
-      return;
-    }
+      if (data === null) {
+        this.downloadingCount += 1;
 
-    this.keys[key] = true;
-  }
+        try {
+          const buffer = await (await fetch(new Request(url))).arrayBuffer();
+          data = new Blob([pako.inflate(new Uint8Array(buffer)).buffer]);
 
-  private downloadOverlayClosed() {
-    this.screenshot = null;
-  }
+          await localforage.setItem(url, data);
+        } finally {
+          this.downloadingCount -= 1;
+        }
+      }
 
-  private editJson() {
-    this.isEditingJson = !this.isEditingJson;
-  }
-
-  private editEnvironment() {
-    this.showEnvironmentEditor = !this.showEnvironmentEditor;
-  }
-
-  private closeEditor() {
-    this.isEditingJson = false;
-  }
-
-  private sceneJson(): object {
-    return {
-      json: this.scene.json(),
-      assets: this.scene.assets()
-    };
-  }
-
-  private saveScreenshot() {
-    this.mustSaveScreenshot = true;
-  }
-
-  private releaseKey(key: string) {
-    delete this.keys[key];
-  }
-
-  private moveCamera(event: MouseEvent) {
-    if (!this.captured) {
-      return;
-    }
-
-    if (event.movementX === 0 && event.movementY === 0) {
-      return;
-    }
-
-    if (!this.mouseMoved) {
-      // reconstruct coordinates from scene json in case they changed
-
-      const direction = this.scene.json().camera.direction;
-
-      this.phi = Math.atan2(direction.z, direction.x);
-      this.theta = Math.acos(direction.y);
-    }
-
-    this.phiChange += -event.movementX * 0.001;
-    this.thetaChange += event.movementY * 0.001;
-
-    this.mouseMoved = true;
-  }
-
-  private enterCapture() {
-    if (this.canvas !== null) {
-      this.canvas.requestPointerLock();
-      this.captured = true;
-    }
-  }
-
-  private leaveCapture() {
-    if (this.canvas !== null) {
-      document.exitPointerLock();
-      this.captured = false;
-      this.keys = {};
+      return new Response(data).arrayBuffer();
+    } finally {
+      this.loadingCount -= 1;
     }
   }
 
@@ -293,37 +182,6 @@ export default class App extends Vue {
     }
   }
 
-  private onKeyPress(event: KeyboardEvent) {
-    if (event.shiftKey && event.key === "K" && this.extension !== null) {
-      this.extension.loseContext();
-    }
-
-    if (event.shiftKey && event.key === "L" && this.extension !== null) {
-      this.extension.restoreContext();
-    }
-
-    // ...
-  }
-
-  private onMouseWheel(amount: number) {
-    this.movementSpeed *= Math.pow(1.1, amount / 64);
-  }
-
-  get contextVendor(): string {
-    return this.context === null ? "unknown" : getWebGlVendor(this.context!);
-  }
-
-  get contextRenderer(): string {
-    return this.context === null ? "unknown" : getWebGlRenderer(this.context!);
-  }
-
-  private canvas: HTMLCanvasElement | null = null;
-  private context: WebGL2RenderingContext | null = null;
-  private canvasWidth: number = 0;
-  private canvasHeight: number = 0;
-  private sppmPhotons: number = 0;
-  private sppmPasses: number = 0;
-
   created() {
     this.scene = new this.equinox.WebScene();
     this.scene.set_default_scene();
@@ -334,221 +192,6 @@ export default class App extends Vue {
       await this.load_asset(asset);
       this.scene.set_envmap(asset);
     })();*/
-  }
-
-  private animationFrame: number | null = null;
-
-  mounted() {
-    const canvas = this.$refs.canvas as HTMLCanvasElement;
-
-    new (window as any).ResizeObserver(() => {
-      console.log("Changed to ", canvas.clientWidth, canvas.clientHeight);
-    }).observe(this.$el);
-
-    this.canvas = canvas;
-
-    this.context = canvas.getContext("webgl2", {
-      alpha: false,
-      antialias: false,
-      depth: false,
-      premultipliedAlpha: false,
-      stencil: false,
-      powerPreference: "high-performance",
-      preserveDrawingBuffer: false
-    });
-
-    this.extension = this.context!.getExtension("WEBGL_lose_context");
-
-    if (this.context === null) {
-      alert("Sorry, your browser does not appear to support WebGL2!");
-    }
-
-    this.gpuTimeQueries = new WebGlTimeElapsedQuery(this.context!);
-
-    this.canvas.addEventListener("webglcontextlost", event => {
-      this.gpuTimeQueries!.clear();
-      this.device.context_lost();
-      event.preventDefault();
-    });
-
-    this.device = new this.equinox.WebDevice(this.context!);
-
-    this.canvas.focus();
-
-    this.animationFrame = requestAnimationFrame(this.renderLoop);
-  }
-
-  private lastVsync: number = 0;
-
-  renderLoop() {
-    const start = performance.now();
-
-    if (this.lastVsync !== 0) {
-      this.syncIntervalEstimator.addSample(start - this.lastVsync);
-    }
-
-    this.lastVsync = start;
-
-    if (
-      this.canvas !== null &&
-      this.context !== null &&
-      this.canvas.clientWidth != 0 &&
-      this.canvas.clientHeight != 0
-    ) {
-      this.isContextLost = this.context.isContextLost();
-
-      let forward = 0;
-      let sideways = 0;
-      let upwards = 0;
-
-      if (this.keys["w"]) {
-        forward += 1.0;
-      }
-
-      if (this.keys["s"]) {
-        forward -= 1.0;
-      }
-
-      if (this.keys["a"]) {
-        sideways -= 1.0;
-      }
-
-      if (this.keys["d"]) {
-        sideways += 1.0;
-      }
-
-      if (this.keys["q"]) {
-        upwards += 1.0;
-      }
-
-      if (this.keys["z"]) {
-        upwards -= 1.0;
-      }
-
-      if (forward != 0 || upwards != 0 || sideways != 0) {
-        this.scene.move_camera(
-          sideways * this.movementSpeed,
-          upwards * this.movementSpeed,
-          forward * this.movementSpeed
-        );
-      }
-
-      this.thetaEstimator.addSample(this.thetaChange);
-      this.phiEstimator.addSample(this.phiChange);
-      this.thetaChange = 0;
-      this.phiChange = 0;
-
-      if (this.mouseMoved) {
-        this.theta += this.thetaEstimator.average()!;
-        this.phi += this.phiEstimator.average()!;
-
-        if (this.theta > Math.PI - 0.01) {
-          this.theta = Math.PI - 0.01;
-        }
-
-        if (this.theta < 0.01) {
-          this.theta = 0.01;
-        }
-
-        let x = Math.sin(this.theta) * Math.cos(this.phi);
-        let z = Math.sin(this.theta) * Math.sin(this.phi);
-        let y = Math.cos(this.theta);
-
-        this.scene.set_camera_direction(x, y, z);
-
-        this.mouseMoved = false;
-      }
-
-      /*this.canvas.width = this.canvas.clientWidth;
-      this.canvas.height = this.canvas.clientHeight;*/
-      this.canvasWidth = this.canvas.width;
-      this.canvasHeight = this.canvas.height;
-
-      this.sppmPhotons = this.device.sppm_photons();
-      this.sppmPasses = this.device.sppm_passes();
-
-      this.scene.set_raster_dimensions(this.canvas.width, this.canvas.height);
-
-      try {
-        this.device.update(this.scene);
-
-        const refineTime = this.gpuTimeQueries!.timeElapsed(() => {
-          this.device.refine();
-          this.device.render();
-        });
-
-        this.gpuFrameTimeEstimator.addSample(refineTime);
-
-        if (this.mustSaveScreenshot) {
-          this.generateScreenshotZip();
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    const time = (performance.now() - start) / 1000;
-
-    this.cpuFrameTimeEstimator.addSample(time);
-
-    this.cpuFrameTime = this.cpuFrameTimeEstimator.minimum();
-    this.gpuFrameTime = this.gpuFrameTimeEstimator.minimum();
-    this.syncInterval = this.syncIntervalEstimator.average();
-
-    this.animationFrame = requestAnimationFrame(this.renderLoop);
-    this.mustSaveScreenshot = false; // avoid spurious screenshot
-  }
-
-  private async generateScreenshotZip() {
-    const zip = new Zip();
-
-    const render = new Promise<Blob>(resolve => {
-      this.canvas!.toBlob(blob => resolve(blob!));
-    });
-
-    const info = {
-      sppm_passes: this.device.sppm_passes(),
-      sppm_photons: this.device.sppm_photons(),
-      vendor: this.contextVendor,
-      renderer: this.contextRenderer,
-      version: this.equinox.version()
-    };
-
-    zip.file("scene.json", JSON.stringify(this.sceneJson(), null, 2));
-    zip.file("meta.json", JSON.stringify(info, null, 2));
-    zip.file("render.png", await render);
-
-    this.screenshot = await zip.generateAsync({ type: "blob" });
-  }
-
-  async load_asset(url: string) {
-    const data = await this.fetch_asset_data(url);
-    this.scene.insert_asset(url, new Uint8Array(data));
-  }
-
-  async fetch_asset_data(url: string): Promise<ArrayBuffer> {
-    this.loadingCount += 1;
-
-    try {
-      let data = (await localforage.getItem(url)) as Blob | null;
-
-      if (data === null) {
-        this.downloadingCount += 1;
-
-        try {
-          const buffer = await (await fetch(new Request(url))).arrayBuffer();
-          data = new Blob([pako.inflate(new Uint8Array(buffer)).buffer]);
-
-          await localforage.setItem(url, data);
-        } finally {
-          this.downloadingCount -= 1;
-        }
-      }
-
-      return new Response(data).arrayBuffer();
-    } finally {
-      this.loadingCount -= 1;
-    }
   }
 }
 </script>
@@ -603,18 +246,5 @@ body {
 
 .editor {
   height: 100vh;
-}
-
-canvas {
-  position: absolute;
-  top: 50%;
-  bottom: 0;
-  left: 0%;
-  right: 0;
-  transform: translateY(-50%);
-  width: 100%;
-  height: 50%;
-  margin: 0;
-  outline: none;
 }
 </style>
