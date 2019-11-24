@@ -41,21 +41,53 @@
         <template slot="tab-panel-blah">
           <EnvironmentEditor :scene="scene" :load-asset="load_asset" />
         </template>
+        <template slot="tab-head-documentation">Documentation</template>
+        <template slot="tab-panel-documentation">
+          <h2>Shortcuts</h2>
+          <table style="width:100%">
+            <tr>
+              <td>Toggle renderer status bar</td>
+              <td>Shift + O</td>
+            </tr>
+            <tr>
+              <td>Force WebGL context loss (for debugging)</td>
+              <td>Shift + K</td>
+            </tr>
+            <tr>
+              <td>Restore force-lost WebGL context (for debugging)</td>
+              <td>Shift + L</td>
+            </tr>
+          </table>
+          <h2>Camera Controls</h2>
+          <p>
+            All camera interaction is done when the cursor is captured by left- or right-clicking
+            on the canvas.
+          </p>
+          <table style="width:100%">
+            <tr>
+              <td>Look around</td>
+              <td>Mouse movement</td>
+            </tr>
+            <tr>
+              <td>Basic movement</td>
+              <td>WASD</td>
+            </tr>
+            <tr>
+              <td>Pan upwards</td>
+              <td>Q</td>
+            </tr>
+            <tr>
+              <td>Pan downwards</td>
+              <td>Z</td>
+            </tr>
+            <tr>
+              <td>Adjust movement speed</td>
+              <td>Scroll Wheel</td>
+            </tr>
+          </table>
+        </template>
       </EditorContainer>
     </div>
-    <!--<canvas
-      ref="canvas"
-      tabindex="0"
-      v-on:mousedown="enterCapture()"
-      v-on:mouseup="leaveCapture()"
-      v-on:mouseleave="leaveCapture()"
-      v-on:mousemove="moveCamera($event)"
-      v-on:wheel="onMouseWheel($event.deltaY)"
-      v-on:keydown="pressKey($event.key)"
-      v-on:keyup="releaseKey($event.key)"
-      v-on:keypress="onKeyPress($event)"
-      v-on:contextmenu="$event.preventDefault()"
-    />-->
 
     <JsonEditor
       v-if="isEditingJson"
@@ -164,8 +196,8 @@ export default class App extends Vue {
 
   private isEditingJson: boolean = false;
 
-  private editorTabsAbove = ["test"];
-  private editorTabsBelow = ["blah"];
+  private editorTabsAbove = ["blah"];
+  private editorTabsBelow = ["test", "documentation"];
   private defaultEditorTab = "test";
 
   private extension: WEBGL_lose_context | null = null;

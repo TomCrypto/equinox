@@ -80,6 +80,7 @@ export default class extends Vue {
 
 .tab-head {
   padding: 5px 18px;
+  margin-right: 4px;
   position: relative;
   cursor: pointer;
   font-weight: bold;
