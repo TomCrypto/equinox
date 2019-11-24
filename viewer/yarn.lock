@@ -3032,7 +3032,7 @@ entities@^2.0.0:
   integrity sha512-D9f7V0JSRwIxlRI2mjMqufDrRDnx8p+eEOz7aUM9SuvF8gsBzra0/6tbjl1m8eQHrZlYj6PxqE00hZ1SAIKPLw==
 
 "equinox@file:../pkg":
-  version "0.3.0"
+  version "0.6.0"
 
 errno@^0.1.3, errno@~0.1.7:
   version "0.1.7"

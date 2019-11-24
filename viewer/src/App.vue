@@ -341,6 +341,10 @@ export default class App extends Vue {
   mounted() {
     const canvas = this.$refs.canvas as HTMLCanvasElement;
 
+    new (window as any).ResizeObserver(() => {
+      console.log("Changed to ", canvas.clientWidth, canvas.clientHeight);
+    }).observe(this.$el);
+
     this.canvas = canvas;
 
     this.context = canvas.getContext("webgl2", {
