@@ -15,6 +15,7 @@
     "vue-property-decorator": "^8.1.0"
   },
   "devDependencies": {
+    "@types/file-saver": "^2.0.1",
     "@types/jszip": "^3.1.6",
     "@types/pako": "^1.0.1",
     "@types/webgl2": "^0.0.5",
@@ -29,6 +30,7 @@
     "eslint-config-prettier": "^6.4.0",
     "eslint-plugin-prettier": "^3.1.1",
     "eslint-plugin-vue": "^5.2.3",
+    "file-saver": "^2.0.2",
     "jszip": "^3.2.2",
     "localforage": "^1.7.3",
     "mobile-device-detect": "^0.3.3",

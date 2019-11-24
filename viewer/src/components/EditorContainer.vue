@@ -43,13 +43,13 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 
 @Component
 export default class extends Vue {
-  @Prop() private tabsAbove: string[];
-  @Prop() private tabsBelow: string[];
-  @Prop() private defaultTab: string;
+  @Prop() private tabsAbove!: string[];
+  @Prop() private tabsBelow!: string[];
+  @Prop() private defaultTab!: string;
 
   private activeTab = this.defaultTab;
 
-  private switchTab(tab) {
+  private switchTab(tab: string) {
     this.activeTab = tab;
   }
 }

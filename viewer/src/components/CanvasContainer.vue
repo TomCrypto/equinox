@@ -43,6 +43,7 @@ import LoadingOverlay from "@/components/LoadingOverlay.vue";
 import localforage from "localforage";
 import Zip from "jszip";
 import pako from "pako";
+import FileSaver from "file-saver";
 import {
   getWebGlVendor,
   getWebGlRenderer,
@@ -184,7 +185,7 @@ export default class extends Vue {
   }
 
   private onSaveRender() {
-    this.generateScreenshotZip();
+    this.mustSaveScreenshot = true;
   }
 
   private loseContext() {
@@ -390,6 +391,10 @@ export default class extends Vue {
           this.device.render();
         });
 
+        if (this.mustSaveScreenshot) {
+          this.generateScreenshotZip();
+        }
+
         this.gpuFrameTimeEstimator.addSample(refineTime);
       } catch (e) {
         console.error(e);
@@ -427,7 +432,7 @@ export default class extends Vue {
     zip.file("meta.json", JSON.stringify(info, null, 2));
     zip.file("render.png", await render);
 
-    this.screenshot = await zip.generateAsync({ type: "blob" });
+    FileSaver.saveAs(await zip.generateAsync({ type: "blob" }), "render.zip");
   }
 }
 </script>
