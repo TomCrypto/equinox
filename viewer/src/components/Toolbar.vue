@@ -1,8 +1,25 @@
 <template>
   <div class="toolbar">
-    <button class="environment-editor" title="Environment editor" v-on:click="onEditEnvironment()" />
-    <button class="scene-json" title="View scene JSON representation" v-on:click="onEditJson()" />
-    <button class="save-screenshot" title="Save current render" v-on:click="onSaveScreenshot()" />
+    <button
+      class="toggle-fullscreen"
+      title="Enter or leave fullscreen mode"
+      v-on:click="onToggleFullscreen()"
+    />
+
+    <button class="save-render" title="Save the current render" v-on:click="onSaveRender()" />
+
+    <button
+      v-if="!isCameraLocked"
+      class="lock-camera"
+      title="Lock camera"
+      v-on:click="toggleCameraLock()"
+    />
+    <button
+      v-if="isCameraLocked"
+      class="unlock-camera"
+      title="Unlock camera"
+      v-on:click="toggleCameraLock()"
+    />
   </div>
 </template>
 
@@ -11,9 +28,16 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 
 @Component
 export default class extends Vue {
-  @Prop() private onSaveScreenshot!: () => void;
-  @Prop() private onEditJson!: () => void;
-  @Prop() private onEditEnvironment!: () => void;
+  @Prop() private onToggleCameraLock!: (locked: boolean) => void;
+  @Prop() private onSaveRender!: () => void;
+  @Prop() private onToggleFullscreen!: () => void;
+
+  private isCameraLocked: boolean = false;
+
+  private toggleCameraLock() {
+    this.isCameraLocked = !this.isCameraLocked;
+    this.onToggleCameraLock(this.isCameraLocked);
+  }
 }
 </script>
 

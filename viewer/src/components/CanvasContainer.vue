@@ -16,6 +16,20 @@
       v-on:contextmenu="$event.preventDefault()"
       v-on:dblclick="enterFullscreen()"
     />
+
+    <StatusBar
+      class="status-bar"
+      :sppm-passes="sppmPasses"
+      :sppm-photons="sppmPhotons"
+      :is-context-lost="isContextLost"
+      :width="canvasWidth"
+      :height="canvasHeight"
+      :vendor="contextVendor"
+      :renderer="contextRenderer"
+      :cpuFrameTime="cpuFrameTime"
+      :gpuFrameTime="gpuFrameTime"
+      :syncInterval="syncInterval"
+    />
   </div>
 </template>
 
@@ -34,7 +48,11 @@ import {
 } from "../helpers/webgl_info";
 import MovingWindowEstimator from "../helpers/minimum_window";
 
-@Component
+@Component({
+  components: {
+    StatusBar
+  }
+})
 export default class extends Vue {
   @Prop() private equinox!: typeof import("equinox");
 
@@ -155,7 +173,7 @@ export default class extends Vue {
   private screenshot: Blob | null = null;
 
   private enterFullscreen() {
-    this.canvas.requestFullscreen();
+    this.$el.requestFullscreen();
   }
 
   private loseContext() {
@@ -420,5 +438,15 @@ export default class extends Vue {
   right: 0;
   margin: 0;
   outline: none;
+  z-index: 0;
+}
+
+.status-bar {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 18px !important;
+  border-top: 1px solid #777777;
+  z-index: 1;
 }
 </style>

@@ -116,6 +116,8 @@ export default class extends Vue {
   opacity: 0.6667;
   display: flex;
 
+  flex-wrap: wrap;
+  overflow: hidden;
   flex-grow: 0;
   flex-shrink: 0;
   user-select: none;

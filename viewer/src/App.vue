@@ -36,43 +36,6 @@
         </template>
       </EditorContainer>
     </div>
-
-    <!--<JsonEditor
-      v-if="isEditingJson"
-      :payload="sceneJson()"
-      :on-update-scene="updateScene"
-      :on-close="closeEditor"
-    />
-
-    <Toolbar
-      :on-save-screenshot="saveScreenshot"
-      :on-edit-json="editJson"
-      :on-edit-environment="editEnvironment"
-    />-->
-
-    <!--
-    <StatusBar
-      v-if="canvas !== null"
-      :sppm-passes="sppmPasses"
-      :sppm-photons="sppmPhotons"
-      :is-context-lost="isContextLost"
-      :width="canvasWidth"
-      :height="canvasHeight"
-      :vendor="contextVendor"
-      :renderer="contextRenderer"
-      :cpuFrameTime="cpuFrameTime"
-      :gpuFrameTime="gpuFrameTime"
-      :syncInterval="syncInterval"
-    />
-    -->
-
-    <!--
-    <DownloadOverlay
-      v-if="screenshot !== null"
-      :render="screenshot"
-      :on-close="downloadOverlayClosed"
-    />
-    -->
   </div>
 </template>
 
@@ -185,13 +148,6 @@ export default class App extends Vue {
   created() {
     this.scene = new this.equinox.WebScene();
     this.scene.set_default_scene();
-
-    /*const asset = "assets/old_outdoor_theater_4k.raw";
-
-    (async () => {
-      await this.load_asset(asset);
-      this.scene.set_envmap(asset);
-    })();*/
   }
 }
 </script>
@@ -204,15 +160,6 @@ body {
     "Lucida Sans", Arial, sans-serif;
   user-select: none;
   background-color: #1a1a1a;
-}
-
-.status {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  height: 18px !important;
-  border-top: 1px solid #777777;
-  z-index: 1;
 }
 
 .canvas-panel {
@@ -230,13 +177,6 @@ body {
   outline: none;
   padding: 0px;
   background-color: black;
-}
-
-.canvas-panel:fullscreen {
-  position: absolute;
-  width: 100vw;
-  height: 100vh;
-  border: 0;
 }
 
 .editor-panel {
