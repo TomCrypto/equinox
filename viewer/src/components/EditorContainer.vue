@@ -45,9 +45,9 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 export default class extends Vue {
   @Prop() private tabsAbove: string[];
   @Prop() private tabsBelow: string[];
-  @Prop() private initialTab: string;
+  @Prop() private defaultTab: string;
 
-  private activeTab = this.initialTab;
+  private activeTab = this.defaultTab;
 
   private switchTab(tab) {
     this.activeTab = tab;
@@ -56,12 +56,17 @@ export default class extends Vue {
 </script>
 
 <style scoped>
+.container {
+  display: flex;
+  flex-direction: column;
+}
+
 .container-header {
   background-color: #12263b;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  color: #fff;
+  color: #dddddd;
 }
 
 .tab-heads {
@@ -109,5 +114,7 @@ export default class extends Vue {
 .container-body {
   padding: 20px 20px;
   background-color: #1a1a1a;
+  color: #dddddd;
+  flex: 1;
 }
 </style>

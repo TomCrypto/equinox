@@ -1,6 +1,51 @@
 <template>
   <div id="app">
-    <canvas
+    <div class="canvas-panel">
+      <div class="canvas">
+        <!-- canvas placeholder -->
+        <canvas
+          ref="canvas"
+          tabindex="0"
+          v-on:mousedown="enterCapture()"
+          v-on:mouseup="leaveCapture()"
+          v-on:mouseleave="leaveCapture()"
+          v-on:mousemove="moveCamera($event)"
+          v-on:wheel="onMouseWheel($event.deltaY)"
+          v-on:keydown="pressKey($event.key)"
+          v-on:keyup="releaseKey($event.key)"
+          v-on:keypress="onKeyPress($event)"
+          v-on:contextmenu="$event.preventDefault()"
+        />
+      </div>
+
+      <div class="changelog">sup</div>
+    </div>
+    <div class="editor-panel">
+      <EditorContainer
+        class="editor"
+        :tabs-above="editorTabsAbove"
+        :tabs-below="editorTabsBelow"
+        :defaultTab="defaultEditorTab"
+      >
+        <template slot="tab-head-test">Advanced Editor</template>
+        <template slot="tab-panel-test">
+          <p>
+            Obtain full control by directly editing the scene's underlying representation. Note that
+            some changes (especially changing the geometry modifier stack and changing non-symbolic
+            parameters) may trigger shader rebuilds which can take a few seconds.
+          </p>
+          <p>
+            On Windows, shader builds can be very slow due to the ANGLE GLSL to HLSL conversion. It
+            is recommended to switch to native OpenGL if possible.
+          </p>
+          <hr />
+          <p>(code editor here)</p>
+        </template>
+        <template slot="tab-head-blah">Environment</template>
+        <template slot="tab-panel-blah"></template>
+      </EditorContainer>
+    </div>
+    <!--<canvas
       ref="canvas"
       tabindex="0"
       v-on:mousedown="enterCapture()"
@@ -12,22 +57,7 @@
       v-on:keyup="releaseKey($event.key)"
       v-on:keypress="onKeyPress($event)"
       v-on:contextmenu="$event.preventDefault()"
-    />
-
-    <EditorContainer :tabs-above="tabsAbove" :tabs-below="tabsBelow" :initialTab="initialTab">
-      <template slot="tab-head-test">Test</template>
-      <template slot="tab-panel-test">
-        <h2 class="title">Test</h2>
-        <p class="description">foo</p>
-        <p class="description">blah</p>
-      </template>
-      <template slot="tab-head-blah">Blah</template>
-      <template slot="tab-panel-blah">
-        <h2 class="title">Blah</h2>
-        <p class="description">foo</p>
-        <p class="description">blah</p>
-      </template>
-    </EditorContainer>
+    />-->
 
     <JsonEditor
       v-if="isEditingJson"
@@ -36,12 +66,13 @@
       :on-close="closeEditor"
     />
 
-    <Toolbar
+    <!--<Toolbar
       :on-save-screenshot="saveScreenshot"
       :on-edit-json="editJson"
       :on-edit-environment="editEnvironment"
-    />
+    />-->
 
+    <!--
     <StatusBar
       v-if="canvas !== null"
       :sppm-passes="sppmPasses"
@@ -55,6 +86,7 @@
       :gpuFrameTime="gpuFrameTime"
       :syncInterval="syncInterval"
     />
+    -->
 
     <LoadingOverlay
       v-if="canvas !== null"
@@ -136,9 +168,9 @@ export default class App extends Vue {
 
   private isEditingJson: boolean = false;
 
-  private tabsAbove = ["test"];
-  private tabsBelow = ["blah"];
-  private initialTab = "test";
+  private editorTabsAbove = ["test"];
+  private editorTabsBelow = ["blah"];
+  private defaultEditorTab = "test";
 
   private extension: WEBGL_lose_context | null = null;
   private showEnvironmentEditor: boolean = false;
@@ -428,8 +460,8 @@ export default class App extends Vue {
         this.mouseMoved = false;
       }
 
-      this.canvas.width = this.canvas.clientWidth;
-      this.canvas.height = this.canvas.clientHeight;
+      /*this.canvas.width = this.canvas.clientWidth;
+      this.canvas.height = this.canvas.clientHeight;*/
       this.canvasWidth = this.canvas.width;
       this.canvasHeight = this.canvas.height;
 
@@ -540,10 +572,43 @@ body {
   z-index: 1;
 }
 
-canvas {
-  width: 100vw;
+.canvas-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  float: left;
+  width: 50%;
   height: 100vh;
-  background-color: black;
-  display: block;
+  flex: 1;
+}
+
+.canvas {
+  flex: 1;
+  padding: 0px;
+  background-color: #1a1a1a;
+  height: 50%;
+}
+
+.changelog {
+  flex: 1;
+}
+
+.editor-panel {
+  float: right;
+  width: 50%;
+}
+
+.editor {
+  height: 100vh;
+}
+
+canvas {
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  background-color: #1a1a1a;
+  border: 4px solid #1a1a1a;
+  border-radius: 10px;
+  margin: 0;
+  outline: none;
 }
 </style>
