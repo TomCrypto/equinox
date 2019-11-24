@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <div class="canvas-panel">
-      <div class="canvas">
+      <div class="canvas-container">
         <!-- canvas placeholder -->
         <canvas
           ref="canvas"
@@ -582,11 +582,12 @@ body {
   flex: 1;
 }
 
-.canvas {
-  flex: 1;
+.canvas-container {
   padding: 0px;
   background-color: #1a1a1a;
+  width: 100%;
   height: 50%;
+  position: relative;
 }
 
 .changelog {
@@ -603,7 +604,13 @@ body {
 }
 
 canvas {
-  width: calc(100% - 8px);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  right: 0;
+  transform: translateX(-50%);
+  width: calc(50% - 8px);
   height: calc(100% - 8px);
   background-color: #1a1a1a;
   border: 4px solid #1a1a1a;
