@@ -14,6 +14,7 @@
         v-on:keyup="releaseKey($event.key)"
         v-on:keypress="onKeyPress($event)"
         v-on:contextmenu="$event.preventDefault()"
+        v-on:dblclick="enterFullscreen()"
       />
     </div>
     <div class="editor-panel">
@@ -207,6 +208,11 @@ export default class App extends Vue {
 
   private mustSaveScreenshot: boolean = false;
   private screenshot: Blob | null = null;
+
+  private enterFullscreen() {
+    this.canvas.requestFullscreen();
+    console.log("requestFullscreen");
+  }
 
   private loseContext() {
     if (this.extension !== null) {
@@ -616,6 +622,13 @@ body {
   outline: none;
   padding: 0px;
   background-color: black;
+}
+
+.canvas-panel:fullscreen {
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+  border: 0;
 }
 
 .editor-panel {
