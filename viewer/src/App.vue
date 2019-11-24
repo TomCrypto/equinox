@@ -333,12 +333,12 @@ export default class App extends Vue {
     this.scene = new this.equinox.WebScene();
     this.scene.set_default_scene();
 
-    const asset = "assets/old_outdoor_theater_4k.raw";
+    /*const asset = "assets/old_outdoor_theater_4k.raw";
 
     (async () => {
       await this.load_asset(asset);
       this.scene.set_envmap(asset);
-    })();
+    })();*/
   }
 
   private animationFrame: number | null = null;
@@ -561,6 +561,7 @@ body {
   font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande",
     "Lucida Sans", Arial, sans-serif;
   user-select: none;
+  background-color: #1a1a1a;
 }
 
 .status {
@@ -584,10 +585,14 @@ body {
 
 .canvas-container {
   padding: 0px;
-  background-color: #1a1a1a;
-  width: 100%;
-  height: 50%;
+  background-color: black;
+  width: calc(100% - 8x);
+  height: calc(50% - 8px);
   position: relative;
+  border: 4px solid #1a1a1a;
+  border-radius: 12px;
+  margin: 0;
+  outline: none;
 }
 
 .changelog {
@@ -610,11 +615,8 @@ canvas {
   left: 50%;
   right: 0;
   transform: translateX(-50%);
-  width: calc(50% - 8px);
-  height: calc(100% - 8px);
-  background-color: #1a1a1a;
-  border: 4px solid #1a1a1a;
-  border-radius: 10px;
+  width: 50%;
+  height: 100%;
   margin: 0;
   outline: none;
 }

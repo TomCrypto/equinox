@@ -116,5 +116,7 @@ export default class extends Vue {
   background-color: #1a1a1a;
   color: #dddddd;
   flex: 1;
+  overflow-y: auto;
+  user-select: text;
 }
 </style>
