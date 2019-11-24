@@ -14,6 +14,21 @@
       v-on:contextmenu="$event.preventDefault()"
     />
 
+    <EditorContainer :tabs-above="tabsAbove" :tabs-below="tabsBelow" :initialTab="initialTab">
+      <template slot="tab-head-test">Test</template>
+      <template slot="tab-panel-test">
+        <h2 class="title">Test</h2>
+        <p class="description">foo</p>
+        <p class="description">blah</p>
+      </template>
+      <template slot="tab-head-blah">Blah</template>
+      <template slot="tab-panel-blah">
+        <h2 class="title">Blah</h2>
+        <p class="description">foo</p>
+        <p class="description">blah</p>
+      </template>
+    </EditorContainer>
+
     <JsonEditor
       v-if="isEditingJson"
       :payload="sceneJson()"
@@ -65,6 +80,7 @@ import Toolbar from "@/components/Toolbar.vue";
 import JsonEditor from "@/components/JsonEditor.vue";
 import DownloadOverlay from "@/components/DownloadOverlay.vue";
 import EnvironmentEditor from "@/components/EnvironmentEditor.vue";
+import EditorContainer from "@/components/EditorContainer.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
 import Zip from "jszip";
@@ -83,7 +99,8 @@ import MovingWindowEstimator from "./helpers/minimum_window";
     LoadingOverlay,
     JsonEditor,
     DownloadOverlay,
-    EnvironmentEditor
+    EnvironmentEditor,
+    EditorContainer
   }
 })
 export default class App extends Vue {
@@ -118,6 +135,10 @@ export default class App extends Vue {
   private downloadingCount: number = 0;
 
   private isEditingJson: boolean = false;
+
+  private tabsAbove = ["test"];
+  private tabsBelow = ["blah"];
+  private initialTab = "test";
 
   private extension: WEBGL_lose_context | null = null;
   private showEnvironmentEditor: boolean = false;
@@ -504,6 +525,10 @@ export default class App extends Vue {
 <style>
 body {
   margin: 0;
+  overflow: hidden;
+  font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande",
+    "Lucida Sans", Arial, sans-serif;
+  user-select: none;
 }
 
 .status {
