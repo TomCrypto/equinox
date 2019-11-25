@@ -1,6 +1,7 @@
-use crate::BoundingBox;
+use crate::{BoundingBox, Scene};
 use cgmath::prelude::*;
 use cgmath::{Matrix3, Point3, Rad, Vector3};
+use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -76,6 +77,10 @@ pub enum Geometry {
 }
 
 impl Geometry {
+    pub(crate) fn validate(&self, _scene: &Scene) -> Result<(), Error> {
+        Ok(())
+    }
+
     /// Returns the approximate cost of evaluating the distance field, based on
     /// the arbitrary measure that the evaluation cost of the unit sphere is 1.
     pub fn evaluation_cost(&self) -> f32 {

@@ -1,3 +1,5 @@
+use crate::Scene;
+use js_sys::Error;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -36,6 +38,10 @@ pub enum Material {
 }
 
 impl Material {
+    pub(crate) fn validate(&self, _scene: &Scene) -> Result<(), Error> {
+        Ok(())
+    }
+
     pub fn has_delta_bsdf(&self) -> bool {
         match self {
             Self::Lambertian { .. } => false,

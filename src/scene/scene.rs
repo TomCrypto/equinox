@@ -2,6 +2,7 @@ use crate::{
     Aperture, Camera, Dirty, Display, Environment, Geometry, Instance, Integrator, Material, Raster,
 };
 
+use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
@@ -93,7 +94,45 @@ impl Scene {
         }
     }
 
-    /// Returns a list of all assets actually used in the scene.
+    /// Validates the contents of this scene.
+    ///
+    /// If this method succeeds, then the scene should always be renderable
+    /// without errors, barring implementation limitations in the renderer.
+    pub fn validate(&self) -> Result<(), Error> {
+        self.camera.validate(self)?;
+        self.raster.validate(self)?;
+
+        for instance in self.instance_list.values() {
+            instance.validate(self)?;
+        }
+
+        for geometry in self.geometry_list.values() {
+            geometry.validate(self)?;
+        }
+
+        for material in self.material_list.values() {
+            material.validate(self)?;
+        }
+
+        if let Some(asset) = &*self.environment_map {
+            if !self.assets.contains_key(asset) {
+                return Err(Error::new("environment_map not in assets"));
+            }
+        }
+
+        self.environment.validate(self)?;
+        self.display.validate(self)?;
+
+        if let Some(aperture) = &*self.aperture {
+            aperture.validate(self)?;
+        }
+
+        self.integrator.validate(self)?;
+
+        Ok(())
+    }
+
+    /// Returns a list of all assets actually used in this scene.
     ///
     /// It is possible for assets to be preloaded for the scene without being
     /// referenced anywhere; this method will detect which assets are in use.

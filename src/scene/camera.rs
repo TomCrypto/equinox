@@ -1,4 +1,6 @@
+use crate::Scene;
 use cgmath::{Point3, Vector3};
+use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
@@ -49,4 +51,10 @@ pub struct Camera {
 
     #[default(0.024)]
     pub film_height: f32,
+}
+
+impl Camera {
+    pub(crate) fn validate(&self, _scene: &Scene) -> Result<(), Error> {
+        Ok(())
+    }
 }

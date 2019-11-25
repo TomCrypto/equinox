@@ -97,6 +97,7 @@ impl WebScene {
     /// possible, so it won't necessarily always dirty the entire scene.
     pub fn set_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
         self.scene.patch_from_other(from_json(json)?);
+        self.scene.validate()?;
 
         Ok(())
     }

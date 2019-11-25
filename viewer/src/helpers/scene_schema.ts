@@ -7,14 +7,6 @@ export default {
     optionalAsset: {
       type: ["null", "string"],
       pattern: "\\.raw$"
-    },
-    vector3: {
-      type: "array",
-      minItems: 3,
-      maxItems: 3,
-      items: {
-        type: "number"
-      }
     }
   },
   $schema: "http://json-schema.org/draft-07/schema#",
@@ -263,7 +255,13 @@ export default {
                   enum: ["solid"]
                 },
                 tint: {
-                  $ref: "#/definitions/vector3"
+                  type: "array",
+                  minItems: 3,
+                  maxItems: 3,
+                  items: {
+                    type: "number",
+                    minimum: 0
+                  }
                 }
               },
               required: ["type", "tint"]
@@ -275,7 +273,13 @@ export default {
                   enum: ["map"]
                 },
                 tint: {
-                  $ref: "#/definitions/vector3"
+                  type: "array",
+                  minItems: 3,
+                  maxItems: 3,
+                  items: {
+                    type: "number",
+                    minimum: 0
+                  }
                 },
                 rotation: {
                   type: "number"

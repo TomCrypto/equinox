@@ -126,14 +126,8 @@ export default class extends Vue {
   flex-direction: column;
 }
 
-.editor-container {
-}
-
 .editor {
   flex: 1;
-}
-
-.log {
 }
 
 .error {

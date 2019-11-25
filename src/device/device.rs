@@ -149,6 +149,8 @@ impl Device {
             return Ok(false); // context currently lost
         }
 
+        scene.validate()?;
+
         let mut invalidated = false;
 
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {

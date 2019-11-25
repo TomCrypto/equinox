@@ -1,6 +1,5 @@
-#[allow(unused_imports)]
-use log::{debug, info, warn};
-
+use crate::Scene;
+use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -20,4 +19,18 @@ pub struct Instance {
 
 fn true_default() -> bool {
     true
+}
+
+impl Instance {
+    pub(crate) fn validate(&self, scene: &Scene) -> Result<(), Error> {
+        if !scene.geometry_list.contains_key(&self.geometry) {
+            return Err(Error::new(&format!("no such geometry: {}", self.geometry)));
+        }
+
+        if !scene.material_list.contains_key(&self.material) {
+            return Err(Error::new(&format!("no such material: {}", self.material)));
+        }
+
+        Ok(())
+    }
 }
