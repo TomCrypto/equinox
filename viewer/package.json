@@ -26,6 +26,7 @@
     "@vue/cli-service": "^3.11.0",
     "@vue/eslint-config-prettier": "^5.0.0",
     "@vue/eslint-config-typescript": "^4.0.0",
+    "ajv": "^6.10.2",
     "codemirror": "^5.49.2",
     "equinox": "file:../pkg",
     "eslint": "^6.5.1",

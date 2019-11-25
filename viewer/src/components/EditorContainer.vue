@@ -16,9 +16,7 @@
       </ul>
     </header>
     <main class="container-body">
-      <div class="tab-panel">
-        <slot :name="`tab-panel-${this.activeTab}`"></slot>
-      </div>
+      <slot :name="`tab-panel-${this.activeTab}`"></slot>
     </main>
     <header class="container-header header-below">
       <ul class="tab-heads">

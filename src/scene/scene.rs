@@ -93,6 +93,30 @@ impl Scene {
         }
     }
 
+    /// Returns a list of all assets actually used in the scene.
+    ///
+    /// It is possible for assets to be preloaded for the scene without being
+    /// referenced anywhere; this method will detect which assets are in use.
+    pub fn used_assets(&self) -> Vec<Asset> {
+        self.assets
+            .keys()
+            .filter(|&asset| {
+                if self.environment_map.as_ref() == Some(asset) {
+                    return true;
+                }
+
+                if let Some(aperture) = &*self.aperture {
+                    if &aperture.aperture_texels == asset {
+                        return true;
+                    }
+                }
+
+                false
+            })
+            .cloned()
+            .collect()
+    }
+
     pub fn has_photon_receivers(&self) -> bool {
         self.instance_list
             .values()

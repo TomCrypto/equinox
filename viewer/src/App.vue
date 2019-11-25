@@ -96,7 +96,10 @@ export default class App extends Vue {
   }
 
   // TODO: move to the advanced editor (just need a load_asset dependency)
-  private async updateScene(json: object, assets: string[]): Promise<boolean> {
+  private async updateScene(
+    json: object,
+    assets: string[]
+  ): Promise<string | null> {
     const oldAssets = this.scene.assets();
     const promises = [];
 
@@ -118,9 +121,9 @@ export default class App extends Vue {
 
     try {
       this.scene.set_json(json);
-      return true;
-    } catch {
-      return false;
+      return null;
+    } catch (e) {
+      return e.toString();
     }
   }
 

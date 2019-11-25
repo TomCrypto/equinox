@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="root">
     <p>
       Obtain full control by directly editing the scene's underlying representation. Note that
       some changes (especially changing the geometry modifier stack and changing non-symbolic
@@ -14,6 +14,10 @@
       on any change to the scene JSON; in other words, the JSON does not update by itself.
     </p>
     <hr />
+    <div ref="editor" class="editor" />
+    <div class="log">
+      <p class="error">{{ error }}</p>
+    </div>
   </div>
 </template>
 
@@ -21,6 +25,8 @@
 import { Component, Prop, Vue } from "vue-property-decorator";
 import { WebScene } from "equinox";
 import CodeMirror from "codemirror";
+import SceneSchema from "../helpers/scene_schema";
+import ajv from "ajv";
 
 @Component
 export default class extends Vue {
@@ -29,10 +35,12 @@ export default class extends Vue {
   @Prop() private onUpdateScene!: (
     json: object,
     assets: string[]
-  ) => Promise<boolean>;
+  ) => Promise<string | null>;
+
+  private error: string = "";
 
   mounted() {
-    const editor = CodeMirror(this.$el as any, {
+    const editor = CodeMirror(this.$refs.editor as HTMLElement, {
       mode: "application/json",
       gutters: ["CodeMirror-lint-markers"],
       lineNumbers: true,
@@ -44,6 +52,8 @@ export default class extends Vue {
     editor.on("change", () => {
       this.onJsonChange(editor.getValue());
     });
+
+    editor.setSize(null, "100%");
 
     editor.setValue(JSON.stringify(this.sceneJson(), null, 2));
   }
@@ -58,15 +68,15 @@ export default class extends Vue {
   private async onJsonChange(input: string) {
     const result = this.validateJson(input);
 
-    if (result === null) {
-      // bad: do something
-    } else {
+    if (result !== null) {
       const [json, assets] = result;
 
-      if (await this.onUpdateScene(json, assets)) {
-        // all good, nothing to do
+      const error = await this.onUpdateScene(json, assets);
+
+      if (error !== null) {
+        this.error = `renderer error: ${error}`;
       } else {
-        console.error("json update failed");
+        this.error = "";
       }
     }
   }
@@ -75,7 +85,20 @@ export default class extends Vue {
     try {
       const payload = JSON.parse(value);
 
-      if (!(payload["json"] instanceof Object)) {
+      const validator = ajv();
+
+      if (!validator.validate(SceneSchema, payload)) {
+        const error = validator.errors[0];
+
+        this.error = `error: scene.${error.dataPath}: ${error.message}`;
+
+        console.log(validator.errors);
+        return null;
+      } else {
+        return [payload["json"], payload["assets"]];
+      }
+
+      /*if (!(payload["json"] instanceof Object)) {
         return null;
       }
 
@@ -87,14 +110,34 @@ export default class extends Vue {
         if (!(typeof asset === "string")) {
           return null;
         }
-      }
-
-      return [payload["json"], payload["assets"]];
+      }*/
     } catch {
+      this.error = "JSON syntax error";
       return null;
     }
   }
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+.root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-container {
+}
+
+.editor {
+  flex: 1;
+}
+
+.log {
+}
+
+.error {
+  color: red;
+  font-weight: bold;
+}
+</style>
