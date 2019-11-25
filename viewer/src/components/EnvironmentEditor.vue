@@ -1,5 +1,12 @@
 <template>
-  <div class="editor">
+  <div>
+    <div class="radio-group">
+      <input type="radio" id="solid" name="selector" />
+      <label for="solid">Solid Background</label>
+      <input type="radio" id="map" name="selector" />
+      <label for="map">Environment Map</label>
+    </div>
+
     <multiselect
       :value="environmentMap"
       :options="environmentMaps"
@@ -141,16 +148,33 @@ export default class extends Vue {
 <style src="vue-multiselect/dist/vue-multiselect.min.css"></style>
 
 <style scoped>
-.editor {
+input[type="radio"] {
   position: absolute;
+  visibility: hidden;
+  display: none;
+}
 
-  top: 10%;
-  left: 75%;
+label {
+  color: #332f35;
+  display: inline-block;
+  cursor: pointer;
+  font-weight: bold;
+  padding: 5px 20px;
+}
 
-  width: 20%;
-  height: 80%;
+input[type="radio"]:checked + label {
+  color: #132f35;
+  background: #332f35;
+}
 
-  border: 2px solid black;
-  border-radius: 5px;
+label + input[type="radio"] + label {
+  border-left: solid 3px #332f35;
+}
+.radio-group {
+  border: solid 3px #332f35;
+  display: inline-block;
+  margin: 20px;
+  border-radius: 10px;
+  overflow: hidden;
 }
 </style>

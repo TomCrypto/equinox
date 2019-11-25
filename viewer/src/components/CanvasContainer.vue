@@ -125,8 +125,6 @@ export default class extends Vue {
     const ratioX = rasterW / clientW;
     const ratioY = rasterH / clientH;
 
-    // note: can avoid stretching if both ratioX <= 1 and ratioY <= 1 if we want
-
     if (ratioX < ratioY) {
       this.canvasStyle = `
         width: ${Math.ceil(rasterW / ratioY)}px;
@@ -307,6 +305,9 @@ export default class extends Vue {
       this.canvas.clientWidth != 0 &&
       this.canvas.clientHeight != 0
     ) {
+      // TODO: do this every time; do we even need the resize observer then?
+      this.resizeAndMaintainAspectRatio();
+
       this.isContextLost = this.context.isContextLost();
 
       let forward = 0;
