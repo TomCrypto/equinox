@@ -15,10 +15,10 @@ pub enum Parameter {
 }
 
 impl Parameter {
-    pub fn value(&self, symbolic_values: &BTreeMap<String, f32>) -> Option<f32> {
+    pub fn value(&self, symbolic_values: &BTreeMap<String, f32>) -> f32 {
         match self {
-            Self::Constant(number) => Some(*number),
-            Self::Symbolic(symbol) => symbolic_values.get(symbol).copied(),
+            Self::Constant(number) => *number,
+            Self::Symbolic(symbol) => symbolic_values[symbol],
         }
     }
 }
@@ -98,22 +98,22 @@ impl Geometry {
         }
     }
 
-    /// Returns an estimated bounding box for an instance of this geometry, or
-    /// `None` if a symbolic parameter was not present in the parameter table.
-    pub fn bounding_box(&self, symbolic_values: &BTreeMap<String, f32>) -> Option<BoundingBox> {
+    /// Returns a bounding box for an instance of this geometry, or panics if
+    /// some referenced parameter values are absent from the parameter table.
+    pub fn bounding_box(&self, parameters: &BTreeMap<String, f32>) -> BoundingBox {
         match self {
             Self::Sphere { radius } => {
-                let radius = radius.value(symbolic_values)?;
+                let radius = radius.value(parameters);
 
-                Some(BoundingBox {
+                BoundingBox {
                     min: [-radius; 3].into(),
                     max: [radius; 3].into(),
-                })
+                }
             }
             Self::Ellipsoid { radius } => {
-                let mut radius_x = radius[0].value(symbolic_values)?;
-                let mut radius_y = radius[1].value(symbolic_values)?;
-                let mut radius_z = radius[2].value(symbolic_values)?;
+                let mut radius_x = radius[0].value(parameters);
+                let mut radius_y = radius[1].value(parameters);
+                let mut radius_z = radius[2].value(parameters);
 
                 // TODO: we need to do this to account for the fact that this SDF is a bound, is
                 // there a better way to implement this or are we stuck with this approximation?
@@ -124,49 +124,49 @@ impl Geometry {
                 radius_y *= radius_y / min_radius;
                 radius_z *= radius_z / min_radius;
 
-                Some(BoundingBox {
+                BoundingBox {
                     min: [-radius_x, -radius_y, -radius_z].into(),
                     max: [radius_x, radius_y, radius_z].into(),
-                })
+                }
             }
             Self::Cuboid { dimensions } => {
-                let dim_x = dimensions[0].value(symbolic_values)?;
-                let dim_y = dimensions[1].value(symbolic_values)?;
-                let dim_z = dimensions[2].value(symbolic_values)?;
+                let dim_x = dimensions[0].value(parameters);
+                let dim_y = dimensions[1].value(parameters);
+                let dim_z = dimensions[2].value(parameters);
 
-                Some(BoundingBox {
+                BoundingBox {
                     min: [-dim_x, -dim_y, -dim_z].into(),
                     max: [dim_x, dim_y, dim_z].into(),
-                })
+                }
             }
             // TODO: this is wrong (also we should bound repetition anyway)
-            Self::InfiniteRepetition { .. } => Some(BoundingBox {
+            Self::InfiniteRepetition { .. } => BoundingBox {
                 min: Point3::new(-100.0, -2.0, -100.0),
                 max: Point3::new(100.0, 2.0, 100.0),
-            }),
+            },
             Self::Union { children } => {
                 let mut bbox = BoundingBox::neg_infinity_bounds();
 
                 for child in children {
-                    bbox.extend(&child.bounding_box(symbolic_values)?);
+                    bbox.extend(&child.bounding_box(parameters));
                 }
 
-                Some(bbox)
+                bbox
             }
             Self::Intersection { children } => {
                 let mut bbox = BoundingBox::pos_infinity_bounds();
 
                 for child in children {
-                    bbox.intersect(&child.bounding_box(symbolic_values)?);
+                    bbox.intersect(&child.bounding_box(parameters));
                 }
 
-                Some(bbox)
+                bbox
             }
-            Self::Subtraction { lhs, .. } => lhs.bounding_box(symbolic_values),
+            Self::Subtraction { lhs, .. } => lhs.bounding_box(parameters),
             Self::Onion { thickness, f } => {
-                let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
+                let BoundingBox { mut min, mut max } = f.bounding_box(parameters);
 
-                let thickness = thickness.value(symbolic_values)?;
+                let thickness = thickness.value(parameters);
 
                 min.x -= thickness;
                 min.y -= thickness;
@@ -175,47 +175,47 @@ impl Geometry {
                 max.y += thickness;
                 max.z += thickness;
 
-                Some(BoundingBox { min, max })
+                BoundingBox { min, max }
             }
             Self::Scale { factor, f } => {
-                let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
+                let BoundingBox { mut min, mut max } = f.bounding_box(parameters);
 
-                min *= factor.value(symbolic_values)?;
-                max *= factor.value(symbolic_values)?;
+                min *= factor.value(parameters);
+                max *= factor.value(parameters);
 
-                Some(BoundingBox { min, max })
+                BoundingBox { min, max }
             }
             Self::Rotate { axis, angle, f } => {
                 let rotation_axis: Vector3<f32> = [
-                    axis[0].value(symbolic_values)?,
-                    axis[1].value(symbolic_values)?,
-                    axis[2].value(symbolic_values)?,
+                    axis[0].value(parameters),
+                    axis[1].value(parameters),
+                    axis[2].value(parameters),
                 ]
                 .into();
 
                 let rotation = Matrix3::from_axis_angle(
                     rotation_axis.normalize(),
-                    Rad(angle.value(symbolic_values)?),
+                    Rad(angle.value(parameters)),
                 );
 
-                Some(f.bounding_box(symbolic_values)?.transform(rotation))
+                f.bounding_box(parameters).transform(rotation)
             }
             Self::Translate { translation, f } => {
-                let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
+                let BoundingBox { mut min, mut max } = f.bounding_box(parameters);
 
-                min.x += translation[0].value(symbolic_values)?;
-                min.y += translation[1].value(symbolic_values)?;
-                min.z += translation[2].value(symbolic_values)?;
-                max.x += translation[0].value(symbolic_values)?;
-                max.y += translation[1].value(symbolic_values)?;
-                max.z += translation[2].value(symbolic_values)?;
+                min.x += translation[0].value(parameters);
+                min.y += translation[1].value(parameters);
+                min.z += translation[2].value(parameters);
+                max.x += translation[0].value(parameters);
+                max.y += translation[1].value(parameters);
+                max.z += translation[2].value(parameters);
 
-                Some(BoundingBox { min, max })
+                BoundingBox { min, max }
             }
             Self::Round { f, radius } => {
-                let BoundingBox { mut min, mut max } = f.bounding_box(symbolic_values)?;
+                let BoundingBox { mut min, mut max } = f.bounding_box(parameters);
 
-                let radius = radius.value(symbolic_values)?;
+                let radius = radius.value(parameters);
 
                 min.x -= radius;
                 min.y -= radius;
@@ -224,9 +224,9 @@ impl Geometry {
                 max.y += radius;
                 max.z += radius;
 
-                Some(BoundingBox { min, max })
+                BoundingBox { min, max }
             }
-            Self::ForceNumericalNormals { f } => f.bounding_box(symbolic_values),
+            Self::ForceNumericalNormals { f } => f.bounding_box(parameters),
         }
     }
 

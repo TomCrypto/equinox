@@ -46,9 +46,7 @@ impl Device {
             let geometry = &geometry_list[&instance.geometry];
             let material = &material_list[&instance.material];
 
-            let bbox = geometry
-                .bounding_box(&instance.parameters)
-                .ok_or_else(|| Error::new("bad instance parameters"))?;
+            let bbox = geometry.bounding_box(&instance.parameters);
 
             instance_info.push(InstanceInfo {
                 bbox,
