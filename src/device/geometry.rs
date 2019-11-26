@@ -125,6 +125,18 @@ impl GeometryGlslGenerator {
                     dim_x, dim_y, dim_z
                 )
             }
+            Geometry::Cylinder { height, radius } => {
+                let height = self.lookup_parameter(height, parameters);
+                let radius = self.lookup_parameter(radius, parameters);
+
+                format!(
+                    r#"
+                    vec2 d = abs(vec2(length(p.xz), p.y)) - vec2({}, {});
+                    return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+                    "#,
+                    radius, height
+                )
+            }
             Geometry::InfiniteRepetition { f, period } => {
                 let period_x = self.lookup_parameter(&period[0], parameters);
                 let period_y = self.lookup_parameter(&period[1], parameters);

@@ -35,6 +35,10 @@ pub enum Geometry {
     Cuboid {
         dimensions: [Parameter; 3],
     },
+    Cylinder {
+        height: Parameter,
+        radius: Parameter,
+    },
     InfiniteRepetition {
         f: Box<Geometry>,
         period: [Parameter; 3],
@@ -83,6 +87,7 @@ impl Geometry {
             Self::Sphere { .. } => 1.0,
             Self::Ellipsoid { .. } => 1.0,
             Self::Cuboid { .. } => 1.5,
+            Self::Cylinder { .. } => 2.0,
             Self::InfiniteRepetition { f, .. } => 0.5 + f.evaluation_cost(),
             Self::Union { children } => children.iter().map(|x| 0.25 + x.evaluation_cost()).sum(),
             Self::Intersection { children } => {
@@ -137,6 +142,15 @@ impl Geometry {
                 BoundingBox {
                     min: [-dim_x, -dim_y, -dim_z].into(),
                     max: [dim_x, dim_y, dim_z].into(),
+                }
+            }
+            Self::Cylinder { height, radius } => {
+                let height = height.value(parameters);
+                let radius = radius.value(parameters);
+
+                BoundingBox {
+                    min: [-radius, -height, -radius].into(),
+                    max: [radius, height, radius].into(),
                 }
             }
             // TODO: this is wrong (also we should bound repetition anyway)
@@ -260,6 +274,10 @@ impl Geometry {
                 Self::record_parameter(parameters, &dimensions[0]);
                 Self::record_parameter(parameters, &dimensions[1]);
                 Self::record_parameter(parameters, &dimensions[2]);
+            }
+            Self::Cylinder { height, radius } => {
+                Self::record_parameter(parameters, height);
+                Self::record_parameter(parameters, radius);
             }
             Self::InfiniteRepetition { f, period } => {
                 Self::record_parameter(parameters, &period[0]);
