@@ -161,13 +161,8 @@ impl WebScene {
         direction = direction.normalize();
         up_vector = up_vector.normalize();
 
-        log::info!("direction = {:?}", direction);
-        log::info!("up_vector = {:?}", up_vector);
-
         let xfm = Basis3::look_at(direction, up_vector).invert();
         let rotated_dir = xfm.rotate_vector([dx, dy, dz].into());
-
-        log::info!("rotated dir = {:?}", rotated_dir);
 
         Dirty::modify(&mut self.scene.camera, |camera| {
             camera.position[0] += rotated_dir[0];
