@@ -96,10 +96,14 @@ impl WebScene {
     /// This method will attempt to dirty the least amount of scene data
     /// possible, so it won't necessarily always dirty the entire scene.
     pub fn set_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
-        let new_scene: Scene = from_json(json)?;
-        new_scene.validate()?; // report errors
+        let mut temporary: Scene = from_json(json)?;
 
-        self.scene.patch_from_other(new_scene);
+        std::mem::swap(&mut self.scene.assets, &mut temporary.assets);
+        let is_valid = temporary.validate(); // validate and swap back
+        std::mem::swap(&mut self.scene.assets, &mut temporary.assets);
+
+        is_valid?; // don't continue on failure
+        self.scene.patch_from_other(temporary);
 
         Ok(())
     }

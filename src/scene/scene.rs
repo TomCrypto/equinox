@@ -31,7 +31,7 @@ macro_rules! validate_contains {
     ($list: expr, $key: expr) => {
         if !$list.contains_key((&$key as &dyn AsRef<str>).as_ref()) {
             return Err(Error::new(&format!(
-                "validation error: {} = `{}' not in {}",
+                "validation error: {} (`{}') not in {}",
                 stringify!($key),
                 $key,
                 stringify!($list)
@@ -42,7 +42,7 @@ macro_rules! validate_contains {
     ($list: expr, $prefix: expr, $key: expr) => {
         if !$list.contains_key((&$key as &dyn AsRef<str>).as_ref()) {
             return Err(Error::new(&format!(
-                "validation error: {}.{} = `{}' not in {}",
+                "validation error: {}.{} (`{}') not in {}",
                 $prefix,
                 stringify!($key),
                 $key,
@@ -267,13 +267,17 @@ impl Scene {
     }
 
     fn validate_aperture(&self, aperture: &Aperture) -> Result<(), Error> {
-        validate_contains!(self.assets, aperture.aperture_texels);
+        let assets = &self.assets;
+
+        validate_contains!(assets, aperture.aperture_texels);
 
         Ok(())
     }
 
     fn validate_environment_map(&self, environment_map: &str) -> Result<(), Error> {
-        validate_contains!(self.assets, environment_map);
+        let assets = &self.assets;
+
+        validate_contains!(assets, environment_map);
 
         Ok(())
     }
@@ -301,8 +305,14 @@ impl Scene {
             validate_contains!(material_list, prefix, material);
 
             for parameter in geometry_list[geometry].symbolic_parameters() {
-                let geometry_prefix = format!("geometry_list[\"{}\"]", geometry);
-                validate_contains!(parameters, geometry_prefix, parameter);
+                if !parameters.contains_key(&parameter) {
+                    let geometry_prefix = format!("geometry_list[\"{}\"]", geometry);
+
+                    return Err(Error::new(&format!(
+                        "validation error: {} parameter `{}' missing in {}.parameters",
+                        geometry_prefix, parameter, prefix
+                    )));
+                }
             }
         }
 

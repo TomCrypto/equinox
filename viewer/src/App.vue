@@ -123,7 +123,7 @@ export default class App extends Vue {
       this.scene.set_json(json);
       return null;
     } catch (e) {
-      return e.toString();
+      return e.message;
     }
   }
 

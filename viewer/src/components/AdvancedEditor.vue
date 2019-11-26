@@ -73,7 +73,7 @@ export default class extends Vue {
       const error = await this.onUpdateScene(json, assets);
 
       if (error !== null) {
-        this.error = `renderer error: ${error}`;
+        this.error = error;
       } else {
         this.error = "";
       }
