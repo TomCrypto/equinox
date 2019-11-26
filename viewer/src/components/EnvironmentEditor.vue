@@ -31,7 +31,7 @@ import { WebScene } from "equinox";
 @Component
 export default class extends Vue {
   @Prop() private scene!: WebScene;
-  @Prop() private loadAsset!: (url: string) => Promise<void>;
+  @Prop() private loadAssets!: (assets: string[]) => Promise<void>;
 
   private sceneJson: any = null;
 
@@ -58,7 +58,7 @@ export default class extends Vue {
   }
 
   private async updateEnvironmentMap(url: string) {
-    await this.loadAsset(url);
+    await this.loadAssets([url]);
 
     this.scene.set_envmap(url);
     this.sceneJson = this.scene.json();

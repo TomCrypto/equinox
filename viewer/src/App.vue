@@ -14,11 +14,11 @@
       >
         <template slot="tab-head-advanced">Advanced Editor</template>
         <template slot="tab-panel-advanced">
-          <AdvancedEditor :scene="scene" :on-update-scene="updateScene" />
+          <AdvancedEditor :scene="scene" :load-assets="loadAssets" />
         </template>
         <template slot="tab-head-environment">Environment</template>
         <template slot="tab-panel-environment">
-          <EnvironmentEditor :scene="scene" :load-asset="load_asset" />
+          <EnvironmentEditor :scene="scene" :load-assets="loadAssets" />
         </template>
         <template slot="tab-head-documentation">Documentation</template>
         <template slot="tab-panel-documentation">
@@ -71,8 +71,6 @@ export default class App extends Vue {
   private loadingCount: number = 0;
   private downloadingCount: number = 0;
 
-  // loads the given assets and adds them to the scene
-
   async loadAssets(assets: string[]): Promise<void> {
     const sceneAssets = this.scene.assets() as string[];
 
@@ -84,7 +82,7 @@ export default class App extends Vue {
     const promises = [];
 
     for (const asset of assets) {
-      promises.push(this.fetch_asset_data(asset));
+      promises.push(this.fetchAsset(asset));
     }
 
     for (const [index, buffer] of (await Promise.all(promises)).entries()) {
@@ -92,24 +90,7 @@ export default class App extends Vue {
     }
   }
 
-  async fetch_assets(assets: string[]): Promise<Uint8Array[]> {
-    const promises = [];
-
-    for (const asset of assets) {
-      promises.push(this.fetch_asset_data(asset));
-    }
-
-    return (await Promise.all<ArrayBuffer>(promises)).map(
-      arraybuffer => new Uint8Array(arraybuffer)
-    );
-  }
-
-  async load_asset(url: string) {
-    const data = await this.fetch_asset_data(url);
-    this.scene.insert_asset(url, new Uint8Array(data));
-  }
-
-  async fetch_asset_data(url: string): Promise<ArrayBuffer> {
+  async fetchAsset(url: string): Promise<ArrayBuffer> {
     this.loadingCount += 1;
 
     try {
@@ -134,39 +115,7 @@ export default class App extends Vue {
     }
   }
 
-  // TODO: move to the advanced editor (just need a load_asset dependency)
-  private async updateScene(
-    json: object,
-    assets: string[]
-  ): Promise<string | null> {
-    const oldAssets = this.scene.assets();
-    const promises = [];
-
-    for (const asset of assets) {
-      if (oldAssets.includes(asset)) {
-        continue;
-      }
-
-      promises.push(this.load_asset(asset));
-    }
-
-    await Promise.all(promises);
-
-    for (const asset of oldAssets) {
-      if (!assets.includes(asset)) {
-        this.scene.remove_asset(asset);
-      }
-    }
-
-    try {
-      this.scene.set_json(json);
-      return null;
-    } catch (e) {
-      return e.message;
-    }
-  }
-
-  created() {
+  mounted() {
     // TODO: load a default asset-less prefab from inside JS
     this.scene.set_default_scene();
   }

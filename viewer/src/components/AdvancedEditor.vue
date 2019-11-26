@@ -30,10 +30,7 @@ import CodeMirror from "codemirror";
 export default class extends Vue {
   @Prop() private scene!: WebScene;
 
-  @Prop() private onUpdateScene!: (
-    json: object,
-    assets: string[]
-  ) => Promise<string | null>;
+  @Prop() private loadAssets!: (assets: string[]) => Promise<void>;
 
   private error: string = "";
 
@@ -70,7 +67,7 @@ export default class extends Vue {
     if (result !== null) {
       const [json, assets] = result;
 
-      const error = await this.onUpdateScene(json, assets);
+      const error = await this.updateScene(json, assets);
 
       if (error !== null) {
         this.error = error;
@@ -105,6 +102,27 @@ export default class extends Vue {
     } catch {
       this.error = "JSON syntax error";
       return null;
+    }
+  }
+
+  private async updateScene(
+    json: object,
+    assets: string[]
+  ): Promise<string | null> {
+    await this.loadAssets(assets);
+
+    try {
+      this.scene.set_json(json);
+
+      for (const asset of this.scene.assets()) {
+        if (!assets.includes(asset)) {
+          this.scene.remove_asset(asset);
+        }
+      }
+
+      return null;
+    } catch (e) {
+      return e.message;
     }
   }
 }
