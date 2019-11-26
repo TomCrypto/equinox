@@ -46,7 +46,6 @@ import pako from "pako";
 import MovingWindowEstimator from "./helpers/minimum_window";
 import CanvasContainer from "@/components/CanvasContainer.vue";
 import SaveLoadEditor from "@/components/SaveLoadEditor.vue";
-import CodeMirror from "codemirror";
 
 @Component({
   components: {
