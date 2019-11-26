@@ -26,7 +26,7 @@
         </template>
         <template slot="tab-head-save-load">Save/Load</template>
         <template slot="tab-panel-save-load">
-          <SaveLoadEditor :scene="scene" />
+          <SaveLoadEditor :scene="scene" :load-assets="loadAssets" />
         </template>
       </EditorContainer>
     </div>
@@ -70,6 +70,39 @@ export default class App extends Vue {
 
   private loadingCount: number = 0;
   private downloadingCount: number = 0;
+
+  // loads the given assets and adds them to the scene
+
+  async loadAssets(assets: string[]): Promise<void> {
+    const sceneAssets = this.scene.assets() as string[];
+
+    assets = assets.filter(asset => {
+      // asset is already loaded on scene
+      return !sceneAssets.includes(asset);
+    });
+
+    const promises = [];
+
+    for (const asset of assets) {
+      promises.push(this.fetch_asset_data(asset));
+    }
+
+    for (const [index, buffer] of (await Promise.all(promises)).entries()) {
+      this.scene.insert_asset(assets[index], new Uint8Array(buffer));
+    }
+  }
+
+  async fetch_assets(assets: string[]): Promise<Uint8Array[]> {
+    const promises = [];
+
+    for (const asset of assets) {
+      promises.push(this.fetch_asset_data(asset));
+    }
+
+    return (await Promise.all<ArrayBuffer>(promises)).map(
+      arraybuffer => new Uint8Array(arraybuffer)
+    );
+  }
 
   async load_asset(url: string) {
     const data = await this.fetch_asset_data(url);

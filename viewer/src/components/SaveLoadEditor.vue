@@ -30,6 +30,8 @@ interface Metadata {
 export default class extends Vue {
   @Prop() private scene!: WebScene;
 
+  @Prop() private loadAssets: (assets: string[]) => Promise<void>;
+
   private scenes: Map<string, Metadata> = new Map();
 
   private readonly store = localforage.createInstance({
@@ -58,9 +60,7 @@ export default class extends Vue {
   private async saveScene(name: string) {
     // TODO: fetch the current scene JSON and create a thumbnail of the render
     // this needs to talk to the canvas container, so we'll bubble up and then
-    // back down
-
-    console.log("Saving " + name);
+    // back down, or use events
 
     const scene = {
       thumbnail: "",
@@ -78,18 +78,23 @@ export default class extends Vue {
   }
 
   private async loadScene(name: string) {
-    console.log("Loading scene " + name);
-
     const scene = this.scenes.get(name);
 
     if (scene === undefined) {
       throw new Error("scene did not exist");
     }
 
-    // TODO: load assets into the scene, then remove all old unneeded assets
-    // (this will need a "load_assets" callback of some kind)
+    await this.loadAssets(scene.assets);
+
+    // TODO: error handling here in case the scene is bad...
 
     this.scene.set_json(scene.json);
+
+    for (const asset of this.scene.assets()) {
+      if (!scene.assets.includes(asset)) {
+        this.scene.remove_asset(asset);
+      }
+    }
   }
 
   private async updateFromStore() {
@@ -100,7 +105,6 @@ export default class extends Vue {
     }
 
     this.scenes = scenes;
-    console.log(this.scenes);
 
     // TODO: load prefab scenes (and save them to localstorage) if they were missing
     // store the prefab scenes in some separate helper modules and put the thumbnails in public/
