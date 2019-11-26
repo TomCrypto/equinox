@@ -24,6 +24,10 @@
         <template slot="tab-panel-documentation">
           <DocumentationEditor />
         </template>
+        <template slot="tab-head-save-load">Save/Load</template>
+        <template slot="tab-panel-save-load">
+          <SaveLoadEditor :scene="scene" />
+        </template>
       </EditorContainer>
     </div>
   </div>
@@ -41,6 +45,7 @@ import localforage from "localforage";
 import pako from "pako";
 import MovingWindowEstimator from "./helpers/minimum_window";
 import CanvasContainer from "@/components/CanvasContainer.vue";
+import SaveLoadEditor from "@/components/SaveLoadEditor.vue";
 import CodeMirror from "codemirror";
 
 @Component({
@@ -50,7 +55,8 @@ import CodeMirror from "codemirror";
     EditorContainer,
     DocumentationEditor,
     CanvasContainer,
-    AdvancedEditor
+    AdvancedEditor,
+    SaveLoadEditor
   }
 })
 export default class App extends Vue {
@@ -59,7 +65,7 @@ export default class App extends Vue {
   private scene = new this.equinox.WebScene();
 
   private editorTabsAbove = ["environment"];
-  private editorTabsBelow = ["documentation", "advanced"];
+  private editorTabsBelow = ["documentation", "save-load", "advanced"];
   private defaultEditorTab = "documentation";
 
   private loadingCount: number = 0;
