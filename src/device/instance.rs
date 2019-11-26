@@ -106,7 +106,7 @@ impl Device {
 
             for (data, parameters) in izip!(region, parameters.chunks(4)) {
                 for i in 0..4 {
-                    if let Some(symbol) = parameters.get(i) {
+                    if let Some(&symbol) = parameters.get(i) {
                         data.0[i] = instance.parameters[symbol];
                     } else {
                         data.0[i] = 0.0; // unused vec4 padding

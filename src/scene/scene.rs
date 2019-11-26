@@ -305,7 +305,7 @@ impl Scene {
             validate_contains!(material_list, prefix, material);
 
             for parameter in geometry_list[geometry].symbolic_parameters() {
-                if !parameters.contains_key(&parameter) {
+                if !parameters.contains_key(parameter) {
                     let geometry_prefix = format!("geometry_list[\"{}\"]", geometry);
 
                     return Err(Error::new(&format!(

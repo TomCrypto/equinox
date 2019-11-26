@@ -232,7 +232,7 @@ impl Geometry {
 
     /// Returns a vector of all symbolic parameters found in this geometry in
     /// a deterministic order, representing the approximate evaluation order.
-    pub fn symbolic_parameters(&self) -> Vec<String> {
+    pub fn symbolic_parameters(&self) -> Vec<&str> {
         let mut parameters = vec![];
 
         self.symbolic_parameters_recursive(&mut parameters);
@@ -240,13 +240,13 @@ impl Geometry {
         parameters
     }
 
-    fn record_parameter(parameters: &mut Vec<String>, parameter: &Parameter) {
+    fn record_parameter<'a>(parameters: &mut Vec<&'a str>, parameter: &'a Parameter) {
         if let Parameter::Symbolic(symbol) = parameter {
-            parameters.push(symbol.clone());
+            parameters.push(symbol);
         }
     }
 
-    fn symbolic_parameters_recursive(&self, parameters: &mut Vec<String>) {
+    fn symbolic_parameters_recursive<'a>(&'a self, parameters: &mut Vec<&'a str>) {
         match self {
             Self::Sphere { radius } => {
                 Self::record_parameter(parameters, radius);
@@ -268,9 +268,11 @@ impl Geometry {
 
                 f.symbolic_parameters_recursive(parameters);
             }
-            Self::Union { children } | Self::Intersection { children } => children
-                .iter()
-                .for_each(|child| child.symbolic_parameters_recursive(parameters)),
+            Self::Union { children } | Self::Intersection { children } => {
+                for child in children {
+                    child.symbolic_parameters_recursive(parameters);
+                }
+            }
             Self::Subtraction { lhs, rhs } => {
                 lhs.symbolic_parameters_recursive(parameters);
                 rhs.symbolic_parameters_recursive(parameters);

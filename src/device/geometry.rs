@@ -1,4 +1,5 @@
 use crate::{Geometry, Parameter};
+use std::collections::HashMap;
 use std::fmt::Display;
 
 #[derive(Debug, Default)]
@@ -13,11 +14,11 @@ impl GeometryGlslGenerator {
     }
 
     pub fn add_distance_function(&mut self, geometry: &Geometry) -> DistanceFn {
-        self.distance_recursive(geometry, &mut 0)
+        self.distance_recursive(geometry, &Self::build_parameter_map(geometry))
     }
 
     pub fn add_normal_function(&mut self, geometry: &Geometry) -> Option<NormalFn> {
-        self.normal_recursive(geometry, &mut 0)
+        self.normal_recursive(geometry, &Self::build_parameter_map(geometry))
     }
 
     /// Generates GLSL code for a list of geometries.
@@ -65,7 +66,6 @@ impl GeometryGlslGenerator {
                 code.push(format!("      return {};", normal.call("p")));
             } else {
                 let estimate = Self::gradient_estimate(&distance);
-
                 code.push(format!("      return {};", estimate));
             }
         }
@@ -78,22 +78,30 @@ impl GeometryGlslGenerator {
         format!("{}\n", code.join("\n"))
     }
 
-    // In the methods below, the parameters must be evaluated in the same order used
-    // when enumerating symbolic parameters in the geometry struct.
-    // TODO: this probably needs to change; it's too error-prone. Use a map from
-    // symbolic string to index?
+    fn build_parameter_map(geometry: &Geometry) -> HashMap<&str, usize> {
+        geometry
+            .symbolic_parameters()
+            .iter()
+            .enumerate()
+            .map(|(index, &symbol)| (symbol, index))
+            .collect()
+    }
 
-    fn distance_recursive(&mut self, geometry: &Geometry, index: &mut usize) -> DistanceFn {
+    fn distance_recursive(
+        &mut self,
+        geometry: &Geometry,
+        parameters: &HashMap<&str, usize>,
+    ) -> DistanceFn {
         let code = match geometry {
             Geometry::Sphere { radius } => {
-                let radius = self.lookup_parameter(radius, index);
+                let radius = self.lookup_parameter(radius, parameters);
 
                 format!("return length(p) - {};", radius)
             }
             Geometry::Ellipsoid { radius } => {
-                let radius_x = self.lookup_parameter(&radius[0], index);
-                let radius_y = self.lookup_parameter(&radius[1], index);
-                let radius_z = self.lookup_parameter(&radius[2], index);
+                let radius_x = self.lookup_parameter(&radius[0], parameters);
+                let radius_y = self.lookup_parameter(&radius[1], parameters);
+                let radius_z = self.lookup_parameter(&radius[2], parameters);
 
                 format!(
                     r#"
@@ -105,9 +113,9 @@ impl GeometryGlslGenerator {
                 )
             }
             Geometry::Cuboid { dimensions } => {
-                let dim_x = self.lookup_parameter(&dimensions[0], index);
-                let dim_y = self.lookup_parameter(&dimensions[1], index);
-                let dim_z = self.lookup_parameter(&dimensions[2], index);
+                let dim_x = self.lookup_parameter(&dimensions[0], parameters);
+                let dim_y = self.lookup_parameter(&dimensions[1], parameters);
+                let dim_z = self.lookup_parameter(&dimensions[2], parameters);
 
                 format!(
                     r#"
@@ -118,11 +126,11 @@ impl GeometryGlslGenerator {
                 )
             }
             Geometry::InfiniteRepetition { f, period } => {
-                let period_x = self.lookup_parameter(&period[0], index);
-                let period_y = self.lookup_parameter(&period[1], index);
-                let period_z = self.lookup_parameter(&period[2], index);
+                let period_x = self.lookup_parameter(&period[0], parameters);
+                let period_y = self.lookup_parameter(&period[1], parameters);
+                let period_z = self.lookup_parameter(&period[2], parameters);
 
-                let function = self.distance_recursive(f, index);
+                let function = self.distance_recursive(f, parameters);
 
                 format!(
                     "vec3 c = vec3({}, {}, {});
@@ -133,11 +141,11 @@ impl GeometryGlslGenerator {
                     function.call("mod(p + 0.5 * c, c) - 0.5 * c")
                 )
             }
-            Geometry::Union { children } => self.nary_operator(children, index, "min"),
-            Geometry::Intersection { children } => self.nary_operator(children, index, "max"),
+            Geometry::Union { children } => self.nary_operator(children, parameters, "min"),
+            Geometry::Intersection { children } => self.nary_operator(children, parameters, "max"),
             Geometry::Subtraction { lhs, rhs } => {
-                let lhs_function = self.distance_recursive(lhs, index);
-                let rhs_function = self.distance_recursive(rhs, index);
+                let lhs_function = self.distance_recursive(lhs, parameters);
+                let rhs_function = self.distance_recursive(rhs, parameters);
 
                 format!(
                     "return max({}, -{});",
@@ -146,16 +154,16 @@ impl GeometryGlslGenerator {
                 )
             }
             Geometry::Onion { thickness, f } => {
-                let thickness = self.lookup_parameter(thickness, index);
+                let thickness = self.lookup_parameter(thickness, parameters);
 
-                let function = self.distance_recursive(f, index);
+                let function = self.distance_recursive(f, parameters);
 
                 format!("return abs({}) - {};", function.call("p"), thickness)
             }
             Geometry::Scale { factor, f } => {
-                let factor = self.lookup_parameter(factor, index);
+                let factor = self.lookup_parameter(factor, parameters);
 
-                let function = self.distance_recursive(f, index);
+                let function = self.distance_recursive(f, parameters);
 
                 format!(
                     "float s = {}; return {} * s;",
@@ -164,12 +172,12 @@ impl GeometryGlslGenerator {
                 )
             }
             Geometry::Rotate { axis, angle, f } => {
-                let kx = self.lookup_parameter(&axis[0], index);
-                let ky = self.lookup_parameter(&axis[1], index);
-                let kz = self.lookup_parameter(&axis[2], index);
-                let theta = self.lookup_parameter(angle, index);
+                let kx = self.lookup_parameter(&axis[0], parameters);
+                let ky = self.lookup_parameter(&axis[1], parameters);
+                let kz = self.lookup_parameter(&axis[2], parameters);
+                let theta = self.lookup_parameter(angle, parameters);
 
-                let function = self.distance_recursive(f, index);
+                let function = self.distance_recursive(f, parameters);
 
                 format!(
                     r#"
@@ -190,42 +198,43 @@ impl GeometryGlslGenerator {
                 )
             }
             Geometry::Translate { translation, f } => {
-                let tx = self.lookup_parameter(&translation[0], index);
-                let ty = self.lookup_parameter(&translation[1], index);
-                let tz = self.lookup_parameter(&translation[2], index);
+                let tx = self.lookup_parameter(&translation[0], parameters);
+                let ty = self.lookup_parameter(&translation[1], parameters);
+                let tz = self.lookup_parameter(&translation[2], parameters);
 
                 let translation = format!("vec3({}, {}, {})", tx, ty, tz);
 
-                let function = self.distance_recursive(f, index);
+                let function = self.distance_recursive(f, parameters);
 
                 format!("return {};", function.call(format!("p - {}", translation)))
             }
             Geometry::Round { radius, f } => {
-                let radius = self.lookup_parameter(radius, index);
+                let radius = self.lookup_parameter(radius, parameters);
 
-                let function = self.distance_recursive(f, index);
+                let function = self.distance_recursive(f, parameters);
 
                 format!("return {} - {};", function.call("p"), radius)
             }
-            Geometry::ForceNumericalNormals { f } => {
-                format!("return {};", self.distance_recursive(f, index).call("p"))
-            }
+            Geometry::ForceNumericalNormals { f } => format!(
+                "return {};",
+                self.distance_recursive(f, parameters).call("p")
+            ),
         };
 
         self.register_distance_function(code.trim())
     }
 
-    fn normal_recursive(&mut self, geometry: &Geometry, index: &mut usize) -> Option<NormalFn> {
+    fn normal_recursive(
+        &mut self,
+        geometry: &Geometry,
+        parameters: &HashMap<&str, usize>,
+    ) -> Option<NormalFn> {
         let code = match geometry {
-            Geometry::Sphere { radius } => {
-                let _ = self.lookup_parameter(radius, index);
-
-                Some("return normalize(p);".to_owned())
-            }
+            Geometry::Sphere { .. } => Some("return normalize(p);".to_owned()),
             Geometry::Ellipsoid { radius } => {
-                let radius_x = self.lookup_parameter(&radius[0], index);
-                let radius_y = self.lookup_parameter(&radius[1], index);
-                let radius_z = self.lookup_parameter(&radius[2], index);
+                let radius_x = self.lookup_parameter(&radius[0], parameters);
+                let radius_y = self.lookup_parameter(&radius[1], parameters);
+                let radius_z = self.lookup_parameter(&radius[2], parameters);
 
                 Some(format!(
                     r#"
@@ -236,13 +245,13 @@ impl GeometryGlslGenerator {
                 ))
             }
             Geometry::Translate { translation, f } => {
-                let tx = self.lookup_parameter(&translation[0], index);
-                let ty = self.lookup_parameter(&translation[1], index);
-                let tz = self.lookup_parameter(&translation[2], index);
+                let tx = self.lookup_parameter(&translation[0], parameters);
+                let ty = self.lookup_parameter(&translation[1], parameters);
+                let tz = self.lookup_parameter(&translation[2], parameters);
 
                 let translation = format!("vec3({}, {}, {})", tx, ty, tz);
 
-                let function = self.normal_recursive(f, index)?;
+                let function = self.normal_recursive(f, parameters)?;
 
                 Some(format!(
                     "return {};",
@@ -250,12 +259,12 @@ impl GeometryGlslGenerator {
                 ))
             }
             Geometry::Rotate { axis, angle, f } => {
-                let kx = self.lookup_parameter(&axis[0], index);
-                let ky = self.lookup_parameter(&axis[1], index);
-                let kz = self.lookup_parameter(&axis[2], index);
-                let theta = self.lookup_parameter(angle, index);
+                let kx = self.lookup_parameter(&axis[0], parameters);
+                let ky = self.lookup_parameter(&axis[1], parameters);
+                let kz = self.lookup_parameter(&axis[2], parameters);
+                let theta = self.lookup_parameter(angle, parameters);
 
-                let function = self.normal_recursive(f, index)?;
+                let function = self.normal_recursive(f, parameters)?;
 
                 Some(format!(
                     r#"
@@ -277,9 +286,9 @@ impl GeometryGlslGenerator {
                 ))
             }
             Geometry::Scale { factor, f } => {
-                let scale = self.lookup_parameter(factor, index);
+                let scale = self.lookup_parameter(factor, parameters);
 
-                let function = self.normal_recursive(f, index)?;
+                let function = self.normal_recursive(f, parameters)?;
 
                 Some(format!(
                     "return {};",
@@ -292,11 +301,16 @@ impl GeometryGlslGenerator {
         Some(self.register_normal_function(code?))
     }
 
-    fn nary_operator(&mut self, children: &[Geometry], index: &mut usize, op: &str) -> String {
+    fn nary_operator(
+        &mut self,
+        children: &[Geometry],
+        parameters: &HashMap<&str, usize>,
+        op: &str,
+    ) -> String {
         assert!(!children.is_empty());
 
         if children.len() == 1 {
-            let function = self.distance_recursive(&children[0], index);
+            let function = self.distance_recursive(&children[0], parameters);
 
             return format!("return {};", function.call("p"));
         }
@@ -304,7 +318,7 @@ impl GeometryGlslGenerator {
         let mut code = String::new();
 
         for (i, child) in children.iter().enumerate() {
-            let function = self.distance_recursive(child, index);
+            let function = self.distance_recursive(child, parameters);
 
             if i != children.len() - 1 {
                 code += &format!("{}({}, ", op, function.call("p"));
@@ -322,24 +336,22 @@ impl GeometryGlslGenerator {
 
     // TODO: could make the "geometry_buffer" string a parameter possibly
 
-    fn lookup_parameter(&self, parameter: &Parameter, index: &mut usize) -> String {
+    fn lookup_parameter(&self, parameter: &Parameter, parameters: &HashMap<&str, usize>) -> String {
         match parameter {
             Parameter::Constant(number) => format!("{:+e}", number),
-            Parameter::Symbolic(_) => self.lookup_symbolic_parameter(index),
+            Parameter::Symbolic(symbol) => {
+                self.lookup_symbolic_parameter(parameters[symbol.as_str()])
+            }
         }
     }
 
-    fn lookup_symbolic_parameter(&self, index: &mut usize) -> String {
-        let result = match *index % 4 {
-            0 => format!("geometry_buffer.data[inst + {}U].x", *index / 4),
-            1 => format!("geometry_buffer.data[inst + {}U].y", *index / 4),
-            2 => format!("geometry_buffer.data[inst + {}U].z", *index / 4),
-            _ => format!("geometry_buffer.data[inst + {}U].w", *index / 4),
-        };
-
-        *index += 1;
-
-        result
+    fn lookup_symbolic_parameter(&self, index: usize) -> String {
+        match index % 4 {
+            0 => format!("geometry_buffer.data[inst + {}U].x", index / 4),
+            1 => format!("geometry_buffer.data[inst + {}U].y", index / 4),
+            2 => format!("geometry_buffer.data[inst + {}U].z", index / 4),
+            _ => format!("geometry_buffer.data[inst + {}U].w", index / 4),
+        }
     }
 
     fn gradient_estimate(distance: &DistanceFn) -> String {

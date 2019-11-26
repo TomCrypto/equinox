@@ -114,10 +114,13 @@ impl WebScene {
     }
 
     pub fn set_raster_dimensions(&mut self, width: u32, height: u32) {
-        Dirty::modify(&mut self.scene.raster, |raster| {
-            raster.width = width;
-            raster.height = height;
-        });
+        if self.scene.raster.width != width {
+            self.scene.raster.width = width;
+        }
+
+        if self.scene.raster.height != height {
+            self.scene.raster.height = height;
+        }
     }
 
     pub fn insert_asset(&mut self, name: &str, data: &[u8]) {
@@ -164,17 +167,15 @@ impl WebScene {
         let xfm = Basis3::look_at(direction, up_vector).invert();
         let rotated_dir = xfm.rotate_vector([dx, dy, dz].into());
 
-        Dirty::modify(&mut self.scene.camera, |camera| {
-            camera.position[0] += rotated_dir[0];
-            camera.position[1] += rotated_dir[1];
-            camera.position[2] += rotated_dir[2];
-        });
+        self.scene.camera.position[0] += rotated_dir[0];
+        self.scene.camera.position[1] += rotated_dir[1];
+        self.scene.camera.position[2] += rotated_dir[2];
     }
 
     pub fn set_camera_direction(&mut self, x: f32, y: f32, z: f32) {
-        Dirty::modify(&mut self.scene.camera, |camera| {
-            camera.direction = [x, y, z];
-        });
+        if self.scene.camera.direction != [x, y, z] {
+            self.scene.camera.direction = [x, y, z];
+        }
     }
 
     /// Sets the scene to a default scene.
