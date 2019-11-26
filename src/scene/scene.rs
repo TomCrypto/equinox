@@ -1,12 +1,56 @@
 use crate::{
-    Aperture, Camera, Dirty, Display, Environment, Geometry, Instance, Integrator, Material, Raster,
+    Aperture, ApertureShape, Camera, Dirty, Display, Environment, Geometry, Instance, Integrator,
+    Material, Raster,
 };
-
 use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
-pub type Asset = String;
+macro_rules! validate {
+    ($cond: expr) => {
+        if ($cond) == false {
+            return Err(Error::new(&format!(
+                "validation error: {}",
+                stringify!($cond)
+            )));
+        }
+    };
+
+    ($prefix: expr, $cond: expr) => {
+        if ($cond) == false {
+            return Err(Error::new(&format!(
+                "validation error: {}.{}",
+                $prefix,
+                stringify!($cond)
+            )));
+        }
+    };
+}
+
+macro_rules! validate_contains {
+    ($list: expr, $key: expr) => {
+        if !$list.contains_key((&$key as &dyn AsRef<str>).as_ref()) {
+            return Err(Error::new(&format!(
+                "validation error: {} = `{}' not in {}",
+                stringify!($key),
+                $key,
+                stringify!($list)
+            )));
+        }
+    };
+
+    ($list: expr, $prefix: expr, $key: expr) => {
+        if !$list.contains_key((&$key as &dyn AsRef<str>).as_ref()) {
+            return Err(Error::new(&format!(
+                "validation error: {}.{} = `{}' not in {}",
+                $prefix,
+                stringify!($key),
+                $key,
+                stringify!($list)
+            )));
+        }
+    };
+}
 
 /// # Dirty Flags
 ///
@@ -20,14 +64,14 @@ pub struct Scene {
     pub instance_list: Dirty<BTreeMap<String, Instance>>,
     pub geometry_list: Dirty<BTreeMap<String, Geometry>>,
     pub material_list: Dirty<BTreeMap<String, Material>>,
-    pub environment_map: Dirty<Option<Asset>>,
+    pub environment_map: Dirty<Option<String>>,
     pub environment: Dirty<Environment>,
     pub display: Dirty<Display>,
     pub aperture: Dirty<Option<Aperture>>,
     pub integrator: Dirty<Integrator>,
 
     #[serde(skip)]
-    pub assets: HashMap<Asset, Vec<u8>>,
+    pub assets: HashMap<String, Vec<u8>>,
 }
 
 impl Scene {
@@ -94,66 +138,52 @@ impl Scene {
         }
     }
 
-    /// Validates the contents of this scene.
+    /// Validates all dirty contents of this scene.
     ///
     /// If this method succeeds, then the scene should always be renderable
     /// without errors, barring implementation limitations in the renderer.
     pub fn validate(&self) -> Result<(), Error> {
-        self.camera.validate(self)?;
-        self.raster.validate(self)?;
-
-        for instance in self.instance_list.values() {
-            instance.validate(self)?;
+        if let Some(camera) = Dirty::as_dirty(&self.camera) {
+            self.validate_camera(camera)?;
         }
 
-        for geometry in self.geometry_list.values() {
-            geometry.validate(self)?;
+        if let Some(raster) = Dirty::as_dirty(&self.raster) {
+            self.validate_raster(raster)?;
         }
 
-        for material in self.material_list.values() {
-            material.validate(self)?;
+        if let Some(environment) = Dirty::as_dirty(&self.environment) {
+            self.validate_environment(environment)?;
         }
 
-        if let Some(asset) = &*self.environment_map {
-            if !self.assets.contains_key(asset) {
-                return Err(Error::new("environment_map not in assets"));
-            }
+        if let Some(display) = Dirty::as_dirty(&self.display) {
+            self.validate_display(display)?;
         }
 
-        self.environment.validate(self)?;
-        self.display.validate(self)?;
-
-        if let Some(aperture) = &*self.aperture {
-            aperture.validate(self)?;
+        if let Some(integrator) = Dirty::as_dirty(&self.integrator) {
+            self.validate_integrator(integrator)?;
         }
 
-        self.integrator.validate(self)?;
+        if let Some(Some(aperture)) = Dirty::as_dirty(&self.aperture) {
+            self.validate_aperture(aperture)?;
+        }
+
+        if let Some(Some(environment_map)) = Dirty::as_dirty(&self.environment_map) {
+            self.validate_environment_map(environment_map)?;
+        }
+
+        if let Some(instance_list) = Dirty::as_dirty(&self.instance_list) {
+            self.validate_instance_list(instance_list)?;
+        }
+
+        if let Some(geometry_list) = Dirty::as_dirty(&self.geometry_list) {
+            self.validate_geometry_list(geometry_list)?;
+        }
+
+        if let Some(material_list) = Dirty::as_dirty(&self.material_list) {
+            self.validate_material_list(material_list)?;
+        }
 
         Ok(())
-    }
-
-    /// Returns a list of all assets actually used in this scene.
-    ///
-    /// It is possible for assets to be preloaded for the scene without being
-    /// referenced anywhere; this method will detect which assets are in use.
-    pub fn used_assets(&self) -> Vec<Asset> {
-        self.assets
-            .keys()
-            .filter(|&asset| {
-                if self.environment_map.as_ref() == Some(asset) {
-                    return true;
-                }
-
-                if let Some(aperture) = &*self.aperture {
-                    if &aperture.aperture_texels == asset {
-                        return true;
-                    }
-                }
-
-                false
-            })
-            .cloned()
-            .collect()
     }
 
     pub fn has_photon_receivers(&self) -> bool {
@@ -167,5 +197,139 @@ impl Scene {
                     false
                 }
             })
+    }
+
+    fn validate_camera(&self, camera: &Camera) -> Result<(), Error> {
+        validate!(camera.focal_distance > 0.0);
+        validate!(camera.focal_length > 0.0);
+        validate!(camera.film_height > 0.0);
+        validate!(camera.direction != [0.0, 0.0, 0.0]);
+        validate!(camera.up_vector != [0.0, 0.0, 0.0]);
+
+        match camera.aperture {
+            ApertureShape::Point => {}
+            ApertureShape::Circle { radius } => {
+                validate!("camera.aperture", radius >= 0.0);
+            }
+            ApertureShape::Ngon { radius, sides, .. } => {
+                validate!("camera.aperture", radius >= 0.0);
+                validate!("camera.aperture", sides >= 3);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_raster(&self, raster: &Raster) -> Result<(), Error> {
+        validate!(raster.width >= 1);
+        validate!(raster.height >= 1);
+        validate!(raster.width <= 8192);
+        validate!(raster.height <= 8192);
+
+        Ok(())
+    }
+
+    fn validate_environment(&self, environment: &Environment) -> Result<(), Error> {
+        match environment {
+            Environment::Solid { tint } | Environment::Map { tint, .. } => {
+                validate!("environment", tint[0] >= 0.0);
+                validate!("environment", tint[1] >= 0.0);
+                validate!("environment", tint[2] >= 0.0);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_display(&self, display: &Display) -> Result<(), Error> {
+        validate!(display.exposure >= -10.0);
+        validate!(display.exposure <= 10.0);
+        validate!(display.saturation >= 0.0);
+        validate!(display.saturation <= 1.0);
+
+        Ok(())
+    }
+
+    fn validate_integrator(&self, integrator: &Integrator) -> Result<(), Error> {
+        validate!(integrator.hash_table_bits >= 18);
+        validate!(integrator.hash_table_bits <= 24);
+        validate!(integrator.photons_per_pass > 0);
+        validate!(integrator.photon_rate >= 0.1);
+        validate!(integrator.photon_rate <= 0.9);
+        validate!(integrator.max_search_radius > 0.0);
+        validate!(integrator.min_search_radius > 0.0);
+        validate!(integrator.alpha >= 0.0);
+        validate!(integrator.alpha <= 1.0);
+        validate!(integrator.max_scatter_bounces > 0);
+        validate!(integrator.max_gather_bounces > 0);
+
+        Ok(())
+    }
+
+    fn validate_aperture(&self, aperture: &Aperture) -> Result<(), Error> {
+        validate_contains!(self.assets, aperture.aperture_texels);
+
+        Ok(())
+    }
+
+    fn validate_environment_map(&self, environment_map: &str) -> Result<(), Error> {
+        validate_contains!(self.assets, environment_map);
+
+        Ok(())
+    }
+
+    fn validate_instance_list(
+        &self,
+        instance_list: &BTreeMap<String, Instance>,
+    ) -> Result<(), Error> {
+        let geometry_list = &self.geometry_list;
+        let material_list = &self.material_list;
+
+        for (
+            name,
+            Instance {
+                geometry,
+                material,
+                parameters,
+                ..
+            },
+        ) in instance_list.iter()
+        {
+            let prefix = format!("instance_list[\"{}\"]", name);
+
+            validate_contains!(geometry_list, prefix, geometry);
+            validate_contains!(material_list, prefix, material);
+
+            // TODO: validate presence of parameters inside geometry?
+            // (or rather validate that all parameters are given)
+        }
+
+        Ok(())
+    }
+
+    fn validate_geometry_list(
+        &self,
+        geometry_list: &BTreeMap<String, Geometry>,
+    ) -> Result<(), Error> {
+        for (name, _geometry) in geometry_list.iter() {
+            let _prefix = format!("geometry_list[\"{}\"]", name);
+
+            // TODO: implement geometry validation
+        }
+
+        Ok(())
+    }
+
+    fn validate_material_list(
+        &self,
+        material_list: &BTreeMap<String, Material>,
+    ) -> Result<(), Error> {
+        for (name, _material) in material_list.iter() {
+            let _prefix = format!("material_list[\"{}\"]", name);
+
+            // TODO: implement material validation
+        }
+
+        Ok(())
     }
 }

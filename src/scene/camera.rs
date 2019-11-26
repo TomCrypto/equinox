@@ -1,6 +1,3 @@
-use crate::Scene;
-use cgmath::{Point3, Vector3};
-use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
@@ -31,14 +28,14 @@ impl ApertureShape {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, SmartDefault, Serialize)]
 pub struct Camera {
-    #[default(Point3::new(0.0, 0.0, 0.0))]
-    pub position: Point3<f32>,
+    #[default([0.0; 3])]
+    pub position: [f32; 3],
 
-    #[default(Vector3::new(0.0, 0.0, 1.0))]
-    pub direction: Vector3<f32>,
+    #[default([0.0, 0.0, 1.0])]
+    pub direction: [f32; 3],
 
-    #[default(Vector3::new(0.0, 1.0, 0.0))]
-    pub up_vector: Vector3<f32>,
+    #[default([0.0, 1.0, 0.0])]
+    pub up_vector: [f32; 3],
 
     #[default(ApertureShape::Point)]
     pub aperture: ApertureShape,
@@ -51,10 +48,4 @@ pub struct Camera {
 
     #[default(0.024)]
     pub film_height: f32,
-}
-
-impl Camera {
-    pub(crate) fn validate(&self, _scene: &Scene) -> Result<(), Error> {
-        Ok(())
-    }
 }

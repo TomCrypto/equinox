@@ -1,5 +1,3 @@
-use crate::Scene;
-use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
@@ -28,10 +26,4 @@ pub struct Integrator {
 
     #[default(8)]
     pub max_gather_bounces: u32,
-}
-
-impl Integrator {
-    pub(crate) fn validate(&self, _scene: &Scene) -> Result<(), Error> {
-        Ok(())
-    }
 }

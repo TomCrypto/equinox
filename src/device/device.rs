@@ -206,7 +206,7 @@ impl Device {
         let environment = &mut scene.environment;
 
         invalidated |= Dirty::clean(&mut scene.environment_map, |environment_map| {
-            self.update_environment_map(assets, environment_map.as_ref())?;
+            self.update_environment_map(assets, environment_map.as_ref().map(String::as_str))?;
 
             Dirty::dirty(environment);
 

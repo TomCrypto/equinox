@@ -1,5 +1,3 @@
-use crate::Scene;
-use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
@@ -13,12 +11,6 @@ pub struct Display {
     pub saturation: f32,
     #[default(None)]
     pub camera_response: Option<CameraResponse>,
-}
-
-impl Display {
-    pub(crate) fn validate(&self, _scene: &Scene) -> Result<(), Error> {
-        Ok(())
-    }
 }
 
 #[allow(clippy::all)]

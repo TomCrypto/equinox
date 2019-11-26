@@ -232,8 +232,8 @@ export default class extends Vue {
 
       const direction = this.scene.json().camera.direction;
 
-      this.phi = Math.atan2(direction.z, direction.x);
-      this.theta = Math.acos(direction.y);
+      this.phi = Math.atan2(direction[2], direction[0]);
+      this.theta = Math.acos(direction[1]);
     }
 
     this.phiChange += -event.movementX * 0.001;

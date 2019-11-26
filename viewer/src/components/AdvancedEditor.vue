@@ -25,8 +25,6 @@
 import { Component, Prop, Vue } from "vue-property-decorator";
 import { WebScene } from "equinox";
 import CodeMirror from "codemirror";
-import SceneSchema from "../helpers/scene_schema";
-import ajv from "ajv";
 
 @Component
 export default class extends Vue {
@@ -56,6 +54,7 @@ export default class extends Vue {
     editor.setSize(null, "100%");
 
     editor.setValue(JSON.stringify(this.sceneJson(), null, 2));
+    editor.clearHistory();
   }
 
   private sceneJson(): object {
@@ -85,32 +84,24 @@ export default class extends Vue {
     try {
       const payload = JSON.parse(value);
 
-      const validator = ajv();
-
-      if (!validator.validate(SceneSchema, payload)) {
-        const error = validator.errors[0];
-
-        this.error = `error: scene.${error.dataPath}: ${error.message}`;
-
-        console.log(validator.errors);
-        return null;
-      } else {
-        return [payload["json"], payload["assets"]];
-      }
-
-      /*if (!(payload["json"] instanceof Object)) {
+      if (!(payload["json"] instanceof Object)) {
+        this.error = `error: json should be an object`;
         return null;
       }
 
       if (!(payload["assets"] instanceof Array)) {
+        this.error = `error: assets should be an array`;
         return null;
       }
 
       for (const asset of payload["assets"]) {
         if (!(typeof asset === "string")) {
+          this.error = `error: assets should be a string array`;
           return null;
         }
-      }*/
+      }
+
+      return [payload["json"], payload["assets"]];
     } catch {
       this.error = "JSON syntax error";
       return null;

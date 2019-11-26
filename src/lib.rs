@@ -57,7 +57,7 @@ pub mod shader {
     include!(concat!(env!("OUT_DIR"), "/glsl_shaders.rs"));
 }
 
-use cgmath::{prelude::*, Basis3};
+use cgmath::{prelude::*, Basis3, Vector3};
 use js_sys::{Array, Error};
 use maplit::btreemap;
 use serde::{de::DeserializeOwned, Serialize};
@@ -96,8 +96,10 @@ impl WebScene {
     /// This method will attempt to dirty the least amount of scene data
     /// possible, so it won't necessarily always dirty the entire scene.
     pub fn set_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
-        self.scene.patch_from_other(from_json(json)?);
-        self.scene.validate()?;
+        let new_scene: Scene = from_json(json)?;
+        new_scene.validate()?; // report errors
+
+        self.scene.patch_from_other(new_scene);
 
         Ok(())
     }
@@ -149,17 +151,30 @@ impl WebScene {
 
     /// Applies a camera-space translation to the camera position.
     pub fn move_camera(&mut self, dx: f32, dy: f32, dz: f32) {
-        let xfm =
-            Basis3::look_at(self.scene.camera.direction, self.scene.camera.up_vector).invert();
+        let mut direction: Vector3<f32> = self.scene.camera.direction.into();
+        let mut up_vector: Vector3<f32> = self.scene.camera.up_vector.into();
+
+        direction = direction.normalize();
+        up_vector = up_vector.normalize();
+
+        log::info!("direction = {:?}", direction);
+        log::info!("up_vector = {:?}", up_vector);
+
+        let xfm = Basis3::look_at(direction, up_vector).invert();
+        let rotated_dir = xfm.rotate_vector([dx, dy, dz].into());
+
+        log::info!("rotated dir = {:?}", rotated_dir);
 
         Dirty::modify(&mut self.scene.camera, |camera| {
-            camera.position += xfm.rotate_vector([dx, dy, dz].into());
+            camera.position[0] += rotated_dir[0];
+            camera.position[1] += rotated_dir[1];
+            camera.position[2] += rotated_dir[2];
         });
     }
 
     pub fn set_camera_direction(&mut self, x: f32, y: f32, z: f32) {
         Dirty::modify(&mut self.scene.camera, |camera| {
-            camera.direction = [x, y, z].into();
+            camera.direction = [x, y, z];
         });
     }
 
@@ -275,13 +290,13 @@ impl WebScene {
             visible: true,
         });
 
-        self.scene.camera.position.x = 0.0;
-        self.scene.camera.position.y = 7.5;
-        self.scene.camera.position.z = 14.2;
+        self.scene.camera.position[0] = 0.0;
+        self.scene.camera.position[1] = 7.5;
+        self.scene.camera.position[2] = 14.2;
 
-        self.scene.camera.direction.x = 0.0;
-        self.scene.camera.direction.y = -0.5;
-        self.scene.camera.direction.z = -0.85;
+        self.scene.camera.direction[0] = 0.0;
+        self.scene.camera.direction[1] = -0.5;
+        self.scene.camera.direction[2] = -0.85;
 
         self.scene.camera.aperture = ApertureShape::Circle { radius: 0.0 };
 

@@ -1,5 +1,3 @@
-use crate::Scene;
-use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
@@ -64,10 +62,4 @@ pub struct Raster {
     #[default(720)]
     pub height: u32,
     pub filter: RasterFilter,
-}
-
-impl Raster {
-    pub(crate) fn validate(&self, _scene: &Scene) -> Result<(), Error> {
-        Ok(())
-    }
 }

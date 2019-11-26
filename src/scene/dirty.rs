@@ -27,6 +27,15 @@ impl<T> Dirty<T> {
         this.is_clean = false;
     }
 
+    /// Returns the value only if it is dirty.
+    pub fn as_dirty(this: &Self) -> Option<&T> {
+        if this.is_clean {
+            return None;
+        }
+
+        Some(&this.inner)
+    }
+
     /// Marks the value as clean and returns whether it was dirty.
     ///
     /// The `update` callback is invoked if the value is dirty. If the callback

@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::{Asset, Device, Environment};
+use crate::{Device, Environment};
 use half::f16;
 use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
@@ -22,8 +22,8 @@ pub struct EnvironmentData {
 impl Device {
     pub(crate) fn update_environment_map(
         &mut self,
-        assets: &HashMap<Asset, Vec<u8>>,
-        map: Option<&Asset>,
+        assets: &HashMap<String, Vec<u8>>,
+        map: Option<&str>,
     ) -> Result<(), Error> {
         if let Some(map) = map {
             let (header, data) =
