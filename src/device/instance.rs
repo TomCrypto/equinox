@@ -2,8 +2,8 @@
 use log::{debug, info, warn};
 
 use crate::{
-    material_index, material_parameter_block_count, renumber_parameters, BoundingBox, Device,
-    Geometry, Instance, Material,
+    material_index, material_parameter_block_count, BoundingBox, Device, Geometry, Instance,
+    Material,
 };
 use itertools::izip;
 use js_sys::Error;
@@ -100,15 +100,15 @@ impl Device {
                 continue;
             }
 
-            let indices = renumber_parameters(&geometry_list[&instance.geometry]);
-            let block_count = (indices.len() + 3) / 4;
+            let parameters = geometry_list[&instance.geometry].symbolic_parameters();
+            let block_count = (parameters.len() + 3) / 4;
 
             let region = &mut params[offset..offset + block_count];
             offset += block_count;
 
-            for (data, indices) in izip!(region, indices.chunks(4)) {
+            for (data, parameters) in izip!(region, parameters.chunks(4)) {
                 for i in 0..4 {
-                    if let Some(symbol) = indices.get(i) {
+                    if let Some(symbol) = parameters.get(i) {
                         data.0[i] = instance.parameters[symbol];
                     } else {
                         data.0[i] = 0.0; // unused vec4 padding

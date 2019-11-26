@@ -229,4 +229,85 @@ impl Geometry {
             Self::ForceNumericalNormals { f } => f.bounding_box(symbolic_values),
         }
     }
+
+    /// Returns a vector of all symbolic parameters found in this geometry in
+    /// a deterministic order, representing the approximate evaluation order.
+    pub fn symbolic_parameters(&self) -> Vec<String> {
+        let mut parameters = vec![];
+
+        self.symbolic_parameters_recursive(&mut parameters);
+
+        parameters
+    }
+
+    fn record_parameter(parameters: &mut Vec<String>, parameter: &Parameter) {
+        if let Parameter::Symbolic(symbol) = parameter {
+            parameters.push(symbol.clone());
+        }
+    }
+
+    fn symbolic_parameters_recursive(&self, parameters: &mut Vec<String>) {
+        match self {
+            Self::Sphere { radius } => {
+                Self::record_parameter(parameters, radius);
+            }
+            Self::Ellipsoid { radius } => {
+                Self::record_parameter(parameters, &radius[0]);
+                Self::record_parameter(parameters, &radius[1]);
+                Self::record_parameter(parameters, &radius[2]);
+            }
+            Self::Cuboid { dimensions } => {
+                Self::record_parameter(parameters, &dimensions[0]);
+                Self::record_parameter(parameters, &dimensions[1]);
+                Self::record_parameter(parameters, &dimensions[2]);
+            }
+            Self::InfiniteRepetition { f, period } => {
+                Self::record_parameter(parameters, &period[0]);
+                Self::record_parameter(parameters, &period[1]);
+                Self::record_parameter(parameters, &period[2]);
+
+                f.symbolic_parameters_recursive(parameters);
+            }
+            Self::Union { children } | Self::Intersection { children } => children
+                .iter()
+                .for_each(|child| child.symbolic_parameters_recursive(parameters)),
+            Self::Subtraction { lhs, rhs } => {
+                lhs.symbolic_parameters_recursive(parameters);
+                rhs.symbolic_parameters_recursive(parameters);
+            }
+            Self::Onion { thickness, f } => {
+                Self::record_parameter(parameters, thickness);
+
+                f.symbolic_parameters_recursive(parameters);
+            }
+            Self::Scale { factor, f } => {
+                Self::record_parameter(parameters, factor);
+
+                f.symbolic_parameters_recursive(parameters);
+            }
+            Self::Rotate { axis, angle, f } => {
+                Self::record_parameter(parameters, &axis[0]);
+                Self::record_parameter(parameters, &axis[1]);
+                Self::record_parameter(parameters, &axis[2]);
+                Self::record_parameter(parameters, angle);
+
+                f.symbolic_parameters_recursive(parameters);
+            }
+            Self::Translate { translation, f } => {
+                Self::record_parameter(parameters, &translation[0]);
+                Self::record_parameter(parameters, &translation[1]);
+                Self::record_parameter(parameters, &translation[2]);
+
+                f.symbolic_parameters_recursive(parameters);
+            }
+            Self::Round { f, radius } => {
+                Self::record_parameter(parameters, radius);
+
+                f.symbolic_parameters_recursive(parameters);
+            }
+            Self::ForceNumericalNormals { f } => {
+                f.symbolic_parameters_recursive(parameters);
+            }
+        }
+    }
 }

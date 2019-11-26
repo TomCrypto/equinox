@@ -79,7 +79,9 @@ impl GeometryGlslGenerator {
     }
 
     // In the methods below, the parameters must be evaluated in the same order used
-    // when renumbering the parameter table further below in `renumber_parameters`.
+    // when enumerating symbolic parameters in the geometry struct.
+    // TODO: this probably needs to change; it's too error-prone. Use a map from
+    // symbolic string to index?
 
     fn distance_recursive(&mut self, geometry: &Geometry, index: &mut usize) -> DistanceFn {
         let code = match geometry {
@@ -380,87 +382,6 @@ impl GeometryGlslGenerator {
     fn generate_id(&mut self) -> u32 {
         self.next_function_id += 1;
         self.next_function_id
-    }
-}
-
-/// Returns a vector of all symbolic parameter values in the order they are
-/// encountered in the geometry. The resulting order will be deterministic.
-pub(crate) fn renumber_parameters(geometry: &Geometry) -> Vec<String> {
-    let mut parameters = vec![];
-
-    renumber_parameters_recursive(geometry, &mut parameters);
-
-    parameters
-}
-
-fn add_parameter(parameters: &mut Vec<String>, parameter: &Parameter) {
-    if let Parameter::Symbolic(symbol) = parameter {
-        parameters.push(symbol.clone());
-    }
-}
-
-fn renumber_parameters_recursive(geometry: &Geometry, parameters: &mut Vec<String>) {
-    match geometry {
-        Geometry::Sphere { radius } => {
-            add_parameter(parameters, radius);
-        }
-        Geometry::Ellipsoid { radius } => {
-            add_parameter(parameters, &radius[0]);
-            add_parameter(parameters, &radius[1]);
-            add_parameter(parameters, &radius[2]);
-        }
-        Geometry::Cuboid { dimensions } => {
-            add_parameter(parameters, &dimensions[0]);
-            add_parameter(parameters, &dimensions[1]);
-            add_parameter(parameters, &dimensions[2]);
-        }
-        Geometry::InfiniteRepetition { f, period } => {
-            add_parameter(parameters, &period[0]);
-            add_parameter(parameters, &period[1]);
-            add_parameter(parameters, &period[2]);
-
-            renumber_parameters_recursive(f, parameters);
-        }
-        Geometry::Union { children } | Geometry::Intersection { children } => children
-            .iter()
-            .for_each(|child| renumber_parameters_recursive(child, parameters)),
-        Geometry::Subtraction { lhs, rhs } => {
-            renumber_parameters_recursive(lhs, parameters);
-            renumber_parameters_recursive(rhs, parameters);
-        }
-        Geometry::Onion { thickness, f } => {
-            add_parameter(parameters, thickness);
-
-            renumber_parameters_recursive(f, parameters);
-        }
-        Geometry::Scale { factor, f } => {
-            add_parameter(parameters, factor);
-
-            renumber_parameters_recursive(f, parameters);
-        }
-        Geometry::Rotate { axis, angle, f } => {
-            add_parameter(parameters, &axis[0]);
-            add_parameter(parameters, &axis[1]);
-            add_parameter(parameters, &axis[2]);
-            add_parameter(parameters, angle);
-
-            renumber_parameters_recursive(f, parameters);
-        }
-        Geometry::Translate { translation, f } => {
-            add_parameter(parameters, &translation[0]);
-            add_parameter(parameters, &translation[1]);
-            add_parameter(parameters, &translation[2]);
-
-            renumber_parameters_recursive(f, parameters);
-        }
-        Geometry::Round { f, radius } => {
-            add_parameter(parameters, radius);
-
-            renumber_parameters_recursive(f, parameters);
-        }
-        Geometry::ForceNumericalNormals { f } => {
-            renumber_parameters_recursive(f, parameters);
-        }
     }
 }
 

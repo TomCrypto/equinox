@@ -300,8 +300,10 @@ impl Scene {
             validate_contains!(geometry_list, prefix, geometry);
             validate_contains!(material_list, prefix, material);
 
-            // TODO: validate presence of parameters inside geometry?
-            // (or rather validate that all parameters are given)
+            for parameter in geometry_list[geometry].symbolic_parameters() {
+                let geometry_prefix = format!("geometry_list[\"{}\"]", geometry);
+                validate_contains!(parameters, geometry_prefix, parameter);
+            }
         }
 
         Ok(())
