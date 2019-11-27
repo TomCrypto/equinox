@@ -1,20 +1,18 @@
 <template>
-  <div class="root">
-    <div class="save-panel">
-      <input class="name-input" v-model="name" type="text" placeholder="Scene name" />
-      <button class="save-button" v-on:click="saveScene(name)">Save</button>
-    </div>
-    <div class="scene-list">
-      <button
-        class="load-scene"
-        v-for="scene in displayScenes"
-        :key="scene.name"
-        :style="`background-image: url(${scene.thumbnail})`"
-        v-on:click="loadScene(scene.name)"
-      >
-        <div class="scene-name">{{ scene.name }}</div>
-      </button>
-    </div>
+  <div class="scene-list">
+    <button class="button" v-on:click="saveScene()">
+      <div class="save-text">SAVE</div>
+    </button>
+
+    <button
+      class="button load-scene"
+      v-for="scene in displayScenes"
+      :key="scene.name"
+      :style="`background-image: url(${scene.thumbnail})`"
+      v-on:click="loadScene(scene.name)"
+    >
+      <div class="scene-name">{{ scene.name }}</div>
+    </button>
   </div>
 </template>
 
@@ -42,8 +40,6 @@ export default class extends Vue {
     driver: localforage.LOCALSTORAGE,
     name: "equinox-saved-scenes-v1"
   });
-
-  private name: string = "";
 
   get displayScenes(): unknown {
     const scenes = [];
@@ -79,8 +75,8 @@ export default class extends Vue {
     );
   }
 
-  private async saveScene(name: string) {
-    this.$root.$emit("save-scene-request", name);
+  private async saveScene() {
+    this.$root.$emit("save-scene-request", "Unnamed scene");
   }
 
   private async deleteScene(name: string) {
@@ -124,45 +120,22 @@ export default class extends Vue {
 </script>
 
 <style scoped>
-.root {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  user-select: none;
-}
-
-.save-panel {
-  flex: 0;
-  display: flex;
-  flex-direction: row;
-}
-
-.name-input {
-  flex: 2;
-  user-select: text;
-}
-
-.save-button {
-  flex: 1;
-}
-
 .scene-list {
   flex: 1;
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
+
+  user-select: none;
 }
 
-.load-scene {
+.button {
   flex: 1;
-  background-color: black;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
   min-width: 320px;
   min-height: 180px;
   text-decoration: none;
   margin: 3px;
+  background-color: black;
   border-radius: 6px;
   box-shadow: inset 0px 0px 5px 0px #555555;
   border: 1px solid #555555;
@@ -173,12 +146,18 @@ export default class extends Vue {
   align-items: stretch;
 }
 
-.load-scene:active {
+.load-scene {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.button:active {
   position: relative;
   top: 2px;
 }
 
-.load-scene:focus {
+.button:focus {
   box-shadow: 0 0 1pt 1pt #7193d9;
   outline: 0;
 }
@@ -194,5 +173,10 @@ export default class extends Vue {
   margin-bottom: 8px;
   margin-left: 4px;
   margin-right: 4px;
+}
+
+.save-text {
+  color: #ffffff;
+  font-size: 2em;
 }
 </style>
