@@ -17,6 +17,7 @@
     />
 
     <StatusBar
+      v-if="showStatusBar"
       class="status-bar"
       :sppm-passes="sppmPasses"
       :sppm-photons="sppmPhotons"
@@ -109,6 +110,7 @@ export default class extends Vue {
   }
 
   private animationFrame: number | null = null;
+  private showStatusBar: boolean = true;
 
   destroyed() {
     this.observer.disconnect();
@@ -271,6 +273,10 @@ export default class extends Vue {
 
     if (event.shiftKey && event.key === "L" && this.extension !== null) {
       this.extension.restoreContext();
+    }
+
+    if (event.shiftKey && event.key === "O") {
+      this.showStatusBar = !this.showStatusBar;
     }
 
     // ...
