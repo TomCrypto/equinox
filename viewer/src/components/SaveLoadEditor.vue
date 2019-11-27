@@ -11,7 +11,9 @@
         :key="scene.name"
         :style="`background-image: url(${scene.thumbnail})`"
         v-on:click="loadScene(scene.name)"
-      >{{ scene.name }}</button>
+      >
+        <div class="scene-name">{{ scene.name }}</div>
+      </button>
     </div>
   </div>
 </template>
@@ -78,7 +80,6 @@ export default class extends Vue {
     );
   }
 
-  // how to get screenshot from current scene here??
   private async saveScene(name: string) {
     this.$root.$emit("save-scene-request", name);
   }
@@ -168,10 +169,31 @@ export default class extends Vue {
   border: 1px solid #555555;
   cursor: pointer;
   padding-top: 4px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: stretch;
 }
 
 .load-scene:active {
   position: relative;
   top: 2px;
+}
+
+.load-scene:focus {
+  box-shadow: 0 0 1pt 1pt #7193d9;
+  outline: 0;
+}
+
+.scene-name {
+  text-shadow: 0.08em 0 black, 0 0.08em black, -0.08em 0 black, 0 -0.08em black,
+    -0.08em -0.08em black, -0.08em 0.08em black, 0.08em -0.08em black,
+    0.08em 0.08em black;
+  color: #ffffff;
+  font-size: 1em;
+
+  flex: 0;
+  margin-bottom: 8px;
+  margin-left: 4px;
+  margin-right: 4px;
 }
 </style>
