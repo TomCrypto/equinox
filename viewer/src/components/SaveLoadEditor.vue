@@ -13,6 +13,9 @@
       :style="`background-image: url(${scene.thumbnail})`"
       v-on:click="loadScene(scene.name)"
     >
+      <div class="delete-scene" v-on:click="deleteScene($event, scene.name)">
+        <font-awesome-icon icon="trash" fixed-width />
+      </div>
       <div class="scene-name">{{ scene.name }}</div>
     </button>
   </div>
@@ -81,9 +84,13 @@ export default class extends Vue {
     this.$root.$emit("save-scene-request", "Unnamed scene");
   }
 
-  private async deleteScene(name: string) {
-    await this.store.removeItem(name);
-    this.updateFromStore();
+  private async deleteScene(event: Event, name: string) {
+    console.log(event);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    /*await this.store.removeItem(name);
+    this.updateFromStore();*/
   }
 
   private async loadScene(name: string) {
@@ -159,6 +166,7 @@ export default class extends Vue {
   align-items: stretch;
   display: flex;
   flex-direction: column-reverse;
+  position: relative;
 }
 
 .button:active {
@@ -188,5 +196,21 @@ export default class extends Vue {
   color: #ffffff;
   font-size: 2em;
   flex: 0;
+}
+
+.delete-scene {
+  display: inline-block;
+  position: absolute;
+  margin: 8px;
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  background-color: transparent;
+  color: #ffffff;
+  border: 0;
+  outline: 0;
+  text-align: center;
+  vertical-align: middle;
 }
 </style>
