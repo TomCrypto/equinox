@@ -99,10 +99,12 @@ impl WebScene {
         let mut temporary: Scene = from_json(json)?;
 
         std::mem::swap(&mut self.scene.assets, &mut temporary.assets);
-        let is_valid = temporary.validate(); // validate and swap back
-        std::mem::swap(&mut self.scene.assets, &mut temporary.assets);
 
-        is_valid?; // don't continue on failure
+        if let Err(error) = temporary.validate() {
+            std::mem::swap(&mut self.scene.assets, &mut temporary.assets);
+            return Err(error.into()); // put the assets back on the scene
+        }
+
         self.scene.patch_from_other(temporary);
 
         Ok(())

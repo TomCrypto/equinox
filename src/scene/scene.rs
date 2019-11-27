@@ -136,6 +136,8 @@ impl Scene {
         if self.integrator != other.integrator {
             self.integrator = other.integrator;
         }
+
+        self.assets = other.assets;
     }
 
     /// Validates all dirty contents of this scene.
