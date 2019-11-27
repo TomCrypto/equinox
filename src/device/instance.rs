@@ -64,11 +64,12 @@ impl Device {
 
         let node_count = HierarchyBuilder::node_count_for_leaves(instance_info.len());
 
-        let mut nodes = vec![SceneInstanceNode::default(); self.instance_buffer.max_len()];
+        let mut nodes = vec![SceneInstanceNode::default(); node_count];
 
-        HierarchyBuilder::new(&mut nodes[..node_count]).build(&mut instance_info);
+        HierarchyBuilder::new(&mut nodes).build(&mut instance_info);
 
-        self.instance_buffer.write_array(&nodes)?;
+        self.instance_buffer
+            .write_array(self.instance_buffer.max_len(), &nodes)?;
         self.integrator_gather_photons_shader
             .set_define("INSTANCE_DATA_LEN", self.instance_buffer.len());
         self.integrator_scatter_photons_shader
@@ -90,7 +91,7 @@ impl Device {
         // the parameter table are coherent and that all fields are nicely packed into
         // individual vec4 elements. Out-of-bounds parameter indices are checked here.
 
-        let mut params = vec![GeometryParameter::default(); self.geometry_buffer.max_len()];
+        let mut params = vec![];
         let mut offset = 0;
 
         for instance in instance_list.values() {
@@ -100,6 +101,10 @@ impl Device {
 
             let parameters = geometry_list[&instance.geometry].symbolic_parameters();
             let block_count = (parameters.len() + 3) / 4;
+
+            for _ in 0..block_count {
+                params.push(GeometryParameter::default());
+            }
 
             let region = &mut params[offset..offset + block_count];
             offset += block_count;
@@ -115,7 +120,8 @@ impl Device {
             }
         }
 
-        self.geometry_buffer.write_array(&params)?;
+        self.geometry_buffer
+            .write_array(self.geometry_buffer.max_len(), &params)?;
         self.integrator_gather_photons_shader
             .set_define("GEOMETRY_DATA_LEN", self.geometry_buffer.len());
         self.integrator_scatter_photons_shader

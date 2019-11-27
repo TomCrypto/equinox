@@ -102,12 +102,14 @@ impl Device {
         let scatter_dimensions = 5 + 4 * integrator.max_scatter_bounces as usize;
 
         let mut quasi_buffer =
-            vec![SamplerDimensionAlpha::default(); self.gather_quasi_buffer.max_len()];
+            vec![SamplerDimensionAlpha::default(); gather_dimensions.max(scatter_dimensions)];
 
         Self::populate_quasi_buffer(&mut quasi_buffer[..gather_dimensions]);
-        self.gather_quasi_buffer.write_array(&quasi_buffer)?;
+        self.gather_quasi_buffer
+            .write_array(self.gather_quasi_buffer.max_len(), &quasi_buffer)?;
         Self::populate_quasi_buffer(&mut quasi_buffer[..scatter_dimensions]);
-        self.scatter_quasi_buffer.write_array(&quasi_buffer)?;
+        self.scatter_quasi_buffer
+            .write_array(self.scatter_quasi_buffer.max_len(), &quasi_buffer)?;
 
         self.integrator_gather_photons_shader
             .set_define("SAMPLER_MAX_DIMENSIONS", quasi_buffer.len());

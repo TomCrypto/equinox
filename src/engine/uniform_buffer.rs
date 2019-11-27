@@ -17,10 +17,13 @@ pub struct UniformBuffer<T: ?Sized> {
 }
 
 impl<T: AsBytes + FromBytes> UniformBuffer<[T]> {
-    pub fn write_array(&mut self, contents: &[T]) -> Result<(), Error> {
-        if self.len != contents.len() || self.handle.is_none() {
-            self.create_and_allocate(size_of::<T>() * contents.len().max(1))?;
-            self.len = contents.len().max(1);
+    pub fn write_array(&mut self, len: usize, contents: &[T]) -> Result<(), Error> {
+        assert!(contents.len() <= len);
+        let buffer_length = len.max(1);
+
+        if self.len != buffer_length || self.handle.is_none() {
+            self.create_and_allocate(size_of::<T>() * buffer_length)?;
+            self.len = buffer_length;
         }
 
         self.gl

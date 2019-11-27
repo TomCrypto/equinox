@@ -99,7 +99,13 @@ impl Device {
         &mut self,
         materials: &BTreeMap<String, Material>,
     ) -> Result<(), Error> {
-        let mut parameters = vec![MaterialParameter::default(); self.material_buffer.max_len()];
+        let mut parameter_count = 0;
+
+        for material in materials.values() {
+            parameter_count += material_parameter_block_count(material);
+        }
+
+        let mut parameters = vec![MaterialParameter::default(); parameter_count];
         let mut start = 0;
 
         for material in materials.values() {
@@ -110,7 +116,8 @@ impl Device {
             start += count;
         }
 
-        self.material_buffer.write_array(&parameters)?;
+        self.material_buffer
+            .write_array(self.material_buffer.max_len(), &parameters)?;
         self.integrator_gather_photons_shader
             .set_define("MATERIAL_DATA_LEN", self.material_buffer.len());
         self.integrator_scatter_photons_shader
