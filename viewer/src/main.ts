@@ -11,10 +11,17 @@ import "codemirror/addon/lint/lint";
 import "codemirror/addon/lint/json-lint";
 import "codemirror/mode/javascript/javascript";
 import { library } from "@fortawesome/fontawesome-svg-core";
-import { faHdd, faTrash } from "@fortawesome/free-solid-svg-icons";
+import {
+  faHdd,
+  faTrash,
+  faDownload,
+  faExpand,
+  faLock,
+  faUnlock
+} from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
-library.add(faHdd, faTrash);
+library.add(faHdd, faTrash, faDownload, faExpand, faLock, faUnlock);
 
 (window as any).jsonlint = require("jsonlint-mod");
 

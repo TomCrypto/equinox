@@ -2,6 +2,7 @@
   <div class="container">
     <canvas
       class="canvas"
+      v-bind:class="{ 'canvas-locked': isCameraLocked }"
       :style="canvasStyle"
       ref="canvas"
       tabindex="0"
@@ -31,7 +32,12 @@
       :syncInterval="syncInterval"
     />
 
-    <Toolbar :on-save-render="onSaveRender" :on-toggle-fullscreen="toggleFullscreen" />
+    <Toolbar
+      :on-save-render="onSaveRender"
+      :on-toggle-fullscreen="toggleFullscreen"
+      :is-camera-locked="isCameraLocked"
+      v-on:camera-lock="toggleCameraLock()"
+    />
   </div>
 </template>
 
@@ -179,6 +185,7 @@ export default class extends Vue {
   private screenshot: Blob | null = null;
   private isSceneSaveRequested: boolean = false;
   private sceneSaveRequestName: string = "";
+  private isCameraLocked: boolean = false;
 
   private toggleFullscreen() {
     if (document.fullscreenElement === null) {
@@ -186,6 +193,10 @@ export default class extends Vue {
     } else {
       document.exitFullscreen();
     }
+  }
+
+  private toggleCameraLock() {
+    this.isCameraLocked = !this.isCameraLocked;
   }
 
   private onSaveRender() {
@@ -554,6 +565,7 @@ export default class extends Vue {
   position: relative;
   width: 100%;
   height: 100%;
+  user-select: none;
 }
 
 .canvas {
@@ -562,6 +574,10 @@ export default class extends Vue {
   right: 0;
   margin: 0;
   outline: none;
+}
+
+.canvas-locked {
+  pointer-events: none;
 }
 
 .status-bar {

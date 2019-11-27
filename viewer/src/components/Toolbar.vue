@@ -1,25 +1,30 @@
 <template>
   <div class="toolbar">
-    <button
-      class="toggle-fullscreen"
-      title="Toggle fullscreen mode"
-      v-on:click="onToggleFullscreen()"
-    />
+    <div class="toolbar-item" title="Toggle fullscreen mode" v-on:click="onToggleFullscreen()">
+      <font-awesome-icon class="toolbar-icon" icon="expand" size="2x" />
+    </div>
 
-    <button class="save-render" title="Save the current render" v-on:click="onSaveRender()" />
+    <div class="toolbar-item" title="Save the current render" v-on:click="onSaveRender()">
+      <font-awesome-icon class="toolbar-icon" icon="download" size="2x" />
+    </div>
 
-    <button
+    <div
       v-if="!isCameraLocked"
-      class="lock-camera"
+      class="toolbar-item"
       title="Lock camera"
       v-on:click="toggleCameraLock()"
-    />
-    <button
+    >
+      <font-awesome-icon class="toolbar-icon" icon="unlock" size="2x" />
+    </div>
+
+    <div
       v-if="isCameraLocked"
-      class="unlock-camera"
+      class="toolbar-item"
       title="Unlock camera"
       v-on:click="toggleCameraLock()"
-    />
+    >
+      <font-awesome-icon class="toolbar-icon" icon="lock" size="2x" />
+    </div>
   </div>
 </template>
 
@@ -28,15 +33,12 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 
 @Component
 export default class extends Vue {
-  @Prop() private onToggleCameraLock!: (locked: boolean) => void;
-  @Prop() private onSaveRender!: () => void;
   @Prop() private onToggleFullscreen!: () => void;
-
-  private isCameraLocked: boolean = false;
+  @Prop() private onSaveRender!: () => void;
+  @Prop() private isCameraLocked!: boolean;
 
   private toggleCameraLock() {
-    this.isCameraLocked = !this.isCameraLocked;
-    this.onToggleCameraLock(this.isCameraLocked);
+    this.$emit("camera-lock");
   }
 }
 </script>
@@ -44,55 +46,64 @@ export default class extends Vue {
 <style scoped>
 .toolbar {
   position: absolute;
-  top: 0;
-  right: 0;
+  bottom: 56px;
+  left: 50%;
 
-  height: 32px;
+  transform: translateX(-50%);
 
-  background-color: black;
-  opacity: 0.8;
+  background-color: transparent;
+  opacity: 0.1;
+  filter: blur(1px);
   display: flex;
 
-  user-select: none;
+  transition: opacity 0.2s ease-out, filter 0.2s ease-out;
 }
 
-.toolbar button {
-  width: 32px;
+.toolbar:hover {
+  filter: none;
+  opacity: 0.8;
+}
 
-  background-color: white;
-  border: 1px solid black;
-  background-size: cover;
+.toolbar-item:first-child {
+  border-radius: 16px 0 0 16px;
+  border-left-width: 4px;
+}
+
+.toolbar-item:last-child {
+  border-radius: 0 16px 16px 0;
+  border-right-width: 4px;
+}
+
+.toolbar-item {
+  border-style: solid;
+  border-color: #dddddd;
+  border-top-width: 4px;
+  border-bottom-width: 4px;
+  border-left-width: 1px;
+  border-right-width: 1px;
+
+  width: 48px;
+  height: 48px;
+  color: #dddddd;
+
+  background-color: #1a1a1a;
+
+  cursor: pointer;
 
   flex-grow: 0;
   flex-shrink: 0;
+
+  position: relative;
 }
 
-.toolbar button::-moz-focus-inner {
-  border: 0;
+.toolbar-item:active {
+  box-shadow: inset 0px 0px 10px #ffffff;
 }
 
-.toolbar button:focus {
-  border: 1px solid black;
-  outline: none;
-}
-
-.toolbar button:active {
-  box-shadow: inset 0px 0px 10px #c1c1c1;
-}
-
-.toggle-fullscreen {
-  background-image: url("../assets/toggle-fullscreen.png");
-}
-
-.lock-camera {
-  background-image: url("../assets/lock-camera.png");
-}
-
-.unlock-camera {
-  background-image: url("../assets/unlock-camera.png");
-}
-
-.save-render {
-  background-image: url("../assets/save-render.png");
+.toolbar-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 </style>
