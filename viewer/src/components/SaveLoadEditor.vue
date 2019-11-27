@@ -158,6 +158,11 @@ export default class extends Vue {
   border: 1px solid #555555;
   cursor: pointer;
   padding-top: 4px;
+  outline: 0;
+}
+
+.button::-moz-focus-inner {
+  border: 0;
 }
 
 .button:active {
@@ -167,7 +172,6 @@ export default class extends Vue {
 
 .button:focus {
   box-shadow: 0 0 1pt 1pt #7193d9;
-  outline: 0;
 }
 
 .scene-name-container {
@@ -208,7 +212,6 @@ export default class extends Vue {
   background-color: transparent;
   color: #ffffff;
   border: 0;
-  outline: 0;
   text-align: center;
   vertical-align: middle;
   z-index: 1;
