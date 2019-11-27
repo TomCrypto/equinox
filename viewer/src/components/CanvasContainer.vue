@@ -17,6 +17,8 @@
       v-on:contextmenu="$event.preventDefault()"
     />
 
+    <LoadingOverlay :assets-in-flight="assetsInFlight" />
+
     <StatusBar
       v-if="showStatusBar"
       class="status-bar"
@@ -47,6 +49,7 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 import { WebScene, WebDevice } from "equinox";
 import StatusBar from "@/components/StatusBar.vue";
 import Toolbar from "@/components/Toolbar.vue";
+import LoadingOverlay from "@/components/LoadingOverlay.vue";
 import Zip from "jszip";
 import FileSaver from "file-saver";
 import {
@@ -58,6 +61,7 @@ import MovingWindowEstimator from "../helpers/minimum_window";
 
 @Component({
   components: {
+    LoadingOverlay,
     StatusBar,
     Toolbar
   }
@@ -66,6 +70,8 @@ export default class extends Vue {
   @Prop() private equinox!: typeof import("equinox");
 
   @Prop() private scene!: WebScene;
+
+  @Prop() private assetsInFlight!: number;
 
   private device!: WebDevice;
 

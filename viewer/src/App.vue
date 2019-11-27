@@ -1,9 +1,7 @@
 <template>
   <div id="app">
     <div class="canvas-panel">
-      <CanvasContainer :equinox="equinox" :scene="scene" />
-
-      <LoadingOverlay :loading-count="loadingCount" :downloading-count="downloadingCount" />
+      <CanvasContainer :equinox="equinox" :scene="scene" :assets-in-flight="assetsInFlight" />
     </div>
     <div class="editor-panel">
       <EditorContainer
@@ -35,7 +33,6 @@
 
 <script lang="ts">
 import { Component, Prop, Vue } from "vue-property-decorator";
-import LoadingOverlay from "@/components/LoadingOverlay.vue";
 import EnvironmentEditor from "@/components/EnvironmentEditor.vue";
 import EditorContainer from "@/components/EditorContainer.vue";
 import DocumentationEditor from "@/components/DocumentationEditor.vue";
@@ -49,7 +46,6 @@ import SaveLoadEditor from "@/components/SaveLoadEditor.vue";
 
 @Component({
   components: {
-    LoadingOverlay,
     EnvironmentEditor,
     EditorContainer,
     DocumentationEditor,
@@ -67,8 +63,7 @@ export default class App extends Vue {
   private editorTabsBelow = ["documentation", "save-load", "advanced"];
   private defaultEditorTab = "documentation";
 
-  private loadingCount: number = 0;
-  private downloadingCount: number = 0;
+  private assetsInFlight: number = 0;
 
   private readonly store = localforage.createInstance({
     driver: localforage.INDEXEDDB,
@@ -95,27 +90,21 @@ export default class App extends Vue {
   }
 
   async fetchAsset(url: string): Promise<ArrayBuffer> {
-    this.loadingCount += 1;
+    this.assetsInFlight += 1;
 
     try {
       let data = (await this.store.getItem(url)) as Blob | null;
 
       if (data === null) {
-        this.downloadingCount += 1;
+        const buffer = await (await fetch(new Request(url))).arrayBuffer();
+        data = new Blob([pako.inflate(new Uint8Array(buffer)).buffer]);
 
-        try {
-          const buffer = await (await fetch(new Request(url))).arrayBuffer();
-          data = new Blob([pako.inflate(new Uint8Array(buffer)).buffer]);
-
-          await this.store.setItem(url, data);
-        } finally {
-          this.downloadingCount -= 1;
-        }
+        await this.store.setItem(url, data);
       }
 
       return new Response(data).arrayBuffer();
     } finally {
-      this.loadingCount -= 1;
+      this.assetsInFlight -= 1;
     }
   }
 

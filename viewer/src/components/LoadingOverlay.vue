@@ -1,6 +1,6 @@
 <template>
   <div v-show="isLoading" class="loading-overlay">
-    <img src="@/assets/loading-assets.svg" />
+    <font-awesome-icon class="loading-icon" icon="circle-notch" spin size="lg" />
     <p>{{ loadingText }}</p>
   </div>
 </template>
@@ -10,25 +10,18 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 
 @Component
 export default class extends Vue {
-  // number of assets currently being loaded
-  @Prop() private loadingCount!: number;
-  // of those, number of assets currently downloading
-  @Prop() private downloadingCount!: number;
+  @Prop() private assetsInFlight!: number;
 
   get isLoading(): boolean {
-    return this.loadingCount != 0 || this.downloadingCount != 0;
+    return true; // this.assetsInFlight != 0
   }
 
   get loadingText(): string {
-    if (this.downloadingCount > 0) {
-      return `Downloading ${this.pluralizedAsset(this.downloadingCount)}`;
+    if (this.assetsInFlight > 1) {
+      return `Downloading ${this.assetsInFlight} assets`;
     } else {
-      return `Loading ${this.pluralizedAsset(this.loadingCount)}`;
+      return "Downloading 1 asset";
     }
-  }
-
-  private pluralizedAsset(count: number): string {
-    return count === 1 ? "1 asset" : `${count} assets`;
   }
 }
 </script>
@@ -36,10 +29,10 @@ export default class extends Vue {
 <style scoped>
 .loading-overlay {
   position: absolute;
-  top: 92%;
+  bottom: 140px;
   left: 50%;
 
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   padding: 6px 6px;
   border-radius: 8px;
   height: 24px;
@@ -50,12 +43,12 @@ export default class extends Vue {
 
   user-select: none;
   pointer-events: none;
+  align-items: center;
 }
 
-.loading-overlay img {
+.loading-icon {
   width: 24px;
-
-  margin-right: 6px;
+  color: white;
 
   flex-grow: 0;
   flex-shrink: 0;
@@ -63,7 +56,6 @@ export default class extends Vue {
 
 .loading-overlay p {
   color: #ffffff;
-  margin: 0;
   padding: auto;
   font-size: 0.8em;
   line-height: 24px;
@@ -72,6 +64,7 @@ export default class extends Vue {
 
   flex-grow: 1;
   flex-shrink: 1;
-  margin-right: 6px;
+  margin-left: 6px;
+  margin-right: 2px;
 }
 </style>
