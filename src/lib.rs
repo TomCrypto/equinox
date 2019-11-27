@@ -35,6 +35,7 @@ mod scene {
     pub mod instance;
     pub mod integrator;
     pub mod material;
+    pub mod metadata;
     pub mod raster;
     pub mod scene;
 }
@@ -46,7 +47,7 @@ pub use device::{
 pub use engine::{framebuffer::*, shader::*, texture::*, uniform_buffer::*, vertex_array::*};
 pub use scene::{
     aperture::*, bounding_box::*, camera::*, dirty::*, display::*, environment::*, geometry::*,
-    instance::*, integrator::*, material::*, raster::*, scene::*,
+    instance::*, integrator::*, material::*, metadata::*, raster::*, scene::*,
 };
 
 /// WebGL shaders from the `shader` directory.
@@ -89,6 +90,10 @@ impl WebScene {
 
     pub fn raster_height(&self) -> u32 {
         self.scene.raster.height
+    }
+
+    pub fn name(&self) -> String {
+        self.scene.metadata.name.clone()
     }
 
     /// Reconfigures the scene using the provided scene JSON data.

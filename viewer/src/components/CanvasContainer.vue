@@ -109,9 +109,8 @@ export default class extends Vue {
 
     this.animationFrame = requestAnimationFrame(this.renderLoop);
 
-    this.$root.$on("save-scene-request", name => {
+    this.$root.$on("save-scene-request", () => {
       this.isSceneSaveRequested = true;
-      this.sceneSaveRequestName = name;
     });
   }
 
@@ -184,7 +183,6 @@ export default class extends Vue {
   private mustSaveScreenshot: boolean = false;
   private screenshot: Blob | null = null;
   private isSceneSaveRequested: boolean = false;
-  private sceneSaveRequestName: string = "";
   private isCameraLocked: boolean = false;
 
   private toggleFullscreen() {
@@ -465,7 +463,7 @@ export default class extends Vue {
   private async performSceneSave() {
     const json = this.scene.json();
     const assets = this.scene.assets();
-    const thumbnail = "";
+    const name = this.scene.name();
 
     const thumbnailWidth = 320;
     const thumbnailHeight = 180;
@@ -479,7 +477,7 @@ export default class extends Vue {
 
     this.$root.$emit(
       "save-scene-response",
-      this.sceneSaveRequestName,
+      name,
       json,
       assets,
       this.createThumbnail(this.canvas, w, h)

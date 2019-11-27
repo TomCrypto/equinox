@@ -83,7 +83,7 @@ export default class extends Vue {
   }
 
   private async saveScene() {
-    this.$root.$emit("save-scene-request", "Unnamed scene");
+    this.$root.$emit("save-scene-request");
   }
 
   private async deleteScene(name: string) {

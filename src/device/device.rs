@@ -151,6 +151,9 @@ impl Device {
 
         scene.validate()?;
 
+        // We do nothing with the scene metadata object
+        Dirty::clean(&mut scene.metadata, |_| Ok(()))?;
+
         let mut invalidated = false;
 
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {

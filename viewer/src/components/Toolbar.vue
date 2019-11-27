@@ -11,7 +11,7 @@
     <div
       v-if="!isCameraLocked"
       class="toolbar-item"
-      title="Lock camera"
+      title="Lock the camera"
       v-on:click="toggleCameraLock()"
     >
       <font-awesome-icon class="toolbar-icon" icon="unlock" size="2x" />
@@ -20,7 +20,7 @@
     <div
       v-if="isCameraLocked"
       class="toolbar-item"
-      title="Unlock camera"
+      title="Unlock the camera"
       v-on:click="toggleCameraLock()"
     >
       <font-awesome-icon class="toolbar-icon" icon="lock" size="2x" />
@@ -48,6 +48,8 @@ export default class extends Vue {
   position: absolute;
   bottom: 56px;
   left: 50%;
+
+  padding: 12px;
 
   transform: translateX(-50%);
 
@@ -88,6 +90,8 @@ export default class extends Vue {
 
   background-color: #1a1a1a;
 
+  transition: color 0.2s ease-out;
+
   cursor: pointer;
 
   flex-grow: 0;
@@ -96,8 +100,13 @@ export default class extends Vue {
   position: relative;
 }
 
+.toolbar-item:hover {
+  color: #438edf;
+}
+
 .toolbar-item:active {
-  box-shadow: inset 0px 0px 10px #ffffff;
+  box-shadow: inset 0px 0px 5px #ffffff;
+  color: #244d79;
 }
 
 .toolbar-icon {

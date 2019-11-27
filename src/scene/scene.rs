@@ -1,6 +1,6 @@
 use crate::{
     Aperture, ApertureShape, Camera, Dirty, Display, Environment, Geometry, Instance, Integrator,
-    Material, Raster,
+    Material, Metadata, Raster,
 };
 use js_sys::Error;
 use serde::{Deserialize, Serialize};
@@ -59,6 +59,8 @@ macro_rules! validate_contains {
 /// taken when using the same scene instance on multiple devices simultaneously.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Scene {
+    #[serde(default)]
+    pub metadata: Dirty<Metadata>,
     pub camera: Dirty<Camera>,
     pub raster: Dirty<Raster>,
     pub instance_list: Dirty<BTreeMap<String, Instance>>,
@@ -80,6 +82,7 @@ impl Scene {
     /// This method will force a complete device update the next time the
     /// device is updated using this scene, and should be used sparingly.
     pub fn dirty_all_fields(&mut self) {
+        Dirty::dirty(&mut self.metadata);
         Dirty::dirty(&mut self.camera);
         Dirty::dirty(&mut self.raster);
         Dirty::dirty(&mut self.instance_list);
@@ -97,6 +100,10 @@ impl Scene {
     /// Scene contents which are identical between the two scenes will not be
     /// modified, so the method will avoid dirtying as many fields as it can.
     pub fn patch_from_other(&mut self, other: Self) {
+        if self.metadata != other.metadata {
+            self.metadata = other.metadata;
+        }
+
         if self.camera != other.camera {
             self.camera = other.camera;
         }
@@ -145,6 +152,10 @@ impl Scene {
     /// If this method succeeds, then the scene should always be renderable
     /// without errors, barring implementation limitations in the renderer.
     pub fn validate(&self) -> Result<(), Error> {
+        if let Some(metadata) = Dirty::as_dirty(&self.metadata) {
+            self.validate_metadata(metadata)?;
+        }
+
         if let Some(camera) = Dirty::as_dirty(&self.camera) {
             self.validate_camera(camera)?;
         }
@@ -199,6 +210,12 @@ impl Scene {
                     false
                 }
             })
+    }
+
+    fn validate_metadata(&self, metadata: &Metadata) -> Result<(), Error> {
+        validate!(metadata.name != "");
+
+        Ok(())
     }
 
     fn validate_camera(&self, camera: &Camera) -> Result<(), Error> {
