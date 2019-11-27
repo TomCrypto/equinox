@@ -34,7 +34,7 @@ Vue.config.productionTip = false;
 
 (async () => {
   ((equinox: typeof import("equinox")) => {
-    console.info("WASM module loaded: " + equinox.version());
+    console.info(`WASM module loaded: ${equinox.version()}`);
     equinox.initialize_logging(); // called once on startup
 
     new Vue({
