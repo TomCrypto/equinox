@@ -111,7 +111,7 @@ export default class extends Vue {
 }
 
 .container-body {
-  padding: 20px 20px;
+  margin: 10px 10px;
   background-color: #1a1a1a;
   color: #dddddd;
   flex: 1;
