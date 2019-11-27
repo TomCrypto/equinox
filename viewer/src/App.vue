@@ -70,6 +70,11 @@ export default class App extends Vue {
   private loadingCount: number = 0;
   private downloadingCount: number = 0;
 
+  private readonly store = localforage.createInstance({
+    driver: localforage.INDEXEDDB,
+    name: "equinox-asset-data-v1"
+  });
+
   async loadAssets(assets: string[]): Promise<void> {
     const sceneAssets = this.scene.assets() as string[];
 
@@ -93,7 +98,7 @@ export default class App extends Vue {
     this.loadingCount += 1;
 
     try {
-      let data = (await localforage.getItem(url)) as Blob | null;
+      let data = (await this.store.getItem(url)) as Blob | null;
 
       if (data === null) {
         this.downloadingCount += 1;
@@ -102,7 +107,7 @@ export default class App extends Vue {
           const buffer = await (await fetch(new Request(url))).arrayBuffer();
           data = new Blob([pako.inflate(new Uint8Array(buffer)).buffer]);
 
-          await localforage.setItem(url, data);
+          await this.store.setItem(url, data);
         } finally {
           this.downloadingCount -= 1;
         }

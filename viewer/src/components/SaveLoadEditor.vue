@@ -40,8 +40,7 @@ export default class extends Vue {
 
   private readonly store = localforage.createInstance({
     driver: localforage.LOCALSTORAGE,
-    version: 1,
-    name: "equinox-saved-scenes"
+    name: "equinox-saved-scenes-v1"
   });
 
   private name: string = "";
