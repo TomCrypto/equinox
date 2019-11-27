@@ -584,7 +584,7 @@ export default class extends Vue {
   position: absolute;
   bottom: 0;
   width: 100%;
-  height: 18px !important;
+  height: 18px;
   border-top: 1px solid #777777;
   z-index: 1;
 }
