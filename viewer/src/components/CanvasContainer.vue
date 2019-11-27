@@ -84,13 +84,7 @@ export default class extends Vue {
 
   private device!: WebDevice;
 
-  private readonly observer = new (window as any).ResizeObserver(() => {
-    this.resizeAndMaintainAspectRatio();
-  });
-
   mounted() {
-    this.observer.observe(this.$el);
-
     const canvas = this.$refs.canvas as HTMLCanvasElement;
 
     this.canvas = canvas;
@@ -133,10 +127,6 @@ export default class extends Vue {
   private animationFrame: number | null = null;
   private showStatusBar: boolean = true;
 
-  destroyed() {
-    this.observer.disconnect();
-  }
-
   private canvasStyle: string = "";
 
   private resizeAndMaintainAspectRatio() {
@@ -147,22 +137,22 @@ export default class extends Vue {
       return; // spurious resize event
     }
 
-    const rasterW = this.scene.raster_width();
-    const rasterH = this.scene.raster_height();
+    const canvasW = this.canvas.width;
+    const canvasH = this.canvas.height;
 
-    const ratioX = rasterW / clientW;
-    const ratioY = rasterH / clientH;
+    const ratioX = canvasW / clientW;
+    const ratioY = canvasH / clientH;
 
     if (ratioX < ratioY) {
       this.canvasStyle = `
-        width: ${Math.max(1, rasterW / ratioY)}px;
+        width: ${Math.max(1, canvasW / ratioY)}px;
         transform: translateX(-50%); left: 50%;
 
         height: 100%;
       `;
     } else {
       this.canvasStyle = `
-        height: ${Math.max(1, rasterH / ratioX)}px;
+        height: ${Math.max(1, canvasH / ratioX)}px;
         transform: translateY(-50%); top: 50%;
 
         width:  100%;
@@ -344,9 +334,6 @@ export default class extends Vue {
       this.canvas.clientWidth != 0 &&
       this.canvas.clientHeight != 0
     ) {
-      // TODO: do this every time; do we even need the resize observer then?
-      this.resizeAndMaintainAspectRatio();
-
       this.isContextLost = this.context.isContextLost();
 
       let forward = 0;
@@ -411,12 +398,6 @@ export default class extends Vue {
         this.mouseMoved = false;
       }
 
-      this.canvas.width = this.scene.raster_width();
-      this.canvas.height = this.scene.raster_height();
-
-      this.canvasWidth = this.canvas.width;
-      this.canvasHeight = this.canvas.height;
-
       this.sppmPhotons = this.device.sppm_photons();
       this.sppmPasses = this.device.sppm_passes();
 
@@ -428,6 +409,14 @@ export default class extends Vue {
           this.isExpensiveUpdate = true;
         } else {
           this.device.update(this.scene);
+        }
+
+        if (!this.isExpensiveUpdate) {
+          this.canvas.width = this.scene.raster_width();
+          this.canvas.height = this.scene.raster_height();
+          this.resizeAndMaintainAspectRatio();
+          this.canvasWidth = this.canvas.width;
+          this.canvasHeight = this.canvas.height;
         }
 
         const refineTime = this.gpuTimeQueries!.timeElapsed(() => {
