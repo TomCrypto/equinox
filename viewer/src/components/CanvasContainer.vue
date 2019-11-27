@@ -36,6 +36,7 @@
       :on-save-render="onSaveRender"
       :on-toggle-fullscreen="toggleFullscreen"
       :is-camera-locked="isCameraLocked"
+      :is-saving-render="isSavingRender"
       v-on:camera-lock="toggleCameraLock()"
     />
   </div>
@@ -180,7 +181,8 @@ export default class extends Vue {
 
   private isContextLost: boolean = false;
 
-  private mustSaveScreenshot: boolean = false;
+  private mustSaveRender: boolean = false;
+  private isSavingRender: boolean = false;
   private screenshot: Blob | null = null;
   private isSceneSaveRequested: boolean = false;
   private isCameraLocked: boolean = false;
@@ -198,7 +200,7 @@ export default class extends Vue {
   }
 
   private onSaveRender() {
-    this.mustSaveScreenshot = true;
+    this.mustSaveRender = true;
   }
 
   private loseContext() {
@@ -229,7 +231,7 @@ export default class extends Vue {
   }
 
   private saveScreenshot() {
-    this.mustSaveScreenshot = true;
+    this.mustSaveRender = true;
   }
 
   private releaseKey(key: string) {
@@ -411,9 +413,9 @@ export default class extends Vue {
           this.device.render();
         });
 
-        if (this.mustSaveScreenshot) {
+        if (this.mustSaveRender) {
           this.generateScreenshotZip();
-          this.mustSaveScreenshot = false;
+          this.mustSaveRender = false;
         }
 
         if (this.isSceneSaveRequested) {
@@ -439,25 +441,31 @@ export default class extends Vue {
   }
 
   private async generateScreenshotZip() {
-    const zip = new Zip();
+    this.isSavingRender = true;
 
-    const render = new Promise<Blob>(resolve => {
-      this.canvas!.toBlob(blob => resolve(blob!));
-    });
+    try {
+      const zip = new Zip();
 
-    const info = {
-      sppm_passes: this.device.sppm_passes(),
-      sppm_photons: this.device.sppm_photons(),
-      vendor: this.contextVendor,
-      renderer: this.contextRenderer,
-      version: this.equinox.version()
-    };
+      const render = new Promise<Blob>(resolve => {
+        this.canvas!.toBlob(blob => resolve(blob!));
+      });
 
-    zip.file("scene.json", JSON.stringify(this.sceneJson(), null, 2));
-    zip.file("meta.json", JSON.stringify(info, null, 2));
-    zip.file("render.png", await render);
+      const info = {
+        sppm_passes: this.device.sppm_passes(),
+        sppm_photons: this.device.sppm_photons(),
+        vendor: this.contextVendor,
+        renderer: this.contextRenderer,
+        version: this.equinox.version()
+      };
 
-    FileSaver.saveAs(await zip.generateAsync({ type: "blob" }), "render.zip");
+      zip.file("scene.json", JSON.stringify(this.sceneJson(), null, 2));
+      zip.file("meta.json", JSON.stringify(info, null, 2));
+      zip.file("render.png", await render);
+
+      FileSaver.saveAs(await zip.generateAsync({ type: "blob" }), "render.zip");
+    } finally {
+      this.isSavingRender = false;
+    }
   }
 
   private async performSceneSave() {

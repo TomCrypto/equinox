@@ -17,11 +17,12 @@ import {
   faDownload,
   faExpand,
   faLock,
-  faUnlock
+  faUnlock,
+  faCog
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
-library.add(faHdd, faTrash, faDownload, faExpand, faLock, faUnlock);
+library.add(faHdd, faTrash, faDownload, faExpand, faLock, faUnlock, faCog);
 
 (window as any).jsonlint = require("jsonlint-mod");
 

@@ -5,7 +5,8 @@
     </div>
 
     <div class="toolbar-item" title="Save the current render" v-on:click="onSaveRender()">
-      <font-awesome-icon class="toolbar-icon" icon="download" size="2x" />
+      <font-awesome-icon v-if="!isSavingRender" class="toolbar-icon" icon="download" size="2x" />
+      <font-awesome-icon v-if="isSavingRender" class="toolbar-icon" icon="cog" spin size="2x" />
     </div>
 
     <div
@@ -35,6 +36,7 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 export default class extends Vue {
   @Prop() private onToggleFullscreen!: () => void;
   @Prop() private onSaveRender!: () => void;
+  @Prop() private isSavingRender!: boolean;
   @Prop() private isCameraLocked!: boolean;
 
   private toggleCameraLock() {
@@ -98,6 +100,8 @@ export default class extends Vue {
   flex-shrink: 0;
 
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .toolbar-item:hover {
@@ -110,9 +114,6 @@ export default class extends Vue {
 }
 
 .toolbar-icon {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  flex: 1;
 }
 </style>
