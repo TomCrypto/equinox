@@ -9,6 +9,7 @@
         class="load-scene"
         v-for="scene in displayScenes"
         :key="scene.name"
+        :style="`background-image: url(${scene.thumbnail})`"
         v-on:click="loadScene(scene.name)"
       >{{ scene.name }}</button>
     </div>
@@ -20,7 +21,7 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 import localforage from "localforage";
 import { WebScene } from "equinox";
 
-interface Metadata {
+export interface Metadata {
   thumbnail: string;
   json: object;
   assets: string[];
@@ -46,7 +47,7 @@ export default class extends Vue {
     const scenes = [];
 
     for (const [name, scene] of this.scenes.entries()) {
-      scenes.push({ name, scene });
+      scenes.push({ name, thumbnail: scene.thumbnail });
     }
 
     return scenes;
@@ -54,22 +55,26 @@ export default class extends Vue {
 
   mounted() {
     this.updateFromStore();
+
+    this.$root.$on(
+      "save-scene-response",
+      async (name, json, assets, thumbnail) => {
+        console.log(thumbnail);
+
+        await this.store.setItem(name, {
+          json,
+          assets,
+          thumbnail
+        });
+
+        this.updateFromStore();
+      }
+    );
   }
 
   // how to get screenshot from current scene here??
   private async saveScene(name: string) {
-    // TODO: fetch the current scene JSON and create a thumbnail of the render
-    // this needs to talk to the canvas container, so we'll bubble up and then
-    // back down, or use events
-
-    const scene = {
-      thumbnail: "",
-      json: this.scene.json(),
-      assets: this.scene.assets()
-    };
-
-    await this.store.setItem(name, scene);
-    this.updateFromStore();
+    this.$root.$emit("save-scene-request", name);
   }
 
   private async deleteScene(name: string) {
@@ -138,10 +143,17 @@ export default class extends Vue {
 .scene-list {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
 }
 
 .load-scene {
   flex: 1;
+  background-color: black;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  min-width: 320px;
+  min-height: 180px;
 }
 </style>

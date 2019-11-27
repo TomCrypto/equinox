@@ -101,6 +101,11 @@ export default class extends Vue {
     this.canvas.focus();
 
     this.animationFrame = requestAnimationFrame(this.renderLoop);
+
+    this.$root.$on("save-scene-request", name => {
+      this.isSceneSaveRequested = true;
+      this.sceneSaveRequestName = name;
+    });
   }
 
   private animationFrame: number | null = null;
@@ -127,14 +132,14 @@ export default class extends Vue {
 
     if (ratioX < ratioY) {
       this.canvasStyle = `
-        width: ${Math.ceil(rasterW / ratioY)}px;
+        width: ${Math.max(1, rasterW / ratioY)}px;
         transform: translateX(-50%); left: 50%;
 
         height: 100%;
       `;
     } else {
       this.canvasStyle = `
-        height: ${Math.ceil(rasterH / ratioX)}px;
+        height: ${Math.max(1, rasterH / ratioX)}px;
         transform: translateY(-50%); top: 50%;
 
         width:  100%;
@@ -170,6 +175,8 @@ export default class extends Vue {
 
   private mustSaveScreenshot: boolean = false;
   private screenshot: Blob | null = null;
+  private isSceneSaveRequested: boolean = false;
+  private sceneSaveRequestName: string = "";
 
   private toggleFullscreen() {
     if (document.fullscreenElement === null) {
@@ -391,6 +398,12 @@ export default class extends Vue {
 
         if (this.mustSaveScreenshot) {
           this.generateScreenshotZip();
+          this.mustSaveScreenshot = false;
+        }
+
+        if (this.isSceneSaveRequested) {
+          this.performSceneSave();
+          this.isSceneSaveRequested = false;
         }
 
         this.gpuFrameTimeEstimator.addSample(refineTime);
@@ -408,7 +421,6 @@ export default class extends Vue {
     this.syncInterval = this.syncIntervalEstimator.average();
 
     this.animationFrame = requestAnimationFrame(this.renderLoop);
-    this.mustSaveScreenshot = false; // avoid spurious screenshot
   }
 
   private async generateScreenshotZip() {
@@ -431,6 +443,102 @@ export default class extends Vue {
     zip.file("render.png", await render);
 
     FileSaver.saveAs(await zip.generateAsync({ type: "blob" }), "render.zip");
+  }
+
+  private async performSceneSave() {
+    const json = this.scene.json();
+    const assets = this.scene.assets();
+    const thumbnail = "";
+
+    const thumbnailWidth = 320;
+    const thumbnailHeight = 180;
+
+    const [w, h] = this.resizeToRatio(
+      this.canvas.width,
+      this.canvas.height,
+      thumbnailWidth,
+      thumbnailHeight
+    );
+
+    this.$root.$emit(
+      "save-scene-response",
+      this.sceneSaveRequestName,
+      json,
+      assets,
+      this.createThumbnail(this.canvas, w, h)
+    );
+  }
+
+  private resizeToRatio(
+    srcW: number,
+    srcH: number,
+    maxW: number,
+    maxH: number
+  ): [number, number] {
+    const ratioX = srcW / maxW;
+    const ratioY = srcH / maxH;
+
+    if (ratioX < ratioY) {
+      return [srcW / ratioY, maxH];
+    } else {
+      return [maxW, srcH / ratioX];
+    }
+  }
+
+  private createThumbnail(
+    src: HTMLCanvasElement,
+    dstW: number,
+    dstH: number
+  ): string {
+    console.log("Resizing canvas down to ", dstW, " x ", dstH);
+
+    let dst = document.createElement("canvas");
+    let srcW = src.width;
+    let srcH = src.height;
+    dst.width = srcW;
+    dst.height = srcH;
+
+    dst.getContext("2d").drawImage(src, 0, 0);
+
+    console.log("Starting with srcW = ", srcW, ", srcH = ", srcH);
+
+    while (srcW / 2 >= dstW && srcH / 2 >= dstH) {
+      console.log("Downsampling by one half once");
+
+      // downsample dst canvas by one half
+      const tmp = document.createElement("canvas");
+      tmp.width = srcW / 2;
+      tmp.height = srcH / 2;
+
+      tmp
+        .getContext("2d")
+        .drawImage(dst, 0, 0, dst.width, dst.height, 0, 0, srcW / 2, srcH / 2);
+      console.log(
+        `Downsampled ${dst.width}x${dst.height} => ${srcW / 2}x${srcH / 2}`
+      );
+      dst = tmp;
+
+      srcW /= 2;
+      srcH /= 2;
+    }
+
+    // downsample dst canvas by the rest, if needed
+
+    if (dstW != srcW && dstH != srcH) {
+      const final = document.createElement("canvas");
+      final.width = dstW;
+      final.height = dstH;
+
+      final
+        .getContext("2d")
+        .drawImage(dst, 0, 0, dst.width, dst.height, 0, 0, dstW, dstH);
+      console.log(`Downsampled ${dst.width}x${dst.height} => ${dstW}x${dstH}`);
+      dst = final;
+    }
+
+    console.log(`Returning final canvas of size ${dst.width}x${dst.height}`);
+
+    return dst.toDataURL();
   }
 }
 </script>
