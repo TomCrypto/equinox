@@ -1,7 +1,9 @@
 <template>
   <div class="scene-list">
-    <button class="button" v-on:click="saveScene()">
-      <div class="save-text">SAVE</div>
+    <button class="button save-scene" v-on:click="saveScene()" title="Save the current scene">
+      <div class="save-text">
+        <font-awesome-icon icon="hdd" size="2x" />
+      </div>
     </button>
 
     <button
@@ -141,15 +143,22 @@ export default class extends Vue {
   border: 1px solid #555555;
   cursor: pointer;
   padding-top: 4px;
+}
+
+.save-scene {
   display: flex;
-  flex-direction: column-reverse;
-  align-items: stretch;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .load-scene {
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
+  align-items: stretch;
+  display: flex;
+  flex-direction: column-reverse;
 }
 
 .button:active {
@@ -178,5 +187,6 @@ export default class extends Vue {
 .save-text {
   color: #ffffff;
   font-size: 2em;
+  flex: 0;
 }
 </style>

@@ -10,11 +10,17 @@ import "codemirror/addon/lint/lint.css";
 import "codemirror/addon/lint/lint";
 import "codemirror/addon/lint/json-lint";
 import "codemirror/mode/javascript/javascript";
+import { library } from "@fortawesome/fontawesome-svg-core";
+import { faHdd } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+
+library.add(faHdd);
 
 (window as any).jsonlint = require("jsonlint-mod");
 
 Vue.component("multiselect", Multiselect);
 Vue.component("VueSlider", VueSlider);
+Vue.component("font-awesome-icon", FontAwesomeIcon);
 
 Vue.config.productionTip = false;
 
