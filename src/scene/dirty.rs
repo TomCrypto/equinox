@@ -36,6 +36,11 @@ impl<T> Dirty<T> {
         Some(&this.inner)
     }
 
+    /// Returns whether the value is dirty.
+    pub fn is_dirty(this: &Self) -> bool {
+        !this.is_clean
+    }
+
     /// Marks the value as clean and returns whether it was dirty.
     ///
     /// The `update` callback is invoked if the value is dirty. If the callback

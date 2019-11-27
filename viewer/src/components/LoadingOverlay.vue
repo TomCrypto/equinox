@@ -1,7 +1,14 @@
 <template>
-  <div v-show="isLoading" class="loading-overlay">
-    <font-awesome-icon class="loading-icon" icon="circle-notch" spin size="lg" />
-    <p>{{ loadingText }}</p>
+  <div>
+    <div class="loading-overlay" v-if="showAssetInfo">
+      <font-awesome-icon class="loading-icon" icon="circle-notch" spin size="lg" />
+      <p>{{ loadingText }}</p>
+    </div>
+
+    <div class="loading-overlay" v-if="isExpensiveUpdate">
+      <font-awesome-icon class="loading-icon" icon="exclamation-circle" size="lg" />
+      <p>Please wait...</p>
+    </div>
   </div>
 </template>
 
@@ -11,9 +18,10 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 @Component
 export default class extends Vue {
   @Prop() private assetsInFlight!: number;
+  @Prop() private isExpensiveUpdate!: boolean;
 
-  get isLoading(): boolean {
-    return true; // this.assetsInFlight != 0
+  get showAssetInfo(): boolean {
+    return this.assetsInFlight != 0 && !this.isExpensiveUpdate;
   }
 
   get loadingText(): string {

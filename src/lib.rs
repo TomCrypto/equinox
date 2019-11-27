@@ -335,6 +335,11 @@ impl WebDevice {
         })
     }
 
+    /// Returns whether updating the device with a scene may be time-consuming.
+    pub fn is_expensive_update(&mut self, scene: &WebScene) -> Result<bool, JsValue> {
+        Ok(self.device.is_update_expensive(&scene.scene)?)
+    }
+
     /// Updates the device with a scene, returning true if an update occurred.
     pub fn update(&mut self, scene: &mut WebScene) -> Result<bool, JsValue> {
         Ok(self.device.update(&mut scene.scene)?)

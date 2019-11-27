@@ -143,6 +143,23 @@ impl Device {
         self.device_lost = true;
     }
 
+    /// Determines whether a device update with a scene may be time-consuming.
+    pub fn is_update_expensive(&self, scene: &Scene) -> Result<bool, Error> {
+        if self.device_lost {
+            return Ok(false);
+        }
+
+        scene.validate()?;
+
+        let mut expensive = false;
+
+        expensive |= Dirty::is_dirty(&scene.geometry_list);
+        expensive |= Dirty::is_dirty(&scene.environment_map);
+        expensive |= Dirty::is_dirty(&scene.aperture);
+
+        Ok(expensive)
+    }
+
     /// Updates this device to render a given scene or returns an error.
     pub fn update(&mut self, scene: &mut Scene) -> Result<bool, Error> {
         if self.device_lost && !self.try_restore(scene)? {
