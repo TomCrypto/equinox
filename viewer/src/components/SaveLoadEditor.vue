@@ -25,6 +25,7 @@ export interface Metadata {
   thumbnail: string;
   json: object;
   assets: string[];
+  timestamp: string;
 }
 
 @Component
@@ -47,10 +48,16 @@ export default class extends Vue {
     const scenes = [];
 
     for (const [name, scene] of this.scenes.entries()) {
-      scenes.push({ name, thumbnail: scene.thumbnail });
+      scenes.push({
+        name,
+        thumbnail: scene.thumbnail,
+        timestamp: scene.timestamp
+      });
     }
 
-    return scenes;
+    return scenes.sort((lhs, rhs) =>
+      rhs.timestamp.localeCompare(lhs.timestamp)
+    );
   }
 
   mounted() {
@@ -59,12 +66,11 @@ export default class extends Vue {
     this.$root.$on(
       "save-scene-response",
       async (name, json, assets, thumbnail) => {
-        console.log(thumbnail);
-
         await this.store.setItem(name, {
           json,
           assets,
-          thumbnail
+          thumbnail,
+          timestamp: new Date().toISOString()
         });
 
         this.updateFromStore();
@@ -155,5 +161,17 @@ export default class extends Vue {
   background-size: contain;
   min-width: 320px;
   min-height: 180px;
+  text-decoration: none;
+  margin: 3px;
+  border-radius: 6px;
+  box-shadow: inset 0px 0px 5px 0px #555555;
+  border: 1px solid #555555;
+  cursor: pointer;
+  padding-top: 4px;
+}
+
+.load-scene:active {
+  position: relative;
+  top: 2px;
 }
 </style>

@@ -26,7 +26,7 @@ localforage.config({
 
 (async () => {
   ((equinox: typeof import("equinox")) => {
-    console.log("WASM module loaded: " + equinox.version());
+    console.info("WASM module loaded: " + equinox.version());
     equinox.initialize_logging(); // called once on startup
 
     new Vue({
