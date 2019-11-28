@@ -1,7 +1,7 @@
 <template>
   <div class="scene-list">
     <div class="scene-card">
-      <button class="button" v-on:click="saveScene()" title="Save the current scene">
+      <button class="button" v-on:click="requestSceneSave()" title="Save the current scene">
         <div class="save-icon">
           <font-awesome-icon icon="hdd" size="2x" />
         </div>
@@ -27,6 +27,7 @@
 import { Component, Prop, Vue } from "vue-property-decorator";
 import localforage from "localforage";
 import { WebScene } from "equinox";
+import GlassThicknessPrefab from "../prefab/GlassThickness";
 
 export interface Metadata {
   thumbnail: string;
@@ -67,28 +68,28 @@ export default class extends Vue {
   mounted() {
     this.updateFromStore();
 
-    this.$root.$on(
-      "save-scene-response",
-      async (name, json, assets, thumbnail) => {
-        await this.store.setItem(name, {
-          json,
-          assets,
-          thumbnail,
-          timestamp: new Date().toISOString()
-        });
-
-        this.updateFromStore();
-      }
+    this.$root.$on("save-scene-response", (name, json, assets, thumbnail) =>
+      this.saveScene(name, {
+        json,
+        assets,
+        thumbnail,
+        timestamp: new Date().toISOString()
+      })
     );
   }
 
-  private async saveScene() {
+  private async saveScene(name: string, scene: Metadata) {
+    await this.store.setItem(name, scene);
+    await this.updateFromStore();
+  }
+
+  private requestSceneSave() {
     this.$root.$emit("save-scene-request");
   }
 
   private async deleteScene(name: string) {
     await this.store.removeItem(name);
-    this.updateFromStore();
+    await this.updateFromStore();
   }
 
   private async loadScene(name: string) {
@@ -112,6 +113,10 @@ export default class extends Vue {
   }
 
   private async updateFromStore() {
+    if ((await this.store.getItem(GlassThicknessPrefab.name)) === null) {
+      await this.store.setItem(GlassThicknessPrefab.name, GlassThicknessPrefab);
+    }
+
     const scenes = new Map();
 
     for (const name of await this.store.keys()) {
@@ -119,9 +124,6 @@ export default class extends Vue {
     }
 
     this.scenes = scenes;
-
-    // TODO: load prefab scenes (and save them to localstorage) if they were missing
-    // store the prefab scenes in some separate helper modules and put the thumbnails in public/
   }
 }
 </script>

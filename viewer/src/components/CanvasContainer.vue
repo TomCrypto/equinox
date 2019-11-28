@@ -572,7 +572,7 @@ export default class extends Vue {
 
     console.log(`Returning final canvas of size ${dst.width}x${dst.height}`);
 
-    return dst.toDataURL();
+    return dst.toDataURL("image/jpeg", 0.9);
   }
 }
 </script>
