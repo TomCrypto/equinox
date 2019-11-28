@@ -256,6 +256,12 @@ impl Scene {
             }
         }
 
+        if let Environment::Map { .. } = environment {
+            if self.environment_map.is_none() {
+                return Err(Error::new("validation error: environment_map != null"));
+            }
+        }
+
         Ok(())
     }
 

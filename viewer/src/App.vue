@@ -43,6 +43,7 @@ import pako from "pako";
 import MovingWindowEstimator from "./helpers/minimum_window";
 import CanvasContainer from "@/components/CanvasContainer.vue";
 import SaveLoadEditor from "@/components/SaveLoadEditor.vue";
+import DefaultScene from "./prefab/DefaultScene";
 
 @Component({
   components: {
@@ -109,8 +110,7 @@ export default class App extends Vue {
   }
 
   mounted() {
-    // TODO: load a default asset-less prefab from inside JS
-    this.scene.set_default_scene();
+    this.scene.set_json(DefaultScene.json);
   }
 }
 </script>

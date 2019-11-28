@@ -28,6 +28,7 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 import localforage from "localforage";
 import { WebScene } from "equinox";
 import GlassThicknessPrefab from "../prefab/GlassThickness";
+import DefaultScenePrefab from "../prefab/DefaultScene";
 
 export interface Metadata {
   thumbnail: string;
@@ -115,6 +116,10 @@ export default class extends Vue {
   private async updateFromStore() {
     if ((await this.store.getItem(GlassThicknessPrefab.name)) === null) {
       await this.store.setItem(GlassThicknessPrefab.name, GlassThicknessPrefab);
+    }
+
+    if ((await this.store.getItem(DefaultScenePrefab.name)) === null) {
+      await this.store.setItem(DefaultScenePrefab.name, DefaultScenePrefab);
     }
 
     const scenes = new Map();
