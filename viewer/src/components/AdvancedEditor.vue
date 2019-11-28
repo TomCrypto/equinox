@@ -1,18 +1,22 @@
 <template>
   <div class="root">
-    <p>
-      Obtain full control by directly editing the scene's underlying representation. Note that
-      some changes (especially changing the geometry modifier stack and changing non-symbolic
-      parameters) may trigger shader rebuilds which can take a few seconds.
-    </p>
-    <p>
-      On Windows, shader builds can be very slow due to the ANGLE GLSL to HLSL conversion. It
-      is recommended to switch to native OpenGL if possible.
-    </p>
-    <p>
-      Note: any camera interaction performed while this editor is open will be rolled back
-      on any change to the scene JSON; in other words, the JSON does not update by itself.
-    </p>
+    <ul>
+      <li>
+        <b>WARNING</b>: On Windows, shader builds can be extremely slow due to ANGLE; it
+        is recommended to configure your browser to use native OpenGL if possible to improve
+        build times; see
+        <a
+          class="hyperlink"
+          target="_blank"
+          rel="noopener noreferrer"
+          href="https://github.com/mrdoob/three.js/wiki/How-to-use-OpenGL-or-ANGLE-rendering-on-Windows"
+        >this link</a> for directions.
+      </li>
+      <li>
+        <b>Note</b>: any camera interaction performed while this editor is open will be rolled back
+        on any change to the scene JSON; the JSON will not update automatically.
+      </li>
+    </ul>
     <hr />
     <div ref="editor" class="editor" />
     <div class="log">
@@ -142,5 +146,9 @@ export default class extends Vue {
 .error {
   color: red;
   font-weight: bold;
+}
+
+.hyperlink {
+  color: #abcdef;
 }
 </style>

@@ -36,16 +36,10 @@
     <p>
       A default scene with a few objects in it has been configured. Explore the editing options
       using this scene (a good starting point is to set an environment map for more interesting
-      lighting) or load another scene of your choosing.
+      lighting) or load another scene.
     </p>
 
-    <h3>Changelog</h3>
-
-    <ul>
-      <li>
-        <b>2019-11-25</b>: New UI
-      </li>
-    </ul>
+    <!-- TOOD: changelog here? -->
   </div>
 </template>
 
