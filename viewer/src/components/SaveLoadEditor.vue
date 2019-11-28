@@ -41,7 +41,7 @@ export interface Metadata {
 export default class extends Vue {
   @Prop() private scene!: WebScene;
 
-  @Prop() private loadAssets: (assets: string[]) => Promise<void>;
+  @Prop() private loadAssets!: (assets: string[]) => Promise<void>;
 
   private scenes: Map<string, Metadata> = new Map();
 
@@ -69,13 +69,15 @@ export default class extends Vue {
   mounted() {
     this.updateFromStore();
 
-    this.$root.$on("save-scene-response", (name, json, assets, thumbnail) =>
-      this.saveScene(name, {
-        json,
-        assets,
-        thumbnail,
-        timestamp: new Date().toISOString()
-      })
+    this.$root.$on(
+      "save-scene-response",
+      (name: string, json: object, assets: string[], thumbnail: string) =>
+        this.saveScene(name, {
+          json,
+          assets,
+          thumbnail,
+          timestamp: new Date().toISOString()
+        })
     );
   }
 

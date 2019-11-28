@@ -137,8 +137,8 @@ export default class extends Vue {
       return; // spurious resize event
     }
 
-    const canvasW = this.canvas.width;
-    const canvasH = this.canvas.height;
+    const canvasW = this.canvas!.width;
+    const canvasH = this.canvas!.height;
 
     const ratioX = canvasW / clientW;
     const ratioY = canvasH / clientH;
@@ -488,8 +488,8 @@ export default class extends Vue {
     const thumbnailHeight = 180;
 
     const [w, h] = this.resizeToRatio(
-      this.canvas.width,
-      this.canvas.height,
+      this.canvas!.width,
+      this.canvas!.height,
       thumbnailWidth,
       thumbnailHeight
     );
@@ -499,7 +499,7 @@ export default class extends Vue {
       name,
       json,
       assets,
-      this.createThumbnail(this.canvas, w, h)
+      this.createThumbnail(this.canvas!, w, h)
     );
   }
 
@@ -532,7 +532,7 @@ export default class extends Vue {
     dst.width = srcW;
     dst.height = srcH;
 
-    dst.getContext("2d").drawImage(src, 0, 0);
+    dst.getContext("2d")!.drawImage(src, 0, 0);
 
     console.log("Starting with srcW = ", srcW, ", srcH = ", srcH);
 
@@ -545,7 +545,7 @@ export default class extends Vue {
       tmp.height = srcH / 2;
 
       tmp
-        .getContext("2d")
+        .getContext("2d")!
         .drawImage(dst, 0, 0, dst.width, dst.height, 0, 0, srcW / 2, srcH / 2);
       console.log(
         `Downsampled ${dst.width}x${dst.height} => ${srcW / 2}x${srcH / 2}`
@@ -564,7 +564,7 @@ export default class extends Vue {
       final.height = dstH;
 
       final
-        .getContext("2d")
+        .getContext("2d")!
         .drawImage(dst, 0, 0, dst.width, dst.height, 0, 0, dstW, dstH);
       console.log(`Downsampled ${dst.width}x${dst.height} => ${dstW}x${dstH}`);
       dst = final;
