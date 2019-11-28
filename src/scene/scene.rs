@@ -59,7 +59,6 @@ macro_rules! validate_contains {
 /// taken when using the same scene instance on multiple devices simultaneously.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Scene {
-    #[serde(default)]
     pub metadata: Dirty<Metadata>,
     pub camera: Dirty<Camera>,
     pub raster: Dirty<Raster>,
