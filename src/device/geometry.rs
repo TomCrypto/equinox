@@ -137,12 +137,12 @@ impl GeometryGlslGenerator {
                     radius, height
                 )
             }
-            Geometry::InfiniteRepetition { f, period } => {
+            Geometry::InfiniteRepetition { child, period } => {
                 let period_x = self.lookup_parameter(&period[0], parameters);
                 let period_y = self.lookup_parameter(&period[1], parameters);
                 let period_z = self.lookup_parameter(&period[2], parameters);
 
-                let function = self.distance_recursive(f, parameters);
+                let function = self.distance_recursive(child, parameters);
 
                 format!(
                     "vec3 c = vec3({}, {}, {});
@@ -165,17 +165,17 @@ impl GeometryGlslGenerator {
                     rhs_function.call("p")
                 )
             }
-            Geometry::Onion { thickness, f } => {
+            Geometry::Onion { thickness, child } => {
                 let thickness = self.lookup_parameter(thickness, parameters);
 
-                let function = self.distance_recursive(f, parameters);
+                let function = self.distance_recursive(child, parameters);
 
                 format!("return abs({}) - {};", function.call("p"), thickness)
             }
-            Geometry::Scale { factor, f } => {
+            Geometry::Scale { factor, child } => {
                 let factor = self.lookup_parameter(factor, parameters);
 
-                let function = self.distance_recursive(f, parameters);
+                let function = self.distance_recursive(child, parameters);
 
                 format!(
                     "float s = {}; return {} * s;",
@@ -183,13 +183,13 @@ impl GeometryGlslGenerator {
                     function.call("p / s")
                 )
             }
-            Geometry::Rotate { axis, angle, f } => {
+            Geometry::Rotate { axis, angle, child } => {
                 let kx = self.lookup_parameter(&axis[0], parameters);
                 let ky = self.lookup_parameter(&axis[1], parameters);
                 let kz = self.lookup_parameter(&axis[2], parameters);
                 let theta = self.lookup_parameter(angle, parameters);
 
-                let function = self.distance_recursive(f, parameters);
+                let function = self.distance_recursive(child, parameters);
 
                 format!(
                     r#"
@@ -209,27 +209,27 @@ impl GeometryGlslGenerator {
                     function.call("p")
                 )
             }
-            Geometry::Translate { translation, f } => {
+            Geometry::Translate { translation, child } => {
                 let tx = self.lookup_parameter(&translation[0], parameters);
                 let ty = self.lookup_parameter(&translation[1], parameters);
                 let tz = self.lookup_parameter(&translation[2], parameters);
 
                 let translation = format!("vec3({}, {}, {})", tx, ty, tz);
 
-                let function = self.distance_recursive(f, parameters);
+                let function = self.distance_recursive(child, parameters);
 
                 format!("return {};", function.call(format!("p - {}", translation)))
             }
-            Geometry::Round { radius, f } => {
+            Geometry::Round { radius, child } => {
                 let radius = self.lookup_parameter(radius, parameters);
 
-                let function = self.distance_recursive(f, parameters);
+                let function = self.distance_recursive(child, parameters);
 
                 format!("return {} - {};", function.call("p"), radius)
             }
-            Geometry::ForceNumericalNormals { f } => format!(
+            Geometry::ForceNumericalNormals { child } => format!(
                 "return {};",
-                self.distance_recursive(f, parameters).call("p")
+                self.distance_recursive(child, parameters).call("p")
             ),
         };
 
@@ -256,27 +256,27 @@ impl GeometryGlslGenerator {
                     radius_x, radius_y, radius_z
                 ))
             }
-            Geometry::Translate { translation, f } => {
+            Geometry::Translate { translation, child } => {
                 let tx = self.lookup_parameter(&translation[0], parameters);
                 let ty = self.lookup_parameter(&translation[1], parameters);
                 let tz = self.lookup_parameter(&translation[2], parameters);
 
                 let translation = format!("vec3({}, {}, {})", tx, ty, tz);
 
-                let function = self.normal_recursive(f, parameters)?;
+                let function = self.normal_recursive(child, parameters)?;
 
                 Some(format!(
                     "return {};",
                     function.call(format!("p - {}", translation))
                 ))
             }
-            Geometry::Rotate { axis, angle, f } => {
+            Geometry::Rotate { axis, angle, child } => {
                 let kx = self.lookup_parameter(&axis[0], parameters);
                 let ky = self.lookup_parameter(&axis[1], parameters);
                 let kz = self.lookup_parameter(&axis[2], parameters);
                 let theta = self.lookup_parameter(angle, parameters);
 
-                let function = self.normal_recursive(f, parameters)?;
+                let function = self.normal_recursive(child, parameters)?;
 
                 Some(format!(
                     r#"
@@ -297,10 +297,10 @@ impl GeometryGlslGenerator {
                     function.call("p")
                 ))
             }
-            Geometry::Scale { factor, f } => {
+            Geometry::Scale { factor, child } => {
                 let scale = self.lookup_parameter(factor, parameters);
 
-                let function = self.normal_recursive(f, parameters)?;
+                let function = self.normal_recursive(child, parameters)?;
 
                 Some(format!(
                     "return {};",

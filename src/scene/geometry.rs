@@ -40,7 +40,7 @@ pub enum Geometry {
         radius: Parameter,
     },
     InfiniteRepetition {
-        f: Box<Geometry>,
+        child: Box<Geometry>,
         period: [Parameter; 3],
     },
     Union {
@@ -55,27 +55,27 @@ pub enum Geometry {
     },
     Onion {
         thickness: Parameter,
-        f: Box<Geometry>,
+        child: Box<Geometry>,
     },
     Scale {
         factor: Parameter,
-        f: Box<Geometry>,
+        child: Box<Geometry>,
     },
     Rotate {
         axis: [Parameter; 3],
         angle: Parameter,
-        f: Box<Geometry>,
+        child: Box<Geometry>,
     },
     Translate {
         translation: [Parameter; 3],
-        f: Box<Geometry>,
+        child: Box<Geometry>,
     },
     Round {
         radius: Parameter,
-        f: Box<Geometry>,
+        child: Box<Geometry>,
     },
     ForceNumericalNormals {
-        f: Box<Geometry>,
+        child: Box<Geometry>,
     },
 }
 
@@ -88,18 +88,18 @@ impl Geometry {
             Self::Ellipsoid { .. } => 1.0,
             Self::Cuboid { .. } => 1.5,
             Self::Cylinder { .. } => 2.0,
-            Self::InfiniteRepetition { f, .. } => 0.5 + f.evaluation_cost(),
+            Self::InfiniteRepetition { child, .. } => 0.5 + child.evaluation_cost(),
             Self::Union { children } => children.iter().map(|x| 0.25 + x.evaluation_cost()).sum(),
             Self::Intersection { children } => {
                 children.iter().map(|x| 0.5 + x.evaluation_cost()).sum()
             }
             Self::Subtraction { lhs, rhs } => lhs.evaluation_cost() + rhs.evaluation_cost() + 0.25,
-            Self::Onion { f, .. } => f.evaluation_cost() + 0.25,
-            Self::Scale { f, .. } => f.evaluation_cost() + 1.0,
-            Self::Rotate { f, .. } => f.evaluation_cost() + 2.0,
-            Self::Translate { f, .. } => f.evaluation_cost() + 0.25,
-            Self::Round { f, .. } => f.evaluation_cost() + 0.25,
-            Self::ForceNumericalNormals { f } => f.evaluation_cost(),
+            Self::Onion { child, .. } => child.evaluation_cost() + 0.25,
+            Self::Scale { child, .. } => child.evaluation_cost() + 1.0,
+            Self::Rotate { child, .. } => child.evaluation_cost() + 2.0,
+            Self::Translate { child, .. } => child.evaluation_cost() + 0.25,
+            Self::Round { child, .. } => child.evaluation_cost() + 0.25,
+            Self::ForceNumericalNormals { child } => child.evaluation_cost(),
         }
     }
 
@@ -177,8 +177,8 @@ impl Geometry {
                 bbox
             }
             Self::Subtraction { lhs, .. } => lhs.bounding_box(parameters),
-            Self::Onion { thickness, f } => {
-                let BoundingBox { mut min, mut max } = f.bounding_box(parameters);
+            Self::Onion { thickness, child } => {
+                let BoundingBox { mut min, mut max } = child.bounding_box(parameters);
 
                 let thickness = thickness.value(parameters);
 
@@ -191,15 +191,15 @@ impl Geometry {
 
                 BoundingBox { min, max }
             }
-            Self::Scale { factor, f } => {
-                let BoundingBox { mut min, mut max } = f.bounding_box(parameters);
+            Self::Scale { factor, child } => {
+                let BoundingBox { mut min, mut max } = child.bounding_box(parameters);
 
                 min *= factor.value(parameters);
                 max *= factor.value(parameters);
 
                 BoundingBox { min, max }
             }
-            Self::Rotate { axis, angle, f } => {
+            Self::Rotate { axis, angle, child } => {
                 let rotation_axis: Vector3<f32> = [
                     axis[0].value(parameters),
                     axis[1].value(parameters),
@@ -212,10 +212,10 @@ impl Geometry {
                     Rad(angle.value(parameters)),
                 );
 
-                f.bounding_box(parameters).transform(rotation)
+                child.bounding_box(parameters).transform(rotation)
             }
-            Self::Translate { translation, f } => {
-                let BoundingBox { mut min, mut max } = f.bounding_box(parameters);
+            Self::Translate { translation, child } => {
+                let BoundingBox { mut min, mut max } = child.bounding_box(parameters);
 
                 min.x += translation[0].value(parameters);
                 min.y += translation[1].value(parameters);
@@ -226,8 +226,8 @@ impl Geometry {
 
                 BoundingBox { min, max }
             }
-            Self::Round { f, radius } => {
-                let BoundingBox { mut min, mut max } = f.bounding_box(parameters);
+            Self::Round { child, radius } => {
+                let BoundingBox { mut min, mut max } = child.bounding_box(parameters);
 
                 let radius = radius.value(parameters);
 
@@ -240,7 +240,7 @@ impl Geometry {
 
                 BoundingBox { min, max }
             }
-            Self::ForceNumericalNormals { f } => f.bounding_box(parameters),
+            Self::ForceNumericalNormals { child } => child.bounding_box(parameters),
         }
     }
 
@@ -279,12 +279,12 @@ impl Geometry {
                 Self::record_parameter(parameters, height);
                 Self::record_parameter(parameters, radius);
             }
-            Self::InfiniteRepetition { f, period } => {
+            Self::InfiniteRepetition { child, period } => {
                 Self::record_parameter(parameters, &period[0]);
                 Self::record_parameter(parameters, &period[1]);
                 Self::record_parameter(parameters, &period[2]);
 
-                f.symbolic_parameters_recursive(parameters);
+                child.symbolic_parameters_recursive(parameters);
             }
             Self::Union { children } | Self::Intersection { children } => {
                 for child in children {
@@ -295,38 +295,38 @@ impl Geometry {
                 lhs.symbolic_parameters_recursive(parameters);
                 rhs.symbolic_parameters_recursive(parameters);
             }
-            Self::Onion { thickness, f } => {
+            Self::Onion { thickness, child } => {
                 Self::record_parameter(parameters, thickness);
 
-                f.symbolic_parameters_recursive(parameters);
+                child.symbolic_parameters_recursive(parameters);
             }
-            Self::Scale { factor, f } => {
+            Self::Scale { factor, child } => {
                 Self::record_parameter(parameters, factor);
 
-                f.symbolic_parameters_recursive(parameters);
+                child.symbolic_parameters_recursive(parameters);
             }
-            Self::Rotate { axis, angle, f } => {
+            Self::Rotate { axis, angle, child } => {
                 Self::record_parameter(parameters, &axis[0]);
                 Self::record_parameter(parameters, &axis[1]);
                 Self::record_parameter(parameters, &axis[2]);
                 Self::record_parameter(parameters, angle);
 
-                f.symbolic_parameters_recursive(parameters);
+                child.symbolic_parameters_recursive(parameters);
             }
-            Self::Translate { translation, f } => {
+            Self::Translate { translation, child } => {
                 Self::record_parameter(parameters, &translation[0]);
                 Self::record_parameter(parameters, &translation[1]);
                 Self::record_parameter(parameters, &translation[2]);
 
-                f.symbolic_parameters_recursive(parameters);
+                child.symbolic_parameters_recursive(parameters);
             }
-            Self::Round { f, radius } => {
+            Self::Round { child, radius } => {
                 Self::record_parameter(parameters, radius);
 
-                f.symbolic_parameters_recursive(parameters);
+                child.symbolic_parameters_recursive(parameters);
             }
-            Self::ForceNumericalNormals { f } => {
-                f.symbolic_parameters_recursive(parameters);
+            Self::ForceNumericalNormals { child } => {
+                child.symbolic_parameters_recursive(parameters);
             }
         }
     }

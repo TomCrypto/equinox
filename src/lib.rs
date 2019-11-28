@@ -211,7 +211,7 @@ impl WebScene {
                     Parameter::Symbolic("y".to_owned()),
                     Parameter::Symbolic("z".to_owned()),
                 ],
-                f: Box::new(Geometry::Sphere {
+                child: Box::new(Geometry::Sphere {
                     radius: Parameter::Constant(0.799),
                 }),
             },
