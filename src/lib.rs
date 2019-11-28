@@ -60,7 +60,6 @@ pub mod shader {
 
 use cgmath::{prelude::*, Basis3, Vector3};
 use js_sys::{Array, Error};
-use maplit::btreemap;
 use serde::{de::DeserializeOwned, Serialize};
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext;
