@@ -15,7 +15,7 @@
       The application is divided into two panels, with the render output on one side
       and editing controls on the other. The editing controls are divided into tabs
       which each allow editing some aspect of the scene. Each scene also contains a camera from the perspective of which an image is rendered. To
-      control the camera, hold down the left or right mouse and use the mouse and keyboard:
+      control the camera, hold down the left or right mouse button and use the mouse and keyboard:
     </p>
 
     <table style="width:100%">
