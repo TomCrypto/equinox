@@ -104,10 +104,20 @@ export default class extends Vue {
   border-bottom-right-radius: 8px;
 }
 
+.tab-head:hover {
+  background-color: #343434;
+  transition: 0.2s;
+}
+
 .tab-head--active {
   background-color: #1a1a1a;
   color: #dddddd;
   transition: 0.2s;
+}
+
+.tab-head--active:hover {
+  background-color: #1a1a1a;
+  color: #dddddd;
 }
 
 .container-body {
