@@ -112,7 +112,7 @@ ray_t generate_photon_ray(out vec3 throughput, inout quasi_t quasi) {
         coords.xy = surface_uv;
     }
 
-    return ray_t(mix(bbmin, bbmax, coords), wi);
+    return ray_t(mix(bbmin, bbmax, coords) - wi, wi);
 }
 
 void main() {
