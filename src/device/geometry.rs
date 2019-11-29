@@ -45,7 +45,7 @@ impl GeometryGlslGenerator {
                 "        float dist = abs({});",
                 distance.call("ray.org + range.x * ray.dir")
             ));
-            code.push("        if (dist < PREC * 0.1) {{ return true; }}".to_owned());
+            code.push("        if (dist < PREC) {{ return true; }}".to_owned());
             code.push("        range.x += dist;".to_owned());
             code.push("      }}".to_owned());
             code.push("      break;".to_owned());
@@ -368,12 +368,12 @@ impl GeometryGlslGenerator {
     }
 
     fn gradient_estimate(distance: &DistanceFn) -> String {
-        let x1 = distance.call("vec3(p.x + PREC, p.y, p.z)");
-        let y1 = distance.call("vec3(p.x, p.y + PREC, p.z)");
-        let z1 = distance.call("vec3(p.x, p.y, p.z + PREC)");
-        let x2 = distance.call("vec3(p.x - PREC, p.y, p.z)");
-        let y2 = distance.call("vec3(p.x, p.y - PREC, p.z)");
-        let z2 = distance.call("vec3(p.x, p.y, p.z - PREC)");
+        let x1 = distance.call("vec3(p.x + PREC * 0.1, p.y, p.z)");
+        let y1 = distance.call("vec3(p.x, p.y + PREC * 0.1, p.z)");
+        let z1 = distance.call("vec3(p.x, p.y, p.z + PREC * 0.1)");
+        let x2 = distance.call("vec3(p.x - PREC * 0.1, p.y, p.z)");
+        let y2 = distance.call("vec3(p.x, p.y - PREC * 0.1, p.z)");
+        let z2 = distance.call("vec3(p.x, p.y, p.z - PREC * 0.1)");
 
         let dx = format!("{} - {}", x1, x2);
         let dy = format!("{} - {}", y1, y2);

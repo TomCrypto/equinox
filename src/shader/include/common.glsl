@@ -3,7 +3,7 @@ struct ray_t {
     vec3 dir;
 };
 
-#define PREC (1e-3) // general precision for interacting with the distance fields
+#define PREC (1e-4) // general precision for interacting with the distance fields
 
 #define M_PI   3.14159265359
 #define M_2PI  6.28318530718
@@ -16,7 +16,7 @@ struct traversal_t {
 };
 
 ray_t make_ray(vec3 org, vec3 dir, vec3 normal) {
-    return ray_t(org + normal * PREC * sign(dot(dir, normal)), dir);
+    return ray_t(org + normal * 10.0 * PREC * sign(dot(dir, normal)), dir);
 }
 
 traversal_t traversal_prepare() {
