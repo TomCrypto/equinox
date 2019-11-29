@@ -137,7 +137,6 @@ export default class extends Vue {
 
 <style scoped>
 .scene-list {
-  flex: 1;
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
