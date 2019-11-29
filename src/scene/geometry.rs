@@ -106,32 +106,36 @@ impl Geometry {
     /// Returns a bounding box for an instance of this geometry, or panics if
     /// some referenced parameter values are absent from the parameter table.
     pub fn bounding_box(&self, parameters: &BTreeMap<String, f32>) -> BoundingBox {
+        self.bounds(parameters).bbox
+    }
+
+    fn bounds(&self, parameters: &BTreeMap<String, f32>) -> GeometryBounds {
         match self {
             Self::Sphere { radius } => {
                 let radius = radius.value(parameters);
 
-                BoundingBox {
-                    min: [-radius; 3].into(),
-                    max: [radius; 3].into(),
+                GeometryBounds {
+                    bbox: BoundingBox {
+                        min: [-radius; 3].into(),
+                        max: [radius; 3].into(),
+                    },
+                    scale_factor: 1.0,
                 }
             }
             Self::Ellipsoid { radius } => {
-                let mut radius_x = radius[0].value(parameters);
-                let mut radius_y = radius[1].value(parameters);
-                let mut radius_z = radius[2].value(parameters);
+                let radius_x = radius[0].value(parameters);
+                let radius_y = radius[1].value(parameters);
+                let radius_z = radius[2].value(parameters);
 
-                // TODO: we need to do this to account for the fact that this SDF is a bound, is
-                // there a better way to implement this or are we stuck with this approximation?
-
+                let max_radius = radius_x.max(radius_y).max(radius_z);
                 let min_radius = radius_x.min(radius_y).min(radius_z);
 
-                radius_x *= radius_x / min_radius;
-                radius_y *= radius_y / min_radius;
-                radius_z *= radius_z / min_radius;
-
-                BoundingBox {
-                    min: [-radius_x, -radius_y, -radius_z].into(),
-                    max: [radius_x, radius_y, radius_z].into(),
+                GeometryBounds {
+                    bbox: BoundingBox {
+                        min: [-radius_x, -radius_y, -radius_z].into(),
+                        max: [radius_x, radius_y, radius_z].into(),
+                    },
+                    scale_factor: max_radius / min_radius,
                 }
             }
             Self::Cuboid { dimensions } => {
@@ -139,65 +143,82 @@ impl Geometry {
                 let dim_y = dimensions[1].value(parameters);
                 let dim_z = dimensions[2].value(parameters);
 
-                BoundingBox {
-                    min: [-dim_x, -dim_y, -dim_z].into(),
-                    max: [dim_x, dim_y, dim_z].into(),
+                GeometryBounds {
+                    bbox: BoundingBox {
+                        min: [-dim_x, -dim_y, -dim_z].into(),
+                        max: [dim_x, dim_y, dim_z].into(),
+                    },
+                    scale_factor: 1.0,
                 }
             }
             Self::Cylinder { height, radius } => {
                 let height = height.value(parameters);
                 let radius = radius.value(parameters);
 
-                BoundingBox {
-                    min: [-radius, -height, -radius].into(),
-                    max: [radius, height, radius].into(),
+                GeometryBounds {
+                    bbox: BoundingBox {
+                        min: [-radius, -height, -radius].into(),
+                        max: [radius, height, radius].into(),
+                    },
+                    scale_factor: 1.0,
                 }
             }
             // TODO: this is wrong (also we should bound repetition anyway)
-            Self::InfiniteRepetition { .. } => BoundingBox {
-                min: Point3::new(-100.0, -2.0, -100.0),
-                max: Point3::new(100.0, 2.0, 100.0),
+            Self::InfiniteRepetition { .. } => GeometryBounds {
+                bbox: BoundingBox {
+                    min: Point3::new(-100.0, -2.0, -100.0),
+                    max: Point3::new(100.0, 2.0, 100.0),
+                },
+                scale_factor: 1.0,
             },
             Self::Union { children } => {
                 let mut bbox = BoundingBox::neg_infinity_bounds();
+                let mut scale_factor: f32 = 0.0;
 
                 for child in children {
-                    bbox.extend(&child.bounding_box(parameters));
+                    let bounds = child.bounds(parameters);
+
+                    scale_factor = scale_factor.max(bounds.scale_factor);
+                    bbox.extend(&bounds.bbox);
                 }
 
-                bbox
+                GeometryBounds { bbox, scale_factor }
             }
             Self::Intersection { children } => {
                 let mut bbox = BoundingBox::pos_infinity_bounds();
+                let mut scale_factor: f32 = 0.0;
 
                 for child in children {
-                    bbox.intersect(&child.bounding_box(parameters));
+                    let bounds = child.bounds(parameters);
+
+                    scale_factor = scale_factor.max(bounds.scale_factor);
+                    bbox.intersect(&bounds.bbox);
                 }
 
-                bbox
+                GeometryBounds { bbox, scale_factor }
             }
-            Self::Subtraction { lhs, .. } => lhs.bounding_box(parameters),
+            Self::Subtraction { lhs, .. } => lhs.bounds(parameters),
             Self::Onion { thickness, child } => {
-                let BoundingBox { mut min, mut max } = child.bounding_box(parameters);
+                let mut bounds = child.bounds(parameters);
 
-                let thickness = thickness.value(parameters);
+                let thickness = thickness.value(parameters) * bounds.scale_factor;
 
-                min.x -= thickness;
-                min.y -= thickness;
-                min.z -= thickness;
-                max.x += thickness;
-                max.y += thickness;
-                max.z += thickness;
+                bounds.bbox.min.x -= thickness;
+                bounds.bbox.min.y -= thickness;
+                bounds.bbox.min.z -= thickness;
+                bounds.bbox.max.x += thickness;
+                bounds.bbox.max.y += thickness;
+                bounds.bbox.max.z += thickness;
 
-                BoundingBox { min, max }
+                bounds
             }
             Self::Scale { factor, child } => {
-                let BoundingBox { mut min, mut max } = child.bounding_box(parameters);
+                let mut bounds = child.bounds(parameters);
 
-                min *= factor.value(parameters);
-                max *= factor.value(parameters);
+                bounds.bbox.min *= factor.value(parameters);
+                bounds.bbox.max *= factor.value(parameters);
 
-                BoundingBox { min, max }
+                bounds
             }
             Self::Rotate { axis, angle, child } => {
                 let rotation_axis: Vector3<f32> = [
@@ -212,35 +233,39 @@ impl Geometry {
                     Rad(angle.value(parameters)),
                 );
 
-                child.bounding_box(parameters).transform(rotation)
+                let mut bounds = child.bounds(parameters);
+
+                bounds.bbox = bounds.bbox.transform(rotation);
+
+                bounds
             }
             Self::Translate { translation, child } => {
-                let BoundingBox { mut min, mut max } = child.bounding_box(parameters);
+                let mut bounds = child.bounds(parameters);
 
-                min.x += translation[0].value(parameters);
-                min.y += translation[1].value(parameters);
-                min.z += translation[2].value(parameters);
-                max.x += translation[0].value(parameters);
-                max.y += translation[1].value(parameters);
-                max.z += translation[2].value(parameters);
+                bounds.bbox.min.x += translation[0].value(parameters);
+                bounds.bbox.min.y += translation[1].value(parameters);
+                bounds.bbox.min.z += translation[2].value(parameters);
+                bounds.bbox.max.x += translation[0].value(parameters);
+                bounds.bbox.max.y += translation[1].value(parameters);
+                bounds.bbox.max.z += translation[2].value(parameters);
 
-                BoundingBox { min, max }
+                bounds
             }
             Self::Round { child, radius } => {
-                let BoundingBox { mut min, mut max } = child.bounding_box(parameters);
+                let mut bounds = child.bounds(parameters);
 
-                let radius = radius.value(parameters);
+                let radius = radius.value(parameters) * bounds.scale_factor;
 
-                min.x -= radius;
-                min.y -= radius;
-                min.z -= radius;
-                max.x += radius;
-                max.y += radius;
-                max.z += radius;
+                bounds.bbox.min.x -= radius;
+                bounds.bbox.min.y -= radius;
+                bounds.bbox.min.z -= radius;
+                bounds.bbox.max.x += radius;
+                bounds.bbox.max.y += radius;
+                bounds.bbox.max.z += radius;
 
-                BoundingBox { min, max }
+                bounds
             }
-            Self::ForceNumericalNormals { child } => child.bounding_box(parameters),
+            Self::ForceNumericalNormals { child } => child.bounds(parameters),
         }
     }
 
@@ -252,12 +277,6 @@ impl Geometry {
         self.symbolic_parameters_recursive(&mut parameters);
 
         parameters
-    }
-
-    fn record_parameter<'a>(parameters: &mut Vec<&'a str>, parameter: &'a Parameter) {
-        if let Parameter::Symbolic(symbol) = parameter {
-            parameters.push(symbol);
-        }
     }
 
     fn symbolic_parameters_recursive<'a>(&'a self, parameters: &mut Vec<&'a str>) {
@@ -330,4 +349,16 @@ impl Geometry {
             }
         }
     }
+
+    fn record_parameter<'a>(parameters: &mut Vec<&'a str>, parameter: &'a Parameter) {
+        if let Parameter::Symbolic(symbol) = parameter {
+            parameters.push(symbol);
+        }
+    }
+}
+
+#[derive(Debug)]
+struct GeometryBounds {
+    bbox: BoundingBox,
+    scale_factor: f32,
 }
