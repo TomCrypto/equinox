@@ -155,12 +155,7 @@ fn compute_envmap_luminance(pixels: &[u8], luminance: &mut [f32], cols: usize, r
         let weight = ((y as f32 + 0.5) / (rows as f32) * std::f32::consts::PI).sin();
 
         for x in 0..cols {
-            let (r, g, b) = unpack_rgbe8(
-                pixels[4 * (y * cols + x)],
-                pixels[4 * (y * cols + x) + 1],
-                pixels[4 * (y * cols + x) + 2],
-                pixels[4 * (y * cols + x) + 3],
-            );
+            let (r, g, b) = unpack_rgbe8(&pixels[4 * (y * cols + x)..4 * (y * cols + x) + 4]);
 
             let value = r.mul_add(0.2126, g.mul_add(0.7152, b * 0.0722)) * weight;
             luminance[y * cols + x] = value;
@@ -175,7 +170,7 @@ fn compute_envmap_luminance(pixels: &[u8], luminance: &mut [f32], cols: usize, r
 
 fn rgbe8_pixels_to_f16(src_pixels: &[u8], dst_pixels: &mut [u16]) {
     for (rgbe8, half) in src_pixels.chunks(4).zip(dst_pixels.chunks_mut(4)) {
-        let (r, g, b) = unpack_rgbe8(rgbe8[0], rgbe8[1], rgbe8[2], rgbe8[3]);
+        let (r, g, b) = unpack_rgbe8(rgbe8);
 
         half[0] = f16::from_f32(r).to_bits();
         half[1] = f16::from_f32(g).to_bits();
@@ -184,16 +179,16 @@ fn rgbe8_pixels_to_f16(src_pixels: &[u8], dst_pixels: &mut [u16]) {
     }
 }
 
-fn unpack_rgbe8(r: u8, g: u8, b: u8, e: u8) -> (f32, f32, f32) {
-    if e == 0 {
+fn unpack_rgbe8(rgbe: &[u8]) -> (f32, f32, f32) {
+    if rgbe[3] == 0 {
         return (0.0, 0.0, 0.0);
     }
 
-    let f = 2.0f32.powi(e as i32 - 128 - 8);
+    let f = 2.0f32.powi(rgbe[3] as i32 - 128 - 8);
 
-    let r = (r as f32 * f).max(0.0).min(65500.0);
-    let g = (g as f32 * f).max(0.0).min(65500.0);
-    let b = (b as f32 * f).max(0.0).min(65500.0);
+    let r = (rgbe[0] as f32 * f).max(0.0).min(65500.0);
+    let g = (rgbe[1] as f32 * f).max(0.0).min(65500.0);
+    let b = (rgbe[2] as f32 * f).max(0.0).min(65500.0);
 
     (r, g, b)
 }
