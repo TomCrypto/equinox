@@ -346,9 +346,6 @@ impl Device {
         invalidated |= Dirty::clean(&mut scene.integrator, |integrator| {
             self.update_integrator(integrator)?;
 
-            // TODO: return an error if the texture is too large to create here...
-            // (check against the size limits or something)
-
             let col_bits = integrator.hash_table_bits / 2;
             let row_bits = integrator.hash_table_bits - col_bits;
 
