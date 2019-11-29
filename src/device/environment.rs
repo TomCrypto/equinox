@@ -29,16 +29,16 @@ impl Device {
             let (header, data) =
                 LayoutVerified::<_, Header>::new_from_prefix(assets[map].as_slice()).unwrap();
 
-            if header.data_format.try_parse() != Some(DataFormat::RGBA16F) {
-                return Err(Error::new("expected RGBA16F environment map"));
+            if header.data_format.try_parse() != Some(DataFormat::RGBE8) {
+                return Err(Error::new("expected RGBE8 environment map"));
             }
 
             if header.color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
                 return Err(Error::new("expected linear sRGB environment map"));
             }
 
-            if header.dimensions[0] % 2 != 0 || header.dimensions[1] % 2 != 0 {
-                return Err(Error::new("environment map must have even dimensions"));
+            if header.dimensions[0] == 0 || header.dimensions[1] == 0 {
+                return Err(Error::new("invalid environment map dimensions"));
             }
 
             let pixels = LayoutVerified::new_slice(data).unwrap();
@@ -75,7 +75,8 @@ impl Device {
             // Pack the per-pixel PDF into the alpha channel of the envmap pixel data. To
             // avoid getting clipped by the very low FP16 limit, divide this PDF by 1024.
 
-            let mut envmap_pixels = pixels.to_vec();
+            let mut envmap_pixels = vec![0u16; pixels.len()];
+            rgbe8_pixels_to_f16(&pixels, &mut envmap_pixels);
 
             for y in 0..rows {
                 let marg_pdf = if y < rows - 1 {
@@ -96,11 +97,11 @@ impl Device {
                 }
             }
 
-            self.envmap_texture.upload(cols, rows, &envmap_pixels);
+            self.envmap_color.upload(cols, rows, &envmap_pixels);
         } else {
             self.envmap_cond_cdf.upload(1, 1, &[0]);
             self.envmap_marg_cdf.upload(1, 1, &[0]);
-            self.envmap_texture.upload(1, 1, &[0; 4]);
+            self.envmap_color.upload(1, 1, &[0; 4]);
         }
 
         Ok(())
@@ -111,17 +112,13 @@ impl Device {
 
         match environment {
             Environment::Map { tint, rotation } => {
-                if self.envmap_texture.cols() == 1 || self.envmap_texture.rows() == 1 {
-                    return Err(Error::new("no environment map asset specified"));
-                }
-
                 shader_data.tint[0] = tint[0].max(0.0);
                 shader_data.tint[1] = tint[1].max(0.0);
                 shader_data.tint[2] = tint[2].max(0.0);
                 shader_data.rotation = rotation % (2.0 * std::f32::consts::PI);
                 shader_data.has_envmap = 1;
-                shader_data.cols = self.envmap_texture.cols() as i32;
-                shader_data.rows = self.envmap_texture.rows() as i32;
+                shader_data.cols = self.envmap_color.cols() as i32;
+                shader_data.rows = self.envmap_color.rows() as i32;
             }
             Environment::Solid { tint } => {
                 shader_data.tint[0] = tint[0].max(0.0);
@@ -151,16 +148,19 @@ fn pdf_to_cdf(data: &mut [f32]) -> f32 {
     integral
 }
 
-fn compute_envmap_luminance(pixels: &[u16], luminance: &mut [f32], cols: usize, rows: usize) {
+fn compute_envmap_luminance(pixels: &[u8], luminance: &mut [f32], cols: usize, rows: usize) {
     let mut integral = 0.0;
 
     for y in 0..rows {
         let weight = ((y as f32 + 0.5) / (rows as f32) * std::f32::consts::PI).sin();
 
         for x in 0..cols {
-            let r = f16::from_bits(pixels[4 * (y * cols + x)]).to_f32();
-            let g = f16::from_bits(pixels[4 * (y * cols + x) + 1]).to_f32();
-            let b = f16::from_bits(pixels[4 * (y * cols + x) + 2]).to_f32();
+            let (r, g, b) = unpack_rgbe8(
+                pixels[4 * (y * cols + x)],
+                pixels[4 * (y * cols + x) + 1],
+                pixels[4 * (y * cols + x) + 2],
+                pixels[4 * (y * cols + x) + 3],
+            );
 
             let value = r.mul_add(0.2126, g.mul_add(0.7152, b * 0.0722)) * weight;
             luminance[y * cols + x] = value;
@@ -171,4 +171,29 @@ fn compute_envmap_luminance(pixels: &[u16], luminance: &mut [f32], cols: usize, 
     for value in luminance {
         *value /= integral;
     }
+}
+
+fn rgbe8_pixels_to_f16(src_pixels: &[u8], dst_pixels: &mut [u16]) {
+    for (rgbe8, half) in src_pixels.chunks(4).zip(dst_pixels.chunks_mut(4)) {
+        let (r, g, b) = unpack_rgbe8(rgbe8[0], rgbe8[1], rgbe8[2], rgbe8[3]);
+
+        half[0] = f16::from_f32(r).to_bits();
+        half[1] = f16::from_f32(g).to_bits();
+        half[2] = f16::from_f32(b).to_bits();
+        half[3] = 0;
+    }
+}
+
+fn unpack_rgbe8(r: u8, g: u8, b: u8, e: u8) -> (f32, f32, f32) {
+    if e == 0 {
+        return (0.0, 0.0, 0.0);
+    }
+
+    let f = 2.0f32.powi(e as i32 - 128 - 8);
+
+    let r = (r as f32 * f).max(0.0).min(65500.0);
+    let g = (g as f32 * f).max(0.0).min(65500.0);
+    let b = (b as f32 * f).max(0.0).min(65500.0);
+
+    (r, g, b)
 }

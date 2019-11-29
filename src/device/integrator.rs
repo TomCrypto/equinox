@@ -218,7 +218,7 @@ impl Device {
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.environment_buffer, "Environment");
         command.bind(&self.scatter_quasi_buffer, "QuasiSampler");
-        command.bind(&self.envmap_texture, "envmap_texture");
+        command.bind(&self.envmap_color, "envmap_color");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
 
@@ -247,7 +247,7 @@ impl Device {
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.environment_buffer, "Environment");
         command.bind(&self.gather_quasi_buffer, "QuasiSampler");
-        command.bind(&self.envmap_texture, "envmap_texture");
+        command.bind(&self.envmap_color, "envmap_color");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
         command.bind(&self.integrator_photon_table_pos, "photon_table_pos");

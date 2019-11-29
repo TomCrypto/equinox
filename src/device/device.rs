@@ -18,7 +18,7 @@ pub struct Device {
 
     pub(crate) envmap_marg_cdf: Texture<R16F>,
     pub(crate) envmap_cond_cdf: Texture<R16F>,
-    pub(crate) envmap_texture: Texture<RGBA16F>,
+    pub(crate) envmap_color: Texture<RGBA16F>,
 
     pub(crate) display_buffer: UniformBuffer<DisplayData>,
     pub(crate) camera_buffer: UniformBuffer<CameraData>,
@@ -115,7 +115,7 @@ impl Device {
             display_buffer: UniformBuffer::new(gl.clone()),
             integrator_buffer: UniformBuffer::new(gl.clone()),
             environment_buffer: UniformBuffer::new(gl.clone()),
-            envmap_texture: Texture::new(gl.clone()),
+            envmap_color: Texture::new(gl.clone()),
             envmap_marg_cdf: Texture::new(gl.clone()),
             envmap_cond_cdf: Texture::new(gl.clone()),
             rspectrum_temp1: Texture::new(gl.clone()),
@@ -461,7 +461,7 @@ impl Device {
         self.display_buffer.invalidate();
         self.envmap_marg_cdf.invalidate();
         self.envmap_cond_cdf.invalidate();
-        self.envmap_texture.invalidate();
+        self.envmap_color.invalidate();
         self.integrator_buffer.invalidate();
         self.raster_buffer.invalidate();
         self.environment_buffer.invalidate();

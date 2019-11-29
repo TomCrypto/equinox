@@ -68,7 +68,7 @@ export default class App extends Vue {
 
   private readonly store = localforage.createInstance({
     driver: localforage.INDEXEDDB,
-    name: "equinox-asset-data-v1"
+    name: "equinox-asset-data-v2"
   });
 
   async loadAssets(assets: string[]): Promise<void> {

@@ -96,32 +96,32 @@ export default class extends Vue {
 
   MAPS = [
     {
-      name: "Blue Grotto (4K)",
-      url: "assets/blue_grotto_4k.raw"
-    },
-    {
-      name: "Paul Lobe Haus (4K)",
-      url: "assets/paul_lobe_haus_4k.raw"
+      name: "Aft Lounge (8K)",
+      url: "assets/aft_lounge_8k.raw"
     },
     {
       name: "Bethnal Green Entrance (4K)",
       url: "assets/bethnal_green_entrance_4k.raw"
     },
     {
-      name: "Cayley Interior (8K)",
-      url: "assets/cayley_interior_8k.raw"
+      name: "Between Bridges (1K)",
+      url: "assets/between_bridges_1k.raw"
     },
     {
-      name: "Green Point Park (8K)",
-      url: "assets/green_point_park_8k.raw"
+      name: "Between Bridges (2K)",
+      url: "assets/between_bridges_2k.raw"
     },
     {
-      name: "Carpentry Shop 02 (4K)",
-      url: "assets/carpentry_shop_02_4k.raw"
+      name: "Between Bridges (4K)",
+      url: "assets/between_bridges_4k.raw"
     },
     {
-      name: "Old Outdoor Theater (4K)",
-      url: "assets/old_outdoor_theater_4k.raw"
+      name: "Between Bridges (8K)",
+      url: "assets/between_bridges_8k.raw"
+    },
+    {
+      name: "Blue Grotto (4K)",
+      url: "assets/blue_grotto_4k.raw"
     },
     {
       name: "Blue Lagoon Night (4K)",
@@ -132,6 +132,14 @@ export default class extends Vue {
       url: "assets/blue_lagoon_night_8k.raw"
     },
     {
+      name: "Carpentry Shop 02 (4K)",
+      url: "assets/carpentry_shop_02_4k.raw"
+    },
+    {
+      name: "Cayley Interior (8K)",
+      url: "assets/cayley_interior_8k.raw"
+    },
+    {
       name: "Cinema Lobby (4K)",
       url: "assets/cinema_lobby_4k.raw"
     },
@@ -140,12 +148,60 @@ export default class extends Vue {
       url: "assets/cinema_lobby_8k.raw"
     },
     {
+      name: "Green Point Park (8K)",
+      url: "assets/green_point_park_8k.raw"
+    },
+    {
+      name: "Lenong 2 (1K)",
+      url: "assets/lenong_2_1k.raw"
+    },
+    {
+      name: "Lenong 2 (2K)",
+      url: "assets/lenong_2_2k.raw"
+    },
+    {
+      name: "Lenong 2 (4K)",
+      url: "assets/lenong_2_4k.raw"
+    },
+    {
       name: "Moonless Golf (4K)",
       url: "assets/moonless_golf_4k.raw"
     },
     {
       name: "Moonless Golf (8K)",
       url: "assets/moonless_golf_8k.raw"
+    },
+    {
+      name: "Noon Grass (2K)",
+      url: "assets/noon_grass_2k.raw"
+    },
+    {
+      name: "Noon Grass (4K)",
+      url: "assets/noon_grass_4k.raw"
+    },
+    {
+      name: "Noon Grass (8K)",
+      url: "assets/noon_grass_8k.raw"
+    },
+    {
+      name: "Old Outdoor Theater (4K)",
+      url: "assets/old_outdoor_theater_4k.raw"
+    },
+    {
+      name: "Paul Lobe Haus (4K)",
+      url: "assets/paul_lobe_haus_4k.raw"
+    },
+    {
+      name: "Sunny Vondelpark (2K)",
+      url: "assets/sunny_vondelpark_2k.raw"
+    },
+    {
+      name: "Sunny Vondelpark (4K)",
+      url: "assets/sunny_vondelpark_4k.raw"
+    },
+    {
+      name: "Sunny Vondelpark (8K)",
+      url: "assets/sunny_vondelpark_8k.raw"
     }
   ];
 }
