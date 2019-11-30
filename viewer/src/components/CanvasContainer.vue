@@ -2,7 +2,7 @@
   <div class="container">
     <canvas
       class="canvas"
-      v-bind:class="{ 'canvas-locked': isCameraLocked }"
+      v-bind:class="{ 'canvas-locked': isCameraLocked || isRenderPaused }"
       :style="canvasStyle"
       ref="canvas"
       tabindex="0"
@@ -38,8 +38,10 @@
       :on-save-render="onSaveRender"
       :on-toggle-fullscreen="toggleFullscreen"
       :is-camera-locked="isCameraLocked"
+      :is-render-paused="isRenderPaused"
       :is-saving-render="isSavingRender"
       v-on:camera-lock="toggleCameraLock()"
+      v-on:render-pause="toggleRenderPause()"
     />
   </div>
 </template>
@@ -191,6 +193,7 @@ export default class extends Vue {
   private screenshot: Blob | null = null;
   private isSceneSaveRequested: boolean = false;
   private isCameraLocked: boolean = false;
+  private isRenderPaused: boolean = false;
 
   private toggleFullscreen() {
     if (document.fullscreenElement === null) {
@@ -202,6 +205,10 @@ export default class extends Vue {
 
   private toggleCameraLock() {
     this.isCameraLocked = !this.isCameraLocked;
+  }
+
+  private toggleRenderPause() {
+    this.isRenderPaused = !this.isRenderPaused;
   }
 
   private onSaveRender() {
@@ -402,25 +409,30 @@ export default class extends Vue {
       this.sppmPasses = this.device.sppm_passes();
 
       try {
-        if (this.isExpensiveUpdate) {
-          this.device.update(this.scene);
-          this.isExpensiveUpdate = false;
-        } else if (this.device.is_expensive_update(this.scene)) {
-          this.isExpensiveUpdate = true;
-        } else {
-          this.device.update(this.scene);
-        }
+        if (!this.isRenderPaused) {
+          if (this.isExpensiveUpdate) {
+            this.device.update(this.scene);
+            this.isExpensiveUpdate = false;
+          } else if (this.device.is_expensive_update(this.scene)) {
+            this.isExpensiveUpdate = true;
+          } else {
+            this.device.update(this.scene);
+          }
 
-        if (!this.isExpensiveUpdate) {
-          this.canvas.width = this.scene.raster_width();
-          this.canvas.height = this.scene.raster_height();
-          this.resizeAndMaintainAspectRatio();
-          this.canvasWidth = this.canvas.width;
-          this.canvasHeight = this.canvas.height;
+          if (!this.isExpensiveUpdate) {
+            this.canvas.width = this.scene.raster_width();
+            this.canvas.height = this.scene.raster_height();
+            this.resizeAndMaintainAspectRatio();
+            this.canvasWidth = this.canvas.width;
+            this.canvasHeight = this.canvas.height;
+          }
         }
 
         const refineTime = this.gpuTimeQueries!.timeElapsed(() => {
-          this.device.refine();
+          if (!this.isRenderPaused) {
+            this.device.refine();
+          }
+
           this.device.render();
         });
 

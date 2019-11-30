@@ -20,7 +20,9 @@ import {
   faUnlock,
   faCog,
   faCircleNotch,
-  faExclamationCircle
+  faExclamationCircle,
+  faPlay,
+  faPause
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
@@ -33,7 +35,9 @@ library.add(
   faUnlock,
   faCog,
   faCircleNotch,
-  faExclamationCircle
+  faExclamationCircle,
+  faPlay,
+  faPause
 );
 
 (window as any).jsonlint = require("jsonlint-mod");

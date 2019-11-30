@@ -10,6 +10,24 @@
     </div>
 
     <div
+      v-if="!isRenderPaused"
+      class="toolbar-item"
+      title="Pause the render"
+      v-on:click="toggleRenderPause()"
+    >
+      <font-awesome-icon class="toolbar-icon" icon="pause" size="2x" />
+    </div>
+
+    <div
+      v-if="isRenderPaused"
+      class="toolbar-item"
+      title="Resume the render"
+      v-on:click="toggleRenderPause()"
+    >
+      <font-awesome-icon class="toolbar-icon" icon="play" size="2x" />
+    </div>
+
+    <div
       v-if="!isCameraLocked"
       class="toolbar-item"
       title="Lock the camera"
@@ -38,9 +56,14 @@ export default class extends Vue {
   @Prop() private onSaveRender!: () => void;
   @Prop() private isSavingRender!: boolean;
   @Prop() private isCameraLocked!: boolean;
+  @Prop() private isRenderPaused!: boolean;
 
   private toggleCameraLock() {
     this.$emit("camera-lock");
+  }
+
+  private toggleRenderPause() {
+    this.$emit("render-pause");
   }
 }
 </script>
