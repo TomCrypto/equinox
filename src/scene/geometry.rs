@@ -77,6 +77,11 @@ pub enum Geometry {
     ForceNumericalNormals {
         child: Box<Geometry>,
     },
+    Twist {
+        amount: Parameter,
+        step: Parameter,
+        child: Box<Geometry>,
+    },
 }
 
 impl Geometry {
@@ -100,6 +105,7 @@ impl Geometry {
             Self::Translate { child, .. } => child.evaluation_cost() + 0.25,
             Self::Round { child, .. } => child.evaluation_cost() + 0.25,
             Self::ForceNumericalNormals { child } => child.evaluation_cost(),
+            Self::Twist { child, .. } => child.evaluation_cost() + 1.0,
         }
     }
 
@@ -266,6 +272,23 @@ impl Geometry {
                 bounds
             }
             Self::ForceNumericalNormals { child } => child.bounds(parameters),
+            Self::Twist { child, amount, .. } => {
+                let mut bounds = child.bounds(parameters);
+
+                let dx = bounds.bbox.max.x - bounds.bbox.min.x;
+                let dy = bounds.bbox.max.y - bounds.bbox.min.y;
+                let dz = bounds.bbox.max.z - bounds.bbox.min.z;
+
+                bounds.bbox.min.x -= dx * 0.5;
+                bounds.bbox.min.y -= dy * 0.5;
+                bounds.bbox.min.z -= dz * 0.5;
+
+                bounds.bbox.max.x += dx * 0.5;
+                bounds.bbox.max.y += dy * 0.5;
+                bounds.bbox.max.z += dz * 0.5;
+
+                bounds
+            }
         }
     }
 
@@ -345,6 +368,16 @@ impl Geometry {
                 child.symbolic_parameters_recursive(parameters);
             }
             Self::ForceNumericalNormals { child } => {
+                child.symbolic_parameters_recursive(parameters);
+            }
+            Self::Twist {
+                child,
+                amount,
+                step,
+            } => {
+                Self::record_parameter(parameters, amount);
+                Self::record_parameter(parameters, step);
+
                 child.symbolic_parameters_recursive(parameters);
             }
         }

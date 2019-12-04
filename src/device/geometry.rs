@@ -232,6 +232,32 @@ impl GeometryGlslGenerator {
                 "return {};",
                 self.distance_recursive(child, parameters).call("p")
             ),
+            Geometry::Twist {
+                amount,
+                step,
+                child,
+            } => {
+                let amount = self.lookup_parameter(amount, parameters);
+                let step = self.lookup_parameter(step, parameters);
+
+                let function = self.distance_recursive(child, parameters);
+
+                format!(
+                    r#"
+                    float k = {} / sqrt(p.x * p.x + p.z * p.z);
+                    float c = cos(2.0 * 3.14159265 * k * p.y);
+                    float s = sin(2.0 * 3.14159265 * k * p.y);
+                    /*mat2  m = mat2(c,-s,s,c);
+                    vec3  q = vec3(m*p.xz,p.y);*/
+                    vec3 q = vec3(p.x * c + p.z * s, -p.x * s + p.z * c, p.y);
+                    // float scale = 1.0 + 5.08 * k + 5.43 * k * k - 2.8 * k * k * k;
+                    return {} / {};
+                "#,
+                    amount,
+                    function.call("q"),
+                    step,
+                )
+            }
         };
 
         self.register_distance_function(code.trim())
