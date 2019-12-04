@@ -1,12 +1,21 @@
 <template>
   <div>
     <div class="loading-overlay" v-if="showAssetInfo">
-      <font-awesome-icon class="loading-icon" icon="circle-notch" spin size="lg" />
+      <font-awesome-icon
+        class="loading-icon"
+        icon="circle-notch"
+        spin
+        size="lg"
+      />
       <p>{{ loadingText }}</p>
     </div>
 
     <div class="loading-overlay" v-if="isExpensiveUpdate">
-      <font-awesome-icon class="loading-icon" icon="exclamation-circle" size="lg" />
+      <font-awesome-icon
+        class="loading-icon"
+        icon="exclamation-circle"
+        size="lg"
+      />
       <p>Please wait...</p>
     </div>
   </div>

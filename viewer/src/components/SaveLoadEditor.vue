@@ -1,7 +1,11 @@
 <template>
   <div class="scene-list">
     <div class="scene-card">
-      <button class="button" v-on:click="requestSceneSave()" title="Save the current scene">
+      <button
+        class="button"
+        v-on:click="requestSceneSave()"
+        title="Save the current scene"
+      >
         <div class="save-icon">
           <font-awesome-icon icon="hdd" size="2x" />
         </div>

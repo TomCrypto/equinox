@@ -36,6 +36,10 @@
     "autoFix": true
   }],
 
+  "eslint.autoFixOnSave": true,
+  "editor.formatOnSave": false,
+  "vetur.validation.template": false,
+
   "eslint.workingDirectories": ["./viewer"],
 
   "files.exclude": {
@@ -45,7 +49,8 @@
     "pkg": true,
     "target": true,
     "viewer/dist": true,
-    "viewer/node_modules": true
+    "viewer/node_modules": true,
+    "viewer/yarn.lock": true
   },
 
   "files.insertFinalNewline": true

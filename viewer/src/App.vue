@@ -1,7 +1,11 @@
 <template>
   <div id="app">
     <div class="canvas-panel">
-      <CanvasContainer :equinox="equinox" :scene="scene" :assets-in-flight="assetsInFlight" />
+      <CanvasContainer
+        :equinox="equinox"
+        :scene="scene"
+        :assets-in-flight="assetsInFlight"
+      />
     </div>
     <div class="editor-panel">
       <EditorContainer
@@ -10,19 +14,27 @@
         :tabs-below="editorTabsBelow"
         :defaultTab="defaultEditorTab"
       >
-        <template slot="tab-head-advanced">Advanced Editor</template>
+        <template slot="tab-head-advanced"
+          >Advanced Editor</template
+        >
         <template slot="tab-panel-advanced">
           <AdvancedEditor :scene="scene" :load-assets="loadAssets" />
         </template>
-        <template slot="tab-head-environment">Environment</template>
+        <template slot="tab-head-environment"
+          >Environment</template
+        >
         <template slot="tab-panel-environment">
           <EnvironmentEditor :scene="scene" :load-assets="loadAssets" />
         </template>
-        <template slot="tab-head-documentation">Documentation</template>
+        <template slot="tab-head-documentation"
+          >Documentation</template
+        >
         <template slot="tab-panel-documentation">
           <DocumentationEditor />
         </template>
-        <template slot="tab-head-save-load">Save/Load</template>
+        <template slot="tab-head-save-load"
+          >Save/Load</template
+        >
         <template slot="tab-panel-save-load">
           <SaveLoadEditor :scene="scene" :load-assets="loadAssets" />
         </template>

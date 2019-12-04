@@ -1,12 +1,31 @@
 <template>
   <div class="toolbar">
-    <div class="toolbar-item" title="Toggle fullscreen mode" v-on:click="onToggleFullscreen()">
+    <div
+      class="toolbar-item"
+      title="Toggle fullscreen mode"
+      v-on:click="onToggleFullscreen()"
+    >
       <font-awesome-icon class="toolbar-icon" icon="expand" size="2x" />
     </div>
 
-    <div class="toolbar-item" title="Save the current render" v-on:click="onSaveRender()">
-      <font-awesome-icon v-if="!isSavingRender" class="toolbar-icon" icon="download" size="2x" />
-      <font-awesome-icon v-if="isSavingRender" class="toolbar-icon" icon="cog" spin size="2x" />
+    <div
+      class="toolbar-item"
+      title="Save the current render"
+      v-on:click="onSaveRender()"
+    >
+      <font-awesome-icon
+        v-if="!isSavingRender"
+        class="toolbar-icon"
+        icon="download"
+        size="2x"
+      />
+      <font-awesome-icon
+        v-if="isSavingRender"
+        class="toolbar-icon"
+        icon="cog"
+        spin
+        size="2x"
+      />
     </div>
 
     <div
