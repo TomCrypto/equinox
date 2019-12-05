@@ -48,9 +48,12 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
             bool inside = dot(ray.dir, normal) > 0.0;
             vec3 f;
 
-            #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
-                throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
-                                                                                                  \
+            float n1, n2;
+
+            throughput *= medium_absorption(traversal.hit.x >> 16U, inside,
+                                            traversal.range.y, n1, n2);
+
+            #define MAT_SWITCH_LOGIC(eval, sample) {                                              \
                 if (is_receiver && deposit_weight < integrator.photon_rate) {                     \
                     deposit_photon(ray, throughput / integrator.photon_rate);                     \
                     return; /* rasterize this photon into the photon table */                     \
@@ -59,7 +62,7 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
                 throughput /= is_receiver ? 1.0 - integrator.photon_rate : 1.0;                   \
                                                                                                   \
                 float unused_pdf; /* we don't use the PDF of the sampling method */               \
-                f = sample(mat_inst, normal, ray.dir, -ray.dir, unused_pdf, quasi);               \
+                f = sample(mat_inst, normal, ray.dir, -ray.dir, n1, n2, unused_pdf, quasi);       \
             }
 
             MAT_DO_SWITCH(material)

@@ -28,7 +28,7 @@ pub(crate) fn material_parameter_block_count(material: &Material) -> usize {
         Material::IdealReflection { .. } => 1,
         Material::IdealRefraction { .. } => 1,
         Material::Phong { .. } => 1,
-        Material::Dielectric { .. } => 3,
+        Material::Dielectric { .. } => 1,
         Material::OrenNayar { .. } => 2,
     }
 }
@@ -45,14 +45,10 @@ fn write_material_parameters(material: &Material, parameters: &mut [MaterialPara
             parameters[0].0[1] = reflectance[1];
             parameters[0].0[2] = reflectance[2];
         }
-        Material::IdealRefraction {
-            transmittance,
-            refractive_index,
-        } => {
+        Material::IdealRefraction { transmittance } => {
             parameters[0].0[0] = transmittance[0];
             parameters[0].0[1] = transmittance[1];
             parameters[0].0[2] = transmittance[2];
-            parameters[0].0[3] = *refractive_index;
         }
         Material::Phong { albedo, shininess } => {
             parameters[0].0[0] = albedo[0];
@@ -60,24 +56,10 @@ fn write_material_parameters(material: &Material, parameters: &mut [MaterialPara
             parameters[0].0[2] = albedo[2];
             parameters[0].0[3] = *shininess;
         }
-        Material::Dielectric {
-            internal_refractive_index,
-            external_refractive_index,
-            internal_extinction_coefficient,
-            external_extinction_coefficient,
-            base_color,
-        } => {
-            parameters[0].0[0] = internal_extinction_coefficient[0];
-            parameters[0].0[1] = internal_extinction_coefficient[1];
-            parameters[0].0[2] = internal_extinction_coefficient[2];
-            parameters[0].0[3] = *internal_refractive_index;
-            parameters[1].0[0] = external_extinction_coefficient[0];
-            parameters[1].0[1] = external_extinction_coefficient[1];
-            parameters[1].0[2] = external_extinction_coefficient[2];
-            parameters[1].0[3] = *external_refractive_index;
-            parameters[2].0[0] = base_color[0];
-            parameters[2].0[1] = base_color[1];
-            parameters[2].0[2] = base_color[2];
+        Material::Dielectric { base_color } => {
+            parameters[0].0[0] = base_color[0];
+            parameters[0].0[1] = base_color[1];
+            parameters[0].0[2] = base_color[2];
         }
         Material::OrenNayar { albedo, roughness } => {
             let roughness2 = roughness.max(0.0).min(1.0).powi(2);

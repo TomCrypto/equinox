@@ -34,7 +34,12 @@ export default {
         },
         photon_receiver: true,
         sample_explicit: true,
-        visible: true
+        visible: true,
+        medium: {
+          extinction: [0, 0, 0],
+          refractive_index: 1
+        },
+        parent: null
       },
       "glass-pane": {
         geometry: "pane",
@@ -46,7 +51,12 @@ export default {
         },
         photon_receiver: true,
         sample_explicit: true,
-        visible: true
+        visible: true,
+        medium: {
+          extinction: [1e-9, 0.000002, 0.000004],
+          refractive_index: 1.65
+        },
+        parent: null
       },
       "glass-sphere": {
         geometry: "two-spheres",
@@ -58,7 +68,12 @@ export default {
         },
         photon_receiver: false,
         sample_explicit: true,
-        visible: true
+        visible: true,
+        medium: {
+          extinction: [0, 0, 0],
+          refractive_index: 1
+        },
+        parent: null
       },
       ground: {
         geometry: "ground",
@@ -66,7 +81,12 @@ export default {
         parameters: {},
         photon_receiver: true,
         sample_explicit: true,
-        visible: true
+        visible: true,
+        medium: {
+          extinction: [0, 0, 0],
+          refractive_index: 1
+        },
+        parent: null
       },
       "test-sphere": {
         geometry: "cube",
@@ -78,7 +98,12 @@ export default {
         },
         photon_receiver: false,
         sample_explicit: true,
-        visible: true
+        visible: true,
+        medium: {
+          extinction: [0, 0, 0],
+          refractive_index: 1
+        },
+        parent: null
       }
     },
     geometry_list: {
@@ -161,10 +186,6 @@ export default {
       },
       "glass-pane": {
         type: "dielectric",
-        internal_refractive_index: 1.65,
-        external_refractive_index: 1,
-        internal_extinction_coefficient: [1e-9, 0.000002, 0.000004],
-        external_extinction_coefficient: [0, 0, 0],
         base_color: [1, 1, 1]
       },
       gold: {

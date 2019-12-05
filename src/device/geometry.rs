@@ -78,11 +78,14 @@ impl GeometryGlslGenerator {
     }
 
     fn build_parameter_map(geometry: &Geometry) -> HashMap<&str, usize> {
+        // The +8 offset here is to accommodate the medium information which
+        // currently uses the first two parameter blocks for every instance.
+
         geometry
             .symbolic_parameters()
             .iter()
             .enumerate()
-            .map(|(index, &symbol)| (symbol, index))
+            .map(|(index, &symbol)| (symbol, 8 + index))
             .collect()
     }
 

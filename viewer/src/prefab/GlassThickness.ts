@@ -35,7 +35,12 @@ export default {
         },
         photon_receiver: true,
         sample_explicit: true,
-        visible: true
+        visible: true,
+        medium: {
+          extinction: [3e-8, 3e-8, 3e-8],
+          refractive_index: 1.55
+        },
+        parent: null
       },
       glass2: {
         geometry: "box",
@@ -48,7 +53,12 @@ export default {
         },
         photon_receiver: true,
         sample_explicit: true,
-        visible: true
+        visible: true,
+        medium: {
+          extinction: [3e-8, 3e-8, 3e-8],
+          refractive_index: 1.55
+        },
+        parent: null
       },
       glass3: {
         geometry: "box",
@@ -61,7 +71,12 @@ export default {
         },
         photon_receiver: true,
         sample_explicit: true,
-        visible: true
+        visible: true,
+        medium: {
+          extinction: [3e-8, 3e-8, 3e-8],
+          refractive_index: 1.55
+        },
+        parent: null
       },
       glass4: {
         geometry: "box",
@@ -74,7 +89,12 @@ export default {
         },
         photon_receiver: true,
         sample_explicit: true,
-        visible: true
+        visible: true,
+        medium: {
+          extinction: [3e-8, 3e-8, 3e-8],
+          refractive_index: 1.55
+        },
+        parent: null
       },
       ground: {
         geometry: "ground",
@@ -82,7 +102,12 @@ export default {
         parameters: {},
         photon_receiver: true,
         sample_explicit: true,
-        visible: true
+        visible: true,
+        medium: {
+          extinction: [0, 0, 0],
+          refractive_index: 1
+        },
+        parent: null
       }
     },
     geometry_list: {
@@ -106,10 +131,6 @@ export default {
     material_list: {
       glass: {
         type: "dielectric",
-        internal_refractive_index: 1.55,
-        external_refractive_index: 1,
-        internal_extinction_coefficient: [3e-8, 3e-8, 3e-8],
-        external_extinction_coefficient: [0, 0, 0],
         base_color: [1, 1, 1]
       },
       lambertian: {

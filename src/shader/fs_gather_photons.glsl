@@ -14,7 +14,7 @@ uniform sampler2D photon_table_sum;
 
 layout(location = 0) out vec4 radiance_estimate;
 
-vec3 get_photon(cell_t cell, vec3 point, uint material, uint inst, vec3 normal, vec3 wo) {
+vec3 get_photon(cell_t cell, vec3 point, uint material, uint inst, vec3 normal, vec3 wo, float n1, float n2) {
     ivec2 coords = hash_entry_for_cell(cell);
 
     vec3 position = texelFetch(photon_table_pos, coords, 0).rgb;
@@ -23,9 +23,9 @@ vec3 get_photon(cell_t cell, vec3 point, uint material, uint inst, vec3 normal, 
         vec3 wi = 2.0 * texelFetch(photon_table_dir, coords, 0).rgb - 1.0;
         vec3 throughput = 65536.0 * texelFetch(photon_table_sum, coords, 0).rgb;
 
-        #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                      \
+        #define MAT_SWITCH_LOGIC(eval, sample) {                                                  \
             float unused_pdf;                                                                     \
-            return throughput * eval(inst, normal, wi, wo, unused_pdf);                           \
+            return throughput * eval(inst, normal, wi, wo, n1, n2, unused_pdf);                   \
         }
 
         MAT_DO_SWITCH(material)
@@ -35,21 +35,21 @@ vec3 get_photon(cell_t cell, vec3 point, uint material, uint inst, vec3 normal, 
     return vec3(0.0);
 }
 
-vec3 gather_photons_in_sphere(vec3 point, vec3 wo, vec3 normal, uint material, uint inst) {
+vec3 query_photon_map(vec3 point, vec3 wo, vec3 normal, uint material, uint inst, float n1, float n2) {
     cell_t cell = cell_for_point(point);
 
     vec3 d = sign(fract(point / integrator.cell_size) - vec3(0.5));
 
     vec3 estimate = vec3(0.0);
 
-    estimate += get_photon(cell + vec3(0.0, 0.0, 0.0), point, material, inst, normal, wo);
-    estimate += get_photon(cell + vec3(0.0, 0.0, d.z), point, material, inst, normal, wo);
-    estimate += get_photon(cell + vec3(0.0, d.y, 0.0), point, material, inst, normal, wo);
-    estimate += get_photon(cell + vec3(0.0, d.y, d.z), point, material, inst, normal, wo);
-    estimate += get_photon(cell + vec3(d.x, 0.0, 0.0), point, material, inst, normal, wo);
-    estimate += get_photon(cell + vec3(d.x, 0.0, d.z), point, material, inst, normal, wo);
-    estimate += get_photon(cell + vec3(d.x, d.y, 0.0), point, material, inst, normal, wo);
-    estimate += get_photon(cell + vec3(d.x, d.y, d.z), point, material, inst, normal, wo);
+    estimate += get_photon(cell + vec3(0.0, 0.0, 0.0), point, material, inst, normal, wo, n1, n2);
+    estimate += get_photon(cell + vec3(0.0, 0.0, d.z), point, material, inst, normal, wo, n1, n2);
+    estimate += get_photon(cell + vec3(0.0, d.y, 0.0), point, material, inst, normal, wo, n1, n2);
+    estimate += get_photon(cell + vec3(0.0, d.y, d.z), point, material, inst, normal, wo, n1, n2);
+    estimate += get_photon(cell + vec3(d.x, 0.0, 0.0), point, material, inst, normal, wo, n1, n2);
+    estimate += get_photon(cell + vec3(d.x, 0.0, d.z), point, material, inst, normal, wo, n1, n2);
+    estimate += get_photon(cell + vec3(d.x, d.y, 0.0), point, material, inst, normal, wo, n1, n2);
+    estimate += get_photon(cell + vec3(d.x, d.y, d.z), point, material, inst, normal, wo, n1, n2);
 
     return estimate / (M_PI * integrator.search_radius_squared);
 }
@@ -76,6 +76,11 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
 
             bool inside = dot(ray.dir, normal) > 0.0;
 
+            float n1, n2;
+
+            throughput *= medium_absorption(traversal.hit.x >> 16U, inside,
+                                            traversal.range.y, n1, n2);
+
             mis = MAT_SAMPLE_EXPLICIT(material) && (bounce != integrator.max_gather_bounces - 1U)
                                                 && !inside;
 
@@ -85,15 +90,13 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
             light_pdf = 0.0;
             vec3 light = mis ? env_sample_light(mis_wi, light_pdf, quasi) : vec3(0.0);
 
-            #define MAT_SWITCH_LOGIC(absorption, eval, sample) {                                  \
-                throughput *= absorption(mat_inst, inside, traversal.range.y);                    \
-                                                                                                  \
+            #define MAT_SWITCH_LOGIC(eval, sample) {                                              \
                 if (light_pdf != 0.0) {                                                           \
-                    mis_f = eval(mat_inst, normal, mis_wi, -ray.dir, mis_material_pdf)            \
+                    mis_f = eval(mat_inst, normal, mis_wi, -ray.dir, n1, n2, mis_material_pdf)    \
                           * abs(dot(mis_wi, normal)) * throughput;                                \
                 }                                                                                 \
                                                                                                   \
-                f = sample(mat_inst, normal, wi, -ray.dir, material_pdf, quasi);                  \
+                f = sample(mat_inst, normal, wi, -ray.dir, n1, n2, material_pdf, quasi);          \
             }
 
             MAT_DO_SWITCH(material)
@@ -130,8 +133,8 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
                     }
                 }
 
-                vec3 li = gather_photons_in_sphere(ray.org, -ray.dir, normal, material, mat_inst);
-                radiance += li / integrator.photons_for_pass; // normalize the photon contribution
+                vec3 li = query_photon_map(ray.org, -ray.dir, normal, material, mat_inst, n1, n2);
+                radiance += throughput * li / integrator.photons_for_pass; // SPPM photon estimate
 
                 return radiance;
             }

@@ -59,7 +59,7 @@ impl Device {
                 mat_inst: material_start[&instance.material],
             });
 
-            geometry_start += (instance.parameters.len() as u16 + 3) / 4;
+            geometry_start += 2 + (instance.parameters.len() as u16 + 3) / 4;
         }
 
         let node_count = HierarchyBuilder::node_count_for_leaves(instance_info.len());
@@ -98,6 +98,28 @@ impl Device {
             if !instance.visible {
                 continue;
             }
+
+            if let Some(parent) = &instance.parent {
+                let parent = &instance_list[parent];
+
+                params.push(GeometryParameter([
+                    parent.medium.extinction[0],
+                    parent.medium.extinction[1],
+                    parent.medium.extinction[2],
+                    parent.medium.refractive_index,
+                ]));
+            } else {
+                params.push(GeometryParameter([0.0, 0.0, 0.0, 1.0]));
+            }
+
+            params.push(GeometryParameter([
+                instance.medium.extinction[0],
+                instance.medium.extinction[1],
+                instance.medium.extinction[2],
+                instance.medium.refractive_index,
+            ]));
+
+            offset += 2;
 
             let parameters = geometry_list[&instance.geometry].symbolic_parameters();
             let block_count = (parameters.len() + 3) / 4;

@@ -18,6 +18,25 @@ layout (std140) uniform Instance {
     BvhNode data[INSTANCE_DATA_LEN];
 } instance_buffer;
 
+vec3 medium_absorption(uint inst, bool inside, float distance, out float n1, out float n2) {
+    const vec3 WAVENUMBERS = M_2PI / vec3(685e-9, 530e-9, 470e-9);
+
+    vec4 ext_medium = geometry_buffer.data[inst + 0U];
+    vec4 int_medium = geometry_buffer.data[inst + 1U];
+
+    if (inside) {
+        n1 = int_medium.w;
+        n2 = ext_medium.w;
+
+        return exp(-int_medium.xyz * int_medium.w * distance * WAVENUMBERS);
+    } else {
+        n1 = ext_medium.w;
+        n2 = int_medium.w;
+
+        return exp(-ext_medium.xyz * ext_medium.w * distance * WAVENUMBERS);
+    }
+}
+
 void get_scene_bbox(out vec3 bbmin, out vec3 bbmax) {
     bbmin = vec3(instance_buffer.data[0].minx,
                  instance_buffer.data[0].miny,

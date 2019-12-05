@@ -319,6 +319,8 @@ impl Scene {
                 geometry,
                 material,
                 parameters,
+                parent,
+                medium,
                 ..
             },
         ) in instance_list.iter()
@@ -327,6 +329,15 @@ impl Scene {
 
             validate_contains!(geometry_list, prefix, geometry);
             validate_contains!(material_list, prefix, material);
+
+            if let Some(parent) = parent {
+                validate_contains!(instance_list, prefix, parent);
+            }
+
+            validate!(prefix, medium.extinction[0] >= 0.0);
+            validate!(prefix, medium.extinction[1] >= 0.0);
+            validate!(prefix, medium.extinction[2] >= 0.0);
+            validate!(prefix, medium.refractive_index >= 1.0);
 
             for parameter in geometry_list[geometry].symbolic_parameters() {
                 if !parameters.contains_key(parameter) {
