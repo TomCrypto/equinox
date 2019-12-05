@@ -66,7 +66,7 @@ fn perform_test(
         device.refine().unwrap();
     }
 
-    device.render().unwrap();
+    device.present().unwrap();
 
     let rendered_bytes = read_canvas_pixels(&context);
     let expected_bytes = read_png_pixels(test_data.png);

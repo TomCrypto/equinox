@@ -225,9 +225,9 @@ impl WebDevice {
         Ok(self.device.refine()?)
     }
 
-    /// Renders the current integrator data.
-    pub fn render(&mut self) -> Result<(), JsValue> {
-        Ok(self.device.render()?)
+    /// Presents the current integrator data.
+    pub fn present(&mut self) -> Result<(), JsValue> {
+        Ok(self.device.present()?)
     }
 
     /// Returns the number of photons traced by the SPPM integrator.

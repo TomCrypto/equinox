@@ -17,10 +17,7 @@
       v-on:contextmenu="$event.preventDefault()"
     />
 
-    <LoadingOverlay
-      :assets-in-flight="assetsInFlight"
-      :is-expensive-update="isExpensiveUpdate"
-    />
+    <LoadingOverlay :assets-in-flight="assetsInFlight" :is-expensive-update="isExpensiveUpdate" />
 
     <StatusBar
       v-if="showStatusBar"
@@ -435,9 +432,9 @@ export default class extends Vue {
           if (!this.isRenderPaused) {
             this.device.refine();
           }
-
-          this.device.render();
         });
+
+        this.device.present();
 
         if (this.mustSaveRender) {
           this.generateScreenshotZip();

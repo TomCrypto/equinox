@@ -43,6 +43,9 @@ pub struct Device {
     // Final convolved render output (real-valued)
     pub(crate) render: Texture<RGBA16F>,
 
+    pub(crate) composited_render: Texture<RGBA8>,
+    pub(crate) composited_fbo: Framebuffer,
+
     pub(crate) fft_pass_data: VertexArray<[FFTPassData]>,
 
     pub(crate) spectrum_temp1_fbo: Framebuffer,
@@ -74,6 +77,9 @@ impl Device {
     pub fn new(gl: &Context) -> Result<Self, Error> {
         Ok(Self {
             gl: gl.clone(),
+
+            composited_render: Texture::new(gl.clone()),
+            composited_fbo: Framebuffer::new(gl.clone()),
 
             integrator_radiance_estimate: Texture::new(gl.clone()),
 
@@ -246,6 +252,11 @@ impl Device {
                 return Err(Error::new("raster dimensions must be nonzero"));
             }
 
+            self.composited_render
+                .create(raster.width as usize, raster.height as usize);
+            self.composited_fbo
+                .rebuild(&[&self.composited_render], None)?;
+
             self.render
                 .create(raster.width as usize, raster.height as usize);
 
@@ -404,14 +415,7 @@ impl Device {
         self.scatter_photons(&pass);
         self.gather_photons();
 
-        Ok(())
-    }
-
-    /// Renders the current render state into the context's canvas.
-    pub fn render(&mut self) -> Result<(), Error> {
-        if self.device_lost {
-            return Ok(());
-        }
+        // postproc pass
 
         if self.state.aperture.is_some() {
             self.render_lens_flare();
@@ -434,7 +438,7 @@ impl Device {
             self.integrator_gather_fbo.rows() as i32,
         );
 
-        command.set_canvas_framebuffer();
+        command.set_framebuffer(&self.composited_fbo);
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
@@ -442,10 +446,23 @@ impl Device {
         Ok(())
     }
 
+    /// Presents the current render state into the context's canvas.
+    pub fn present(&mut self) -> Result<(), Error> {
+        if self.device_lost {
+            return Ok(());
+        }
+
+        self.composited_fbo.blit_color_to_canvas();
+        Ok(()) // just blit our final color buffer
+    }
+
     fn try_restore(&mut self, scene: &mut Scene) -> Result<bool, Error> {
         if self.gl.is_context_lost() {
             return Ok(false);
         }
+
+        self.composited_render.invalidate();
+        self.composited_fbo.invalidate();
 
         self.present_program.invalidate();
         self.read_convolution_buffers_shader.invalidate();
