@@ -28,29 +28,32 @@ pub struct Device {
     pub(crate) gather_quasi_buffer: UniformBuffer<[SamplerDimensionAlpha]>,
     pub(crate) scatter_quasi_buffer: UniformBuffer<[SamplerDimensionAlpha]>,
 
-    // Complex-valued spectrums for each render channel
-    pub(crate) rspectrum_temp1: Texture<RG32F>,
-    pub(crate) gspectrum_temp1: Texture<RG32F>,
-    pub(crate) bspectrum_temp1: Texture<RG32F>,
-    pub(crate) rspectrum_temp2: Texture<RG32F>,
-    pub(crate) gspectrum_temp2: Texture<RG32F>,
-    pub(crate) bspectrum_temp2: Texture<RG32F>,
+    pub(crate) fft_signal_tile_r: Texture<RG32F>,
+    pub(crate) fft_signal_tile_g: Texture<RG32F>,
+    pub(crate) fft_signal_tile_b: Texture<RG32F>,
 
-    pub(crate) r_aperture_spectrum: Texture<RG32F>,
-    pub(crate) g_aperture_spectrum: Texture<RG32F>,
-    pub(crate) b_aperture_spectrum: Texture<RG32F>,
+    pub(crate) fft_filter_tile_r: Vec<Texture<RG32F>>,
+    pub(crate) fft_filter_tile_g: Vec<Texture<RG32F>>,
+    pub(crate) fft_filter_tile_b: Vec<Texture<RG32F>>,
+
+    pub(crate) fft_temp_tile_r: Texture<RG32F>,
+    pub(crate) fft_temp_tile_g: Texture<RG32F>,
+    pub(crate) fft_temp_tile_b: Texture<RG32F>,
+
+    pub(crate) fft_signal_fbo: Framebuffer,
+    pub(crate) fft_filter_fbo: Vec<Framebuffer>,
+    pub(crate) fft_temp_fbo: Framebuffer,
 
     // Final convolved render output (real-valued)
-    pub(crate) render: Texture<RGBA16F>,
+    pub(crate) convolution_output: Texture<RGBA16F>,
 
     pub(crate) composited_render: Texture<RGBA8>,
     pub(crate) composited_fbo: Framebuffer,
 
-    pub(crate) fft_pass_data: VertexArray<[FFTPassData]>,
+    pub(crate) signal_fft_passes: VertexArray<[FFTPassData]>,
+    pub(crate) filter_fft_passes: VertexArray<[FFTPassData]>,
 
-    pub(crate) spectrum_temp1_fbo: Framebuffer,
-    pub(crate) spectrum_temp2_fbo: Framebuffer,
-    pub(crate) render_fbo: Framebuffer,
+    pub(crate) convolution_output_fbo: Framebuffer,
     pub(crate) aperture_fbo: Framebuffer,
 
     pub(crate) load_convolution_buffers_shader: Shader,
@@ -93,7 +96,8 @@ impl Device {
             integrator_photon_table_pos: Texture::new(gl.clone()),
             integrator_photon_table_dir: Texture::new(gl.clone()),
             integrator_photon_table_sum: Texture::new(gl.clone()),
-            fft_pass_data: VertexArray::new(gl.clone()),
+            signal_fft_passes: VertexArray::new(gl.clone()),
+            filter_fft_passes: VertexArray::new(gl.clone()),
             integrator_scatter_photons_shader: Shader::new(
                 gl.clone(),
                 &shader::VS_SCATTER_PHOTONS,
@@ -124,20 +128,8 @@ impl Device {
             envmap_color: Texture::new(gl.clone()),
             envmap_marg_cdf: Texture::new(gl.clone()),
             envmap_cond_cdf: Texture::new(gl.clone()),
-            rspectrum_temp1: Texture::new(gl.clone()),
-            gspectrum_temp1: Texture::new(gl.clone()),
-            bspectrum_temp1: Texture::new(gl.clone()),
-            rspectrum_temp2: Texture::new(gl.clone()),
-            gspectrum_temp2: Texture::new(gl.clone()),
-            bspectrum_temp2: Texture::new(gl.clone()),
-            r_aperture_spectrum: Texture::new(gl.clone()),
-            g_aperture_spectrum: Texture::new(gl.clone()),
-            b_aperture_spectrum: Texture::new(gl.clone()),
-            render: Texture::new(gl.clone()),
-            render_fbo: Framebuffer::new(gl.clone()),
-            aperture_fbo: Framebuffer::new(gl.clone()),
-            spectrum_temp1_fbo: Framebuffer::new(gl.clone()),
-            spectrum_temp2_fbo: Framebuffer::new(gl.clone()),
+            convolution_output: Texture::new(gl.clone()),
+            convolution_output_fbo: Framebuffer::new(gl.clone()),z
             integrator_scatter_fbo: Framebuffer::new(gl.clone()),
             device_lost: true,
             state: IntegratorState::default(),
@@ -257,7 +249,7 @@ impl Device {
             self.composited_fbo
                 .rebuild(&[&self.composited_render], None)?;
 
-            self.render
+            self.convolution_output
                 .create(raster.width as usize, raster.height as usize);
 
             let render_cols = raster.width as usize;
@@ -269,7 +261,8 @@ impl Device {
             self.integrator_gather_fbo
                 .rebuild(&[&self.integrator_radiance_estimate], None)?;
 
-            self.render_fbo.rebuild(&[&self.render], None)?;
+            self.convolution_output_fbo
+                .rebuild(&[&self.convolution_output], None)?;
 
             self.load_convolution_buffers_shader.set_define(
                 "IMAGE_DIMS",
@@ -302,6 +295,10 @@ impl Device {
         let assets = &scene.assets;
 
         invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
+            // TODO: create relevant FFT buffers here
+            // the BUFFERS themselves only depend on the tile size, but the filter buffers may need
+            // to be expanded/shrunk if the raster changes and new tiles are added/removed
+
             if let Some(aperture) = aperture {
                 self.rspectrum_temp1.create(2048, 1024);
                 self.gspectrum_temp1.create(2048, 1024);
@@ -342,7 +339,11 @@ impl Device {
                     None,
                 )?;
 
-                self.prepare_fft_pass_data();
+                
+                
+                // TODO: move this to the lens_flare file
+                self.generate_signal_fft_passes(Self::TILE_SIZE);
+                self.generate_filter_fft_passes(Self::TILE_SIZE);
 
                 self.preprocess_filter(
                     &assets[&aperture.aperture_texels],
@@ -417,17 +418,25 @@ impl Device {
 
         // postproc pass
 
-        if self.state.aperture.is_some() {
+        /*
+        
+        TODO: add lens flare switch logic here
+
+         - if lens flare is not enabled, just directly use the radiance estimate
+         - else, need some custom logic to use the radiance estimate if we have NO
+           lens flare data yet, else use the latest convolution buffer
+           (do we need yet another temporary buffer here? I don't think so, simply
+            don't update the composited render if we don't want to change anything)
+
+        */
+
+        /*if self.state.aperture.is_some() {
             self.render_lens_flare();
-        }
+        }*/
 
         let command = self.present_program.begin_draw();
 
-        if self.state.aperture.is_some() {
-            command.bind(&self.render, "samples");
-        } else {
-            command.bind(&self.integrator_radiance_estimate, "samples");
-        }
+        command.bind(&self.integrator_radiance_estimate, "samples");
 
         command.bind(&self.display_buffer, "Display");
 
@@ -461,6 +470,8 @@ impl Device {
             return Ok(false);
         }
 
+        // TODO: invalidate all new FFT fields
+
         self.composited_render.invalidate();
         self.composited_fbo.invalidate();
 
@@ -479,23 +490,11 @@ impl Device {
         self.integrator_buffer.invalidate();
         self.raster_buffer.invalidate();
         self.environment_buffer.invalidate();
-        self.rspectrum_temp1.invalidate();
-        self.gspectrum_temp1.invalidate();
-        self.bspectrum_temp1.invalidate();
 
-        self.rspectrum_temp2.invalidate();
-        self.gspectrum_temp2.invalidate();
-        self.bspectrum_temp2.invalidate();
-
-        self.r_aperture_spectrum.invalidate();
-        self.g_aperture_spectrum.invalidate();
-        self.b_aperture_spectrum.invalidate();
-
-        self.render.invalidate();
-        self.fft_pass_data.invalidate();
-        self.spectrum_temp1_fbo.invalidate();
-        self.spectrum_temp2_fbo.invalidate();
-        self.render_fbo.invalidate();
+        self.convolution_output.invalidate();
+        self.signal_fft_passes.invalidate();
+        self.filter_fft_passes.invalidate();
+        self.convolution_output_fbo.invalidate();
 
         self.integrator_photon_table_pos.invalidate();
         self.integrator_photon_table_dir.invalidate();

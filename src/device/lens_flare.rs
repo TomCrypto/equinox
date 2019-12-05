@@ -11,7 +11,7 @@ use rustfft::{num_complex::Complex, FFTplanner};
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(8), C)]
-#[derive(AsBytes, FromBytes, Debug)]
+#[derive(AsBytes, FromBytes, Clone, Copy, Debug)]
 pub struct FFTPassData {
     pub horizontal: u16,
     pub direction: u16,
@@ -23,12 +23,6 @@ impl VertexLayout for FFTPassData {
     const VERTEX_LAYOUT: &'static [VertexAttribute] =
         &[VertexAttribute::new(0, 0, VertexAttributeKind::UShort4)];
 }
-
-// TODO: possible speed-ups:
-//  - larger radix to reduce number of iterations (not viable without compute
-//    shaders, or doing some horrible stuff with vertex shader quads)
-//  - complex-to-real/real-to-complex FFT speedups (not really worth the code
-//    complexity increase as it only applies to the outermost dimension)
 
 fn bilinear_interpolation(psf: &[f32], width: usize, height: usize, mut x: f32, mut y: f32) -> f32 {
     if x < 0.0 || y < 0.0 {
@@ -74,7 +68,9 @@ fn bilinear_interpolation(psf: &[f32], width: usize, height: usize, mut x: f32, 
 }
 
 impl Device {
-    pub(crate) fn render_lens_flare(&mut self) {
+    pub(crate) const TILE_SIZE: usize = 512;
+
+    /*pub(crate) fn render_lens_flare(&mut self) {
         let mut location = self.load_into_convolution_buffers(&self.integrator_radiance_estimate);
         self.perform_convolution(&mut location);
         self.load_convolved_render_from_convolution_buffers(&mut location);
@@ -422,182 +418,304 @@ impl Device {
 
         // that's it, we're done, the aperture convolution filter has been
         // initialized
+    }*/
+
+    /// Loads a tile of the signal into the signal tile.
+    ///
+    /// After this method returns, the signal tile buffer will contain the
+    /// specified tile of the signal, zero-padded & ready for convolution.
+    fn load_signal_tile(&self) {
+        /*
+
+        TODO:
+
+         - given the current signal tile, fetch the texels from the source
+           signal texture (i.e. radiance estimate) and break it up into the
+           RGB signal tiles
+
+        */
+
+        todo!()
     }
 
-    pub(crate) fn prepare_fft_pass_data(&mut self) {
-        let mut passes = vec![];
-
-        // forward passes, rows
-
-        let mut m = 2;
-
-        while m <= 2048 {
-            for _ in 0..3 {
-                passes.push(FFTPassData {
-                    horizontal: 1,
-                    direction: 1,                // "forward"
-                    subtransform_size: 4096 / m, // inverse order
-                    convolve: 0,
-                });
-            }
-
-            m *= 2;
-        }
-
-        // forward passes, columns
-
-        let mut m = 2;
-
-        while m <= 1024 {
-            for _ in 0..3 {
-                passes.push(FFTPassData {
-                    horizontal: 0,
-                    direction: 1,                // "forward"
-                    subtransform_size: 2048 / m, // inverse order
-                    convolve: (m == 1024) as u16,
-                });
-            }
-
-            m *= 2;
-        }
-
-        // inverse passes, columns
-
-        let mut m = 2;
-
-        while m <= 1024 {
-            for _ in 0..3 {
-                passes.push(FFTPassData {
-                    horizontal: 0,
-                    direction: 0, // "inverse"
-                    subtransform_size: m,
-                    convolve: 0, // m == 0 if we want to do it inline here?
-                });
-            }
-
-            m *= 2;
-        }
-
-        // inverse passes, rows
-
-        let mut m = 2;
-
-        while m <= 2048 {
-            for _ in 0..3 {
-                passes.push(FFTPassData {
-                    horizontal: 1,
-                    direction: 0, // "inverse"
-                    subtransform_size: m,
-                    convolve: 0,
-                });
-            }
-
-            m *= 2;
-        }
-
-        self.fft_pass_data.upload(&passes);
+    fn clear_convolution_buffer(&self) {
+        self.convolution_output_fbo.clear(0, [0.0; 4]);
     }
 
-    fn load_into_convolution_buffers(&self, texture: &Texture<RGBA32F>) -> DataLocation {
-        let command = self.load_convolution_buffers_shader.begin_draw();
-
-        command.bind(texture, "image");
-
-        command.set_viewport(0, 0, 2048, 1024);
-        command.set_framebuffer(&self.spectrum_temp1_fbo);
-
-        command.unset_vertex_array();
-        command.draw_triangles(0, 1);
-
-        DataLocation::Temp1
-    }
-
-    fn source_r_buffer(&self, location: DataLocation) -> &Texture<RG32F> {
-        match location {
-            DataLocation::Temp1 => &self.rspectrum_temp1,
-            DataLocation::Temp2 => &self.rspectrum_temp2,
-        }
-    }
-
-    fn source_g_buffer(&self, location: DataLocation) -> &Texture<RG32F> {
-        match location {
-            DataLocation::Temp1 => &self.gspectrum_temp1,
-            DataLocation::Temp2 => &self.gspectrum_temp2,
-        }
-    }
-
-    fn source_b_buffer(&self, location: DataLocation) -> &Texture<RG32F> {
-        match location {
-            DataLocation::Temp1 => &self.bspectrum_temp1,
-            DataLocation::Temp2 => &self.bspectrum_temp2,
-        }
-    }
-
-    fn target_framebuffer(&self, location: DataLocation) -> &Framebuffer {
-        match location {
-            DataLocation::Temp1 => &self.spectrum_temp2_fbo,
-            DataLocation::Temp2 => &self.spectrum_temp1_fbo,
-        }
-    }
-
-    fn perform_convolution(&self, location: &mut DataLocation) {
+    /// Performs a forward FFT on the provided filter tile.
+    ///
+    /// After this method returns, the filter tile buffer will contain the FFT
+    /// of the filter tile.
+    fn precompute_filter_tile_fft(&self, filter_tile: usize) {
         let command = self.fft_shader.begin_draw();
 
-        command.set_vertex_array(&self.fft_pass_data);
+        command.set_vertex_array(&self.filter_fft_passes);
 
-        command.bind(&self.r_aperture_spectrum, "r_conv_filter");
-        command.bind(&self.g_aperture_spectrum, "g_conv_filter");
-        command.bind(&self.b_aperture_spectrum, "b_conv_filter");
-
-        command.set_viewport(0, 0, 2048, 1024);
-
-        for triangle_index in 0..(self.fft_pass_data.vertex_count() / 3) {
-            command.bind(self.source_r_buffer(*location), "r_conv_buffer");
-            command.bind(self.source_g_buffer(*location), "g_conv_buffer");
-            command.bind(self.source_b_buffer(*location), "b_conv_buffer");
-
-            command.set_framebuffer(self.target_framebuffer(*location));
-
-            command.draw_triangles(triangle_index, 1);
-
-            location.swap();
-        }
-    }
-
-    fn load_convolved_render_from_convolution_buffers(&self, location: &mut DataLocation) {
-        let command = self.read_convolution_buffers_shader.begin_draw();
-
-        command.bind(self.source_r_buffer(*location), "r_conv_buffer");
-        command.bind(self.source_g_buffer(*location), "g_conv_buffer");
-        command.bind(self.source_b_buffer(*location), "b_conv_buffer");
-
-        command.bind(&self.integrator_radiance_estimate, "source");
-
-        command.set_framebuffer(&self.render_fbo);
+        // TODO: use the signal buffers here as read-only placeholders
+        command.bind(&self.fft_signal_tile_r, "r_conv_filter");
+        command.bind(&self.fft_signal_tile_b, "g_conv_filter");
+        command.bind(&self.fft_signal_tile_g, "b_conv_filter");
 
         command.set_viewport(
             0,
             0,
-            self.render_fbo.cols() as i32,
-            self.render_fbo.rows() as i32,
+            self.fft_filter_fbo[filter_tile].cols() as i32,
+            self.fft_filter_fbo[filter_tile].rows() as i32,
         );
 
-        command.unset_vertex_array();
-        command.draw_triangles(0, 1);
-    }
-}
+        for pass in 0..(self.filter_fft_passes.vertex_count() / 3) {
+            if pass % 2 == 0 {
+                command.bind(&self.fft_filter_tile_r[filter_tile], "r_conv_buffer");
+                command.bind(&self.fft_filter_tile_g[filter_tile], "g_conv_buffer");
+                command.bind(&self.fft_filter_tile_b[filter_tile], "b_conv_buffer");
+                command.set_framebuffer(&self.fft_temp_fbo);
+            } else {
+                command.bind(&self.fft_temp_tile_r, "r_conv_buffer");
+                command.bind(&self.fft_temp_tile_g, "g_conv_buffer");
+                command.bind(&self.fft_temp_tile_b, "b_conv_buffer");
+                command.set_framebuffer(&self.fft_filter_fbo[filter_tile]);
+            }
 
-#[derive(Clone, Copy)]
-enum DataLocation {
-    Temp1,
-    Temp2,
-}
-
-impl DataLocation {
-    pub fn swap(&mut self) {
-        match self {
-            DataLocation::Temp1 => *self = DataLocation::Temp2,
-            DataLocation::Temp2 => *self = DataLocation::Temp1,
+            command.draw_triangles(pass, 1);
         }
     }
+
+    /// Convolves the current signal tile with a filter tile.
+    ///
+    /// After this method returns, the signal tile buffers will contain the
+    /// convolved signal, ready to be composited in the convolution buffer.
+    fn convolve_tile(&self, filter_tile: usize) {
+        let command = self.fft_shader.begin_draw();
+
+        command.set_vertex_array(&self.signal_fft_passes);
+
+        command.bind(&self.fft_filter_tile_r[filter_tile], "r_conv_filter");
+        command.bind(&self.fft_filter_tile_g[filter_tile], "g_conv_filter");
+        command.bind(&self.fft_filter_tile_b[filter_tile], "b_conv_filter");
+
+        command.set_viewport(
+            0,
+            0,
+            self.fft_signal_fbo.cols() as i32,
+            self.fft_signal_fbo.rows() as i32,
+        );
+
+        for pass in 0..(self.signal_fft_passes.vertex_count() / 3) {
+            if pass % 2 == 0 {
+                command.bind(&self.fft_signal_tile_r, "r_conv_buffer");
+                command.bind(&self.fft_signal_tile_g, "g_conv_buffer");
+                command.bind(&self.fft_signal_tile_b, "b_conv_buffer");
+                command.set_framebuffer(&self.fft_temp_fbo);
+            } else {
+                command.bind(&self.fft_temp_tile_r, "r_conv_buffer");
+                command.bind(&self.fft_temp_tile_g, "g_conv_buffer");
+                command.bind(&self.fft_temp_tile_b, "b_conv_buffer");
+                command.set_framebuffer(&self.fft_signal_fbo);
+            }
+
+            command.draw_triangles(pass, 1);
+        }
+    }
+
+    /// Composites the current signal tile into the convolution buffer.
+    ///
+    /// After this method returns, the contents of the signal tile will have
+    /// been accumulated into the convolution buffer. Once the final tile is
+    /// processed, the convolution buffer will contain the convolved signal.
+    fn composite_tile(&self) {
+        /*
+
+        TODO: given which pairwise (signal, filter) tile we are on, figure out the region
+        of the convolution buffer we need to add the signal tile into. then just do it
+        (need a quick shader that can merge the three signal tile channels back together)
+
+        */
+
+        todo!()
+    }
+
+    pub(crate) fn generate_filter_fft_passes(&mut self, tile_size: usize) {
+        let depth = tile_size.leading_zeros() as u16;
+        let mut passes = vec![]; // FFT pass planner
+
+        for m in (1..=depth).rev() {
+            passes.push(FFTPassData {
+                horizontal: 1,
+                direction: 1,
+                subtransform_size: 1 << m,
+                convolve: 0,
+            });
+        }
+
+        for m in (1..=depth).rev() {
+            passes.push(FFTPassData {
+                horizontal: 0,
+                direction: 1,
+                subtransform_size: 1 << m,
+                convolve: 0,
+            });
+        }
+
+        self.filter_fft_passes.upload(&Self::gen_pass_tris(passes));
+    }
+
+    pub(crate) fn generate_signal_fft_passes(&mut self, tile_size: usize) {
+        let depth = tile_size.leading_zeros() as u16;
+        let mut passes = vec![]; // FFT pass planner
+
+        for m in (1..=depth).rev() {
+            passes.push(FFTPassData {
+                horizontal: 1,
+                direction: 1,
+                subtransform_size: 1 << m,
+                convolve: 0,
+            });
+        }
+
+        for m in (1..=depth).rev() {
+            passes.push(FFTPassData {
+                horizontal: 0,
+                direction: 1,
+                subtransform_size: 1 << m,
+                convolve: (m == 1) as u16,
+            });
+        }
+
+        for m in 1..=depth {
+            passes.push(FFTPassData {
+                horizontal: 0,
+                direction: 0,
+                subtransform_size: 1 << m,
+                convolve: 0,
+            });
+        }
+
+        for m in 1..=depth {
+            passes.push(FFTPassData {
+                horizontal: 1,
+                direction: 0,
+                subtransform_size: 1 << m,
+                convolve: 0,
+            });
+        }
+
+        self.signal_fft_passes.upload(&Self::gen_pass_tris(passes));
+    }
+
+    fn gen_pass_tris(passes: Vec<FFTPassData>) -> Vec<FFTPassData> {
+        let tris = passes.into_iter().map(|x| [x, x, x].iter().copied());
+        tris.flatten().collect() // duplicate into one triangle per pass
+    }
+}
+
+/*
+
+the tile size should be a power of two, and will ideally be square. we'll decompose the
+signal and filter into tiles and then convolve them pairwise one by one; each pair will
+be added to a specific location in the output buffer.
+
+finally the output buffer is trimmed to its center signal, to remove all padding zeroes
+and this is the final render.
+
+*/
+
+struct TiledConvolution {
+    signal_cols: usize,
+    signal_rows: usize,
+    filter_cols: usize,
+    filter_rows: usize,
+    tile_size: usize,
+    counter: usize,
+}
+
+impl TiledConvolution {
+    pub fn new(
+        signal_cols: usize,
+        signal_rows: usize,
+        filter_cols: usize,
+        filter_rows: usize,
+        tile_size: usize,
+    ) -> Self {
+        // TODO: assert tile_size is a power of two
+
+        assert_eq!(filter_cols % 4, 0);
+        assert_eq!(filter_rows % 4, 0);
+
+        Self {
+            signal_cols,
+            signal_rows,
+            filter_cols,
+            filter_rows,
+            tile_size,
+            counter: 0,
+        }
+    }
+
+    /// Returns the number of columns of the final convolution buffer.
+    pub fn output_cols(&self) -> usize {
+        self.signal_cols
+    }
+
+    /// Returns the number of rows of the final convolution buffer.
+    pub fn output_rows(&self) -> usize {
+        self.signal_rows
+    }
+
+    /// Returns the next convolution and whether it is the last.
+    pub fn next_convolution(&mut self) -> (Convolution, bool) {
+        let signal_tile_cols = (self.signal_cols + self.tile_size / 2 - 1) / (self.tile_size / 2);
+        let signal_tile_rows = (self.signal_rows + self.tile_size / 2 - 1) / (self.tile_size / 2);
+
+        let filter_tile_cols = (self.filter_cols + self.tile_size - 1) / self.tile_size;
+        let filter_tile_rows = (self.filter_rows + self.tile_size - 1) / self.tile_size;
+
+        let conv_count = signal_tile_cols * signal_tile_rows * filter_tile_cols * filter_tile_rows;
+
+        let global_tile_index = self.counter % conv_count;
+
+        let signal_tile_index = global_tile_index / (signal_tile_cols * signal_tile_rows);
+        let filter_tile_index = global_tile_index % (signal_tile_cols * signal_tile_rows);
+
+        let signal_tile = Tile {
+            x: signal_tile_index / signal_tile_rows,
+            y: signal_tile_index % signal_tile_rows,
+            w: self.tile_size / 2,
+            h: self.tile_size / 2,
+        };
+
+        let filter_tile = Tile {
+            x: filter_tile_index / filter_tile_rows,
+            y: filter_tile_index % filter_tile_rows,
+            w: self.tile_size,
+            h: self.tile_size,
+        };
+
+        // TODO: compute output tile location somehow
+
+        let output_tile: Tile = panic!();
+
+        self.counter += 1;
+
+        (
+            Convolution {
+                signal: signal_tile,
+                filter: filter_tile,
+                output: output_tile,
+            },
+            self.counter % conv_count == 0,
+        )
+    }
+}
+
+struct Tile {
+    x: usize,
+    y: usize,
+    w: usize,
+    h: usize,
+}
+
+struct Convolution {
+    signal: Tile,
+    filter: Tile,
+    output: Tile,
 }
