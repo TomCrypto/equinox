@@ -75,13 +75,8 @@ void main() {
 
     // For debugging purposes only
 
-    if (any(isnan(value.rgb))) {
+    if (any(isnan(value)) || any(isinf(value))) {
         color = vec4(1.0, 0.0, 1.0, 1.0);
-        return;
-    }
-
-    if (any(isinf(value.rgb))) {
-        color = vec4(0.0, 0.0, 1.0, 1.0);
         return;
     }
 
