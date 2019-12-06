@@ -454,7 +454,7 @@ impl Device {
     }
 
     fn clear_convolution_buffer(&self) {
-        self.convolution_output_fbo.clear(0, [0.0; 4]);
+        self.convolution_output_fbo.clear(0, [0.0, 0.0, 0.0, 1.0]);
     }
 
     /// Performs a forward FFT on the provided filter tile.

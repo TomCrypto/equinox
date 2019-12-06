@@ -46,6 +46,9 @@ pub struct Device {
     pub(crate) fft_filter_fbo: Vec<Framebuffer>,
     pub(crate) fft_temp_fbo: Framebuffer,
 
+    // Initial convolution signal, saved from the radiance estimate
+    pub(crate) convolution_signal: Texture<RGBA16F>,
+
     // Final convolved render output (real-valued)
     pub(crate) convolution_output: Texture<RGBA16F>,
 
@@ -146,6 +149,7 @@ impl Device {
             envmap_marg_cdf: Texture::new(gl.clone()),
             envmap_cond_cdf: Texture::new(gl.clone()),
             convolution_output: Texture::new(gl.clone()),
+            convolution_signal: Texture::new(gl.clone()),
             convolution_output_fbo: Framebuffer::new(gl.clone()),
             integrator_scatter_fbo: Framebuffer::new(gl.clone()),
             device_lost: true,
@@ -266,6 +270,8 @@ impl Device {
             self.composited_fbo
                 .rebuild(&[&self.composited_render], None)?;
 
+            self.convolution_signal
+                .create(raster.width as usize, raster.height as usize);
             self.convolution_output
                 .create(raster.width as usize, raster.height as usize);
 
@@ -399,7 +405,15 @@ impl Device {
         self.scatter_photons(&pass);
         self.gather_photons();
 
-        // postproc pass
+        // lens flare pass
+
+        let use_lens_flare = false;
+
+        if use_lens_flare {
+            // do something
+        } else {
+            // directly post-process the radiance estimate
+        }
 
         /*
 
@@ -416,6 +430,8 @@ impl Device {
         /*if self.state.aperture.is_some() {
             self.render_lens_flare();
         }*/
+
+        // postproc pass; if we get here the output will be updated
 
         let command = self.present_program.begin_draw();
 

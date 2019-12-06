@@ -1,4 +1,4 @@
-layout(location = 0) out vec4 convolution_output;
+layout(location = 0) out vec3 convolution_output;
 
 uniform sampler2D signal_tile_r;
 uniform sampler2D signal_tile_g;
@@ -16,5 +16,5 @@ void main() {
     signal_g *= normalization;
     signal_b *= normalization;
 
-    convolution_output = vec4(signal_r, signal_g, signal_b, 1.0);
+    convolution_output = vec3(signal_r, signal_g, signal_b);
 }
