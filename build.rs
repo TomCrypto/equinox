@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use crypto::rc4::Rc4;
 use crypto::symmetriccipher::SynchronousStreamCipher;
 use lazy_static::lazy_static;
@@ -166,8 +168,8 @@ fn preprocess(
             let header = captures.get(1).unwrap().as_str();
 
             if vec_contains(processed, &header) {
-                writeln!(shader, "").unwrap();
-                continue; // already included
+                writeln!(shader).unwrap();
+                continue; // already seen
             }
 
             if vec_contains(expanding, &header) {
@@ -232,6 +234,6 @@ fn gather_metadata(text: &str, metadata: &mut ShaderMetadata) {
     }
 }
 
-fn vec_contains(vec: &Vec<String>, item: &str) -> bool {
+fn vec_contains(vec: &[String], item: &str) -> bool {
     vec.iter().any(|x| x == item) // see issue #42671
 }

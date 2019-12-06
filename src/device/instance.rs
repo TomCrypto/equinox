@@ -167,7 +167,6 @@ pub struct SceneInstanceNode {
 }
 
 impl SceneInstanceNode {
-    #[allow(clippy::too_many_arguments)]
     pub fn make_leaf(
         min: [f32; 3],
         max: [f32; 3],

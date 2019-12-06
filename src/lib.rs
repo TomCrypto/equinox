@@ -1,5 +1,6 @@
 //! The Equinox stochastic photon mapper, see the README for more information.
 
+#![allow(clippy::too_many_arguments)]
 #![allow(clippy::module_inception)]
 #![forbid(dead_code, unsafe_code)]
 
