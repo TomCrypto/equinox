@@ -9,7 +9,6 @@ pub struct Device {
 
     pub(crate) present_program: Shader,
 
-    pub(crate) read_convolution_buffers_shader: Shader,
     pub(crate) fft_shader: Shader,
 
     pub(crate) load_signal_tile_shader: Shader,
@@ -57,9 +56,6 @@ pub struct Device {
     pub(crate) filter_fft_passes: VertexArray<[FFTPassData]>,
 
     pub(crate) convolution_output_fbo: Framebuffer,
-    pub(crate) aperture_fbo: Framebuffer,
-
-    pub(crate) load_convolution_buffers_shader: Shader,
 
     pub(crate) integrator_photon_table_pos: Texture<RGBA32F>,
     pub(crate) integrator_photon_table_dir: Texture<RGB10A2>,
@@ -103,6 +99,22 @@ impl Device {
                 &shader::FS_READ_SIGNAL_TILE,
             ),
 
+            fft_signal_tile_r: Texture::new(gl.clone()),
+            fft_signal_tile_g: Texture::new(gl.clone()),
+            fft_signal_tile_b: Texture::new(gl.clone()),
+
+            fft_filter_tile_r: vec![],
+            fft_filter_tile_g: vec![],
+            fft_filter_tile_b: vec![],
+
+            fft_temp_tile_r: Texture::new(gl.clone()),
+            fft_temp_tile_g: Texture::new(gl.clone()),
+            fft_temp_tile_b: Texture::new(gl.clone()),
+
+            fft_signal_fbo: Framebuffer::new(gl.clone()),
+            fft_filter_fbo: vec![],
+            fft_temp_fbo: Framebuffer::new(gl.clone()),
+
             integrator_gather_photons_shader: Shader::new(
                 gl.clone(),
                 &shader::VS_FULLSCREEN,
@@ -118,17 +130,7 @@ impl Device {
                 &shader::VS_SCATTER_PHOTONS,
                 &shader::FS_SCATTER_PHOTONS,
             ),
-            load_convolution_buffers_shader: Shader::new(
-                gl.clone(),
-                &shader::VS_FULLSCREEN,
-                &shader::FS_LOAD_CONVOLUTION_BUFFERS,
-            ),
             fft_shader: Shader::new(gl.clone(), &shader::VS_FFT_PASS, &shader::FS_FFT_PASS),
-            read_convolution_buffers_shader: Shader::new(
-                gl.clone(),
-                &shader::VS_FULLSCREEN,
-                &shader::FS_READ_CONVOLUTION_BUFFERS,
-            ),
             present_program: Shader::new(gl.clone(), &shader::VS_FULLSCREEN, &shader::FS_PRESENT),
             camera_buffer: UniformBuffer::new(gl.clone()),
             geometry_buffer: UniformBuffer::new(gl.clone()),
@@ -144,7 +146,7 @@ impl Device {
             envmap_marg_cdf: Texture::new(gl.clone()),
             envmap_cond_cdf: Texture::new(gl.clone()),
             convolution_output: Texture::new(gl.clone()),
-            convolution_output_fbo: Framebuffer::new(gl.clone()),z
+            convolution_output_fbo: Framebuffer::new(gl.clone()),
             integrator_scatter_fbo: Framebuffer::new(gl.clone()),
             device_lost: true,
             state: IntegratorState::default(),
@@ -279,28 +281,6 @@ impl Device {
             self.convolution_output_fbo
                 .rebuild(&[&self.convolution_output], None)?;
 
-            self.load_convolution_buffers_shader.set_define(
-                "IMAGE_DIMS",
-                format!(
-                    "vec2({:+e}, {:+e})",
-                    raster.width as f32, raster.height as f32
-                ),
-            );
-
-            self.read_convolution_buffers_shader.set_define(
-                "IMAGE_DIMS",
-                format!(
-                    "vec2({:+e}, {:+e})",
-                    raster.width as f32, raster.height as f32
-                ),
-            );
-
-            self.load_convolution_buffers_shader
-                .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
-
-            self.read_convolution_buffers_shader
-                .set_define("CONV_DIMS", format!("vec2({:+e}, {:+e})", 2048.0, 1024.0));
-
             Ok(())
         })?;
 
@@ -311,8 +291,9 @@ impl Device {
 
         invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
             // TODO: create relevant FFT buffers here
-            // the BUFFERS themselves only depend on the tile size, but the filter buffers may need
-            // to be expanded/shrunk if the raster changes and new tiles are added/removed
+            // the BUFFERS themselves only depend on the tile size, but the filter buffers
+            // may need to be expanded/shrunk if the raster changes and new
+            // tiles are added/removed
 
             if let Some(aperture) = aperture {
                 self.rspectrum_temp1.create(2048, 1024);
@@ -326,15 +307,6 @@ impl Device {
                 self.r_aperture_spectrum.create(2048, 1024);
                 self.g_aperture_spectrum.create(2048, 1024);
                 self.b_aperture_spectrum.create(2048, 1024);
-
-                self.aperture_fbo.rebuild(
-                    &[
-                        &self.r_aperture_spectrum,
-                        &self.g_aperture_spectrum,
-                        &self.b_aperture_spectrum,
-                    ],
-                    None,
-                )?;
 
                 self.spectrum_temp1_fbo.rebuild(
                     &[
@@ -354,8 +326,6 @@ impl Device {
                     None,
                 )?;
 
-                
-                
                 // TODO: move this to the lens_flare file
                 self.generate_signal_fft_passes(Self::TILE_SIZE);
                 self.generate_filter_fft_passes(Self::TILE_SIZE);
@@ -409,11 +379,9 @@ impl Device {
         self.integrator_scatter_photons_shader.rebuild()?;
         self.integrator_gather_photons_shader.rebuild()?;
 
-        self.read_convolution_buffers_shader.rebuild()?;
-        self.load_convolution_buffers_shader.rebuild()?;
-
         if invalidated {
             self.reset_integrator_state(scene);
+            // TODO: reset tiled convolution state
         }
 
         Ok(invalidated)
@@ -434,7 +402,7 @@ impl Device {
         // postproc pass
 
         /*
-        
+
         TODO: add lens flare switch logic here
 
          - if lens flare is not enabled, just directly use the radiance estimate
@@ -491,9 +459,7 @@ impl Device {
         self.composited_fbo.invalidate();
 
         self.present_program.invalidate();
-        self.read_convolution_buffers_shader.invalidate();
         self.fft_shader.invalidate();
-        self.load_convolution_buffers_shader.invalidate();
         self.camera_buffer.invalidate();
         self.geometry_buffer.invalidate();
         self.material_buffer.invalidate();
@@ -515,7 +481,6 @@ impl Device {
         self.integrator_photon_table_dir.invalidate();
         self.integrator_photon_table_sum.invalidate();
         self.integrator_scatter_fbo.invalidate();
-        self.aperture_fbo.invalidate();
         self.gather_quasi_buffer.invalidate();
         self.scatter_quasi_buffer.invalidate();
 

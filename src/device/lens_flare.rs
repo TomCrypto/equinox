@@ -460,13 +460,12 @@ impl Device {
     /// Performs a forward FFT on the provided filter tile.
     ///
     /// After this method returns, the filter tile buffer will contain the FFT
-    /// of the filter tile.
+    /// of the filter tile, the contents of which must have been pregenerated.
     fn precompute_filter_tile_fft(&self, filter_tile: usize) {
         let command = self.fft_shader.begin_draw();
 
         command.set_vertex_array(&self.filter_fft_passes);
 
-        // TODO: use the signal buffers here as read-only placeholders
         command.bind(&self.fft_signal_tile_r, "r_conv_filter");
         command.bind(&self.fft_signal_tile_b, "g_conv_filter");
         command.bind(&self.fft_signal_tile_g, "b_conv_filter");
