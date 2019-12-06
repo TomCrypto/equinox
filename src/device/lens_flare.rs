@@ -4,8 +4,8 @@
 use log::{debug, info, warn};
 
 use crate::{
-    Device, Framebuffer, Texture, VertexArray, VertexAttribute, VertexAttributeKind, VertexLayout,
-    RG32F, RGBA32F,
+    BlendMode, Device, Framebuffer, Texture, VertexArray, VertexAttribute, VertexAttributeKind,
+    VertexLayout, RG32F, RGBA32F,
 };
 use rustfft::{num_complex::Complex, FFTplanner};
 use zerocopy::{AsBytes, FromBytes};
@@ -425,17 +425,32 @@ impl Device {
     /// After this method returns, the signal tile buffer will contain the
     /// specified tile of the signal, zero-padded & ready for convolution.
     fn load_signal_tile(&self) {
-        /*
+        self.fft_signal_fbo.clear(0, [0.0; 4]);
+        self.fft_signal_fbo.clear(1, [0.0; 4]);
+        self.fft_signal_fbo.clear(2, [0.0; 4]);
 
-        TODO:
+        let command = self.load_signal_tile_shader.begin_draw();
 
-         - given the current signal tile, fetch the texels from the source
-           signal texture (i.e. radiance estimate) and break it up into the
-           RGB signal tiles
+        command.bind(&self.integrator_radiance_estimate, "signal");
 
-        */
+        // TODO: bind tile information (basically the offset from the entire signal)
+        // we need to know the current signal tile here, then just upload it
+        // (can just use uniforms for now for simplicity I guess)
 
-        todo!()
+        // we render into the central half of the buffer; the rest is just zero-padded
+        let offset = self.fft_signal_fbo.cols() / 4;
+
+        command.set_viewport(
+            offset as i32,
+            offset as i32,
+            2 * offset as i32,
+            2 * offset as i32,
+        );
+
+        command.set_framebuffer(&self.fft_signal_fbo);
+
+        command.unset_vertex_array();
+        command.draw_triangles(0, 1);
     }
 
     fn clear_convolution_buffer(&self) {
@@ -523,15 +538,23 @@ impl Device {
     /// been accumulated into the convolution buffer. Once the final tile is
     /// processed, the convolution buffer will contain the convolved signal.
     fn composite_tile(&self) {
-        /*
+        let command = self.read_signal_tile_shader.begin_draw();
 
-        TODO: given which pairwise (signal, filter) tile we are on, figure out the region
-        of the convolution buffer we need to add the signal tile into. then just do it
-        (need a quick shader that can merge the three signal tile channels back together)
+        command.bind(&self.fft_signal_tile_r, "signal_tile_r");
+        command.bind(&self.fft_signal_tile_g, "signal_tile_g");
+        command.bind(&self.fft_signal_tile_b, "signal_tile_b");
 
-        */
+        // TODO: bind tile size (we need it to normalize the FFT result correctly)
 
-        todo!()
+        // TODO: set the viewport to wherever the convolved tile should be written to
+        // command.set_viewport(...);
+        // we need to know what the output tile is here
+
+        command.set_framebuffer(&self.convolution_output_fbo);
+        command.set_blend_mode(BlendMode::Add);
+
+        command.unset_vertex_array();
+        command.draw_triangles(0, 1);
     }
 
     pub(crate) fn generate_filter_fft_passes(&mut self, tile_size: usize) {

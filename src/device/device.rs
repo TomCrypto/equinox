@@ -12,6 +12,9 @@ pub struct Device {
     pub(crate) read_convolution_buffers_shader: Shader,
     pub(crate) fft_shader: Shader,
 
+    pub(crate) load_signal_tile_shader: Shader,
+    pub(crate) read_signal_tile_shader: Shader,
+
     pub(crate) geometry_buffer: UniformBuffer<[GeometryParameter]>,
     pub(crate) material_buffer: UniformBuffer<[MaterialParameter]>,
     pub(crate) instance_buffer: UniformBuffer<[SceneInstanceNode]>,
@@ -87,6 +90,18 @@ impl Device {
             integrator_radiance_estimate: Texture::new(gl.clone()),
 
             integrator_gather_fbo: Framebuffer::new(gl.clone()),
+
+            load_signal_tile_shader: Shader::new(
+                gl.clone(),
+                &shader::VS_FULLSCREEN,
+                &shader::FS_LOAD_SIGNAL_TILE,
+            ),
+
+            read_signal_tile_shader: Shader::new(
+                gl.clone(),
+                &shader::VS_FULLSCREEN,
+                &shader::FS_READ_SIGNAL_TILE,
+            ),
 
             integrator_gather_photons_shader: Shader::new(
                 gl.clone(),
