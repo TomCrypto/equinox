@@ -454,7 +454,7 @@ impl Device {
         command.draw_triangles(0, 1);
     }
 
-    fn clear_convolution_buffer(&self) {
+    pub(crate) fn clear_convolution_buffer(&self) {
         self.convolution_output_fbo.clear(0, [0.0, 0.0, 0.0, 1.0]);
     }
 
@@ -499,7 +499,7 @@ impl Device {
     ///
     /// After this method returns, the signal tile buffers will contain the
     /// convolved signal, ready to be composited in the convolution buffer.
-    fn convolve_tile(&self, filter_tile: usize) {
+    pub(crate) fn convolve_tile(&self, filter_tile: usize) {
         let command = self.fft_shader.begin_draw();
 
         command.set_vertex_array(&self.signal_fft_passes);
@@ -537,7 +537,7 @@ impl Device {
     /// After this method returns, the contents of the signal tile will have
     /// been accumulated into the convolution buffer. Once the final tile is
     /// processed, the convolution buffer will contain the convolved signal.
-    fn composite_tile(&self) {
+    pub(crate) fn composite_tile(&self) {
         let command = self.read_signal_tile_shader.begin_draw();
 
         command.bind(&self.fft_signal_tile_r, "signal_tile_r");

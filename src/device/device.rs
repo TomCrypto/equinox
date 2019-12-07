@@ -422,14 +422,13 @@ impl Device {
             let filter_rows = 512;
 
             use itertools::iproduct;
-            use itertools::Itertools;
+            use itertools::{Itertools, Position};
 
             let signal_iter = TileIterator::new(
                 self.fft_signal_fbo.cols(),
                 self.fft_signal_fbo.rows(),
                 Self::TILE_SIZE / 2,
-            )
-            .enumerate();
+            );
 
             let filter_iter =
                 TileIterator::new(filter_cols, filter_rows, Self::TILE_SIZE).enumerate();
@@ -437,7 +436,23 @@ impl Device {
             let iter = iproduct!(signal_iter, filter_iter);
 
             for value in iter.with_position() {
-                // ..
+                if let Position::First(_) | Position::Only(_) = value {
+                    // 1. copy radiance estimate into convolution signal
+                    // TODO: we need a method to copy a texture from an FBO here
+
+                    self.clear_convolution_buffer();
+                }
+
+                let (signal_tile, (filter_index, filter_tile)) = value.into_inner();
+
+                self.convolve_tile(filter_index);
+                // TODO: pass in the output tile in which to place the signal buffer
+                // this needs to be calculated somehow.
+                self.composite_tile();
+
+                if let Position::Last(_) | Position::Only(_) = value {
+                    self.post_process(&self.convolution_output);
+                }
             }
 
         // based on current tile, figure out what to do
