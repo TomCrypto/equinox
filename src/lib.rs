@@ -2,7 +2,8 @@
 
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::module_inception)]
-#![forbid(dead_code, unsafe_code)]
+// #![forbid(dead_code, unsafe_code)]
+#![forbid(unsafe_code)]
 
 mod device {
     pub mod camera;

@@ -302,7 +302,7 @@ impl Device {
             // tiles are added/removed
 
             if let Some(aperture) = aperture {
-                self.rspectrum_temp1.create(2048, 1024);
+                /*self.rspectrum_temp1.create(2048, 1024);
                 self.gspectrum_temp1.create(2048, 1024);
                 self.bspectrum_temp1.create(2048, 1024);
 
@@ -340,7 +340,7 @@ impl Device {
                     &assets[&aperture.aperture_texels],
                     aperture.aperture_width as usize,
                     aperture.aperture_height as usize,
-                );
+                );*/
             }
 
             Ok(())
@@ -407,13 +407,57 @@ impl Device {
 
         // lens flare pass
 
+        let lens_flare_threshold = 20;
+
         let use_lens_flare = false;
 
-        if use_lens_flare {
-            // do something
+        if use_lens_flare && self.state.current_pass >= lens_flare_threshold {
+            // TODO: for now, do it in a single step, iterating fully over all
+            // tiles when it's all working and we're ready, refactor
+            // to do k tiles per frame
+
+            // we must build an iterator over the tiles of the signal PRODUCT
+            // the tiles of the filter. we need to know the filter size...
+            let filter_cols = 512;
+            let filter_rows = 512;
+
+            use itertools::iproduct;
+            use itertools::Itertools;
+
+            let signal_iter = TileIterator::new(
+                self.fft_signal_fbo.cols(),
+                self.fft_signal_fbo.rows(),
+                Self::TILE_SIZE / 2,
+            )
+            .enumerate();
+
+            let filter_iter =
+                TileIterator::new(filter_cols, filter_rows, Self::TILE_SIZE).enumerate();
+
+            let iter = iproduct!(signal_iter, filter_iter);
+
+            for value in iter.with_position() {
+                // ..
+            }
+
+        // based on current tile, figure out what to do
         } else {
-            // directly post-process the radiance estimate
+            self.post_process(&self.integrator_radiance_estimate);
         }
+
+        /*
+
+        need something that can produce an iteration of fixed-size tiles over an image of arbitrary
+        size
+
+        relative to the CENTER of the image? i.e. assume the image is centered with the origin in
+        its center... but what if the image resolution is not even?
+
+        just tile from the bottom-left.
+
+        then combine this iterator with an iterator over the number of filter tiles...
+
+        */
 
         /*
 
@@ -427,15 +471,14 @@ impl Device {
 
         */
 
-        /*if self.state.aperture.is_some() {
-            self.render_lens_flare();
-        }*/
+        Ok(())
+    }
 
-        // postproc pass; if we get here the output will be updated
-
+    // TODO: move this to somewhere else, maybe a post_processing.rs
+    fn post_process(&self, texture: &dyn AsBindTarget) {
         let command = self.present_program.begin_draw();
 
-        command.bind(&self.integrator_radiance_estimate, "samples");
+        command.bind(texture, "samples");
 
         command.bind(&self.display_buffer, "Display");
 
@@ -450,8 +493,6 @@ impl Device {
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
-
-        Ok(())
     }
 
     /// Presents the current render state into the context's canvas.

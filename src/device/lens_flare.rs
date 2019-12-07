@@ -8,6 +8,7 @@ use crate::{
     VertexLayout, RG32F, RGBA32F,
 };
 use rustfft::{num_complex::Complex, FFTplanner};
+use std::iter::repeat;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(8), C)]
@@ -625,8 +626,58 @@ impl Device {
     }
 
     fn gen_pass_tris(passes: Vec<FFTPassData>) -> Vec<FFTPassData> {
-        let tris = passes.into_iter().map(|x| [x, x, x].iter().copied());
-        tris.flatten().collect() // duplicate into one triangle per pass
+        let tris = passes.into_iter().map(|x| repeat(x).take(3));
+        tris.flatten().collect() // converts passes to triangles
+    }
+}
+
+/// An iterator over tiles of a 2D grid.
+///
+/// Given a 2D grid of N columns by M rows, this iterator will generate a list
+/// of tiles (limited to a maximum square size) which entirely cover the grid.
+#[derive(Clone, Copy, Debug)]
+pub struct TileIterator {
+    cols: usize,
+    rows: usize,
+    tile_cols: usize,
+    tile_rows: usize,
+    tile_size: usize,
+    tile_counter: usize,
+}
+
+impl TileIterator {
+    pub fn new(cols: usize, rows: usize, tile_size: usize) -> Self {
+        Self {
+            cols,
+            rows,
+            tile_cols: (cols + tile_size - 1) / tile_size,
+            tile_rows: (rows + tile_size - 1) / tile_size,
+            tile_size,
+            tile_counter: 0,
+        }
+    }
+
+    pub fn tile_count(&self) -> usize {
+        self.tile_cols * self.tile_rows
+    }
+}
+
+impl Iterator for TileIterator {
+    type Item = Tile;
+
+    fn next(&mut self) -> Option<Tile> {
+        if self.tile_counter != self.tile_count() {
+            let x = (self.tile_counter % self.tile_cols) * self.tile_size;
+            let y = (self.tile_counter / self.tile_cols) * self.tile_size;
+
+            let w = (x + self.tile_size).min(self.cols) - x;
+            let h = (y + self.tile_size).min(self.rows) - y;
+            self.tile_counter += 1; // advance to next tile
+
+            Some(Tile { x, y, w, h })
+        } else {
+            None
+        }
     }
 }
 
@@ -729,7 +780,8 @@ impl TiledConvolution {
     }
 }
 
-struct Tile {
+#[derive(Clone, Copy, Debug)]
+pub struct Tile {
     x: usize,
     y: usize,
     w: usize,
