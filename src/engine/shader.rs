@@ -413,12 +413,6 @@ impl<'a> DrawCommand<'a> {
             .bind_framebuffer(Context::DRAW_FRAMEBUFFER, target.handle());
     }
 
-    pub fn set_canvas_framebuffer(&self) {
-        self.shader
-            .gl
-            .bind_framebuffer(Context::DRAW_FRAMEBUFFER, None);
-    }
-
     pub fn draw_triangles(&self, index: usize, triangles: usize) {
         self.shader
             .gl
@@ -429,6 +423,13 @@ impl<'a> DrawCommand<'a> {
         self.shader
             .gl
             .draw_arrays(Context::POINTS, index as i32, points as i32);
+    }
+
+    pub fn set_uniform_ivec2(&self, name: &str, x: i32, y: i32) {
+        if let Some(program) = &self.shader.handle {
+            let location = self.shader.gl.get_uniform_location(program, name);
+            self.shader.gl.uniform2i(location.as_ref(), x, y);
+        }
     }
 
     fn bind_uniform_buffer(&self, handle: Option<&WebGlBuffer>, slot: &str) {

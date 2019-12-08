@@ -13,6 +13,7 @@ pub struct Device {
 
     pub(crate) load_signal_tile_shader: Shader,
     pub(crate) read_signal_tile_shader: Shader,
+    pub(crate) decompose_signal_shader: Shader,
 
     pub(crate) geometry_buffer: UniformBuffer<[GeometryParameter]>,
     pub(crate) material_buffer: UniformBuffer<[MaterialParameter]>,
@@ -58,6 +59,7 @@ pub struct Device {
     pub(crate) signal_fft_passes: VertexArray<[FFTPassData]>,
     pub(crate) filter_fft_passes: VertexArray<[FFTPassData]>,
 
+    pub(crate) convolution_signal_fbo: Framebuffer,
     pub(crate) convolution_output_fbo: Framebuffer,
 
     pub(crate) integrator_photon_table_pos: Texture<RGBA32F>,
@@ -85,6 +87,12 @@ impl Device {
 
             composited_render: Texture::new(gl.clone()),
             composited_fbo: Framebuffer::new(gl.clone()),
+
+            decompose_signal_shader: Shader::new(
+                gl.clone(),
+                &shader::VS_FULLSCREEN,
+                &shader::FS_DECOMPOSE_SIGNAL,
+            ),
 
             integrator_radiance_estimate: Texture::new(gl.clone()),
 
@@ -150,6 +158,7 @@ impl Device {
             envmap_cond_cdf: Texture::new(gl.clone()),
             convolution_output: Texture::new(gl.clone()),
             convolution_signal: Texture::new(gl.clone()),
+            convolution_signal_fbo: Framebuffer::new(gl.clone()),
             convolution_output_fbo: Framebuffer::new(gl.clone()),
             integrator_scatter_fbo: Framebuffer::new(gl.clone()),
             device_lost: true,
@@ -287,6 +296,9 @@ impl Device {
             self.convolution_output_fbo
                 .rebuild(&[&self.convolution_output], None)?;
 
+            self.convolution_signal_fbo
+                .rebuild(&[&self.convolution_signal], None)?;
+
             Ok(())
         })?;
 
@@ -300,6 +312,36 @@ impl Device {
             // the BUFFERS themselves only depend on the tile size, but the filter buffers
             // may need to be expanded/shrunk if the raster changes and new
             // tiles are added/removed
+
+            self.fft_signal_tile_r
+                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+            self.fft_signal_tile_g
+                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+            self.fft_signal_tile_b
+                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+            self.fft_signal_fbo.rebuild(
+                &[
+                    &self.fft_signal_tile_r,
+                    &self.fft_signal_tile_g,
+                    &self.fft_signal_tile_b,
+                ],
+                None,
+            )?;
+
+            self.fft_temp_tile_r
+                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+            self.fft_temp_tile_g
+                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+            self.fft_temp_tile_b
+                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+            self.fft_temp_fbo.rebuild(
+                &[
+                    &self.fft_temp_tile_r,
+                    &self.fft_temp_tile_g,
+                    &self.fft_temp_tile_b,
+                ],
+                None,
+            )?;
 
             if let Some(aperture) = aperture {
                 /*self.rspectrum_temp1.create(2048, 1024);
@@ -384,6 +426,9 @@ impl Device {
 
         self.integrator_scatter_photons_shader.rebuild()?;
         self.integrator_gather_photons_shader.rebuild()?;
+        self.load_signal_tile_shader.rebuild()?;
+        self.read_signal_tile_shader.rebuild()?;
+        self.decompose_signal_shader.rebuild()?;
 
         if invalidated {
             self.reset_integrator_state(scene);
@@ -407,7 +452,7 @@ impl Device {
 
         // lens flare pass
 
-        let lens_flare_threshold = 20;
+        let lens_flare_threshold = 0;
 
         let use_lens_flare = false;
 
@@ -425,30 +470,62 @@ impl Device {
             use itertools::{Itertools, Position};
 
             let signal_iter = TileIterator::new(
-                self.fft_signal_fbo.cols(),
-                self.fft_signal_fbo.rows(),
+                self.convolution_signal_fbo.cols(),
+                self.convolution_signal_fbo.rows(),
                 Self::TILE_SIZE / 2,
             );
+
+            log::info!(">>> LOOP <<<");
 
             let filter_iter =
                 TileIterator::new(filter_cols, filter_rows, Self::TILE_SIZE).enumerate();
 
-            let iter = iproduct!(signal_iter, filter_iter);
+            let iter = signal_iter; // iproduct!(signal_iter, filter_iter);
 
             for value in iter.with_position() {
                 if let Position::First(_) | Position::Only(_) = value {
-                    // 1. copy radiance estimate into convolution signal
-                    // TODO: we need a method to copy a texture from an FBO here
-
-                    self.clear_convolution_buffer();
+                    self.convolution_output_fbo.clear(0, [0.0, 0.0, 0.0, 1.0]);
+                    self.save_radiance_estimate_to_convolution_signal();
                 }
 
-                let (signal_tile, (filter_index, filter_tile)) = value.into_inner();
+                // let (signal_tile, (filter_index, filter_tile)) = value.into_inner();
+                let signal_tile = value.into_inner();
+                let filter_index = 0;
+                let filter_tile = Tile {
+                    x: 0,
+                    y: 0,
+                    w: 512,
+                    h: 512,
+                };
 
-                self.convolve_tile(filter_index);
+                log::info!("processing signal tile {:?}", signal_tile);
+
+                /*
+
+                output tile is given by:
+
+                signal tile offset by the distance from the center of the filter tile to the center
+                of the filter
+
+                 -> how to handle odd filter dimensions here??
+
+                */
+
+                let offset_x = (filter_tile.x + filter_tile.w / 2) as i32 - filter_cols as i32 / 2;
+                let offset_y = (filter_tile.y + filter_tile.h / 2) as i32 - filter_rows as i32 / 2;
+
+                let padding = Self::TILE_SIZE as i32 / 4;
+
+                self.load_signal_tile(signal_tile);
+                // self.convolve_tile(filter_index);
                 // TODO: pass in the output tile in which to place the signal buffer
                 // this needs to be calculated somehow.
-                self.composite_tile();
+                self.composite_tile(
+                    signal_tile.x as i32 + offset_x - padding,
+                    signal_tile.y as i32 + offset_y - padding,
+                    signal_tile.w as i32 + padding * 2,
+                    signal_tile.h as i32 + padding * 2,
+                );
 
                 if let Position::Last(_) | Position::Only(_) = value {
                     self.post_process(&self.convolution_output);
@@ -548,6 +625,7 @@ impl Device {
         self.signal_fft_passes.invalidate();
         self.filter_fft_passes.invalidate();
         self.convolution_output_fbo.invalidate();
+        self.convolution_signal_fbo.invalidate();
 
         self.integrator_photon_table_pos.invalidate();
         self.integrator_photon_table_dir.invalidate();

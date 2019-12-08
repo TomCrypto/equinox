@@ -425,21 +425,27 @@ impl Device {
     ///
     /// After this method returns, the signal tile buffer will contain the
     /// specified tile of the signal, zero-padded & ready for convolution.
-    fn load_signal_tile(&self) {
+    pub(crate) fn load_signal_tile(&self, tile: Tile) {
         self.fft_signal_fbo.clear(0, [0.0; 4]);
         self.fft_signal_fbo.clear(1, [0.0; 4]);
         self.fft_signal_fbo.clear(2, [0.0; 4]);
 
         let command = self.load_signal_tile_shader.begin_draw();
 
-        command.bind(&self.integrator_radiance_estimate, "signal");
+        command.bind(&self.convolution_signal, "signal");
+
+        // we render into the central half of the buffer; the rest is just zero-padded
+        let offset = self.fft_signal_fbo.cols() / 4;
+
+        command.set_uniform_ivec2(
+            "tile_offset",
+            tile.x as i32 - offset as i32,
+            tile.y as i32 - offset as i32,
+        );
 
         // TODO: bind tile information (basically the offset from the entire signal)
         // we need to know the current signal tile here, then just upload it
         // (can just use uniforms for now for simplicity I guess)
-
-        // we render into the central half of the buffer; the rest is just zero-padded
-        let offset = self.fft_signal_fbo.cols() / 4;
 
         command.set_viewport(
             offset as i32,
@@ -454,8 +460,22 @@ impl Device {
         command.draw_triangles(0, 1);
     }
 
-    pub(crate) fn clear_convolution_buffer(&self) {
-        self.convolution_output_fbo.clear(0, [0.0, 0.0, 0.0, 1.0]);
+    pub(crate) fn save_radiance_estimate_to_convolution_signal(&self) {
+        let command = self.decompose_signal_shader.begin_draw();
+
+        command.set_viewport(
+            0,
+            0,
+            self.convolution_signal_fbo.cols() as i32,
+            self.convolution_signal_fbo.rows() as i32,
+        );
+
+        command.bind(&self.integrator_radiance_estimate, "radiance_estimate");
+
+        command.set_framebuffer(&self.convolution_signal_fbo);
+
+        command.unset_vertex_array();
+        command.draw_triangles(0, 1);
     }
 
     /// Performs a forward FFT on the provided filter tile.
@@ -504,9 +524,9 @@ impl Device {
 
         command.set_vertex_array(&self.signal_fft_passes);
 
-        command.bind(&self.fft_filter_tile_r[filter_tile], "r_conv_filter");
+        /*command.bind(&self.fft_filter_tile_r[filter_tile], "r_conv_filter");
         command.bind(&self.fft_filter_tile_g[filter_tile], "g_conv_filter");
-        command.bind(&self.fft_filter_tile_b[filter_tile], "b_conv_filter");
+        command.bind(&self.fft_filter_tile_b[filter_tile], "b_conv_filter");*/
 
         command.set_viewport(
             0,
@@ -537,18 +557,20 @@ impl Device {
     /// After this method returns, the contents of the signal tile will have
     /// been accumulated into the convolution buffer. Once the final tile is
     /// processed, the convolution buffer will contain the convolved signal.
-    pub(crate) fn composite_tile(&self) {
+    pub(crate) fn composite_tile(&self, x: i32, y: i32, w: i32, h: i32) {
         let command = self.read_signal_tile_shader.begin_draw();
 
         command.bind(&self.fft_signal_tile_r, "signal_tile_r");
         command.bind(&self.fft_signal_tile_g, "signal_tile_g");
         command.bind(&self.fft_signal_tile_b, "signal_tile_b");
 
+        command.set_uniform_ivec2("tile_offset", x, y);
+
         // TODO: bind tile size (we need it to normalize the FFT result correctly)
 
-        // TODO: set the viewport to wherever the convolved tile should be written to
-        // command.set_viewport(...);
-        // we need to know what the output tile is here
+        log::info!("compositing tile into ({}, {}, {}, {})", x, y, w, h);
+
+        command.set_viewport(x, y, w, h);
 
         command.set_framebuffer(&self.convolution_output_fbo);
         command.set_blend_mode(BlendMode::Add);
@@ -782,10 +804,10 @@ impl TiledConvolution {
 
 #[derive(Clone, Copy, Debug)]
 pub struct Tile {
-    x: usize,
-    y: usize,
-    w: usize,
-    h: usize,
+    pub x: usize,
+    pub y: usize,
+    pub w: usize,
+    pub h: usize,
 }
 
 struct Convolution {

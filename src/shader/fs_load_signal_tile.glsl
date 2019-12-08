@@ -4,6 +4,8 @@ layout(location = 2) out vec2 signal_tile_b;
 
 uniform sampler2D signal;
 
+uniform ivec2 tile_offset;
+
 void main() {
     vec3 value = texelFetch(signal, ivec2(gl_FragCoord.xy - 0.5) + tile_offset, 0).rgb;
 

@@ -4,9 +4,9 @@ uniform sampler2D r_conv_buffer;
 uniform sampler2D g_conv_buffer;
 uniform sampler2D b_conv_buffer;
 
-uniform sampler2D r_conv_filter;
-uniform sampler2D g_conv_filter;
-uniform sampler2D b_conv_filter;
+//uniform sampler2D r_conv_filter;
+//uniform sampler2D g_conv_filter;
+//uniform sampler2D b_conv_filter;
 
 layout(location = 0) out vec2 r_conv_output;
 layout(location = 1) out vec2 g_conv_output;
@@ -116,7 +116,7 @@ void main(void){
         inverse_fft(i, j);
     }
 
-    if (CONVOLVE) {
+    /*if (CONVOLVE) {
         ivec2 p = ivec2(gl_FragCoord.xy - vec2(0.5));
 
         vec2 r_filter = texelFetch(r_conv_filter, p, 0).rg;
@@ -129,5 +129,5 @@ void main(void){
                              g_conv_output.g * g_filter.r + g_conv_output.r * g_filter.g);
         b_conv_output = vec2(b_conv_output.r * b_filter.r - b_conv_output.g * b_filter.g,
                              b_conv_output.g * b_filter.r + b_conv_output.r * b_filter.g);
-    }
+    }*/
 }
