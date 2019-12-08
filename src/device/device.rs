@@ -343,6 +343,9 @@ impl Device {
                 None,
             )?;
 
+            self.generate_signal_fft_passes(Self::TILE_SIZE);
+            self.generate_filter_fft_passes(Self::TILE_SIZE);
+
             if let Some(aperture) = aperture {
                 /*self.rspectrum_temp1.create(2048, 1024);
                 self.gspectrum_temp1.create(2048, 1024);
@@ -454,7 +457,7 @@ impl Device {
 
         let lens_flare_threshold = 0;
 
-        let use_lens_flare = false;
+        let use_lens_flare = true;
 
         if use_lens_flare && self.state.current_pass >= lens_flare_threshold {
             // TODO: for now, do it in a single step, iterating fully over all
@@ -517,7 +520,7 @@ impl Device {
                 let padding = Self::TILE_SIZE as i32 / 4;
 
                 self.load_signal_tile(signal_tile);
-                // self.convolve_tile(filter_index);
+                self.convolve_tile(filter_index);
                 // TODO: pass in the output tile in which to place the signal buffer
                 // this needs to be calculated somehow.
                 self.composite_tile(

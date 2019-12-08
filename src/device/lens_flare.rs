@@ -580,8 +580,8 @@ impl Device {
     }
 
     pub(crate) fn generate_filter_fft_passes(&mut self, tile_size: usize) {
-        let depth = tile_size.leading_zeros() as u16;
-        let mut passes = vec![]; // FFT pass planner
+        let depth = tile_size.trailing_zeros() as u16;
+        let mut passes = vec![]; // FFT pass planning
 
         for m in (1..=depth).rev() {
             passes.push(FFTPassData {
@@ -605,8 +605,8 @@ impl Device {
     }
 
     pub(crate) fn generate_signal_fft_passes(&mut self, tile_size: usize) {
-        let depth = tile_size.leading_zeros() as u16;
-        let mut passes = vec![]; // FFT pass planner
+        let depth = tile_size.trailing_zeros() as u16;
+        let mut passes = vec![]; // FFT pass planning
 
         for m in (1..=depth).rev() {
             passes.push(FFTPassData {
@@ -703,115 +703,10 @@ impl Iterator for TileIterator {
     }
 }
 
-/*
-
-the tile size should be a power of two, and will ideally be square. we'll decompose the
-signal and filter into tiles and then convolve them pairwise one by one; each pair will
-be added to a specific location in the output buffer.
-
-finally the output buffer is trimmed to its center signal, to remove all padding zeroes
-and this is the final render.
-
-*/
-
-struct TiledConvolution {
-    signal_cols: usize,
-    signal_rows: usize,
-    filter_cols: usize,
-    filter_rows: usize,
-    tile_size: usize,
-    counter: usize,
-}
-
-impl TiledConvolution {
-    pub fn new(
-        signal_cols: usize,
-        signal_rows: usize,
-        filter_cols: usize,
-        filter_rows: usize,
-        tile_size: usize,
-    ) -> Self {
-        // TODO: assert tile_size is a power of two
-
-        assert_eq!(filter_cols % 4, 0);
-        assert_eq!(filter_rows % 4, 0);
-
-        Self {
-            signal_cols,
-            signal_rows,
-            filter_cols,
-            filter_rows,
-            tile_size,
-            counter: 0,
-        }
-    }
-
-    /// Returns the number of columns of the final convolution buffer.
-    pub fn output_cols(&self) -> usize {
-        self.signal_cols
-    }
-
-    /// Returns the number of rows of the final convolution buffer.
-    pub fn output_rows(&self) -> usize {
-        self.signal_rows
-    }
-
-    /// Returns the next convolution and whether it is the last.
-    pub fn next_convolution(&mut self) -> (Convolution, bool) {
-        let signal_tile_cols = (self.signal_cols + self.tile_size / 2 - 1) / (self.tile_size / 2);
-        let signal_tile_rows = (self.signal_rows + self.tile_size / 2 - 1) / (self.tile_size / 2);
-
-        let filter_tile_cols = (self.filter_cols + self.tile_size - 1) / self.tile_size;
-        let filter_tile_rows = (self.filter_rows + self.tile_size - 1) / self.tile_size;
-
-        let conv_count = signal_tile_cols * signal_tile_rows * filter_tile_cols * filter_tile_rows;
-
-        let global_tile_index = self.counter % conv_count;
-
-        let signal_tile_index = global_tile_index / (signal_tile_cols * signal_tile_rows);
-        let filter_tile_index = global_tile_index % (signal_tile_cols * signal_tile_rows);
-
-        let signal_tile = Tile {
-            x: signal_tile_index / signal_tile_rows,
-            y: signal_tile_index % signal_tile_rows,
-            w: self.tile_size / 2,
-            h: self.tile_size / 2,
-        };
-
-        let filter_tile = Tile {
-            x: filter_tile_index / filter_tile_rows,
-            y: filter_tile_index % filter_tile_rows,
-            w: self.tile_size,
-            h: self.tile_size,
-        };
-
-        // TODO: compute output tile location somehow
-
-        let output_tile: Tile = panic!();
-
-        self.counter += 1;
-
-        (
-            Convolution {
-                signal: signal_tile,
-                filter: filter_tile,
-                output: output_tile,
-            },
-            self.counter % conv_count == 0,
-        )
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct Tile {
     pub x: usize,
     pub y: usize,
     pub w: usize,
     pub h: usize,
-}
-
-struct Convolution {
-    signal: Tile,
-    filter: Tile,
-    output: Tile,
 }
