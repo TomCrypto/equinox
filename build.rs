@@ -2,7 +2,6 @@
 
 use crypto::rc4::Rc4;
 use crypto::symmetriccipher::SynchronousStreamCipher;
-use lazy_static::lazy_static;
 use regex::Regex;
 use std::env::var_os;
 use std::ffi::OsStr;
@@ -127,15 +126,6 @@ fn preprocess_glsl_shader(path: PathBuf, include_path: &str) -> Result<ShaderMet
     Ok(metadata)
 }
 
-lazy_static! {
-    static ref HEADER_REGEX: Regex = Regex::new(r#"^#include +<([[:graph:]]+)>$"#).unwrap();
-    static ref DEFINE_REGEX: Regex = Regex::new(r#"^// requires-define ([[:graph:]]+)"#).unwrap();
-    static ref UNIFORM_BLOCK_REGEX: Regex =
-        Regex::new(r#"^layout *\(std140\) +uniform +([[:graph:]]+) *\{$"#).unwrap();
-    static ref TEXTURE_UNIT_REGEX: Regex =
-        Regex::new(r#"^uniform +[ui]?sampler2D +([[:graph:]]+) *;$"#).unwrap();
-}
-
 fn preprocess(
     text: &str,
     name: &str,
@@ -146,6 +136,8 @@ fn preprocess(
     metadata: &mut ShaderMetadata,
     placeholder: bool,
 ) -> Result<String> {
+    let include_pattern = Regex::new(r#"^#include +<([[:graph:]]+)>$"#).unwrap();
+
     println!(
         "cargo:rerun-if-changed={}",
         relative_path.join(name).display()
@@ -164,7 +156,7 @@ fn preprocess(
             break;
         }
 
-        if let Some(captures) = HEADER_REGEX.captures(line) {
+        if let Some(captures) = include_pattern.captures(line) {
             let header = captures.get(1).unwrap().as_str();
 
             if vec_contains(processed, &header) {
@@ -213,20 +205,26 @@ fn preprocess(
 }
 
 fn gather_metadata(text: &str, metadata: &mut ShaderMetadata) {
+    let define_pattern = Regex::new(r#"^// requires-define ([[:graph:]]+)"#).unwrap();
+    let uniform_block_pattern =
+        Regex::new(r#"^layout *\(std140\) +uniform +([[:graph:]]+) *\{$"#).unwrap();
+    let texture_unit_pattern =
+        Regex::new(r#"^uniform +[ui]?sampler2D +([[:graph:]]+) *;$"#).unwrap();
+
     for line in text.lines() {
-        if let Some(captures) = DEFINE_REGEX.captures(line) {
+        if let Some(captures) = define_pattern.captures(line) {
             metadata
                 .defines
                 .push(captures.get(1).unwrap().as_str().to_owned());
         }
 
-        if let Some(captures) = UNIFORM_BLOCK_REGEX.captures(line) {
+        if let Some(captures) = uniform_block_pattern.captures(line) {
             metadata
                 .uniform_blocks
                 .push(captures.get(1).unwrap().as_str().to_owned());
         }
 
-        if let Some(captures) = TEXTURE_UNIT_REGEX.captures(line) {
+        if let Some(captures) = texture_unit_pattern.captures(line) {
             metadata
                 .texture_units
                 .push(captures.get(1).unwrap().as_str().to_owned());
