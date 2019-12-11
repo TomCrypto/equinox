@@ -19,7 +19,7 @@ void main() {
     coords += tile_size / 4 - 1;
     coords %= tile_size;
 
-    vec3 value = texelFetch(filter_tex, coords + tile_offset, 0).rgb;
+    vec3 value = texelFetch(filter_tex, coords + tile_offset, 0).rgb / 60000.0;
 
     filter_tile_r = vec2(value.r, 0.0);
     filter_tile_g = vec2(value.g, 0.0);
