@@ -287,22 +287,15 @@ impl Device {
         invalidated |= Dirty::clean(&mut scene.raster, |raster| {
             self.update_raster(raster)?;
 
-            if raster.width == 0 || raster.height == 0 {
-                return Err(Error::new("raster dimensions must be nonzero"));
-            }
+            let render_cols = raster.width as usize;
+            let render_rows = raster.height as usize;
 
-            self.composited_render
-                .create(raster.width as usize, raster.height as usize);
+            self.composited_render.create(render_cols, render_rows);
             self.composited_fbo
                 .rebuild(&[&self.composited_render], None)?;
 
-            self.convolution_signal
-                .create(raster.width as usize, raster.height as usize);
-            self.convolution_output
-                .create(raster.width as usize, raster.height as usize);
-
-            let render_cols = raster.width as usize;
-            let render_rows = raster.height as usize;
+            self.convolution_signal.create(render_cols, render_rows);
+            self.convolution_output.create(render_cols, render_rows);
 
             self.integrator_radiance_estimate
                 .create(render_cols, render_rows);
@@ -519,12 +512,16 @@ impl Device {
 
             // log::info!(">>> LOOP <<<");
 
-            let filter_iter = TileIterator::new(
-                self.fft_filter_fbo[0].cols(),
-                self.fft_filter_fbo[0].rows(),
-                Self::TILE_SIZE / 2,
-            )
-            .enumerate();
+            // HACK: this is a big hack; we know the filters are square and that they will
+            // be a multiple of the tile size, so we can work out the filter size from here
+
+            let filter_size =
+                (self.fft_filter_fbo.len() as f64).sqrt() as usize * Self::TILE_SIZE / 2;
+
+            log::info!("filter size = {}, {}", filter_size, filter_size);
+
+            let filter_iter =
+                TileIterator::new(filter_size, filter_size, Self::TILE_SIZE / 2).enumerate();
 
             let iter = iproduct!(signal_iter, filter_iter);
 
@@ -549,10 +546,8 @@ impl Device {
 
                 */
 
-                let offset_x = (filter_tile.x + filter_tile.w / 2) as i32
-                    - self.fft_filter_fbo[0].cols() as i32 / 2;
-                let offset_y = (filter_tile.y + filter_tile.h / 2) as i32
-                    - self.fft_filter_fbo[0].rows() as i32 / 2;
+                let offset_x = (filter_tile.x + filter_tile.w / 2) as i32 - filter_size as i32 / 2;
+                let offset_y = (filter_tile.y + filter_tile.h / 2) as i32 - filter_size as i32 / 2;
 
                 let padding = Self::TILE_SIZE as i32 / 4;
 
