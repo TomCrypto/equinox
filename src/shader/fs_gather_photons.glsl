@@ -122,14 +122,16 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
             }
 
             if (is_receiver) {
-                if (mis) {
+                if (mis && material_pdf != 0.0) {
                     // Finish the MIS direct light sampling procedure we started earlier; this
                     // is done to ensure that the MIS weights result in an unbiased estimator.
 
                     if (!is_ray_occluded(make_ray(ray.org, wi, normal), 1.0 / 0.0)) {
                         vec3 light = env_eval_light(wi, light_pdf);
 
-                        radiance += throughput * f * light * power_heuristic(material_pdf, light_pdf);
+                        if (light_pdf != 0.0) {
+                            radiance += throughput * f * light * power_heuristic(material_pdf, light_pdf);
+                        }
                     }
                 }
 
@@ -146,7 +148,11 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
 
             vec3 light = env_eval_light(ray.dir, light_pdf);
 
-            radiance += throughput * light * (mis ? power_heuristic(material_pdf, light_pdf) : 1.0);
+            if (mis && material_pdf != 0.0 && light_pdf != 0.0) {
+                radiance += throughput * light * power_heuristic(material_pdf, light_pdf);
+            } else {
+                radiance += throughput * light;
+            }
 
             return radiance;
         }
