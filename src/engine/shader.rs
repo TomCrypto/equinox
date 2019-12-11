@@ -413,6 +413,12 @@ impl<'a> DrawCommand<'a> {
             .bind_framebuffer(Context::DRAW_FRAMEBUFFER, target.handle());
     }
 
+    pub fn set_canvas_framebuffer(&self) {
+        self.shader
+            .gl
+            .bind_framebuffer(Context::DRAW_FRAMEBUFFER, None);
+    }
+
     pub fn draw_triangles(&self, index: usize, triangles: usize) {
         self.shader
             .gl

@@ -144,28 +144,6 @@ impl Framebuffer {
         self.gl
             .clear_bufferfi(Context::DEPTH_STENCIL, 0, depth, stencil as i32);
     }
-
-    pub fn blit_color_to_canvas(&self) {
-        self.gl.bind_framebuffer(Context::DRAW_FRAMEBUFFER, None);
-        self.gl
-            .bind_framebuffer(Context::READ_FRAMEBUFFER, self.handle.as_ref());
-
-        let cols = self.cols() as i32;
-        let rows = self.rows() as i32;
-
-        self.gl.blit_framebuffer(
-            0,
-            0,
-            cols,
-            rows,
-            0,
-            0,
-            cols,
-            rows,
-            Context::COLOR_BUFFER_BIT,
-            Context::NEAREST,
-        );
-    }
 }
 
 impl Drop for Framebuffer {

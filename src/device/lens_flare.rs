@@ -39,7 +39,6 @@ impl Device {
 
         command.set_uniform_ivec2("tile_offset", tile.x as i32, tile.y as i32);
         command.set_uniform_ivec2("tile_size", Self::TILE_SIZE as i32, Self::TILE_SIZE as i32);
-        // TODO: may also need to bind the filter resolution...
 
         command.set_viewport(0, 0, Self::TILE_SIZE as i32, Self::TILE_SIZE as i32);
 
@@ -68,10 +67,6 @@ impl Device {
             tile.x as i32 - offset as i32,
             tile.y as i32 - offset as i32,
         );
-
-        // TODO: bind tile information (basically the offset from the entire signal)
-        // we need to know the current signal tile here, then just upload it
-        // (can just use uniforms for now for simplicity I guess)
 
         command.set_viewport(
             offset as i32,

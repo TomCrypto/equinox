@@ -18,6 +18,8 @@ pub struct Device {
     pub(crate) read_signal_tile_shader: Shader,
     pub(crate) decompose_signal_shader: Shader,
 
+    pub(crate) blit_to_canvas_shader: Shader,
+
     pub(crate) geometry_buffer: UniformBuffer<[GeometryParameter]>,
     pub(crate) material_buffer: UniformBuffer<[MaterialParameter]>,
     pub(crate) instance_buffer: UniformBuffer<[SceneInstanceNode]>,
@@ -90,6 +92,12 @@ impl Device {
 
             composited_render: Texture::new(gl.clone()),
             composited_fbo: Framebuffer::new(gl.clone()),
+
+            blit_to_canvas_shader: Shader::new(
+                gl.clone(),
+                &shader::VS_FULLSCREEN,
+                &shader::FS_BLIT_TO_CANVAS,
+            ),
 
             decompose_signal_shader: Shader::new(
                 gl.clone(),
@@ -317,15 +325,11 @@ impl Device {
         self.load_signal_tile_shader.rebuild()?;
         self.read_signal_tile_shader.rebuild()?;
         self.decompose_signal_shader.rebuild()?;
+        self.blit_to_canvas_shader.rebuild()?;
 
         let assets = &scene.assets;
 
         invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
-            // TODO: create relevant FFT buffers here
-            // the BUFFERS themselves only depend on the tile size, but the filter buffers
-            // may need to be expanded/shrunk if the raster changes and new
-            // tiles are added/removed
-
             self.fft_filter_fbo.clear();
             self.fft_filter_tile_r.clear();
             self.fft_filter_tile_g.clear();
@@ -554,17 +558,8 @@ impl Device {
 
                 self.load_signal_tile(signal_tile);
                 self.convolve_tile(filter_index);
-                // TODO: pass in the output tile in which to place the signal buffer
-                // this needs to be calculated somehow.
-                self.composite_tile(
-                    signal_tile.x as i32 + offset_x - padding,
-                    signal_tile.y as i32 + offset_y - padding,
-                    signal_tile.w as i32 + padding * 2,
-                    signal_tile.h as i32 + padding * 2,
-                );
 
-                log::info!(
-                    "{}, {}, {}, {}",
+                self.composite_tile(
                     signal_tile.x as i32 + offset_x - padding,
                     signal_tile.y as i32 + offset_y - padding,
                     signal_tile.w as i32 + padding * 2,
@@ -578,35 +573,8 @@ impl Device {
 
         // based on current tile, figure out what to do
         } else {
-            log::info!("post-processing radiance estimate");
             self.post_process(&self.integrator_radiance_estimate);
         }
-
-        /*
-
-        need something that can produce an iteration of fixed-size tiles over an image of arbitrary
-        size
-
-        relative to the CENTER of the image? i.e. assume the image is centered with the origin in
-        its center... but what if the image resolution is not even?
-
-        just tile from the bottom-left.
-
-        then combine this iterator with an iterator over the number of filter tiles...
-
-        */
-
-        /*
-
-        TODO: add lens flare switch logic here
-
-         - if lens flare is not enabled, just directly use the radiance estimate
-         - else, need some custom logic to use the radiance estimate if we have NO
-           lens flare data yet, else use the latest convolution buffer
-           (do we need yet another temporary buffer here? I don't think so, simply
-            don't update the composited render if we don't want to change anything)
-
-        */
 
         Ok(())
     }
@@ -638,10 +606,23 @@ impl Device {
             return Ok(());
         }
 
-        log::info!("blitting");
+        let command = self.blit_to_canvas_shader.begin_draw();
 
-        self.composited_fbo.blit_color_to_canvas();
-        Ok(()) // just blit our final color buffer
+        command.bind(&self.composited_render, "render");
+
+        command.set_canvas_framebuffer();
+
+        command.set_viewport(
+            0,
+            0,
+            self.composited_render.cols() as i32,
+            self.composited_render.rows() as i32,
+        );
+
+        command.unset_vertex_array();
+        command.draw_triangles(0, 1);
+
+        Ok(())
     }
 
     fn try_restore(&mut self, scene: &mut Scene) -> Result<bool, Error> {
@@ -649,10 +630,41 @@ impl Device {
             return Ok(false);
         }
 
-        // TODO: invalidate all new FFT fields
+        for fbo in &mut self.fft_filter_fbo {
+            fbo.invalidate();
+        }
+
+        for texture in &mut self.fft_filter_tile_r {
+            texture.invalidate();
+        }
+
+        for texture in &mut self.fft_filter_tile_g {
+            texture.invalidate();
+        }
+
+        for texture in &mut self.fft_filter_tile_b {
+            texture.invalidate();
+        }
+
+        self.fft_signal_tile_r.invalidate();
+        self.fft_signal_tile_g.invalidate();
+        self.fft_signal_tile_b.invalidate();
+        self.fft_signal_fbo.invalidate();
+
+        self.fft_temp_tile_r.invalidate();
+        self.fft_temp_tile_g.invalidate();
+        self.fft_temp_tile_b.invalidate();
+        self.fft_temp_fbo.invalidate();
 
         self.composited_render.invalidate();
         self.composited_fbo.invalidate();
+
+        self.blit_to_canvas_shader.invalidate();
+
+        self.load_signal_tile_shader.invalidate();
+        self.load_filter_tile_shader.invalidate();
+        self.read_signal_tile_shader.invalidate();
+        self.decompose_signal_shader.invalidate();
 
         self.present_program.invalidate();
         self.fft_shader.invalidate();
@@ -669,6 +681,7 @@ impl Device {
         self.environment_buffer.invalidate();
 
         self.convolution_output.invalidate();
+        self.convolution_signal.invalidate();
         self.signal_fft_passes.invalidate();
         self.filter_fft_passes.invalidate();
         self.convolution_output_fbo.invalidate();
