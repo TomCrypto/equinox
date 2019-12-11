@@ -188,9 +188,7 @@ impl Device {
 
         command.set_uniform_ivec2("tile_offset", x, y);
 
-        // log::info!("compositing tile into ({}, {}, {}, {})", x, y, w, h);
-
-        command.set_viewport(x, y, Self::TILE_SIZE as i32, Self::TILE_SIZE as i32);
+        command.set_viewport(x, y, w, h);
 
         command.set_framebuffer(&self.convolution_output_fbo);
         command.set_blend_mode(BlendMode::Add);

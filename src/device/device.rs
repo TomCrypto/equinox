@@ -510,15 +510,11 @@ impl Device {
                 Self::TILE_SIZE / 2,
             );
 
-            // log::info!(">>> LOOP <<<");
-
             // HACK: this is a big hack; we know the filters are square and that they will
             // be a multiple of the tile size, so we can work out the filter size from here
 
             let filter_size =
                 (self.fft_filter_fbo.len() as f64).sqrt() as usize * Self::TILE_SIZE / 2;
-
-            log::info!("filter size = {}, {}", filter_size, filter_size);
 
             let filter_iter =
                 TileIterator::new(filter_size, filter_size, Self::TILE_SIZE / 2).enumerate();
@@ -532,19 +528,6 @@ impl Device {
                 }
 
                 let (signal_tile, (filter_index, filter_tile)) = value.into_inner();
-
-                // log::info!("processing signal tile {:?}", signal_tile);
-
-                /*
-
-                output tile is given by:
-
-                signal tile offset by the distance from the center of the filter tile to the center
-                of the filter
-
-                 -> how to handle odd filter dimensions here??
-
-                */
 
                 let offset_x = (filter_tile.x + filter_tile.w / 2) as i32 - filter_size as i32 / 2;
                 let offset_y = (filter_tile.y + filter_tile.h / 2) as i32 - filter_size as i32 / 2;
@@ -565,8 +548,6 @@ impl Device {
                     self.post_process(&self.convolution_output);
                 }
             }
-
-        // based on current tile, figure out what to do
         } else {
             self.post_process(&self.integrator_radiance_estimate);
         }
