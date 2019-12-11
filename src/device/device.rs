@@ -1,5 +1,7 @@
+use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
 use web_sys::WebGl2RenderingContext as Context;
+use zerocopy::LayoutVerified;
 
 use crate::*;
 
@@ -11,6 +13,7 @@ pub struct Device {
 
     pub(crate) fft_shader: Shader,
 
+    pub(crate) load_filter_tile_shader: Shader,
     pub(crate) load_signal_tile_shader: Shader,
     pub(crate) read_signal_tile_shader: Shader,
     pub(crate) decompose_signal_shader: Shader,
@@ -97,6 +100,12 @@ impl Device {
             integrator_radiance_estimate: Texture::new(gl.clone()),
 
             integrator_gather_fbo: Framebuffer::new(gl.clone()),
+
+            load_filter_tile_shader: Shader::new(
+                gl.clone(),
+                &shader::VS_FULLSCREEN,
+                &shader::FS_LOAD_FILTER_TILE,
+            ),
 
             load_signal_tile_shader: Shader::new(
                 gl.clone(),
@@ -304,6 +313,10 @@ impl Device {
 
         // this shader needs to be ready for aperture filter preprocessing
         self.fft_shader.rebuild()?;
+        self.load_filter_tile_shader.rebuild()?;
+        self.load_signal_tile_shader.rebuild()?;
+        self.read_signal_tile_shader.rebuild()?;
+        self.decompose_signal_shader.rebuild()?;
 
         let assets = &scene.assets;
 
@@ -312,6 +325,11 @@ impl Device {
             // the BUFFERS themselves only depend on the tile size, but the filter buffers
             // may need to be expanded/shrunk if the raster changes and new
             // tiles are added/removed
+
+            self.fft_filter_fbo.clear();
+            self.fft_filter_tile_r.clear();
+            self.fft_filter_tile_g.clear();
+            self.fft_filter_tile_b.clear();
 
             self.fft_signal_tile_r
                 .create(Self::TILE_SIZE, Self::TILE_SIZE);
@@ -347,45 +365,70 @@ impl Device {
             self.generate_filter_fft_passes(Self::TILE_SIZE);
 
             if let Some(aperture) = aperture {
-                /*self.rspectrum_temp1.create(2048, 1024);
-                self.gspectrum_temp1.create(2048, 1024);
-                self.bspectrum_temp1.create(2048, 1024);
+                log::info!("loading aperture...");
 
-                self.rspectrum_temp2.create(2048, 1024);
-                self.gspectrum_temp2.create(2048, 1024);
-                self.bspectrum_temp2.create(2048, 1024);
+                let (header, data) =
+                    LayoutVerified::<_, Header>::new_from_prefix(assets[aperture].as_slice())
+                        .unwrap();
 
-                self.r_aperture_spectrum.create(2048, 1024);
-                self.g_aperture_spectrum.create(2048, 1024);
-                self.b_aperture_spectrum.create(2048, 1024);
+                if header.data_format.try_parse() != Some(DataFormat::RGBA16F) {
+                    return Err(Error::new("expected RGBA16F aperture"));
+                }
 
-                self.spectrum_temp1_fbo.rebuild(
-                    &[
-                        &self.rspectrum_temp1,
-                        &self.gspectrum_temp1,
-                        &self.bspectrum_temp1,
-                    ],
-                    None,
-                )?;
+                if header.color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
+                    return Err(Error::new("expected linear sRGB aperture"));
+                }
 
-                self.spectrum_temp2_fbo.rebuild(
-                    &[
-                        &self.rspectrum_temp2,
-                        &self.gspectrum_temp2,
-                        &self.bspectrum_temp2,
-                    ],
-                    None,
-                )?;
+                if header.dimensions[0] == 0 || header.dimensions[1] == 0 {
+                    return Err(Error::new("invalid aperture dimensions"));
+                }
 
-                // TODO: move this to the lens_flare file
-                self.generate_signal_fft_passes(Self::TILE_SIZE);
-                self.generate_filter_fft_passes(Self::TILE_SIZE);
+                if header.dimensions[0] != header.dimensions[1] {
+                    return Err(Error::new("invalid aperture dimensions"));
+                }
 
-                self.preprocess_filter(
-                    &assets[&aperture.aperture_texels],
-                    aperture.aperture_width as usize,
-                    aperture.aperture_height as usize,
-                );*/
+                let pixels = LayoutVerified::new_slice(data).unwrap();
+
+                let mut aperture_texture: Texture<RGBA16F> = Texture::new(self.gl.clone());
+                aperture_texture.upload(
+                    header.dimensions[0] as usize,
+                    header.dimensions[1] as usize,
+                    &pixels,
+                );
+
+                // ...
+
+                let tile_generator = TileIterator::new(
+                    header.dimensions[0] as usize,
+                    header.dimensions[1] as usize,
+                    Self::TILE_SIZE / 2,
+                );
+
+                // for each tile...
+
+                for (index, tile) in tile_generator.enumerate() {
+                    log::info!("processing filter tile {} ({:?})...", index, tile);
+
+                    let mut fbo = Framebuffer::new(self.gl.clone());
+
+                    let mut r_tex = Texture::new(self.gl.clone());
+                    let mut g_tex = Texture::new(self.gl.clone());
+                    let mut b_tex = Texture::new(self.gl.clone());
+
+                    r_tex.create(Self::TILE_SIZE, Self::TILE_SIZE);
+                    g_tex.create(Self::TILE_SIZE, Self::TILE_SIZE);
+                    b_tex.create(Self::TILE_SIZE, Self::TILE_SIZE);
+
+                    fbo.rebuild(&[&r_tex, &g_tex, &b_tex], None)?;
+
+                    self.fft_filter_fbo.push(fbo);
+                    self.fft_filter_tile_r.push(r_tex);
+                    self.fft_filter_tile_g.push(g_tex);
+                    self.fft_filter_tile_b.push(b_tex);
+
+                    self.load_filter_tile(index, tile, &aperture_texture);
+                    self.precompute_filter_tile_fft(index);
+                }
             }
 
             Ok(())
@@ -429,9 +472,6 @@ impl Device {
 
         self.integrator_scatter_photons_shader.rebuild()?;
         self.integrator_gather_photons_shader.rebuild()?;
-        self.load_signal_tile_shader.rebuild()?;
-        self.read_signal_tile_shader.rebuild()?;
-        self.decompose_signal_shader.rebuild()?;
 
         if invalidated {
             self.reset_integrator_state(scene);
@@ -455,19 +495,14 @@ impl Device {
 
         // lens flare pass
 
-        let lens_flare_threshold = 0;
+        let lens_flare_threshold = 30;
 
-        let use_lens_flare = true;
+        let use_lens_flare = self.state.has_aperture;
 
         if use_lens_flare && self.state.current_pass >= lens_flare_threshold {
             // TODO: for now, do it in a single step, iterating fully over all
             // tiles when it's all working and we're ready, refactor
             // to do k tiles per frame
-
-            // we must build an iterator over the tiles of the signal PRODUCT
-            // the tiles of the filter. we need to know the filter size...
-            let filter_cols = 512;
-            let filter_rows = 512;
 
             use itertools::iproduct;
             use itertools::{Itertools, Position};
@@ -478,12 +513,16 @@ impl Device {
                 Self::TILE_SIZE / 2,
             );
 
-            log::info!(">>> LOOP <<<");
+            // log::info!(">>> LOOP <<<");
 
-            let filter_iter =
-                TileIterator::new(filter_cols, filter_rows, Self::TILE_SIZE).enumerate();
+            let filter_iter = TileIterator::new(
+                self.fft_filter_fbo[0].cols(),
+                self.fft_filter_fbo[0].rows(),
+                Self::TILE_SIZE / 2,
+            )
+            .enumerate();
 
-            let iter = signal_iter; // iproduct!(signal_iter, filter_iter);
+            let iter = iproduct!(signal_iter, filter_iter);
 
             for value in iter.with_position() {
                 if let Position::First(_) | Position::Only(_) = value {
@@ -491,17 +530,9 @@ impl Device {
                     self.save_radiance_estimate_to_convolution_signal();
                 }
 
-                // let (signal_tile, (filter_index, filter_tile)) = value.into_inner();
-                let signal_tile = value.into_inner();
-                let filter_index = 0;
-                let filter_tile = Tile {
-                    x: 0,
-                    y: 0,
-                    w: 512,
-                    h: 512,
-                };
+                let (signal_tile, (filter_index, filter_tile)) = value.into_inner();
 
-                log::info!("processing signal tile {:?}", signal_tile);
+                // log::info!("processing signal tile {:?}", signal_tile);
 
                 /*
 
@@ -514,8 +545,10 @@ impl Device {
 
                 */
 
-                let offset_x = (filter_tile.x + filter_tile.w / 2) as i32 - filter_cols as i32 / 2;
-                let offset_y = (filter_tile.y + filter_tile.h / 2) as i32 - filter_rows as i32 / 2;
+                let offset_x = (filter_tile.x + filter_tile.w / 2) as i32
+                    - self.fft_filter_fbo[0].cols() as i32 / 2;
+                let offset_y = (filter_tile.y + filter_tile.h / 2) as i32
+                    - self.fft_filter_fbo[0].rows() as i32 / 2;
 
                 let padding = Self::TILE_SIZE as i32 / 4;
 
@@ -530,6 +563,14 @@ impl Device {
                     signal_tile.h as i32 + padding * 2,
                 );
 
+                log::info!(
+                    "{}, {}, {}, {}",
+                    signal_tile.x as i32 + offset_x - padding,
+                    signal_tile.y as i32 + offset_y - padding,
+                    signal_tile.w as i32 + padding * 2,
+                    signal_tile.h as i32 + padding * 2,
+                );
+
                 if let Position::Last(_) | Position::Only(_) = value {
                     self.post_process(&self.convolution_output);
                 }
@@ -537,6 +578,7 @@ impl Device {
 
         // based on current tile, figure out what to do
         } else {
+            log::info!("post-processing radiance estimate");
             self.post_process(&self.integrator_radiance_estimate);
         }
 
@@ -595,6 +637,8 @@ impl Device {
         if self.device_lost {
             return Ok(());
         }
+
+        log::info!("blitting");
 
         self.composited_fbo.blit_color_to_canvas();
         Ok(()) // just blit our final color buffer

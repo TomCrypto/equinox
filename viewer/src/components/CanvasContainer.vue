@@ -17,7 +17,10 @@
       v-on:contextmenu="$event.preventDefault()"
     />
 
-    <LoadingOverlay :assets-in-flight="assetsInFlight" :is-expensive-update="isExpensiveUpdate" />
+    <LoadingOverlay
+      :assets-in-flight="assetsInFlight"
+      :is-expensive-update="isExpensiveUpdate"
+    />
 
     <StatusBar
       v-if="showStatusBar"

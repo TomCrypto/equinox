@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::{Aperture, BlendMode, Device, Integrator, RasterFilter, Scene};
+use crate::{BlendMode, Device, Integrator, RasterFilter, Scene};
 use js_sys::Error;
 use quasirandom::Qrng;
 use rand::{RngCore, SeedableRng};
@@ -51,7 +51,7 @@ pub struct IntegratorState {
 
     pub(crate) filter: RasterFilter,
     pub(crate) integrator: Integrator,
-    pub(crate) aperture: Option<Aperture>,
+    pub(crate) has_aperture: bool,
 
     pub(crate) current_pass: u32,
     pub(crate) photon_count: f32,
@@ -66,7 +66,7 @@ impl Default for IntegratorState {
             rng: ChaCha20Rng::seed_from_u64(0),
             filter_rng: Qrng::new(0),
             filter: RasterFilter::default(),
-            aperture: None,
+            has_aperture: false,
             integrator: Integrator::default(),
             kernel_radii: KernelRadiusSequence::default(),
             photon_count: 0.0,
@@ -134,7 +134,7 @@ impl Device {
         // ignore the first (0, 0) sample from the sequence
         let _ = self.state.filter_rng.next::<(f32, f32)>();
 
-        self.state.aperture = (*scene.aperture).clone();
+        self.state.has_aperture = scene.aperture.is_some();
         self.state.filter = scene.raster.filter;
         self.state.integrator = *scene.integrator;
 

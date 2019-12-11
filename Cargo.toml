@@ -58,9 +58,6 @@ version = "0.2"
 [dependencies.rust-crypto-wasm]
 version = "0.3"
 
-[dependencies.rustfft]
-version = "3.0"
-
 [dependencies.serde]
 version = "1.0"
 features = ["derive"]

@@ -27,7 +27,6 @@ mod engine {
 }
 
 mod scene {
-    pub mod aperture;
     pub mod bounding_box;
     pub mod camera;
     pub mod dirty;
@@ -48,8 +47,8 @@ pub use device::{
 };
 pub use engine::{framebuffer::*, shader::*, texture::*, uniform_buffer::*, vertex_array::*};
 pub use scene::{
-    aperture::*, bounding_box::*, camera::*, dirty::*, display::*, environment::*, geometry::*,
-    instance::*, integrator::*, material::*, metadata::*, raster::*, scene::*,
+    bounding_box::*, camera::*, dirty::*, display::*, environment::*, geometry::*, instance::*,
+    integrator::*, material::*, metadata::*, raster::*, scene::*,
 };
 
 /// WebGL shaders from the `shader` directory.

@@ -11,12 +11,6 @@ void main() {
     float signal_g = texelFetch(signal_tile_g, ivec2(gl_FragCoord.xy - 0.5) - tile_offset, 0).r;
     float signal_b = texelFetch(signal_tile_b, ivec2(gl_FragCoord.xy - 0.5) - tile_offset, 0).r;
 
-    // TODO: need a normalization factor depending on the tile size here...
-    float normalization = 1.0 / (512.0 * 512.0);
-
-    signal_r *= normalization;
-    signal_g *= normalization;
-    signal_b *= normalization;
-
-    convolution_output = vec3(signal_r, signal_g, signal_b);
+    convolution_output = vec3(signal_r, signal_g, signal_b)
+                       / float(textureSize(signal_tile_r, 0).x * textureSize(signal_tile_r, 0).y);
 }
