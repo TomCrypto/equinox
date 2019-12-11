@@ -32,8 +32,10 @@ version = "1.3"
 [dependencies.img2raw]
 version = "0.3"
 
+# restore when https://github.com/rust-itertools/itertools/pull/382 is merged
 [dependencies.itertools]
-version = "0.8"
+git = "https://github.com/andersk/itertools-rs"
+rev = "1e97bf25b59db7bf9b53eaf8ca33bd92744eed1f"
 
 [dependencies.js-sys]
 version = "0.3"

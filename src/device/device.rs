@@ -1,11 +1,11 @@
 use img2raw::{ColorSpace, DataFormat, Header};
+use itertools::{iproduct, Itertools, Position};
 use js_sys::Error;
 use web_sys::WebGl2RenderingContext as Context;
 use zerocopy::LayoutVerified;
 
 use crate::*;
 
-#[derive(Debug)]
 pub struct Device {
     pub(crate) gl: Context,
 
@@ -81,6 +81,8 @@ pub struct Device {
 
     device_lost: bool,
 
+    convolution_tiles: Box<dyn Iterator<Item = Position<(Tile, (usize, Tile))>>>,
+
     pub(crate) state: IntegratorState,
 }
 
@@ -92,6 +94,8 @@ impl Device {
 
             composited_render: Texture::new(gl.clone()),
             composited_fbo: Framebuffer::new(gl.clone()),
+
+            convolution_tiles: Box::new(std::iter::empty()),
 
             blit_to_canvas_shader: Shader::new(
                 gl.clone(),
@@ -473,9 +477,30 @@ impl Device {
         if invalidated {
             self.reset_integrator_state(scene);
             // TODO: reset tiled convolution state
+            self.reset_convolution_tiles_iterator();
         }
 
         Ok(invalidated)
+    }
+
+    fn reset_convolution_tiles_iterator(&mut self) {
+        let signal_iter = TileIterator::new(
+            self.convolution_signal_fbo.cols(),
+            self.convolution_signal_fbo.rows(),
+            Self::TILE_SIZE / 2,
+        );
+
+        // HACK: this is a big hack; we know the filters are square and that they will
+        // be a multiple of the tile size, so we can work out the filter size from here
+
+        let filter_size = (self.fft_filter_fbo.len() as f64).sqrt() as usize * Self::TILE_SIZE / 2;
+
+        let filter_iter =
+            TileIterator::new(filter_size, filter_size, Self::TILE_SIZE / 2).enumerate();
+
+        // TODO: add cycle
+        self.convolution_tiles =
+            Box::new(iproduct!(signal_iter, filter_iter).with_position().cycle());
     }
 
     /// Refines the current render state by performing an SPPM pass.
@@ -497,35 +522,19 @@ impl Device {
         let use_lens_flare = self.state.has_aperture;
 
         if use_lens_flare && self.state.current_pass >= lens_flare_threshold {
-            // TODO: for now, do it in a single step, iterating fully over all
-            // tiles when it's all working and we're ready, refactor
-            // to do k tiles per frame
+            // TODO: allow doing k tiles per frame, as a setting
 
-            use itertools::iproduct;
-            use itertools::{Itertools, Position};
-
-            let signal_iter = TileIterator::new(
-                self.convolution_signal_fbo.cols(),
-                self.convolution_signal_fbo.rows(),
-                Self::TILE_SIZE / 2,
-            );
-
-            // HACK: this is a big hack; we know the filters are square and that they will
-            // be a multiple of the tile size, so we can work out the filter size from here
-
-            let filter_size =
-                (self.fft_filter_fbo.len() as f64).sqrt() as usize * Self::TILE_SIZE / 2;
-
-            let filter_iter =
-                TileIterator::new(filter_size, filter_size, Self::TILE_SIZE / 2).enumerate();
-
-            let iter = iproduct!(signal_iter, filter_iter);
-
-            for value in iter.with_position() {
+            if let Some(value) = self.convolution_tiles.next() {
                 if let Position::First(_) | Position::Only(_) = value {
                     self.convolution_output_fbo.clear(0, [0.0, 0.0, 0.0, 1.0]);
                     self.save_radiance_estimate_to_convolution_signal();
                 }
+
+                // HACK: this is a big hack; we know the filters are square and that they will
+                // be a multiple of the tile size, so we can work out the filter size from here
+
+                let filter_size =
+                    (self.fft_filter_fbo.len() as f64).sqrt() as usize * Self::TILE_SIZE / 2;
 
                 let (signal_tile, (filter_index, filter_tile)) = value.into_inner();
 

@@ -196,7 +196,6 @@ fn from_json<T: DeserializeOwned>(json: &JsValue) -> Result<T, JsValue> {
 
 /// WASM binding for a device.
 #[wasm_bindgen]
-#[derive(Debug)]
 pub struct WebDevice {
     device: Device,
 }
