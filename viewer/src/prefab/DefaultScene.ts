@@ -17,8 +17,8 @@ export default {
       film_height: 0.024
     },
     raster: {
-      width: 512,
-      height: 512,
+      width: 1280,
+      height: 720,
       filter: {
         type: "blackman-harris"
       }
