@@ -1,5 +1,5 @@
 use img2raw::{ColorSpace, DataFormat, Header};
-use itertools::{iproduct, Itertools, Position};
+use itertools::Position;
 use js_sys::Error;
 use web_sys::WebGl2RenderingContext as Context;
 use zerocopy::LayoutVerified;
@@ -52,10 +52,7 @@ pub struct Device {
     pub(crate) fft_filter_fbo: Vec<Framebuffer>,
     pub(crate) fft_temp_fbo: Framebuffer,
 
-    // Initial convolution signal, saved from the radiance estimate
     pub(crate) convolution_signal: Texture<RGBA16F>,
-
-    // Final convolved render output (real-valued)
     pub(crate) convolution_output: Texture<RGBA16F>,
 
     pub(crate) composited_render: Texture<RGBA8>,
@@ -81,15 +78,12 @@ pub struct Device {
 
     device_lost: bool,
 
-    convolution_tiles: Box<dyn Iterator<Item = Position<(Tile, (usize, Tile))>>>,
+    pub(crate) convolution_tiles: Box<dyn Iterator<Item = Position<(Tile, (usize, Tile))>>>,
 
     pub(crate) state: IntegratorState,
 }
 
 impl Device {
-    // TODO: make configurable
-    pub(crate) const TILE_SIZE: usize = 128;
-
     /// Creates a new device using a WebGL2 context.
     pub fn new(gl: &Context) -> Result<Self, Error> {
         Ok(Self {
@@ -224,6 +218,7 @@ impl Device {
         Dirty::clean(&mut scene.metadata, |_| Ok(()))?;
 
         let mut invalidated = false;
+        let mut reset_tiles = false;
 
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
             self.update_camera(camera)?;
@@ -329,43 +324,11 @@ impl Device {
 
         let assets = &scene.assets;
 
-        invalidated |= Dirty::clean(&mut scene.aperture, |aperture| {
+        reset_tiles |= Dirty::clean(&mut scene.aperture, |aperture| {
             self.fft_filter_fbo.clear();
             self.fft_filter_tile_r.clear();
             self.fft_filter_tile_g.clear();
             self.fft_filter_tile_b.clear();
-
-            self.fft_signal_tile_r
-                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
-            self.fft_signal_tile_g
-                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
-            self.fft_signal_tile_b
-                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
-            self.fft_signal_fbo.rebuild(
-                &[
-                    &self.fft_signal_tile_r,
-                    &self.fft_signal_tile_g,
-                    &self.fft_signal_tile_b,
-                ],
-                None,
-            )?;
-
-            self.fft_temp_tile_r
-                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
-            self.fft_temp_tile_g
-                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
-            self.fft_temp_tile_b
-                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
-            self.fft_temp_fbo.rebuild(
-                &[
-                    &self.fft_temp_tile_r,
-                    &self.fft_temp_tile_g,
-                    &self.fft_temp_tile_b,
-                ],
-                None,
-            )?;
-
-            self.generate_fft_passes(2 * Self::TILE_SIZE);
 
             if let Some(aperture) = aperture {
                 log::info!("loading aperture...");
@@ -390,6 +353,37 @@ impl Device {
                     return Err(Error::new("invalid aperture dimensions"));
                 }
 
+                // TODO: make configurable
+                let mut TILE_SIZE: usize = 1024;
+
+                TILE_SIZE = TILE_SIZE.min(header.dimensions[0] as usize);
+
+                self.fft_signal_tile_r.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+                self.fft_signal_tile_g.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+                self.fft_signal_tile_b.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+                self.fft_signal_fbo.rebuild(
+                    &[
+                        &self.fft_signal_tile_r,
+                        &self.fft_signal_tile_g,
+                        &self.fft_signal_tile_b,
+                    ],
+                    None,
+                )?;
+
+                self.fft_temp_tile_r.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+                self.fft_temp_tile_g.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+                self.fft_temp_tile_b.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+                self.fft_temp_fbo.rebuild(
+                    &[
+                        &self.fft_temp_tile_r,
+                        &self.fft_temp_tile_g,
+                        &self.fft_temp_tile_b,
+                    ],
+                    None,
+                )?;
+
+                self.generate_fft_passes(2 * TILE_SIZE);
+
                 let pixels = LayoutVerified::new_slice(data).unwrap();
 
                 let mut aperture_texture: Texture<RGBA16F> = Texture::new(self.gl.clone());
@@ -404,23 +398,21 @@ impl Device {
                 let tile_generator = TileIterator::new(
                     header.dimensions[0] as usize,
                     header.dimensions[1] as usize,
-                    Self::TILE_SIZE,
+                    TILE_SIZE,
                 );
 
                 // for each tile...
 
                 for (index, tile) in tile_generator.enumerate() {
-                    log::info!("processing filter tile {} ({:?})...", index, tile);
-
                     let mut fbo = Framebuffer::new(self.gl.clone());
 
                     let mut r_tex = Texture::new(self.gl.clone());
                     let mut g_tex = Texture::new(self.gl.clone());
                     let mut b_tex = Texture::new(self.gl.clone());
 
-                    r_tex.create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
-                    g_tex.create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
-                    b_tex.create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
+                    r_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+                    g_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+                    b_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
 
                     fbo.rebuild(&[&r_tex, &g_tex, &b_tex], None)?;
 
@@ -432,6 +424,15 @@ impl Device {
                     self.load_filter_tile(index, tile, &aperture_texture);
                     self.precompute_filter_tile_fft(index);
                 }
+            } else {
+                self.fft_signal_fbo.invalidate();
+                self.fft_signal_tile_r.create(1, 1);
+                self.fft_signal_tile_g.create(1, 1);
+                self.fft_signal_tile_b.create(1, 1);
+                self.fft_temp_fbo.invalidate();
+                self.fft_temp_tile_r.create(1, 1);
+                self.fft_temp_tile_g.create(1, 1);
+                self.fft_temp_tile_b.create(1, 1);
             }
 
             Ok(())
@@ -465,7 +466,7 @@ impl Device {
         // These are post-processing settings that don't directly apply to the light
         // transport simulation; we don't need to invalidate any render buffer here.
 
-        Dirty::clean(&mut scene.display, |display| {
+        reset_tiles |= Dirty::clean(&mut scene.display, |display| {
             self.update_display(display)?;
 
             Ok(())
@@ -478,29 +479,13 @@ impl Device {
 
         if invalidated {
             self.reset_integrator_state(scene);
-            // TODO: reset tiled convolution state
-            self.reset_convolution_tiles_iterator();
+        }
+
+        if invalidated || reset_tiles {
+            self.reset_convolution_state();
         }
 
         Ok(invalidated)
-    }
-
-    fn reset_convolution_tiles_iterator(&mut self) {
-        let signal_iter = TileIterator::new(
-            self.convolution_signal_fbo.cols(),
-            self.convolution_signal_fbo.rows(),
-            Self::TILE_SIZE,
-        );
-
-        // HACK: this is a big hack; we know the filters are square and that they will
-        // be a multiple of the tile size, so we can work out the filter size from here
-
-        let filter_size = (self.fft_filter_fbo.len() as f64).sqrt() as usize * Self::TILE_SIZE;
-
-        let filter_iter = TileIterator::new(filter_size, filter_size, Self::TILE_SIZE).enumerate();
-
-        self.convolution_tiles =
-            Box::new(iproduct!(signal_iter, filter_iter).with_position().cycle());
     }
 
     /// Refines the current render state by performing an SPPM pass.
@@ -517,11 +502,16 @@ impl Device {
 
         // lens flare pass
 
+        // TODO: make configurable and structure better
         let lens_flare_threshold = 30;
 
         let use_lens_flare = self.state.has_aperture;
 
         if use_lens_flare && self.state.current_pass >= lens_flare_threshold {
+            let tile_size = self.current_tile_size();
+
+            let filter_size = self.current_filter_size();
+
             // TODO: allow doing k tiles per frame, as a setting
             let k = 1;
 
@@ -531,18 +521,12 @@ impl Device {
                     self.copy_radiance_estimate_to_convolution_signal();
                 }
 
-                // HACK: this is a big hack; we know the filters are square and that they will
-                // be a multiple of the tile size, so we can work out the filter size from here
-
-                let filter_size =
-                    (self.fft_filter_fbo.len() as f64).sqrt() as usize * Self::TILE_SIZE;
-
                 let (signal_tile, (filter_index, filter_tile)) = value.into_inner();
 
                 let dx = (filter_tile.x + filter_tile.w / 2) as i32 - filter_size as i32 / 2;
                 let dy = (filter_tile.y + filter_tile.h / 2) as i32 - filter_size as i32 / 2;
 
-                let padding = Self::TILE_SIZE as i32 / 2;
+                let padding = tile_size as i32 / 2;
 
                 self.load_signal_tile(signal_tile);
                 self.convolve_tile(filter_index);
@@ -556,6 +540,7 @@ impl Device {
 
                 if let Position::Last(_) | Position::Only(_) = value {
                     self.post_process(&self.convolution_output);
+                    break; // skip immediately convolving again
                 }
             }
         } else {

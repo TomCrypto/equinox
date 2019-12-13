@@ -6,6 +6,7 @@ use log::{debug, info, warn};
 use crate::{
     BlendMode, Device, Texture, VertexAttribute, VertexAttributeKind, VertexLayout, RGBA16F,
 };
+use itertools::{iproduct, Itertools};
 use std::iter::repeat;
 use zerocopy::{AsBytes, FromBytes};
 
@@ -24,6 +25,38 @@ impl VertexLayout for FFTPassData {
 }
 
 impl Device {
+    pub(crate) fn reset_convolution_state(&mut self) {
+        if !self.fft_filter_fbo.is_empty() {
+            let tile_size = self.current_tile_size();
+
+            let signal_iter = TileIterator::new(
+                self.convolution_signal_fbo.cols(),
+                self.convolution_signal_fbo.rows(),
+                tile_size,
+            );
+
+            let filter_size = self.current_filter_size();
+
+            let filter_iter = TileIterator::new(filter_size, filter_size, tile_size).enumerate();
+
+            self.convolution_tiles =
+                Box::new(iproduct!(signal_iter, filter_iter).with_position().cycle());
+        }
+    }
+
+    /// Returns the currently initialized tile size.
+    pub(crate) fn current_tile_size(&self) -> usize {
+        self.fft_signal_fbo.cols() / 2
+    }
+
+    /// Returns the currently initialized filter size.
+    pub(crate) fn current_filter_size(&self) -> usize {
+        // This isn't the cleanest code but will work because the filters are always
+        // square and the tiles themselves should always divide the filters exactly.
+
+        (self.fft_filter_fbo.len() as f64).sqrt() as usize * self.current_tile_size()
+    }
+
     /// Loads a tile of the filter into the filter tile.
     ///
     /// After this method returns, the filter tile buffer will contain the
