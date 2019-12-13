@@ -1,17 +1,15 @@
-use img2raw::{ColorSpace, DataFormat, Header};
 use itertools::Position;
 use js_sys::Error;
 use web_sys::WebGl2RenderingContext as Context;
-use zerocopy::LayoutVerified;
 
 use crate::*;
 
 pub struct Device {
     pub(crate) gl: Context,
 
-    pub(crate) present_program: Shader,
+    pub(crate) post_process_shader: Shader,
 
-    pub(crate) fft_shader: Shader,
+    pub(crate) execute_fft_pass_shader: Shader,
 
     pub(crate) load_filter_tile_shader: Shader,
     pub(crate) load_signal_tile_shader: Shader,
@@ -44,13 +42,13 @@ pub struct Device {
     pub(crate) fft_filter_tile_g: Vec<Texture<RG32F>>,
     pub(crate) fft_filter_tile_b: Vec<Texture<RG32F>>,
 
-    pub(crate) fft_temp_tile_r: Texture<RG32F>,
-    pub(crate) fft_temp_tile_g: Texture<RG32F>,
-    pub(crate) fft_temp_tile_b: Texture<RG32F>,
+    pub(crate) fft_buffer_tile_r: Texture<RG32F>,
+    pub(crate) fft_buffer_tile_g: Texture<RG32F>,
+    pub(crate) fft_buffer_tile_b: Texture<RG32F>,
 
     pub(crate) fft_signal_fbo: Framebuffer,
     pub(crate) fft_filter_fbo: Vec<Framebuffer>,
-    pub(crate) fft_temp_fbo: Framebuffer,
+    pub(crate) fft_buffer_fbo: Framebuffer,
 
     pub(crate) convolution_signal: Texture<RGBA16F>,
     pub(crate) convolution_output: Texture<RGBA16F>,
@@ -136,13 +134,13 @@ impl Device {
             fft_filter_tile_g: vec![],
             fft_filter_tile_b: vec![],
 
-            fft_temp_tile_r: Texture::new(gl.clone()),
-            fft_temp_tile_g: Texture::new(gl.clone()),
-            fft_temp_tile_b: Texture::new(gl.clone()),
+            fft_buffer_tile_r: Texture::new(gl.clone()),
+            fft_buffer_tile_g: Texture::new(gl.clone()),
+            fft_buffer_tile_b: Texture::new(gl.clone()),
 
             fft_signal_fbo: Framebuffer::new(gl.clone()),
             fft_filter_fbo: vec![],
-            fft_temp_fbo: Framebuffer::new(gl.clone()),
+            fft_buffer_fbo: Framebuffer::new(gl.clone()),
 
             integrator_gather_photons_shader: Shader::new(
                 gl.clone(),
@@ -159,8 +157,16 @@ impl Device {
                 &shader::VS_SCATTER_PHOTONS,
                 &shader::FS_SCATTER_PHOTONS,
             ),
-            fft_shader: Shader::new(gl.clone(), &shader::VS_FFT_PASS, &shader::FS_FFT_PASS),
-            present_program: Shader::new(gl.clone(), &shader::VS_FULLSCREEN, &shader::FS_PRESENT),
+            execute_fft_pass_shader: Shader::new(
+                gl.clone(),
+                &shader::VS_EXECUTE_FFT_PASS,
+                &shader::FS_EXECUTE_FFT_PASS,
+            ),
+            post_process_shader: Shader::new(
+                gl.clone(),
+                &shader::VS_FULLSCREEN,
+                &shader::FS_POST_PROCESS,
+            ),
             camera_buffer: UniformBuffer::new(gl.clone()),
             geometry_buffer: UniformBuffer::new(gl.clone()),
             material_buffer: UniformBuffer::new(gl.clone()),
@@ -314,13 +320,9 @@ impl Device {
             Ok(())
         })?;
 
-        // this shader needs to be ready for aperture filter preprocessing
-        self.fft_shader.rebuild()?;
+        // These two shaders need to be available
+        self.execute_fft_pass_shader.rebuild()?;
         self.load_filter_tile_shader.rebuild()?;
-        self.load_signal_tile_shader.rebuild()?;
-        self.read_signal_tile_shader.rebuild()?;
-        self.decompose_signal_shader.rebuild()?;
-        self.blit_to_canvas_shader.rebuild()?;
 
         let assets = &scene.assets;
 
@@ -331,108 +333,16 @@ impl Device {
             self.fft_filter_tile_b.clear();
 
             if let Some(aperture) = aperture {
-                log::info!("loading aperture...");
-
-                let (header, data) =
-                    LayoutVerified::<_, Header>::new_from_prefix(assets[aperture].as_slice())
-                        .unwrap();
-
-                if header.data_format.try_parse() != Some(DataFormat::RGBA16F) {
-                    return Err(Error::new("expected RGBA16F aperture"));
-                }
-
-                if header.color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
-                    return Err(Error::new("expected linear sRGB aperture"));
-                }
-
-                if header.dimensions[0] == 0 || header.dimensions[1] == 0 {
-                    return Err(Error::new("invalid aperture dimensions"));
-                }
-
-                if header.dimensions[0] != header.dimensions[1] {
-                    return Err(Error::new("invalid aperture dimensions"));
-                }
-
-                // TODO: make configurable
-                let mut TILE_SIZE: usize = 1024;
-
-                TILE_SIZE = TILE_SIZE.min(header.dimensions[0] as usize);
-
-                self.fft_signal_tile_r.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-                self.fft_signal_tile_g.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-                self.fft_signal_tile_b.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-                self.fft_signal_fbo.rebuild(
-                    &[
-                        &self.fft_signal_tile_r,
-                        &self.fft_signal_tile_g,
-                        &self.fft_signal_tile_b,
-                    ],
-                    None,
-                )?;
-
-                self.fft_temp_tile_r.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-                self.fft_temp_tile_g.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-                self.fft_temp_tile_b.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-                self.fft_temp_fbo.rebuild(
-                    &[
-                        &self.fft_temp_tile_r,
-                        &self.fft_temp_tile_g,
-                        &self.fft_temp_tile_b,
-                    ],
-                    None,
-                )?;
-
-                self.generate_fft_passes(2 * TILE_SIZE);
-
-                let pixels = LayoutVerified::new_slice(data).unwrap();
-
-                let mut aperture_texture: Texture<RGBA16F> = Texture::new(self.gl.clone());
-                aperture_texture.upload(
-                    header.dimensions[0] as usize,
-                    header.dimensions[1] as usize,
-                    &pixels,
-                );
-
-                // ...
-
-                let tile_generator = TileIterator::new(
-                    header.dimensions[0] as usize,
-                    header.dimensions[1] as usize,
-                    TILE_SIZE,
-                );
-
-                // for each tile...
-
-                for (index, tile) in tile_generator.enumerate() {
-                    let mut fbo = Framebuffer::new(self.gl.clone());
-
-                    let mut r_tex = Texture::new(self.gl.clone());
-                    let mut g_tex = Texture::new(self.gl.clone());
-                    let mut b_tex = Texture::new(self.gl.clone());
-
-                    r_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-                    g_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-                    b_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-
-                    fbo.rebuild(&[&r_tex, &g_tex, &b_tex], None)?;
-
-                    self.fft_filter_fbo.push(fbo);
-                    self.fft_filter_tile_r.push(r_tex);
-                    self.fft_filter_tile_g.push(g_tex);
-                    self.fft_filter_tile_b.push(b_tex);
-
-                    self.load_filter_tile(index, tile, &aperture_texture);
-                    self.precompute_filter_tile_fft(index);
-                }
+                self.update_aperture_filter(aperture, assets)?;
             } else {
                 self.fft_signal_fbo.invalidate();
+                self.fft_buffer_fbo.invalidate();
                 self.fft_signal_tile_r.create(1, 1);
                 self.fft_signal_tile_g.create(1, 1);
                 self.fft_signal_tile_b.create(1, 1);
-                self.fft_temp_fbo.invalidate();
-                self.fft_temp_tile_r.create(1, 1);
-                self.fft_temp_tile_g.create(1, 1);
-                self.fft_temp_tile_b.create(1, 1);
+                self.fft_buffer_tile_r.create(1, 1);
+                self.fft_buffer_tile_g.create(1, 1);
+                self.fft_buffer_tile_b.create(1, 1);
             }
 
             Ok(())
@@ -472,7 +382,11 @@ impl Device {
             Ok(())
         })?;
 
-        self.present_program.rebuild()?;
+        self.post_process_shader.rebuild()?;
+        self.blit_to_canvas_shader.rebuild()?;
+        self.decompose_signal_shader.rebuild()?;
+        self.load_signal_tile_shader.rebuild()?;
+        self.read_signal_tile_shader.rebuild()?;
 
         self.integrator_scatter_photons_shader.rebuild()?;
         self.integrator_gather_photons_shader.rebuild()?;
@@ -556,7 +470,7 @@ impl Device {
 
     // TODO: move this to somewhere else, maybe a post_processing.rs
     fn post_process(&self, texture: &dyn AsBindTarget) {
-        let command = self.present_program.begin_draw();
+        let command = self.post_process_shader.begin_draw();
 
         command.bind(texture, "samples");
 
@@ -621,15 +535,14 @@ impl Device {
             texture.invalidate();
         }
 
+        self.fft_signal_fbo.invalidate();
+        self.fft_buffer_fbo.invalidate();
         self.fft_signal_tile_r.invalidate();
         self.fft_signal_tile_g.invalidate();
         self.fft_signal_tile_b.invalidate();
-        self.fft_signal_fbo.invalidate();
-
-        self.fft_temp_tile_r.invalidate();
-        self.fft_temp_tile_g.invalidate();
-        self.fft_temp_tile_b.invalidate();
-        self.fft_temp_fbo.invalidate();
+        self.fft_buffer_tile_r.invalidate();
+        self.fft_buffer_tile_g.invalidate();
+        self.fft_buffer_tile_b.invalidate();
 
         self.composited_render.invalidate();
         self.composited_fbo.invalidate();
@@ -641,8 +554,8 @@ impl Device {
         self.read_signal_tile_shader.invalidate();
         self.decompose_signal_shader.invalidate();
 
-        self.present_program.invalidate();
-        self.fft_shader.invalidate();
+        self.post_process_shader.invalidate();
+        self.execute_fft_pass_shader.invalidate();
         self.camera_buffer.invalidate();
         self.geometry_buffer.invalidate();
         self.material_buffer.invalidate();

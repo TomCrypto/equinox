@@ -4,11 +4,15 @@
 use log::{debug, info, warn};
 
 use crate::{
-    BlendMode, Device, Texture, VertexAttribute, VertexAttributeKind, VertexLayout, RGBA16F,
+    BlendMode, Device, Framebuffer, Texture, VertexAttribute, VertexAttributeKind, VertexLayout,
+    RGBA16F,
 };
+use img2raw::{ColorSpace, DataFormat, Header};
 use itertools::{iproduct, Itertools};
+use js_sys::Error;
+use std::collections::HashMap;
 use std::iter::repeat;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 #[repr(align(8), C)]
 #[derive(AsBytes, FromBytes, Clone, Copy, Debug)]
@@ -25,6 +29,105 @@ impl VertexLayout for FFTPassData {
 }
 
 impl Device {
+    pub(crate) fn update_aperture_filter(
+        &mut self,
+        aperture: &str,
+        assets: &HashMap<String, Vec<u8>>,
+    ) -> Result<(), Error> {
+        let (header, data) =
+            LayoutVerified::<_, Header>::new_from_prefix(assets[aperture].as_slice()).unwrap();
+
+        if header.data_format.try_parse() != Some(DataFormat::RGBA16F) {
+            return Err(Error::new("expected RGBA16F aperture"));
+        }
+
+        if header.color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
+            return Err(Error::new("expected linear sRGB aperture"));
+        }
+
+        if header.dimensions[0] == 0 || header.dimensions[1] == 0 {
+            return Err(Error::new("invalid aperture dimensions"));
+        }
+
+        if header.dimensions[0] != header.dimensions[1] {
+            return Err(Error::new("invalid aperture dimensions"));
+        }
+
+        // TODO: make configurable
+        let mut TILE_SIZE: usize = 1024;
+
+        TILE_SIZE = TILE_SIZE.min(header.dimensions[0] as usize);
+
+        self.fft_signal_tile_r.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+        self.fft_signal_tile_g.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+        self.fft_signal_tile_b.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+        self.fft_signal_fbo.rebuild(
+            &[
+                &self.fft_signal_tile_r,
+                &self.fft_signal_tile_g,
+                &self.fft_signal_tile_b,
+            ],
+            None,
+        )?;
+
+        self.fft_buffer_tile_r.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+        self.fft_buffer_tile_g.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+        self.fft_buffer_tile_b.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+        self.fft_buffer_fbo.rebuild(
+            &[
+                &self.fft_buffer_tile_r,
+                &self.fft_buffer_tile_g,
+                &self.fft_buffer_tile_b,
+            ],
+            None,
+        )?;
+
+        self.generate_fft_passes(2 * TILE_SIZE);
+
+        let pixels = LayoutVerified::new_slice(data).unwrap();
+
+        let mut aperture_texture: Texture<RGBA16F> = Texture::new(self.gl.clone());
+        aperture_texture.upload(
+            header.dimensions[0] as usize,
+            header.dimensions[1] as usize,
+            &pixels,
+        );
+
+        // ...
+
+        let tile_generator = TileIterator::new(
+            header.dimensions[0] as usize,
+            header.dimensions[1] as usize,
+            TILE_SIZE,
+        );
+
+        // for each tile...
+
+        for (index, tile) in tile_generator.enumerate() {
+            let mut fbo = Framebuffer::new(self.gl.clone());
+
+            let mut r_tex = Texture::new(self.gl.clone());
+            let mut g_tex = Texture::new(self.gl.clone());
+            let mut b_tex = Texture::new(self.gl.clone());
+
+            r_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+            g_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+            b_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+
+            fbo.rebuild(&[&r_tex, &g_tex, &b_tex], None)?;
+
+            self.fft_filter_fbo.push(fbo);
+            self.fft_filter_tile_r.push(r_tex);
+            self.fft_filter_tile_g.push(g_tex);
+            self.fft_filter_tile_b.push(b_tex);
+
+            self.load_filter_tile(index, tile, &aperture_texture);
+            self.precompute_filter_tile_fft(index);
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn reset_convolution_state(&mut self) {
         if !self.fft_filter_fbo.is_empty() {
             let tile_size = self.current_tile_size();
@@ -148,7 +251,7 @@ impl Device {
     /// After this method returns, the filter tile buffer will contain the FFT
     /// of the filter tile, the contents of which must have been pregenerated.
     pub(crate) fn precompute_filter_tile_fft(&self, tile_index: usize) {
-        let command = self.fft_shader.begin_draw();
+        let command = self.execute_fft_pass_shader.begin_draw();
 
         command.set_vertex_array(&self.filter_fft_passes);
 
@@ -169,11 +272,11 @@ impl Device {
                 command.bind(&self.fft_filter_tile_r[tile_index], "r_conv_buffer");
                 command.bind(&self.fft_filter_tile_g[tile_index], "g_conv_buffer");
                 command.bind(&self.fft_filter_tile_b[tile_index], "b_conv_buffer");
-                command.set_framebuffer(&self.fft_temp_fbo);
+                command.set_framebuffer(&self.fft_buffer_fbo);
             } else {
-                command.bind(&self.fft_temp_tile_r, "r_conv_buffer");
-                command.bind(&self.fft_temp_tile_g, "g_conv_buffer");
-                command.bind(&self.fft_temp_tile_b, "b_conv_buffer");
+                command.bind(&self.fft_buffer_tile_r, "r_conv_buffer");
+                command.bind(&self.fft_buffer_tile_g, "g_conv_buffer");
+                command.bind(&self.fft_buffer_tile_b, "b_conv_buffer");
                 command.set_framebuffer(&self.fft_filter_fbo[tile_index]);
             }
 
@@ -186,7 +289,7 @@ impl Device {
     /// After this method returns, the signal tile buffers will contain the
     /// convolved signal, ready to be composited in the convolution buffer.
     pub(crate) fn convolve_tile(&self, tile_index: usize) {
-        let command = self.fft_shader.begin_draw();
+        let command = self.execute_fft_pass_shader.begin_draw();
 
         command.set_vertex_array(&self.signal_fft_passes);
 
@@ -206,11 +309,11 @@ impl Device {
                 command.bind(&self.fft_signal_tile_r, "r_conv_buffer");
                 command.bind(&self.fft_signal_tile_g, "g_conv_buffer");
                 command.bind(&self.fft_signal_tile_b, "b_conv_buffer");
-                command.set_framebuffer(&self.fft_temp_fbo);
+                command.set_framebuffer(&self.fft_buffer_fbo);
             } else {
-                command.bind(&self.fft_temp_tile_r, "r_conv_buffer");
-                command.bind(&self.fft_temp_tile_g, "g_conv_buffer");
-                command.bind(&self.fft_temp_tile_b, "b_conv_buffer");
+                command.bind(&self.fft_buffer_tile_r, "r_conv_buffer");
+                command.bind(&self.fft_buffer_tile_g, "g_conv_buffer");
+                command.bind(&self.fft_buffer_tile_b, "b_conv_buffer");
                 command.set_framebuffer(&self.fft_signal_fbo);
             }
 
