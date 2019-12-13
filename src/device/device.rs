@@ -402,14 +402,12 @@ impl Device {
         self.scatter_photons(&pass);
         self.gather_photons();
 
-        if self.state.display.lens_flare_enabled
-            && self.state.current_pass >= self.state.display.lens_flare_threshold
-        {
+        if self.state.display.lens_flare_enabled && self.state.current_pass >= 2 {
             let tile_size = self.current_tile_size();
 
             let filter_size = self.current_filter_size();
 
-            for _ in 0..self.state.display.lens_flare_speed {
+            for _ in 0..self.state.display.lens_flare_tiles_per_pass {
                 let value = self.convolution_tiles.next().unwrap();
 
                 if let Position::First(_) | Position::Only(_) = value {
