@@ -396,6 +396,9 @@ impl Device {
         }
 
         if invalidated || reset_tiles {
+            // TODO: store lens flare metadata somewhere other than on the integrator
+            // state...
+            self.state.display = *scene.display;
             self.reset_convolution_state();
         }
 
@@ -414,22 +417,14 @@ impl Device {
         self.scatter_photons(&pass);
         self.gather_photons();
 
-        // lens flare pass
-
-        // TODO: make configurable and structure better
-        let lens_flare_threshold = 30;
-
-        let use_lens_flare = self.state.has_aperture;
-
-        if use_lens_flare && self.state.current_pass >= lens_flare_threshold {
+        if self.state.display.lens_flare_enabled
+            && self.state.current_pass >= self.state.display.lens_flare_threshold
+        {
             let tile_size = self.current_tile_size();
 
             let filter_size = self.current_filter_size();
 
-            // TODO: allow doing k tiles per frame, as a setting
-            let k = 1;
-
-            for value in self.next_k_tiles(k) {
+            for value in self.next_k_tiles(self.state.display.lens_flare_speed) {
                 if let Position::First(_) | Position::Only(_) = value {
                     self.convolution_output_fbo.clear(0, [0.0, 0.0, 0.0, 1.0]);
                     self.copy_radiance_estimate_to_convolution_signal();
@@ -464,8 +459,8 @@ impl Device {
         Ok(())
     }
 
-    fn next_k_tiles(&mut self, k: usize) -> Vec<Position<(Tile, (usize, Tile))>> {
-        (&mut self.convolution_tiles).take(k).collect()
+    fn next_k_tiles(&mut self, k: u32) -> Vec<Position<(Tile, (usize, Tile))>> {
+        (&mut self.convolution_tiles).take(k as usize).collect()
     }
 
     // TODO: move this to somewhere else, maybe a post_processing.rs

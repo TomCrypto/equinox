@@ -3,18 +3,18 @@ use smart_default::SmartDefault;
 
 pub type CameraResponse = [[f32; 3]; 11];
 
-#[derive(Debug, Deserialize, PartialEq, SmartDefault, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, SmartDefault, Serialize)]
 pub struct Display {
     #[default(0.0)]
     pub exposure: f32,
     #[default(1.0)]
     pub saturation: f32,
-    /*#[default(20)]
+    #[default(20)]
     pub lens_flare_threshold: u32,
     #[default(false)]
     pub lens_flare_enabled: bool,
     #[default(1)]
-    pub lens_flare_tiles: u32,*/
+    pub lens_flare_speed: u32,
     #[default(None)]
     pub camera_response: Option<CameraResponse>,
 }
