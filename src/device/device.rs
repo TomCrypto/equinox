@@ -7,16 +7,13 @@ use crate::*;
 pub struct Device {
     pub(crate) gl: Context,
 
-    pub(crate) post_process_shader: Shader,
-
+    pub(crate) blit_to_canvas_shader: Shader,
+    pub(crate) decompose_signal_shader: Shader,
     pub(crate) execute_fft_pass_shader: Shader,
-
     pub(crate) load_filter_tile_shader: Shader,
     pub(crate) load_signal_tile_shader: Shader,
+    pub(crate) post_process_shader: Shader,
     pub(crate) read_signal_tile_shader: Shader,
-    pub(crate) decompose_signal_shader: Shader,
-
-    pub(crate) blit_to_canvas_shader: Shader,
 
     pub(crate) geometry_buffer: UniformBuffer<[GeometryParameter]>,
     pub(crate) material_buffer: UniformBuffer<[MaterialParameter]>,
@@ -76,6 +73,7 @@ pub struct Device {
 
     device_lost: bool,
 
+    // TODO: move to a ConvolutionState or something
     pub(crate) convolution_tiles: Box<dyn Iterator<Item = Position<(Tile, (usize, Tile))>>>,
 
     pub(crate) state: IntegratorState,
@@ -89,59 +87,46 @@ impl Device {
 
             composited_render: Texture::new(gl.clone()),
             composited_fbo: Framebuffer::new(gl.clone()),
-
             convolution_tiles: Box::new(std::iter::empty()),
-
             blit_to_canvas_shader: Shader::new(
                 gl.clone(),
                 &shader::VS_FULLSCREEN,
                 &shader::FS_BLIT_TO_CANVAS,
             ),
-
             decompose_signal_shader: Shader::new(
                 gl.clone(),
                 &shader::VS_FULLSCREEN,
                 &shader::FS_DECOMPOSE_SIGNAL,
             ),
-
             integrator_radiance_estimate: Texture::new(gl.clone()),
-
             integrator_gather_fbo: Framebuffer::new(gl.clone()),
-
             load_filter_tile_shader: Shader::new(
                 gl.clone(),
                 &shader::VS_FULLSCREEN,
                 &shader::FS_LOAD_FILTER_TILE,
             ),
-
             load_signal_tile_shader: Shader::new(
                 gl.clone(),
                 &shader::VS_FULLSCREEN,
                 &shader::FS_LOAD_SIGNAL_TILE,
             ),
-
             read_signal_tile_shader: Shader::new(
                 gl.clone(),
                 &shader::VS_FULLSCREEN,
                 &shader::FS_READ_SIGNAL_TILE,
             ),
-
             fft_signal_tile_r: Texture::new(gl.clone()),
             fft_signal_tile_g: Texture::new(gl.clone()),
             fft_signal_tile_b: Texture::new(gl.clone()),
-
             fft_filter_tile_r: vec![],
             fft_filter_tile_g: vec![],
             fft_filter_tile_b: vec![],
-
             fft_buffer_tile_r: Texture::new(gl.clone()),
             fft_buffer_tile_g: Texture::new(gl.clone()),
             fft_buffer_tile_b: Texture::new(gl.clone()),
-
             fft_signal_fbo: Framebuffer::new(gl.clone()),
             fft_filter_fbo: vec![],
             fft_buffer_fbo: Framebuffer::new(gl.clone()),
-
             integrator_gather_photons_shader: Shader::new(
                 gl.clone(),
                 &shader::VS_FULLSCREEN,
