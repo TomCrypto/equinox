@@ -1,6 +1,6 @@
 use crate::{
-    ApertureShape, Camera, Dirty, Display, Environment, Geometry, Instance, Integrator, Material,
-    Metadata, Raster,
+    Aperture, ApertureShape, Camera, Dirty, Display, Environment, Geometry, Instance, Integrator,
+    Material, Metadata, Raster,
 };
 use js_sys::Error;
 use serde::{Deserialize, Serialize};
@@ -68,7 +68,7 @@ pub struct Scene {
     pub environment_map: Dirty<Option<String>>,
     pub environment: Dirty<Environment>,
     pub display: Dirty<Display>,
-    pub aperture: Dirty<Option<String>>,
+    pub aperture: Dirty<Option<Aperture>>,
     pub integrator: Dirty<Integrator>,
 
     #[serde(skip)]
@@ -290,10 +290,10 @@ impl Scene {
         Ok(())
     }
 
-    fn validate_aperture(&self, aperture: &str) -> Result<(), Error> {
+    fn validate_aperture(&self, aperture: &Aperture) -> Result<(), Error> {
         let assets = &self.assets;
 
-        validate_contains!(assets, aperture);
+        validate_contains!(assets, aperture.filter);
 
         Ok(())
     }

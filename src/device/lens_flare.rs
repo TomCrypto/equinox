@@ -4,8 +4,8 @@
 use log::{debug, info, warn};
 
 use crate::{
-    BlendMode, Device, Framebuffer, Texture, VertexAttribute, VertexAttributeKind, VertexLayout,
-    RGBA16F,
+    Aperture, BlendMode, ConvolutionTileSize, Device, Framebuffer, Texture, VertexAttribute,
+    VertexAttributeKind, VertexLayout, RGBA16F,
 };
 use img2raw::{ColorSpace, DataFormat, Header};
 use itertools::{iproduct, Itertools};
@@ -31,36 +31,42 @@ impl VertexLayout for FFTPassData {
 impl Device {
     pub(crate) fn update_aperture_filter(
         &mut self,
-        aperture: &str,
+        aperture: &Aperture,
         assets: &HashMap<String, Vec<u8>>,
     ) -> Result<(), Error> {
         let (header, data) =
-            LayoutVerified::<_, Header>::new_from_prefix(assets[aperture].as_slice()).unwrap();
+            LayoutVerified::<_, Header>::new_from_prefix(assets[&aperture.filter].as_slice())
+                .unwrap();
 
         if header.data_format.try_parse() != Some(DataFormat::RGBA16F) {
-            return Err(Error::new("expected RGBA16F aperture"));
+            return Err(Error::new("expected RGBA16F aperture filter"));
         }
 
         if header.color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
-            return Err(Error::new("expected linear sRGB aperture"));
+            return Err(Error::new("expected linear sRGB aperture filter"));
         }
 
         if header.dimensions[0] == 0 || header.dimensions[1] == 0 {
-            return Err(Error::new("invalid aperture dimensions"));
+            return Err(Error::new("invalid aperture filter dimensions"));
         }
 
         if header.dimensions[0] != header.dimensions[1] {
-            return Err(Error::new("invalid aperture dimensions"));
+            return Err(Error::new("invalid aperture filter dimensions"));
         }
 
-        // TODO: make configurable
-        let mut TILE_SIZE: usize = 1024;
+        let mut tile_size = match aperture.tile_size {
+            ConvolutionTileSize::Lowest => 128,
+            ConvolutionTileSize::Low => 256,
+            ConvolutionTileSize::Medium => 512,
+            ConvolutionTileSize::High => 1024,
+        };
 
-        TILE_SIZE = TILE_SIZE.min(header.dimensions[0] as usize);
+        // no sense using a tile which is larger than the filter
+        tile_size = tile_size.min(header.dimensions[0] as usize);
 
-        self.fft_signal_tile_r.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-        self.fft_signal_tile_g.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-        self.fft_signal_tile_b.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+        self.fft_signal_tile_r.create(2 * tile_size, 2 * tile_size);
+        self.fft_signal_tile_g.create(2 * tile_size, 2 * tile_size);
+        self.fft_signal_tile_b.create(2 * tile_size, 2 * tile_size);
         self.fft_signal_fbo.rebuild(
             &[
                 &self.fft_signal_tile_r,
@@ -70,9 +76,9 @@ impl Device {
             None,
         )?;
 
-        self.fft_buffer_tile_r.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-        self.fft_buffer_tile_g.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-        self.fft_buffer_tile_b.create(2 * TILE_SIZE, 2 * TILE_SIZE);
+        self.fft_buffer_tile_r.create(2 * tile_size, 2 * tile_size);
+        self.fft_buffer_tile_g.create(2 * tile_size, 2 * tile_size);
+        self.fft_buffer_tile_b.create(2 * tile_size, 2 * tile_size);
         self.fft_buffer_fbo.rebuild(
             &[
                 &self.fft_buffer_tile_r,
@@ -82,47 +88,39 @@ impl Device {
             None,
         )?;
 
-        self.generate_fft_passes(2 * TILE_SIZE);
-
-        let pixels = LayoutVerified::new_slice(data).unwrap();
-
-        let mut aperture_texture: Texture<RGBA16F> = Texture::new(self.gl.clone());
-        aperture_texture.upload(
-            header.dimensions[0] as usize,
-            header.dimensions[1] as usize,
-            &pixels,
-        );
-
-        // ...
+        self.generate_fft_passes(2 * tile_size);
 
         let tile_generator = TileIterator::new(
             header.dimensions[0] as usize,
             header.dimensions[1] as usize,
-            TILE_SIZE,
+            tile_size,
         );
 
-        // for each tile...
+        let mut filter: Texture<RGBA16F> = Texture::new(self.gl.clone());
+        filter.upload(
+            header.dimensions[0] as usize,
+            header.dimensions[1] as usize,
+            &LayoutVerified::new_slice(data).unwrap(),
+        );
 
         for (index, tile) in tile_generator.enumerate() {
-            let mut fbo = Framebuffer::new(self.gl.clone());
-
             let mut r_tex = Texture::new(self.gl.clone());
             let mut g_tex = Texture::new(self.gl.clone());
             let mut b_tex = Texture::new(self.gl.clone());
+            r_tex.create(2 * tile_size, 2 * tile_size);
+            g_tex.create(2 * tile_size, 2 * tile_size);
+            b_tex.create(2 * tile_size, 2 * tile_size);
 
-            r_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-            g_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-            b_tex.create(2 * TILE_SIZE, 2 * TILE_SIZE);
-
+            let mut fbo = Framebuffer::new(self.gl.clone());
             fbo.rebuild(&[&r_tex, &g_tex, &b_tex], None)?;
 
-            self.fft_filter_fbo.push(fbo);
+            self.load_filter_tile(index, tile, &filter);
+            self.precompute_filter_tile_fft(index);
+
             self.fft_filter_tile_r.push(r_tex);
             self.fft_filter_tile_g.push(g_tex);
             self.fft_filter_tile_b.push(b_tex);
-
-            self.load_filter_tile(index, tile, &aperture_texture);
-            self.precompute_filter_tile_fft(index);
+            self.fft_filter_fbo.push(fbo);
         }
 
         Ok(())
