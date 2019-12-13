@@ -9,6 +9,12 @@ pub struct Display {
     pub exposure: f32,
     #[default(1.0)]
     pub saturation: f32,
+    /*#[default(20)]
+    pub lens_flare_threshold: u32,
+    #[default(false)]
+    pub lens_flare_enabled: bool,
+    #[default(1)]
+    pub lens_flare_tiles: u32,*/
     #[default(None)]
     pub camera_response: Option<CameraResponse>,
 }

@@ -1,4 +1,5 @@
 /target
+/assets/*.raw
 **/*.rs.bk
 /pkg
 /.vscode/tasks.json

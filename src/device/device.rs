@@ -498,7 +498,6 @@ impl Device {
         let filter_iter =
             TileIterator::new(filter_size, filter_size, Self::TILE_SIZE / 2).enumerate();
 
-        // TODO: add cycle
         self.convolution_tiles =
             Box::new(iproduct!(signal_iter, filter_iter).with_position().cycle());
     }
@@ -523,8 +522,9 @@ impl Device {
 
         if use_lens_flare && self.state.current_pass >= lens_flare_threshold {
             // TODO: allow doing k tiles per frame, as a setting
+            let k = 1;
 
-            if let Some(value) = self.convolution_tiles.next() {
+            for value in self.next_k_tiles(k) {
                 if let Position::First(_) | Position::Only(_) = value {
                     self.convolution_output_fbo.clear(0, [0.0, 0.0, 0.0, 1.0]);
                     self.save_radiance_estimate_to_convolution_signal();
@@ -538,8 +538,8 @@ impl Device {
 
                 let (signal_tile, (filter_index, filter_tile)) = value.into_inner();
 
-                let offset_x = (filter_tile.x + filter_tile.w / 2) as i32 - filter_size as i32 / 2;
-                let offset_y = (filter_tile.y + filter_tile.h / 2) as i32 - filter_size as i32 / 2;
+                let dx = (filter_tile.x + filter_tile.w / 2) as i32 - filter_size as i32 / 2;
+                let dy = (filter_tile.y + filter_tile.h / 2) as i32 - filter_size as i32 / 2;
 
                 let padding = Self::TILE_SIZE as i32 / 4;
 
@@ -547,8 +547,8 @@ impl Device {
                 self.convolve_tile(filter_index);
 
                 self.composite_tile(
-                    signal_tile.x as i32 + offset_x - padding,
-                    signal_tile.y as i32 + offset_y - padding,
+                    signal_tile.x as i32 - padding + dx,
+                    signal_tile.y as i32 - padding + dy,
                     signal_tile.w as i32 + padding * 2,
                     signal_tile.h as i32 + padding * 2,
                 );
@@ -562,6 +562,10 @@ impl Device {
         }
 
         Ok(())
+    }
+
+    fn next_k_tiles(&mut self, k: usize) -> Vec<Position<(Tile, (usize, Tile))>> {
+        (&mut self.convolution_tiles).take(k).collect()
     }
 
     // TODO: move this to somewhere else, maybe a post_processing.rs
