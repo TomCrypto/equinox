@@ -409,7 +409,9 @@ impl Device {
 
             let filter_size = self.current_filter_size();
 
-            for value in self.next_k_tiles(self.state.display.lens_flare_speed) {
+            for _ in 0..self.state.display.lens_flare_speed {
+                let value = self.convolution_tiles.next().unwrap();
+
                 if let Position::First(_) | Position::Only(_) = value {
                     self.convolution_output_fbo.clear(0, [0.0, 0.0, 0.0, 1.0]);
                     self.copy_radiance_estimate_to_convolution_signal();
@@ -442,10 +444,6 @@ impl Device {
         }
 
         Ok(())
-    }
-
-    fn next_k_tiles(&mut self, k: u32) -> Vec<Position<(Tile, (usize, Tile))>> {
-        (&mut self.convolution_tiles).take(k as usize).collect()
     }
 
     // TODO: move this to somewhere else, maybe a post_processing.rs
