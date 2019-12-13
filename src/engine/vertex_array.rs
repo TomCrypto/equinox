@@ -59,9 +59,7 @@ impl<T: VertexLayout> VertexArray<[T]> {
 
         if vertices.len() != self.vertex_count || self.buf_handle.is_none() {
             self.create_buffer(vertices.len());
-        }
-
-        if self.vao_handle.is_none() {
+        } else if self.vao_handle.is_none() {
             self.create_vertex_array();
         }
 
@@ -145,6 +143,8 @@ impl<T: VertexLayout> VertexArray<[T]> {
         );
 
         self.vertex_count = vertex_count;
+
+        self.create_vertex_array();
     }
 }
 

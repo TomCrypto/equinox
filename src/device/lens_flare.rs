@@ -114,13 +114,13 @@ impl Device {
             let mut fbo = Framebuffer::new(self.gl.clone());
             fbo.rebuild(&[&r_tex, &g_tex, &b_tex], None)?;
 
-            self.load_filter_tile(index, tile, &filter);
-            self.precompute_filter_tile_fft(index);
-
             self.fft_filter_tile_r.push(r_tex);
             self.fft_filter_tile_g.push(g_tex);
             self.fft_filter_tile_b.push(b_tex);
             self.fft_filter_fbo.push(fbo);
+
+            self.load_filter_tile(index, tile, &filter);
+            self.precompute_filter_tile_fft(index);
         }
 
         Ok(())
@@ -137,7 +137,6 @@ impl Device {
             );
 
             let filter_size = self.current_filter_size();
-
             let filter_iter = TileIterator::new(filter_size, filter_size, tile_size).enumerate();
 
             self.convolution_tiles =
