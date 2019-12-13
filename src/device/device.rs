@@ -87,6 +87,9 @@ pub struct Device {
 }
 
 impl Device {
+    // TODO: make configurable
+    pub(crate) const TILE_SIZE: usize = 128;
+
     /// Creates a new device using a WebGL2 context.
     pub fn new(gl: &Context) -> Result<Self, Error> {
         Ok(Self {
@@ -333,11 +336,11 @@ impl Device {
             self.fft_filter_tile_b.clear();
 
             self.fft_signal_tile_r
-                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
             self.fft_signal_tile_g
-                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
             self.fft_signal_tile_b
-                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
             self.fft_signal_fbo.rebuild(
                 &[
                     &self.fft_signal_tile_r,
@@ -348,11 +351,11 @@ impl Device {
             )?;
 
             self.fft_temp_tile_r
-                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
             self.fft_temp_tile_g
-                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
             self.fft_temp_tile_b
-                .create(Self::TILE_SIZE, Self::TILE_SIZE);
+                .create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
             self.fft_temp_fbo.rebuild(
                 &[
                     &self.fft_temp_tile_r,
@@ -362,8 +365,7 @@ impl Device {
                 None,
             )?;
 
-            self.generate_signal_fft_passes(Self::TILE_SIZE);
-            self.generate_filter_fft_passes(Self::TILE_SIZE);
+            self.generate_fft_passes(2 * Self::TILE_SIZE);
 
             if let Some(aperture) = aperture {
                 log::info!("loading aperture...");
@@ -402,7 +404,7 @@ impl Device {
                 let tile_generator = TileIterator::new(
                     header.dimensions[0] as usize,
                     header.dimensions[1] as usize,
-                    Self::TILE_SIZE / 2,
+                    Self::TILE_SIZE,
                 );
 
                 // for each tile...
@@ -416,9 +418,9 @@ impl Device {
                     let mut g_tex = Texture::new(self.gl.clone());
                     let mut b_tex = Texture::new(self.gl.clone());
 
-                    r_tex.create(Self::TILE_SIZE, Self::TILE_SIZE);
-                    g_tex.create(Self::TILE_SIZE, Self::TILE_SIZE);
-                    b_tex.create(Self::TILE_SIZE, Self::TILE_SIZE);
+                    r_tex.create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
+                    g_tex.create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
+                    b_tex.create(2 * Self::TILE_SIZE, 2 * Self::TILE_SIZE);
 
                     fbo.rebuild(&[&r_tex, &g_tex, &b_tex], None)?;
 
@@ -487,16 +489,15 @@ impl Device {
         let signal_iter = TileIterator::new(
             self.convolution_signal_fbo.cols(),
             self.convolution_signal_fbo.rows(),
-            Self::TILE_SIZE / 2,
+            Self::TILE_SIZE,
         );
 
         // HACK: this is a big hack; we know the filters are square and that they will
         // be a multiple of the tile size, so we can work out the filter size from here
 
-        let filter_size = (self.fft_filter_fbo.len() as f64).sqrt() as usize * Self::TILE_SIZE / 2;
+        let filter_size = (self.fft_filter_fbo.len() as f64).sqrt() as usize * Self::TILE_SIZE;
 
-        let filter_iter =
-            TileIterator::new(filter_size, filter_size, Self::TILE_SIZE / 2).enumerate();
+        let filter_iter = TileIterator::new(filter_size, filter_size, Self::TILE_SIZE).enumerate();
 
         self.convolution_tiles =
             Box::new(iproduct!(signal_iter, filter_iter).with_position().cycle());
@@ -527,21 +528,21 @@ impl Device {
             for value in self.next_k_tiles(k) {
                 if let Position::First(_) | Position::Only(_) = value {
                     self.convolution_output_fbo.clear(0, [0.0, 0.0, 0.0, 1.0]);
-                    self.save_radiance_estimate_to_convolution_signal();
+                    self.copy_radiance_estimate_to_convolution_signal();
                 }
 
                 // HACK: this is a big hack; we know the filters are square and that they will
                 // be a multiple of the tile size, so we can work out the filter size from here
 
                 let filter_size =
-                    (self.fft_filter_fbo.len() as f64).sqrt() as usize * Self::TILE_SIZE / 2;
+                    (self.fft_filter_fbo.len() as f64).sqrt() as usize * Self::TILE_SIZE;
 
                 let (signal_tile, (filter_index, filter_tile)) = value.into_inner();
 
                 let dx = (filter_tile.x + filter_tile.w / 2) as i32 - filter_size as i32 / 2;
                 let dy = (filter_tile.y + filter_tile.h / 2) as i32 - filter_size as i32 / 2;
 
-                let padding = Self::TILE_SIZE as i32 / 4;
+                let padding = Self::TILE_SIZE as i32 / 2;
 
                 self.load_signal_tile(signal_tile);
                 self.convolve_tile(filter_index);

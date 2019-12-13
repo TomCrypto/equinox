@@ -24,12 +24,10 @@ impl VertexLayout for FFTPassData {
 }
 
 impl Device {
-    pub(crate) const TILE_SIZE: usize = 512;
-
     /// Loads a tile of the filter into the filter tile.
     ///
-    /// After this method returns, the filter tile will have been populated with
-    /// the correct data depending on the aperture's point spread function.
+    /// After this method returns, the filter tile buffer will contain the
+    /// specified tile of the filter, zero-padded & ready for convolution.
     pub(crate) fn load_filter_tile(&mut self, index: usize, tile: Tile, filter: &Texture<RGBA16F>) {
         let command = self.load_filter_tile_shader.begin_draw();
 
@@ -38,9 +36,18 @@ impl Device {
         command.set_framebuffer(&self.fft_filter_fbo[index]);
 
         command.set_uniform_ivec2("tile_offset", tile.x as i32, tile.y as i32);
-        command.set_uniform_ivec2("tile_size", Self::TILE_SIZE as i32, Self::TILE_SIZE as i32);
+        command.set_uniform_ivec2(
+            "tile_size",
+            self.fft_filter_fbo[index].cols() as i32,
+            self.fft_filter_fbo[index].rows() as i32,
+        );
 
-        command.set_viewport(0, 0, Self::TILE_SIZE as i32, Self::TILE_SIZE as i32);
+        command.set_viewport(
+            0,
+            0,
+            self.fft_filter_fbo[index].cols() as i32,
+            self.fft_filter_fbo[index].rows() as i32,
+        );
 
         command.unset_vertex_array();
         command.draw_triangles(0, 1);
@@ -81,7 +88,11 @@ impl Device {
         command.draw_triangles(0, 1);
     }
 
-    pub(crate) fn save_radiance_estimate_to_convolution_signal(&self) {
+    /// Copies the radiance estimate to the convolution signal buffer.
+    ///
+    /// This is intended to allow the integrator to keep updating the estimate
+    /// while the convolution operates on a fixed (albeit out of date) signal.
+    pub(crate) fn copy_radiance_estimate_to_convolution_signal(&self) {
         let command = self.decompose_signal_shader.begin_draw();
 
         command.set_viewport(
@@ -108,7 +119,7 @@ impl Device {
 
         command.set_vertex_array(&self.filter_fft_passes);
 
-        // Placeholder textures (we're not convolving this time)
+        // Placeholder textures (we're not convolving in here)
         command.bind(&self.fft_signal_tile_r, "r_conv_filter");
         command.bind(&self.fft_signal_tile_b, "g_conv_filter");
         command.bind(&self.fft_signal_tile_g, "b_conv_filter");
@@ -197,8 +208,17 @@ impl Device {
         command.draw_triangles(0, 1);
     }
 
-    pub(crate) fn generate_filter_fft_passes(&mut self, tile_size: usize) {
-        let (depth, mut passes) = (tile_size.trailing_zeros() as u16, vec![]);
+    /// Generates the necessary FFT passes for convolution.
+    ///
+    /// This method must have been called prior to attempting any FFT or
+    /// convolution operation, or the operation will not work correctly.
+    pub(crate) fn generate_fft_passes(&mut self, resolution: usize) {
+        self.generate_filter_fft_passes(resolution);
+        self.generate_signal_fft_passes(resolution);
+    }
+
+    fn generate_filter_fft_passes(&mut self, resolution: usize) {
+        let (depth, mut passes) = (resolution.trailing_zeros() as u16, vec![]);
 
         for m in (1..=depth).rev() {
             passes.push(FFTPassData {
@@ -221,8 +241,8 @@ impl Device {
         self.filter_fft_passes.upload(&Self::gen_pass_tris(passes));
     }
 
-    pub(crate) fn generate_signal_fft_passes(&mut self, tile_size: usize) {
-        let (depth, mut passes) = (tile_size.trailing_zeros() as u16, vec![]);
+    fn generate_signal_fft_passes(&mut self, resolution: usize) {
+        let (depth, mut passes) = (resolution.trailing_zeros() as u16, vec![]);
 
         for m in (1..=depth).rev() {
             passes.push(FFTPassData {
@@ -265,7 +285,7 @@ impl Device {
 
     fn gen_pass_tris(passes: Vec<FFTPassData>) -> Vec<FFTPassData> {
         let tris = passes.into_iter().map(|x| repeat(x).take(3));
-        tris.flatten().collect() // converts passes to triangles
+        tris.flatten().collect() // create one triangle per pass
     }
 }
 
