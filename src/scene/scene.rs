@@ -270,6 +270,11 @@ impl Scene {
         validate!(display.exposure <= 10.0);
         validate!(display.saturation >= 0.0);
         validate!(display.saturation <= 1.0);
+        validate!(display.lens_flare_tiles_per_pass > 0);
+
+        if display.lens_flare_enabled && self.aperture.is_none() {
+            return Err(Error::new("lens flare enabled with no aperture"));
+        }
 
         Ok(())
     }
