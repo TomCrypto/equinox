@@ -73,10 +73,8 @@ pub struct Device {
 
     device_lost: bool,
 
-    // TODO: move to a ConvolutionState or something
-    pub(crate) convolution_tiles: Box<dyn Iterator<Item = Position<(Tile, (usize, Tile))>>>,
-
     pub(crate) state: IntegratorState,
+    pub(crate) postproc: PostProcState,
 }
 
 impl Device {
@@ -87,7 +85,6 @@ impl Device {
 
             composited_render: Texture::new(gl.clone()),
             composited_fbo: Framebuffer::new(gl.clone()),
-            convolution_tiles: Box::new(std::iter::empty()),
             blit_to_canvas_shader: Shader::new(
                 gl.clone(),
                 &shader::VS_FULLSCREEN,
@@ -172,6 +169,7 @@ impl Device {
             integrator_scatter_fbo: Framebuffer::new(gl.clone()),
             device_lost: true,
             state: IntegratorState::default(),
+            postproc: PostProcState::default(),
         })
     }
 
@@ -381,10 +379,7 @@ impl Device {
         }
 
         if invalidated || reset_tiles {
-            // TODO: store lens flare metadata somewhere other than on the integrator
-            // state...
-            self.state.display = *scene.display;
-            self.reset_convolution_state();
+            self.reset_convolution_state(scene);
         }
 
         Ok(invalidated)
@@ -402,13 +397,13 @@ impl Device {
         self.scatter_photons(&pass);
         self.gather_photons();
 
-        if self.state.display.lens_flare_enabled && self.state.current_pass >= 2 {
+        if self.postproc.display.lens_flare_enabled && self.state.current_pass >= 2 {
             let tile_size = self.current_tile_size();
 
             let filter_size = self.current_filter_size();
 
-            for _ in 0..self.state.display.lens_flare_tiles_per_pass {
-                let value = self.convolution_tiles.next().unwrap();
+            for _ in 0..self.postproc.display.lens_flare_tiles_per_pass {
+                let value = self.postproc.convolution_tiles.next().unwrap();
 
                 if let Position::First(_) | Position::Only(_) = value {
                     self.convolution_output_fbo.clear(0, [0.0, 0.0, 0.0, 1.0]);

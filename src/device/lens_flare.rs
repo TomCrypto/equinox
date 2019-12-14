@@ -2,15 +2,31 @@
 use log::{debug, info, warn};
 
 use crate::{
-    Aperture, BlendMode, ConvolutionTileSize, Device, Framebuffer, Texture, VertexAttribute,
-    VertexAttributeKind, VertexLayout, RGBA16F,
+    Aperture, BlendMode, ConvolutionTileSize, Device, Display, Framebuffer, Scene, Texture,
+    VertexAttribute, VertexAttributeKind, VertexLayout, RGBA16F,
 };
 use img2raw::{ColorSpace, DataFormat, Header};
-use itertools::{iproduct, Itertools};
+use itertools::{iproduct, Itertools, Position};
 use js_sys::Error;
 use std::collections::HashMap;
-use std::iter::repeat;
+use std::iter::{empty, repeat};
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
+
+pub(crate) type ConvolutionStep = Position<(Tile, (usize, Tile))>;
+
+pub struct PostProcState {
+    pub(crate) display: Display,
+    pub(crate) convolution_tiles: Box<dyn Iterator<Item = ConvolutionStep>>,
+}
+
+impl Default for PostProcState {
+    fn default() -> Self {
+        Self {
+            display: Display::default(),
+            convolution_tiles: Box::new(empty()),
+        }
+    }
+}
 
 #[repr(align(8), C)]
 #[derive(AsBytes, FromBytes, Clone, Copy, Debug)]
@@ -124,7 +140,9 @@ impl Device {
         Ok(())
     }
 
-    pub(crate) fn reset_convolution_state(&mut self) {
+    pub(crate) fn reset_convolution_state(&mut self, scene: &Scene) {
+        self.postproc.display = *scene.display;
+
         if !self.fft_filter_fbo.is_empty() {
             let tile_size = self.current_tile_size();
 
@@ -137,7 +155,7 @@ impl Device {
             let filter_size = self.current_filter_size();
             let filter_iter = TileIterator::new(filter_size, filter_size, tile_size).enumerate();
 
-            self.convolution_tiles =
+            self.postproc.convolution_tiles =
                 Box::new(iproduct!(signal_iter, filter_iter).with_position().cycle());
         }
     }
