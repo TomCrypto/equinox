@@ -4,6 +4,7 @@ use smart_default::SmartDefault;
 pub type CameraResponse = [[f32; 3]; 11];
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, SmartDefault, Serialize)]
+#[serde(default)]
 pub struct Display {
     #[default(0.0)]
     pub exposure: f32,
