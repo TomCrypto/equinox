@@ -3,7 +3,7 @@ use log::{debug, info, warn};
 
 use crate::{BlendMode, Device, Integrator, RasterFilter, Scene};
 use js_sys::Error;
-use quasirandom::Qrng;
+use quasi_rd::Sequence;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use zerocopy::{AsBytes, FromBytes};
@@ -47,7 +47,7 @@ pub struct IntegratorPass {
 #[derive(Debug)]
 pub struct IntegratorState {
     pub(crate) rng: ChaCha20Rng,
-    pub(crate) filter_rng: Qrng,
+    pub(crate) filter_rng: Sequence,
 
     pub(crate) filter: RasterFilter,
     pub(crate) integrator: Integrator,
@@ -63,7 +63,7 @@ impl Default for IntegratorState {
     fn default() -> Self {
         Self {
             rng: ChaCha20Rng::seed_from_u64(0),
-            filter_rng: Qrng::new(0),
+            filter_rng: Sequence::new(2),
             filter: RasterFilter::default(),
             integrator: Integrator::default(),
             kernel_radii: KernelRadiusSequence::default(),
@@ -125,12 +125,9 @@ impl Device {
 
     pub(crate) fn reset_integrator_state(&mut self, scene: &mut Scene) {
         self.state.rng = ChaCha20Rng::seed_from_u64(0);
-        self.state.filter_rng = Qrng::new(0);
+        self.state.filter_rng.seek(0);
         self.state.photon_count = 0.0;
         self.state.current_pass = 0;
-
-        // ignore the first (0, 0) sample from the sequence
-        let _ = self.state.filter_rng.next::<(f32, f32)>();
 
         self.state.filter = scene.raster.filter;
         self.state.integrator = *scene.integrator;
@@ -170,9 +167,9 @@ impl Device {
             self.state.photon_count += (pass.n) as f32;
         }
 
-        let (x, y) = self.state.filter_rng.next::<(f32, f32)>();
-
         let mut data = IntegratorData::default();
+        let x = self.state.filter_rng.next_f32();
+        let y = self.state.filter_rng.next_f32();
 
         data.filter_offset[0] = 4.0 * self.state.filter.importance_sample(x) - 2.0;
         data.filter_offset[1] = 4.0 * self.state.filter.importance_sample(y) - 2.0;
@@ -274,33 +271,24 @@ impl Device {
     }
 
     fn populate_quasi_buffer(buffer: &mut [SamplerDimensionAlpha]) {
-        let phi = Self::weyl_sequence_phi(buffer.len() as f64);
+        let mut parameters = vec![0; buffer.len()];
 
-        for (i, value) in buffer.iter_mut().enumerate() {
-            let alpha = (1.0 / phi).powi((1 + i) as i32);
+        quasi_rd::generate_parameters(buffer.len(), &mut parameters);
 
-            // scale the alpha value by 2^64 to go into the fixed-point domain
-            let alpha_u64: u64 = (alpha * 18_446_744_073_709_551_616.0) as u64;
+        let mut k = buffer.len() / 2;
 
-            let lo = alpha_u64 as u32;
-            let hi = (alpha_u64 >> 32) as u32;
+        for (index, output) in buffer.iter_mut().enumerate() {
+            output.alpha = [
+                (parameters[k] >> 96) as u32,
+                (parameters[k] >> 64) as u32,
+                (parameters[k] >> 32) as u32,
+                0,
+            ];
 
-            value.alpha = [lo, hi, lo & 0xffff, lo >> 16];
-        }
-    }
-
-    #[allow(clippy::float_cmp)]
-    fn weyl_sequence_phi(d: f64) -> f64 {
-        let q = 1.0 / (d + 1.0);
-        let mut phi: f64 = 2.0;
-
-        loop {
-            let succ = (1.0 + phi).powf(q);
-
-            if succ != phi {
-                phi = succ;
+            if index % 2 == 0 {
+                k -= index + 1;
             } else {
-                return phi;
+                k += index + 1;
             }
         }
     }

@@ -164,7 +164,7 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
 void main() {
     uint seed = (uint(gl_FragCoord.x) << 16U) + uint(gl_FragCoord.y);
 
-    quasi_t quasi = quasi_init(decorrelate_sample(seed), integrator.current_pass);
+    quasi_t quasi = quasi_init(integrator.current_pass, decorrelate_sample(seed));
 
     ray_t ray;
     evaluate_primary_ray(ray.org, ray.dir, quasi);

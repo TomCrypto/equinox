@@ -119,7 +119,7 @@ ray_t generate_photon_ray(out vec3 throughput, inout quasi_t quasi) {
 }
 
 void main() {
-    quasi_t quasi = quasi_init(decorrelate_sample(uint(gl_VertexID)), integrator.current_pass);
+    quasi_t quasi = quasi_init(integrator.current_pass, decorrelate_sample(uint(gl_VertexID)));
 
     vec3 throughput; // measure photon path contribution
     ray_t ray = generate_photon_ray(throughput, quasi);

@@ -54,8 +54,8 @@ version = "1.3"
 features = ["std"]
 default-features = false
 
-[dependencies.quasirandom]
-version = "0.2"
+[dependencies.quasi-rd]
+version = "0.1"
 
 [dependencies.serde]
 version = "1.0"
