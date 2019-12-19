@@ -38,6 +38,12 @@
         <template slot="tab-panel-save-load">
           <SaveLoadEditor :scene="scene" :load-assets="loadAssets" />
         </template>
+        <template slot="tab-head-licensing"
+          >Licensing</template
+        >
+        <template slot="tab-panel-licensing">
+          <LicensingEditor :licensing="equinox.licensing()" />
+        </template>
       </EditorContainer>
     </div>
   </div>
@@ -48,6 +54,7 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 import EnvironmentEditor from "@/components/EnvironmentEditor.vue";
 import EditorContainer from "@/components/EditorContainer.vue";
 import DocumentationEditor from "@/components/DocumentationEditor.vue";
+import LicensingEditor from "@/components/LicensingEditor.vue";
 import AdvancedEditor from "@/components/AdvancedEditor.vue";
 import { WebScene, WebDevice } from "equinox";
 import localforage from "localforage";
@@ -62,6 +69,7 @@ import DefaultScene from "./prefab/DefaultScene";
     EnvironmentEditor,
     EditorContainer,
     DocumentationEditor,
+    LicensingEditor,
     CanvasContainer,
     AdvancedEditor,
     SaveLoadEditor
@@ -73,7 +81,12 @@ export default class App extends Vue {
   private scene = new this.equinox.WebScene();
 
   private editorTabsAbove = ["environment"];
-  private editorTabsBelow = ["documentation", "save-load", "advanced"];
+  private editorTabsBelow = [
+    "documentation",
+    "save-load",
+    "advanced",
+    "licensing"
+  ];
   private defaultEditorTab = "documentation";
 
   private assetsInFlight: number = 0;

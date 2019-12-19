@@ -251,6 +251,12 @@ pub fn version() -> String {
     concat!("Equinox v", env!("CARGO_PKG_VERSION"), " (WebGL2)").to_owned()
 }
 
+/// Returns licensing information for the WASM module.
+#[wasm_bindgen]
+pub fn licensing() -> String {
+    lies::licenses_text!().to_owned()
+}
+
 /// Configures browser logging functionality.
 ///
 /// This initialization function is always safe to call more than once, so it

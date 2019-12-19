@@ -37,6 +37,9 @@ rev = "1e97bf25b59db7bf9b53eaf8ca33bd92744eed1f"
 [dependencies.js-sys]
 version = "0.3"
 
+[dependencies.lies]
+version = "0.0.3"
+
 [dependencies.log]
 version = "0.4"
 
