@@ -1,8 +1,5 @@
 SOURCE := https://equinox.bitwise.me/assets
 ASSETS := aft_lounge_8k.raw \
-          aperture2.raw \
-          aperture3.raw \
-          aperture.raw \
           bethnal_green_entrance_4k.raw \
           between_bridges_1k.raw \
           between_bridges_2k.raw \
@@ -28,7 +25,10 @@ ASSETS := aft_lounge_8k.raw \
           paul_lobe_haus_4k.raw \
           sunny_vondelpark_2k.raw \
           sunny_vondelpark_4k.raw \
-          sunny_vondelpark_8k.raw
+          sunny_vondelpark_8k.raw \
+          aperture_filter_1.raw \
+          aperture_filter_2.raw \
+          aperture_filter_3.raw
 
 download-assets: $(ASSETS)
 
