@@ -21,7 +21,7 @@
       </li>
     </ul>
     <hr />
-    <div ref="editor" class="editor" />
+    <textarea ref="editor" />
     <div class="log">
       <p class="error">{{ error }}</p>
     </div>
@@ -42,20 +42,21 @@ export default class extends Vue {
   private error: string = "";
 
   mounted() {
-    const editor = CodeMirror(this.$refs.editor as HTMLElement, {
-      mode: "application/json",
-      gutters: ["CodeMirror-lint-markers"],
-      lineNumbers: true,
-      tabSize: 2,
-      theme: "monokai",
-      lint: true
-    });
+    const editor = CodeMirror.fromTextArea(
+      this.$refs.editor as HTMLTextAreaElement,
+      {
+        mode: "application/json",
+        gutters: ["CodeMirror-lint-markers"],
+        lineNumbers: true,
+        tabSize: 2,
+        theme: "monokai",
+        lint: true
+      }
+    );
 
     editor.on("change", () => {
       this.onJsonChange(editor.getValue());
     });
-
-    editor.setSize(null, "100%");
 
     editor.setValue(JSON.stringify(this.sceneJson(), null, 2));
     editor.clearHistory();
@@ -142,10 +143,6 @@ export default class extends Vue {
   flex-direction: column;
 }
 
-.editor {
-  flex: 1;
-}
-
 .error {
   color: red;
   font-weight: bold;
@@ -153,5 +150,11 @@ export default class extends Vue {
 
 .hyperlink {
   color: #abcdef;
+}
+</style>
+
+<style>
+.CodeMirror {
+  flex: 1;
 }
 </style>
