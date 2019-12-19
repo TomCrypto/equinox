@@ -1,7 +1,5 @@
 #![allow(clippy::too_many_arguments)]
 
-use crypto::rc4::Rc4;
-use crypto::symmetriccipher::SynchronousStreamCipher;
 use regex::Regex;
 use std::env::var_os;
 use std::ffi::OsStr;
@@ -32,7 +30,7 @@ fn preprocess_shaders(dir: &str, ext: &str, include_path: &str) -> Result<()> {
         r#"
     #[derive(Debug)]
     pub struct ShaderInfo {{
-        pub code: &'static [u8],
+        pub code: &'static str,
         pub headers: &'static [&'static str],
         pub defines: &'static [&'static str],
         pub uniform_blocks: &'static [&'static str],
@@ -68,24 +66,17 @@ fn preprocess_shaders(dir: &str, ext: &str, include_path: &str) -> Result<()> {
             let out_dir: PathBuf = var_os("OUT_DIR").unwrap().into();
             let shader = read_to_string(out_dir.join(path.file_name().unwrap()))?;
 
-            let mut rc4 =
-                Rc4::new(b"\x80\x33\x5d\x92\x96\x5f\xbd\x83\x63\x5f\xbd\x86\x54\x7f\xf9\x3c");
-
-            let mut shader_bytes = vec![0; shader.as_bytes().len()];
-
-            rc4.process(shader.as_bytes(), &mut shader_bytes);
-
             writeln!(
                 generated_file,
                 r#"pub const {}: ShaderInfo = ShaderInfo {{
-                code: &{:?},
+                code: {:?},
                 headers: &{:?},
                 defines: &{:?},
                 uniform_blocks: &{:?},
                 texture_units: &{:?},
             }};"#,
                 name,
-                shader_bytes,
+                shader,
                 metadata.headers,
                 metadata.defines,
                 metadata.uniform_blocks,
