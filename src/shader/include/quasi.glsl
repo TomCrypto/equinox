@@ -17,7 +17,7 @@ uint multiply_high(uint x, uint y) {
 }
 
 quasi_t quasi_init(uint lo, uint hi) {
-    return quasi_t(uvec2(lo, hi), 0U);
+    return quasi_t(uvec2(hi, lo), 0U);
 }
 
 float quasi_sample(inout quasi_t state) {
