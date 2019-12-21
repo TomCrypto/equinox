@@ -14,23 +14,33 @@
         :tabs-below="editorTabsBelow"
         :defaultTab="defaultEditorTab"
       >
-        <template slot="tab-head-advanced">Advanced Editor</template>
+        <template slot="tab-head-advanced"
+          >Advanced Editor</template
+        >
         <template slot="tab-panel-advanced">
           <AdvancedEditor :scene="scene" :load-assets="loadAssets" />
         </template>
-        <template slot="tab-head-environment">Environment</template>
+        <template slot="tab-head-environment"
+          >Environment</template
+        >
         <template slot="tab-panel-environment">
           <EnvironmentEditor :scene="scene" :load-assets="loadAssets" />
         </template>
-        <template slot="tab-head-documentation">Documentation</template>
+        <template slot="tab-head-documentation"
+          >Documentation</template
+        >
         <template slot="tab-panel-documentation">
           <DocumentationEditor />
         </template>
-        <template slot="tab-head-save-load">Save/Load</template>
+        <template slot="tab-head-save-load"
+          >Save/Load</template
+        >
         <template slot="tab-panel-save-load">
           <SaveLoadEditor :scene="scene" :load-assets="loadAssets" />
         </template>
-        <template slot="tab-head-licensing">Licensing</template>
+        <template slot="tab-head-licensing"
+          >Licensing</template
+        >
         <template slot="tab-panel-licensing">
           <LicensingEditor :licensing="equinox.licensing()" />
         </template>
@@ -79,7 +89,8 @@ export default class App extends Vue {
   ];
   private defaultEditorTab = "documentation";
 
-  private assetsInFlight: number = 0;
+  private assetDownloads = new Map<string, Promise<ArrayBuffer>>();
+  private assetsInFlight = 0;
 
   private readonly store = localforage.createInstance({
     driver: localforage.INDEXEDDB,
@@ -97,8 +108,13 @@ export default class App extends Vue {
     const promises = [];
 
     for (const asset of assets) {
-      promises.push(this.fetchAsset(asset));
+      const promise = this.assetDownloads.get(asset) || this.fetchAsset(asset);
+
+      promises.push(promise);
+      this.assetDownloads.set(asset, promise);
     }
+
+    this.assetsInFlight = this.assetDownloads.size;
 
     for (const [index, buffer] of (await Promise.all(promises)).entries()) {
       this.scene.insert_asset(assets[index], new Uint8Array(buffer));
@@ -106,8 +122,6 @@ export default class App extends Vue {
   }
 
   async fetchAsset(url: string): Promise<ArrayBuffer> {
-    this.assetsInFlight += 1;
-
     try {
       let data = (await this.store.getItem(url)) as Blob | null;
 
@@ -120,7 +134,8 @@ export default class App extends Vue {
 
       return new Response(data).arrayBuffer();
     } finally {
-      this.assetsInFlight -= 1;
+      this.assetDownloads.delete(url);
+      this.assetsInFlight = this.assetDownloads.size;
     }
   }
 
