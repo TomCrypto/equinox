@@ -68,6 +68,7 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
             ray.org += ray.dir * traversal.range.y;
 
             vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
+            normal = get_normal(normal, ray.org);
 
             uint material = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;

@@ -8,6 +8,33 @@ layout (std140) uniform Material {
     vec4 data[MATERIAL_DATA_LEN];
 } material_buffer;
 
+uniform sampler2D normal_map;
+
+vec3 getTriPlanarBlend(vec3 _wNorm){
+	vec3 blending = abs( _wNorm );
+    blending = pow(blending, vec3(128.0));
+	blending = normalize(max(blending, 1e-6)); // Force weights to sum to 1.0
+	float b = (blending.x + blending.y + blending.z);
+	blending /= vec3(b, b, b);
+	return blending;
+}
+
+vec3 get_normal(vec3 world_normal, vec3 world_pos) {
+    vec3 blending = getTriPlanarBlend(world_normal);
+
+    vec3 xaxis = textureLod(normal_map, world_pos.yz * 0.2, 0.0).rbg * 2.0 - 1.0;
+	vec3 yaxis = textureLod(normal_map, world_pos.xz * 0.2, 0.0).rbg * 2.0 - 1.0;
+	vec3 zaxis = textureLod(normal_map, world_pos.xy * 0.2, 0.0).rbg * 2.0 - 1.0;
+
+    xaxis.xz *= world_normal.x < 0.0 ? +1.0 : -1.0;
+    yaxis.xz *= world_normal.y < 0.0 ? -1.0 : +1.0;
+    zaxis.xz *= world_normal.z < 0.0 ? +1.0 : -1.0;
+
+    vec3 normalTex = normalize(xaxis * blending.x + yaxis * blending.y + zaxis * blending.z);
+
+    return rotate(normalTex, world_normal);
+}
+
 // == LAMBERTIAN =================================================================================
 #define MAT_LAMBERTIAN_ALBEDO                               material_buffer.data[inst +  0U].xyz
 // == IDEAL REFLECTION ===========================================================================

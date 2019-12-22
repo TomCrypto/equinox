@@ -16,7 +16,7 @@ struct traversal_t {
 };
 
 ray_t make_ray(vec3 org, vec3 dir, vec3 normal) {
-    return ray_t(org + normal * 10.0 * PREC * sign(dot(dir, normal)), dir);
+    return ray_t(org + normal * 50.0 * PREC * sign(dot(dir, normal)), dir);
 }
 
 traversal_t traversal_prepare() {
@@ -74,6 +74,8 @@ vec2 direction_to_equirectangular(vec3 dir, float rotation) {
 // Rotates an arbitrary vector "a" by an arbitrarily chosen rotation which
 // takes the (0, 1, 0) vector to the "n" vector ("n" must be unit length).
 vec3 rotate(vec3 a, vec3 n) {
+    // TODO: there is a problematic discontinuity at y = 0 which must be fixed.
+
     float dir = (n.y > 0.0) ? 1.0 : -1.0;
     n.y += dir; // avoids extra register
 
