@@ -107,6 +107,13 @@ impl<T: Copy + Default> MaterialParameter<T> {
             } => Some((texture, mapping)),
         }
     }
+
+    pub fn texture2(&self) -> Option<&str> {
+        match self {
+            Self::Constant(_) => None,
+            Self::Textured { texture, .. } => Some(texture),
+        }
+    }
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]

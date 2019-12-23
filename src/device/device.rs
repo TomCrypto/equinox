@@ -23,6 +23,9 @@ pub struct Device {
     pub(crate) envmap_cond_cdf: Texture<R16F>,
     pub(crate) envmap_color: Texture<RGBA16F>,
 
+    // TODO: material texture array
+    pub(crate) loaded_textures: Vec<String>,
+
     pub(crate) roughness_map: Texture<R8>,
     pub(crate) albedo_map: Texture<RGBA8>,
 
@@ -88,6 +91,8 @@ impl Device {
 
             roughness_map: Texture::new(gl.clone()),
             albedo_map: Texture::new(gl.clone()),
+
+            loaded_textures: vec![],
 
             composited_render: Texture::new(gl.clone()),
             composited_fbo: Framebuffer::new(gl.clone()),
