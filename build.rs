@@ -200,7 +200,7 @@ fn gather_metadata(text: &str, metadata: &mut ShaderMetadata) {
     let uniform_block_pattern =
         Regex::new(r#"^layout *\(std140\) +uniform +([[:graph:]]+) *\{$"#).unwrap();
     let texture_unit_pattern =
-        Regex::new(r#"^uniform +[ui]?sampler2D +([[:graph:]]+) *;$"#).unwrap();
+        Regex::new(r#"^uniform +[ui]?sampler2D(Array)? +([[:graph:]]+) *;$"#).unwrap();
 
     for line in text.lines() {
         if let Some(captures) = define_pattern.captures(line) {
@@ -218,7 +218,7 @@ fn gather_metadata(text: &str, metadata: &mut ShaderMetadata) {
         if let Some(captures) = texture_unit_pattern.captures(line) {
             metadata
                 .texture_units
-                .push(captures.get(1).unwrap().as_str().to_owned());
+                .push(captures.get(2).unwrap().as_str().to_owned());
         }
     }
 }

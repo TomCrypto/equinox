@@ -215,8 +215,7 @@ impl Device {
         command.bind(&self.envmap_color, "envmap_color");
         command.bind(&self.envmap_marg_cdf, "envmap_marg_cdf");
         command.bind(&self.envmap_cond_cdf, "envmap_cond_cdf");
-        command.bind(&self.roughness_map, "roughness_map");
-        command.bind(&self.albedo_map, "albedo_map");
+        command.bind(&self.material_textures, "material_textures");
 
         command.set_viewport(
             0,
@@ -249,8 +248,7 @@ impl Device {
         command.bind(&self.integrator_photon_table_pos, "photon_table_pos");
         command.bind(&self.integrator_photon_table_dir, "photon_table_dir");
         command.bind(&self.integrator_photon_table_sum, "photon_table_sum");
-        command.bind(&self.roughness_map, "roughness_map");
-        command.bind(&self.albedo_map, "albedo_map");
+        command.bind(&self.material_textures, "material_textures");
 
         command.set_framebuffer(&self.integrator_gather_fbo);
 

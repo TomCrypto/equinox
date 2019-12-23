@@ -18,16 +18,7 @@ layout (std140) uniform Material {
     Parameter data[MATERIAL_DATA_LEN];
 } material_buffer;
 
-uniform sampler2D roughness_map;
-uniform sampler2D albedo_map;
-
-float sample_texture_float(uint texture, vec2 uv) {
-    return textureLod(roughness_map, uv, 0.0).x;
-}
-
-vec3 sample_texture_vec3(uint texture, vec2 uv) {
-    return textureLod(albedo_map, uv, 0.0).xyz;
-}
+uniform sampler2DArray material_textures;
 
 vec3 getTriPlanarBlend(vec3 _wNorm){
 	vec3 blending = abs( _wNorm );
@@ -38,22 +29,9 @@ vec3 getTriPlanarBlend(vec3 _wNorm){
 	return blending;
 }
 
-float mat_param_float(uint inst, vec3 normal, vec3 p) {
-    Parameter param = material_buffer.data[inst];
-
-    if (param.texture == 0xffffffffU || param.scale.x == 0.0) {
-        return param.base.x; // texture is absent or irrelevant
-    }
-
-    vec3 triplanar_weights = getTriPlanarBlend(normal);
-
-    float yz_sample = sample_texture_float(param.texture, param.uv_offset + param.uv_scale * p.yz);
-    float xz_sample = sample_texture_float(param.texture, param.uv_offset + param.uv_scale * p.xz);
-    float xy_sample = sample_texture_float(param.texture, param.uv_offset + param.uv_scale * p.xy);
-
-    return param.base.x + param.scale.x * (yz_sample * triplanar_weights.x
-                                        +  xz_sample * triplanar_weights.y
-                                        +  xy_sample * triplanar_weights.z);
+vec3 sample_texture_vec3(uint texture, vec2 uv) {
+    // TODO: unpack sRGB if needed?
+    return textureLod(material_textures, vec3(uv, float(texture)), 0.0).xyz;
 }
 
 vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
@@ -72,6 +50,10 @@ vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
     return param.base.xyz + param.scale.xyz * (yz_sample * triplanar_weights.x
                                             +  xz_sample * triplanar_weights.y
                                             +  xy_sample * triplanar_weights.z);
+}
+
+float mat_param_float(uint inst, vec3 normal, vec3 p) {
+    return luminance(mat_param_vec3(inst, normal, p));
 }
 
 // TODO: find a better way for this; evaluating these parameters is now potentially expensive

@@ -23,11 +23,8 @@ pub struct Device {
     pub(crate) envmap_cond_cdf: Texture<R16F>,
     pub(crate) envmap_color: Texture<RGBA16F>,
 
-    // TODO: material texture array
+    pub(crate) material_textures: Texture<RGBA8>,
     pub(crate) loaded_textures: Vec<String>,
-
-    pub(crate) roughness_map: Texture<R8>,
-    pub(crate) albedo_map: Texture<RGBA8>,
 
     pub(crate) display_buffer: UniformBuffer<DisplayData>,
     pub(crate) camera_buffer: UniformBuffer<CameraData>,
@@ -89,9 +86,7 @@ impl Device {
         Ok(Self {
             gl: gl.clone(),
 
-            roughness_map: Texture::new(gl.clone()),
-            albedo_map: Texture::new(gl.clone()),
-
+            material_textures: Texture::new(gl.clone()),
             loaded_textures: vec![],
 
             composited_render: Texture::new(gl.clone()),
@@ -255,60 +250,7 @@ impl Device {
         let assets = &scene.assets;
 
         invalidated |= Dirty::clean(&mut scene.material_list, |materials| {
-            use img2raw::{ColorSpace, DataFormat, Header};
-            use zerocopy::LayoutVerified;
-
-            let bytes = &include_bytes!("../../assets/roughness_map.raw")[..];
-
-            let tmp = bytes.to_vec();
-
-            let (header, data) =
-                LayoutVerified::<_, Header>::new_from_prefix(tmp.as_slice()).expect("FAILED");
-
-            if header.data_format.try_parse() != Some(DataFormat::R8) {
-                return Err(Error::new("expected RGBA8 normal map"));
-            }
-
-            if header.color_space.try_parse() != Some(ColorSpace::NonColor) {
-                return Err(Error::new("expected non-color normal map"));
-            }
-
-            if header.dimensions[0] == 0 || header.dimensions[1] == 0 {
-                return Err(Error::new("invalid normal map dimensions"));
-            }
-
-            self.roughness_map.upload(
-                header.dimensions[0] as usize,
-                header.dimensions[1] as usize,
-                &data,
-            );
-
-            let bytes = &include_bytes!("../../assets/albedo_map.raw")[..];
-
-            let tmp = bytes.to_vec();
-
-            let (header, data) =
-                LayoutVerified::<_, Header>::new_from_prefix(tmp.as_slice()).expect("FAILED");
-
-            if header.data_format.try_parse() != Some(DataFormat::RGBA8) {
-                return Err(Error::new("expected RGBA8 normal map"));
-            }
-
-            if header.color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
-                return Err(Error::new("expected non-color normal map"));
-            }
-
-            if header.dimensions[0] == 0 || header.dimensions[1] == 0 {
-                return Err(Error::new("invalid normal map dimensions"));
-            }
-
-            self.albedo_map.upload(
-                header.dimensions[0] as usize,
-                header.dimensions[1] as usize,
-                &data,
-            );
-
-            self.update_materials(materials)?;
+            self.update_materials(materials, assets)?;
 
             Dirty::dirty(instances);
 
@@ -585,6 +527,8 @@ impl Device {
 
         self.blit_to_canvas_shader.invalidate();
 
+        self.material_textures.invalidate();
+
         self.load_signal_tile_shader.invalidate();
         self.load_filter_tile_shader.invalidate();
         self.read_signal_tile_shader.invalidate();
@@ -610,9 +554,6 @@ impl Device {
         self.filter_fft_passes.invalidate();
         self.convolution_output_fbo.invalidate();
         self.convolution_signal_fbo.invalidate();
-
-        self.roughness_map.invalidate();
-        self.albedo_map.invalidate();
 
         self.integrator_photon_table_pos.invalidate();
         self.integrator_photon_table_dir.invalidate();

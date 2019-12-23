@@ -2,9 +2,10 @@
 use log::{debug, info, warn};
 
 use crate::{Device, Material, MaterialParameter, TextureMapping};
+use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
-use std::collections::BTreeMap;
-use zerocopy::{AsBytes, FromBytes};
+use std::collections::{BTreeMap, HashMap};
+use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 #[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Clone, Copy, Debug, Default)]
@@ -41,7 +42,6 @@ pub(crate) fn material_parameter_count(material: &Material) -> usize {
 
 // TODO: refactor this to remove duplication
 
-// TODO: pass texture layer mapping here
 fn write_material_parameter_float(
     param: &MaterialParameter<f32>,
     out: &mut MaterialParameterData,
@@ -67,7 +67,7 @@ fn write_material_parameter_float(
             }
         }
     } else {
-        out.texture = 0;
+        out.texture = 0xffff_ffff;
     }
 }
 
@@ -103,7 +103,7 @@ fn write_material_parameter_vec3(
             }
         }
     } else {
-        out.texture = 0;
+        out.texture = 0xffff_ffff;
     }
 }
 
@@ -137,6 +137,9 @@ fn write_material_parameters(
 }
 
 impl Device {
+    const MATERIAL_TEXTURE_COLS: usize = 1024;
+    const MATERIAL_TEXTURE_ROWS: usize = 1024;
+
     fn textures_out_of_date(&self, textures: &[&str]) -> bool {
         if self.loaded_textures.len() != textures.len() {
             return true;
@@ -145,14 +148,55 @@ impl Device {
         textures.iter().eq(self.loaded_textures.iter())
     }
 
-    fn upload_material_textures(&mut self, textures: &[&str]) {
-        if
-        /* texture array is invalidated || */
-        self.textures_out_of_date(textures) {
-            // recreate entire texture array!
+    fn upload_material_textures(
+        &mut self,
+        assets: &HashMap<String, Vec<u8>>,
+        textures: &[&str],
+    ) -> Result<(), Error> {
+        if self.material_textures.is_invalid() || self.textures_out_of_date(textures) {
+            if textures.is_empty() {
+                self.material_textures.create_array(1, 1, 1);
+            } else {
+                let mut layers = vec![];
+
+                for &texture in textures {
+                    let (header, data) =
+                        LayoutVerified::<_, Header>::new_from_prefix(assets[texture].as_slice())
+                            .unwrap();
+
+                    if header.data_format.try_parse() != Some(DataFormat::RGBA8) {
+                        return Err(Error::new("expected RGBA8 material texture"));
+                    }
+
+                    // TODO: use SRGB color space for materials? makes the most sense I think
+                    // we can check for S3TC_SRGB support here and update the shader accordingly?
+
+                    /*if header.color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
+                        return Err(Error::new("expected linear sRGB material texture"));
+                    }*/
+
+                    if header.dimensions[0] as usize != Self::MATERIAL_TEXTURE_COLS {
+                        return Err(Error::new("invalid material texture dimensions"));
+                    }
+
+                    if header.dimensions[1] as usize != Self::MATERIAL_TEXTURE_ROWS {
+                        return Err(Error::new("invalid material texture dimensions"));
+                    }
+
+                    layers.push(data);
+                }
+
+                self.material_textures.upload_array(
+                    Self::MATERIAL_TEXTURE_COLS,
+                    Self::MATERIAL_TEXTURE_ROWS,
+                    &layers,
+                );
+            }
 
             self.loaded_textures = textures.iter().map(|&texture| texture.to_owned()).collect();
         }
+
+        Ok(())
     }
 
     fn add_texture<'a>(texture: Option<&'a str>, textures: &mut Vec<&'a str>) {
@@ -164,6 +208,7 @@ impl Device {
     pub(crate) fn update_materials(
         &mut self,
         materials: &BTreeMap<String, Material>,
+        assets: &HashMap<String, Vec<u8>>,
     ) -> Result<(), Error> {
         let mut parameter_count = 0;
         let mut textures = vec![];
@@ -204,7 +249,7 @@ impl Device {
             texture_layers.insert(texture, index);
         }
 
-        self.upload_material_textures(&textures);
+        self.upload_material_textures(assets, &textures)?;
 
         let mut parameters = vec![MaterialParameterData::default(); parameter_count];
         let mut start = 0;
@@ -220,6 +265,8 @@ impl Device {
 
             start += count;
         }
+
+        log::info!("{:?}", parameters);
 
         self.material_buffer
             .write_array(self.material_buffer.max_len(), &parameters)?;

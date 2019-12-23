@@ -33,7 +33,7 @@ impl RenderTarget for DepthStencil {}
 pub struct Texture<T> {
     gl: Context,
 
-    pub handle: Option<WebGlTexture>,
+    handle: Option<WebGlTexture>,
     layout: (usize, usize, usize),
     format: PhantomData<T>,
 }
@@ -56,23 +56,28 @@ impl<T> Texture<T> {
         self.layout.1
     }
 
+    pub fn layers(&self) -> usize {
+        self.layout.2
+    }
+
     pub fn invalidate(&mut self) {
         self.handle = None;
     }
 
-    fn create_texture(&mut self, cols: usize, rows: usize, mip_levels: usize) -> bool {
-        assert!(
-            cols > 0 && rows > 0 && mip_levels > 0,
-            "invalid texture layout/size requested"
-        );
+    pub fn is_invalid(&self) -> bool {
+        self.handle.is_none()
+    }
 
-        if self.layout != (cols, rows, mip_levels) || self.handle.is_none() {
+    fn create_texture(&mut self, cols: usize, rows: usize, layers: usize) -> bool {
+        assert!(cols > 0 && rows > 0, "invalid texture layout requested");
+
+        if self.layout != (cols, rows, layers) || self.handle.is_none() {
             if let Some(texture_handle) = &self.handle {
                 self.gl.delete_texture(Some(texture_handle));
             }
 
             self.handle = self.gl.create_texture();
-            self.layout = (cols, rows, mip_levels);
+            self.layout = (cols, rows, layers);
 
             if let Err(_) | Ok(None) = self.gl.get_extension("OES_texture_float_linear") {
                 panic!("the WebGL2 extension `OES_texture_float_linear' is unavailable");
@@ -86,7 +91,7 @@ impl<T> Texture<T> {
 }
 
 impl<T: TextureFormat> Texture<T> {
-    fn mag_filter_for_format(&self) -> i32 {
+    fn filter_mode_for_format(&self) -> i32 {
         if T::Filterable::VALUE {
             Context::LINEAR as i32
         } else {
@@ -94,133 +99,43 @@ impl<T: TextureFormat> Texture<T> {
         }
     }
 
-    fn min_filter_for_format(&self, mipped: bool) -> i32 {
-        if !T::Filterable::VALUE && mipped {
-            unreachable!("mipped texture with non-filterable format requested");
-        }
-
-        if T::Filterable::VALUE && mipped {
-            Context::LINEAR_MIPMAP_LINEAR as i32
-        } else if T::Filterable::VALUE {
-            Context::LINEAR as i32
-        } else {
-            Context::NEAREST as i32
-        }
-    }
-
-    fn set_texture_parameters(&mut self, mipped: bool) {
+    fn set_texture_parameters(&mut self, target: u32) {
         self.gl.tex_parameteri(
-            Context::TEXTURE_2D,
+            target,
             Context::TEXTURE_MAG_FILTER,
-            self.mag_filter_for_format(),
+            self.filter_mode_for_format(),
         );
 
         self.gl.tex_parameteri(
-            Context::TEXTURE_2D,
+            target,
             Context::TEXTURE_MIN_FILTER,
-            self.min_filter_for_format(mipped),
+            self.filter_mode_for_format(),
         );
 
-        self.gl.tex_parameteri(
-            Context::TEXTURE_2D,
-            Context::TEXTURE_WRAP_S,
-            Context::REPEAT as i32,
-        );
+        self.gl
+            .tex_parameteri(target, Context::TEXTURE_WRAP_S, Context::REPEAT as i32);
 
-        self.gl.tex_parameteri(
-            Context::TEXTURE_2D,
-            Context::TEXTURE_WRAP_T,
-            Context::REPEAT as i32,
-        );
+        self.gl
+            .tex_parameteri(target, Context::TEXTURE_WRAP_T, Context::REPEAT as i32);
     }
 }
 
-impl<T: TextureFormat<Filterable = True, Compressed = True>> Texture<T> {
+impl<T: TextureFormat<Compressed = True>> Texture<T> {
     // Compressed textures can never be rendered to by hardware, so they have to be
     // initialized with data; it doesn't make sense to create an uninitialized one.
 
-    pub fn upload_compressed(&mut self, _rows: usize, _cols: usize, _data: &[T::Data]) {
+    pub fn upload_compressed(&mut self, _rows: usize, _cols: usize, _layer: &[T::Data]) {
         unimplemented!("compressed textures are not implemented yet")
     }
-}
 
-impl<T: TextureFormat<Filterable = True, Compressed = False>> Texture<T> {
-    pub fn create_mipped(&mut self, cols: usize, rows: usize) {
-        let mip_levels = Self::mip_levels(cols, rows);
-
-        if self.create_texture(cols, rows, mip_levels) {
-            return; // mipped texture already created
-        }
-
-        self.gl
-            .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
-
-        self.gl.tex_storage_2d(
-            Context::TEXTURE_2D,
-            mip_levels as i32,
-            T::GL_INTERNAL_FORMAT,
-            cols as i32,
-            rows as i32,
-        );
-
-        self.set_texture_parameters(true);
-    }
-
-    pub fn upload_mipped(&mut self, cols: usize, rows: usize, data: &[T::Data]) {
-        let mip_levels = Self::mip_levels(cols, rows);
-
-        self.create_mipped(cols, rows);
-
-        let level_slices = T::parse(cols, rows, mip_levels, data);
-
-        assert_eq!(level_slices.len(), mip_levels);
-
-        self.gl.bind_buffer(Context::PIXEL_UNPACK_BUFFER, None);
-        self.gl
-            .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
-
-        for (level, level_slice) in level_slices.into_iter().enumerate() {
-            let level_cols = (cols / (1 << level)).max(1);
-            let level_rows = (rows / (1 << level)).max(1);
-
-            self.gl
-                .tex_sub_image_2d_with_i32_and_i32_and_u32_and_type_and_opt_array_buffer_view(
-                    Context::TEXTURE_2D,
-                    0,
-                    0,
-                    level as i32,
-                    level_cols as i32,
-                    level_rows as i32,
-                    T::GL_FORMAT,
-                    T::GL_TYPE,
-                    Some(&level_slice),
-                )
-                .unwrap();
-        }
-    }
-
-    pub fn gen_mipmaps(&mut self) {
-        self.gl.hint(Context::GENERATE_MIPMAP_HINT, Context::NICEST);
-        self.gl
-            .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
-        self.gl.generate_mipmap(Context::TEXTURE_2D);
-    }
-
-    pub fn level_dimensions(&self, level: usize) -> (usize, usize) {
-        let level_cols = (self.cols() / (1 << level)).max(1);
-        let level_rows = (self.rows() / (1 << level)).max(1);
-
-        (level_cols, level_rows)
-    }
-
-    fn mip_levels(cols: usize, rows: usize) -> usize {
-        1 + (cols.max(rows) as f32).log2().floor() as usize
+    pub fn upload_array_compressed(&mut self, _rows: usize, _cols: usize, _layers: &[&[T::Data]]) {
+        unimplemented!("compressed texture arrays are not implemented yet")
     }
 }
 
 impl<T: TextureFormat<Compressed = False>> Texture<T> {
     pub fn create(&mut self, cols: usize, rows: usize) {
-        if self.create_texture(cols, rows, 1) {
+        if self.create_texture(cols, rows, 0) {
             return; // texture already created
         }
 
@@ -235,17 +150,14 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
             rows as i32,
         );
 
-        self.set_texture_parameters(false);
+        self.set_texture_parameters(Context::TEXTURE_2D);
     }
 
-    pub fn upload(&mut self, cols: usize, rows: usize, data: &[T::Data]) {
+    pub fn upload(&mut self, cols: usize, rows: usize, layer: &[T::Data]) {
         self.create(cols, rows);
 
-        let level_slices = T::parse(cols, rows, 1, data);
+        let texture_data = T::into_texture_source_data(cols, rows, layer);
 
-        assert_eq!(level_slices.len(), 1);
-
-        self.gl.bind_buffer(Context::PIXEL_UNPACK_BUFFER, None);
         self.gl
             .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
 
@@ -259,9 +171,62 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
                 rows as i32,
                 T::GL_FORMAT,
                 T::GL_TYPE,
-                Some(&level_slices[0]),
+                Some(&texture_data),
             )
             .unwrap();
+    }
+
+    pub fn create_array(&mut self, cols: usize, rows: usize, layers: usize) {
+        assert_ne!(layers, 0, "texture array must have at least one layer");
+
+        if self.create_texture(cols, rows, layers) {
+            return; // texture already created
+        }
+
+        self.gl
+            .bind_texture(Context::TEXTURE_2D_ARRAY, self.handle.as_ref());
+
+        self.gl.tex_storage_3d(
+            Context::TEXTURE_2D_ARRAY,
+            1,
+            T::GL_INTERNAL_FORMAT,
+            cols as i32,
+            rows as i32,
+            layers as i32,
+        );
+
+        log::info!("Created 2D texture array with {} layers", layers);
+
+        self.set_texture_parameters(Context::TEXTURE_2D_ARRAY);
+    }
+
+    pub fn upload_array(&mut self, cols: usize, rows: usize, layers: &[&[T::Data]]) {
+        self.create_array(cols, rows, layers.len());
+
+        for (layer, data) in layers.iter().enumerate() {
+            log::info!("uploading layer {} of texture array", layer);
+
+            let texture_data = T::into_texture_source_data(cols, rows, data);
+
+            self.gl
+                .bind_texture(Context::TEXTURE_2D_ARRAY, self.handle.as_ref());
+
+            self.gl
+                .tex_sub_image_3d_with_opt_array_buffer_view(
+                    Context::TEXTURE_2D_ARRAY,
+                    0,
+                    0,
+                    0,
+                    layer as i32,
+                    cols as i32,
+                    rows as i32,
+                    1,
+                    T::GL_FORMAT,
+                    T::GL_TYPE,
+                    Some(&texture_data),
+                )
+                .unwrap();
+        }
     }
 }
 
@@ -279,7 +244,7 @@ impl<T: TextureFormat> AsAttachment for Texture<T> {
 
 impl<T: TextureFormat> AsBindTarget for Texture<T> {
     fn bind_target(&self) -> BindTarget {
-        BindTarget::Texture(self.handle.as_ref())
+        BindTarget::Texture(self.handle.as_ref(), self.layers() != 0)
     }
 }
 
@@ -302,7 +267,7 @@ pub trait TextureFormat {
     const GL_FORMAT: u32;
     const GL_TYPE: u32;
 
-    fn parse(_cols: usize, _rows: usize, _levels: usize, _data: &[Self::Data]) -> Vec<Object> {
+    fn into_texture_source_data(_cols: usize, _rows: usize, _layer: &[Self::Data]) -> Object {
         unimplemented!("texture data upload is not yet implemented for this texture format")
     }
 }
@@ -389,26 +354,10 @@ impl TextureFormat for RG32F {
     const GL_FORMAT: u32 = Context::RG;
     const GL_TYPE: u32 = Context::FLOAT;
 
-    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
-        let mut views = Vec::with_capacity(levels);
+    fn into_texture_source_data(cols: usize, rows: usize, layer: &[Self::Data]) -> Object {
+        assert!(layer.len() == cols * rows * 2);
 
-        for level in 0..levels {
-            let level_cols = (cols / (1 << level)).max(1);
-            let level_rows = (rows / (1 << level)).max(1);
-            let level_size = level_cols * level_rows * 2;
-
-            assert!(data.len() >= level_size);
-
-            let (level_data, remaining) = data.split_at(level_size);
-
-            views.push(Float32Array::from(level_data).into());
-
-            data = remaining;
-        }
-
-        assert!(data.is_empty());
-
-        views
+        Float32Array::from(layer).into()
     }
 }
 
@@ -423,26 +372,10 @@ impl TextureFormat for RGBA8 {
     const GL_FORMAT: u32 = Context::RGBA;
     const GL_TYPE: u32 = Context::UNSIGNED_BYTE;
 
-    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
-        let mut views = Vec::with_capacity(levels);
+    fn into_texture_source_data(cols: usize, rows: usize, layer: &[Self::Data]) -> Object {
+        assert!(layer.len() == cols * rows * 4);
 
-        for level in 0..levels {
-            let level_cols = (cols / (1 << level)).max(1);
-            let level_rows = (rows / (1 << level)).max(1);
-            let level_size = level_cols * level_rows * 4;
-
-            assert!(data.len() >= level_size);
-
-            let (level_data, remaining) = data.split_at(level_size);
-
-            views.push(Uint8Array::from(level_data).into());
-
-            data = remaining;
-        }
-
-        assert!(data.is_empty());
-
-        views
+        Uint8Array::from(layer).into()
     }
 }
 
@@ -457,26 +390,10 @@ impl TextureFormat for R8 {
     const GL_FORMAT: u32 = Context::RED;
     const GL_TYPE: u32 = Context::UNSIGNED_BYTE;
 
-    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
-        let mut views = Vec::with_capacity(levels);
+    fn into_texture_source_data(cols: usize, rows: usize, layer: &[Self::Data]) -> Object {
+        assert!(layer.len() == cols * rows);
 
-        for level in 0..levels {
-            let level_cols = (cols / (1 << level)).max(1);
-            let level_rows = (rows / (1 << level)).max(1);
-            let level_size = level_cols * level_rows;
-
-            assert!(data.len() >= level_size);
-
-            let (level_data, remaining) = data.split_at(level_size);
-
-            views.push(Uint8Array::from(level_data).into());
-
-            data = remaining;
-        }
-
-        assert!(data.is_empty());
-
-        views
+        Uint8Array::from(layer).into()
     }
 }
 
@@ -491,26 +408,10 @@ impl TextureFormat for R16F {
     const GL_FORMAT: u32 = Context::RED;
     const GL_TYPE: u32 = Context::HALF_FLOAT;
 
-    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
-        let mut views = Vec::with_capacity(levels);
+    fn into_texture_source_data(cols: usize, rows: usize, layer: &[Self::Data]) -> Object {
+        assert!(layer.len() == cols * rows);
 
-        for level in 0..levels {
-            let level_cols = (cols / (1 << level)).max(1);
-            let level_rows = (rows / (1 << level)).max(1);
-            let level_size = level_cols * level_rows;
-
-            assert!(data.len() >= level_size);
-
-            let (level_data, remaining) = data.split_at(level_size);
-
-            views.push(Uint16Array::from(level_data).into());
-
-            data = remaining;
-        }
-
-        assert!(data.is_empty());
-
-        views
+        Uint16Array::from(layer).into()
     }
 }
 
@@ -525,26 +426,10 @@ impl TextureFormat for RGBA16F {
     const GL_FORMAT: u32 = Context::RGBA;
     const GL_TYPE: u32 = Context::HALF_FLOAT;
 
-    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
-        let mut views = Vec::with_capacity(levels);
+    fn into_texture_source_data(cols: usize, rows: usize, layer: &[Self::Data]) -> Object {
+        assert!(layer.len() == cols * rows * 4);
 
-        for level in 0..levels {
-            let level_cols = (cols / (1 << level)).max(1);
-            let level_rows = (rows / (1 << level)).max(1);
-            let level_size = level_cols * level_rows * 4;
-
-            assert!(data.len() >= level_size);
-
-            let (level_data, remaining) = data.split_at(level_size);
-
-            views.push(Uint16Array::from(level_data).into());
-
-            data = remaining;
-        }
-
-        assert!(data.is_empty());
-
-        views
+        Uint16Array::from(layer).into()
     }
 }
 

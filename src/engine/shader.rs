@@ -257,8 +257,13 @@ impl Shader {
     ) -> String {
         let pattern = Regex::new(r#"^#include <([[:graph:]]*)>$"#).unwrap();
 
-        let mut source = String::from("#version 300 es\nprecision highp float;\n");
-        source.reserve(glsl_source.len()); // avoid unnecessary data reallocations
+        let mut source = String::from(
+            r#"#version 300 es
+            precision highp float;
+            precision highp sampler2DArray;
+        "#,
+        );
+        source.reserve(glsl_source.len());
 
         for (name, value) in defines {
             source += "#define ";
@@ -313,7 +318,7 @@ pub struct DrawCommand<'a> {
 #[derive(Debug)]
 pub enum BindTarget<'a> {
     UniformBuffer(Option<&'a WebGlBuffer>),
-    Texture(Option<&'a WebGlTexture>),
+    Texture(Option<&'a WebGlTexture>, bool),
 }
 
 pub trait AsBindTarget {
@@ -340,7 +345,7 @@ impl<'a> DrawCommand<'a> {
     pub fn bind(&self, target: &dyn AsBindTarget, slot: &str) {
         match target.bind_target() {
             BindTarget::UniformBuffer(handle) => self.bind_uniform_buffer(handle, slot),
-            BindTarget::Texture(handle) => self.bind_texture(handle, slot),
+            BindTarget::Texture(handle, array) => self.bind_texture(handle, slot, array),
         }
     }
 
@@ -432,10 +437,17 @@ impl<'a> DrawCommand<'a> {
         }
     }
 
-    fn bind_texture(&self, handle: Option<&WebGlTexture>, slot: &str) {
+    fn bind_texture(&self, handle: Option<&WebGlTexture>, slot: &str, array: bool) {
         if let Some(&BindingPoint::TextureUnit(slot)) = self.shader.binds.get(slot) {
             self.shader.gl.active_texture(Context::TEXTURE0 + slot);
-            self.shader.gl.bind_texture(Context::TEXTURE_2D, handle);
+
+            if array {
+                self.shader
+                    .gl
+                    .bind_texture(Context::TEXTURE_2D_ARRAY, handle);
+            } else {
+                self.shader.gl.bind_texture(Context::TEXTURE_2D, handle);
+            }
         } else {
             panic!("slot '{}' does not map to a binding point", slot);
         }
