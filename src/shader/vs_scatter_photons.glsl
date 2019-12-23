@@ -34,7 +34,7 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
             ray.org += ray.dir * traversal.range.y;
 
             vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
-            normal = get_normal(normal, ray.org);
+            // normal = get_normal(normal, ray.org, ray.dir);
 
             uint material = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
@@ -63,7 +63,7 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
                 throughput /= is_receiver ? 1.0 - integrator.photon_rate : 1.0;                   \
                                                                                                   \
                 float unused_pdf; /* we don't use the PDF of the sampling method */               \
-                f = sample(mat_inst, normal, ray.dir, -ray.dir, n1, n2, unused_pdf, quasi);       \
+                f = sample(mat_inst, normal, ray.dir, -ray.dir, n1, n2, unused_pdf, quasi, ray.org);       \
             }
 
             MAT_DO_SWITCH(material)

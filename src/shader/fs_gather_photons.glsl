@@ -25,7 +25,7 @@ vec3 get_photon(cell_t cell, vec3 point, uint material, uint inst, vec3 normal, 
 
         #define MAT_SWITCH_LOGIC(eval, sample) {                                                  \
             float unused_pdf;                                                                     \
-            return throughput * eval(inst, normal, wi, wo, n1, n2, unused_pdf);                   \
+            return throughput * eval(inst, normal, wi, wo, n1, n2, unused_pdf, position);         \
         }
 
         MAT_DO_SWITCH(material)
@@ -68,7 +68,7 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
             ray.org += ray.dir * traversal.range.y;
 
             vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
-            normal = get_normal(normal, ray.org);
+            // normal = get_normal(normal, ray.org, ray.dir);
 
             uint material = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
@@ -93,11 +93,11 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
 
             #define MAT_SWITCH_LOGIC(eval, sample) {                                              \
                 if (light_pdf != 0.0) {                                                           \
-                    mis_f = eval(mat_inst, normal, mis_wi, -ray.dir, n1, n2, mis_material_pdf)    \
+                    mis_f = eval(mat_inst, normal, mis_wi, -ray.dir, n1, n2, mis_material_pdf, ray.org)    \
                           * abs(dot(mis_wi, normal)) * throughput;                                \
                 }                                                                                 \
                                                                                                   \
-                f = sample(mat_inst, normal, wi, -ray.dir, n1, n2, material_pdf, quasi);          \
+                f = sample(mat_inst, normal, wi, -ray.dir, n1, n2, material_pdf, quasi, ray.org);          \
             }
 
             MAT_DO_SWITCH(material)

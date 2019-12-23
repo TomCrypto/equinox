@@ -482,6 +482,28 @@ impl TextureFormat for R8 {
     const GL_INTERNAL_FORMAT: u32 = Context::R8;
     const GL_FORMAT: u32 = Context::RED;
     const GL_TYPE: u32 = Context::UNSIGNED_BYTE;
+
+    fn parse(cols: usize, rows: usize, levels: usize, mut data: &[Self::Data]) -> Vec<Object> {
+        let mut views = Vec::with_capacity(levels);
+
+        for level in 0..levels {
+            let level_cols = (cols / (1 << level)).max(1);
+            let level_rows = (rows / (1 << level)).max(1);
+            let level_size = level_cols * level_rows;
+
+            assert!(data.len() >= level_size);
+
+            let (level_data, remaining) = data.split_at(level_size);
+
+            views.push(Uint8Array::from(level_data).into());
+
+            data = remaining;
+        }
+
+        assert!(data.is_empty());
+
+        views
+    }
 }
 
 impl TextureFormat for R16F {

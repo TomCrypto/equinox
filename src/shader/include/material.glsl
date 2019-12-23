@@ -8,31 +8,28 @@ layout (std140) uniform Material {
     vec4 data[MATERIAL_DATA_LEN];
 } material_buffer;
 
-uniform sampler2D normal_map;
+uniform sampler2D roughness_map;
+uniform sampler2D albedo_map;
 
 vec3 getTriPlanarBlend(vec3 _wNorm){
 	vec3 blending = abs( _wNorm );
-    blending = pow(blending, vec3(128.0));
+    blending = pow(blending, vec3(16.0));
 	blending = normalize(max(blending, 1e-6)); // Force weights to sum to 1.0
 	float b = (blending.x + blending.y + blending.z);
 	blending /= vec3(b, b, b);
 	return blending;
 }
 
-vec3 get_normal(vec3 world_normal, vec3 world_pos) {
-    vec3 blending = getTriPlanarBlend(world_normal);
+vec3 triplanar_sample(sampler2D tex, vec3 n, vec3 pos) {
+    pos *= 0.2;
 
-    vec3 xaxis = textureLod(normal_map, world_pos.yz * 0.2, 0.0).rbg * 2.0 - 1.0;
-	vec3 yaxis = textureLod(normal_map, world_pos.xz * 0.2, 0.0).rbg * 2.0 - 1.0;
-	vec3 zaxis = textureLod(normal_map, world_pos.xy * 0.2, 0.0).rbg * 2.0 - 1.0;
+    vec3 blending = getTriPlanarBlend(n);
 
-    xaxis.xz *= world_normal.x < 0.0 ? +1.0 : -1.0;
-    yaxis.xz *= world_normal.y < 0.0 ? -1.0 : +1.0;
-    zaxis.xz *= world_normal.z < 0.0 ? +1.0 : -1.0;
+    vec3 xaxis = textureLod(tex, pos.yz, 0.0).rgb;
+	vec3 yaxis = textureLod(tex, pos.xz, 0.0).rgb;
+	vec3 zaxis = textureLod(tex, pos.xy, 0.0).rgb;
 
-    vec3 normalTex = normalize(xaxis * blending.x + yaxis * blending.y + zaxis * blending.z);
-
-    return rotate(normalTex, world_normal);
+    return xaxis * blending.x + yaxis * blending.y + zaxis * blending.z;
 }
 
 // == LAMBERTIAN =================================================================================
@@ -53,7 +50,7 @@ vec3 get_normal(vec3 world_normal, vec3 world_pos) {
 
 // == LAMBERTIAN BSDF ============================================================================
 
-vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
+vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
     float wi_n = dot(wi, normal);
 
     if (wi_n <= 0.0 || dot(wo, normal) <= 0.0) {
@@ -65,7 +62,7 @@ vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1
     return vec3(MAT_LAMBERTIAN_ALBEDO / M_PI);
 }
 
-vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
+vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
     float u1 = quasi_sample(quasi);
     float u2 = quasi_sample(quasi);
 
@@ -87,11 +84,11 @@ vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
 
 // == IDEAL REFLECTION BSDF ======================================================================
 
-vec3 mat_ideal_reflection_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
+vec3 mat_ideal_reflection_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
     return pdf = 0.0, vec3(0.0);
 }
 
-vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
+vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
     pdf = 1.0;
     wi = reflect(-wo, normal);
 
@@ -100,13 +97,13 @@ vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 
 // == IDEAL REFRACTION BSDF ======================================================================
 
-vec3 mat_ideal_refraction_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
+vec3 mat_ideal_refraction_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
     pdf = 0.0;
 
     return vec3(0.0);
 }
 
-vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
+vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
     pdf = 1.0;
 
     if (dot(wo, normal) >= 0.0) {
@@ -128,26 +125,30 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 
 // == PHONG BSDF =================================================================================
 
-vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
+vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
     float wi_n = dot(wi, normal);
 
     if (wi_n <= 0.0 || dot(wo, normal) <= 0.0) {
         return pdf = 0.0, vec3(0.0);
     }
 
-    float cos_alpha = pow(max(0.0, dot(reflect(-wo, normal), wi)), MAT_PHONG_EXPONENT);
+    float exponent = 2.0 + (MAT_PHONG_EXPONENT - 2.0) * triplanar_sample(roughness_map, normal, pos).r;
 
-    pdf = cos_alpha * (MAT_PHONG_EXPONENT + 1.0) / M_2PI;
+    float cos_alpha = pow(max(0.0, dot(reflect(-wo, normal), wi)), exponent);
 
-    return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / M_2PI * cos_alpha / max(1e-6, wi_n);
+    pdf = cos_alpha * (exponent + 1.0) / M_2PI;
+
+    return MAT_PHONG_ALBEDO * triplanar_sample(albedo_map, normal, pos) * (exponent + 2.0) / M_2PI * cos_alpha / max(1e-6, wi_n);
 }
 
-vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
+vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
     float u1 = quasi_sample(quasi);
     float u2 = quasi_sample(quasi);
 
+    float exponent = 2.0 + (MAT_PHONG_EXPONENT - 2.0) * triplanar_sample(roughness_map, normal, pos).r;
+
     float phi = M_2PI * u1;
-    float theta = acos(pow(u2, 1.0 / (MAT_PHONG_EXPONENT + 1.0)));
+    float theta = acos(pow(u2, 1.0 / (exponent + 1.0)));
 
     vec3 ideal = reflect(-wo, normal);
 
@@ -157,20 +158,20 @@ vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n
         return pdf = 0.0, vec3(0.0);
     }
 
-    float cos_alpha = pow(max(0.0, dot(ideal, wi)), MAT_PHONG_EXPONENT);
+    float cos_alpha = pow(max(0.0, dot(ideal, wi)), exponent);
 
-    pdf = cos_alpha * (MAT_PHONG_EXPONENT + 1.0) / M_2PI;
+    pdf = cos_alpha * (exponent + 1.0) / M_2PI;
 
-    return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / (MAT_PHONG_EXPONENT + 1.0);
+    return MAT_PHONG_ALBEDO * triplanar_sample(albedo_map, normal, pos) * (exponent + 2.0) / (exponent + 1.0);
 }
 
 // == DIELECTRIC BSDF ============================================================================
 
-vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
+vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
     return pdf = 0.0, vec3(0.0);
 }
 
-vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
+vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
     pdf = 1.0;
 
     float cosI = dot(-wo, normal);
@@ -205,7 +206,7 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
         wi = reflect(-wo, normal);
     }
 
-    return MAT_DIELECTRIC_BASE_COLOR;
+    return triplanar_sample(albedo_map, normal, pos) * MAT_DIELECTRIC_BASE_COLOR;
 }
 
 // == OREN-NAYAR BSDF ============================================================================
@@ -221,7 +222,7 @@ float oren_nayar_term(float wi_n, float wo_n, vec3 wi, vec3 wo, vec3 normal, flo
                                                    * tan(min(theta_i, theta_o));
 }
 
-vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
+vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
     float wi_n = dot(wi, normal);
     float wo_n = dot(wo, normal);
 
@@ -234,7 +235,7 @@ vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1
     return vec3(MAT_OREN_NAYAR_ALBEDO / M_PI) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
 }
 
-vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
+vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
     float u1 = quasi_sample(quasi);
     float u2 = quasi_sample(quasi);
 
