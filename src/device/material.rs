@@ -141,7 +141,7 @@ impl Device {
             return true;
         }
 
-        textures.iter().eq(self.loaded_textures.iter())
+        !textures.iter().eq(self.loaded_textures.iter())
     }
 
     fn upload_material_textures(
