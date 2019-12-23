@@ -4,7 +4,7 @@ use log::{debug, info, warn};
 use crate::{AsAttachment, AsBindTarget, BindTarget};
 use js_sys::{Float32Array, Object, Uint16Array, Uint8Array};
 use std::marker::PhantomData;
-use web_sys::{WebGl2RenderingContext as Context, WebGlBuffer, WebGlTexture};
+use web_sys::{WebGl2RenderingContext as Context, WebGlTexture};
 
 pub trait Boolean {
     const VALUE: bool;
@@ -28,10 +28,6 @@ pub struct NotRenderable;
 
 impl RenderTarget for Color {}
 impl RenderTarget for DepthStencil {}
-
-pub trait AsPixelSource {
-    fn as_pixel_source(&self) -> Option<&WebGlBuffer>;
-}
 
 #[derive(Debug)]
 pub struct Texture<T> {
@@ -266,28 +262,6 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
                 Some(&level_slices[0]),
             )
             .unwrap();
-    }
-
-    pub fn copy_from(&mut self, source: &dyn AsPixelSource) {
-        self.gl
-            .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
-
-        self.gl
-            .bind_buffer(Context::PIXEL_UNPACK_BUFFER, source.as_pixel_source());
-
-        self.gl
-            .tex_sub_image_2d_with_i32_and_i32_and_u32_and_type_and_i32(
-                Context::TEXTURE_2D,
-                0,
-                0,
-                0,
-                self.cols() as i32,
-                self.rows() as i32,
-                T::GL_FORMAT,
-                T::GL_TYPE,
-                0,
-            )
-            .expect("texSubImage2D with a PBO source cannot fail");
     }
 }
 
