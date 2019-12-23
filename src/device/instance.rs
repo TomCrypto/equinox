@@ -2,8 +2,7 @@
 use log::{debug, info, warn};
 
 use crate::{
-    material_index, material_parameter_block_count, BoundingBox, Device, Geometry, Instance,
-    Material,
+    material_index, material_parameter_count, BoundingBox, Device, Geometry, Instance, Material,
 };
 use itertools::izip;
 use js_sys::Error;
@@ -28,7 +27,7 @@ impl Device {
         for (name, material) in material_list {
             material_start.insert(name.to_owned(), count);
 
-            count += material_parameter_block_count(material) as u16;
+            count += material_parameter_count(material) as u16;
         }
 
         for (index, name) in geometry_list.keys().enumerate() {

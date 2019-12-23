@@ -4,12 +4,30 @@
 
 #include <quasi.glsl>
 
+struct Parameter {
+    vec4 base;
+    vec4 scale;
+
+    uint texture;
+
+    float uv_scale;
+    vec2 uv_offset;
+};
+
 layout (std140) uniform Material {
-    vec4 data[MATERIAL_DATA_LEN];
+    Parameter data[MATERIAL_DATA_LEN];
 } material_buffer;
 
 uniform sampler2D roughness_map;
 uniform sampler2D albedo_map;
+
+float sample_texture_float(uint texture, vec2 uv) {
+    return textureLod(roughness_map, uv, 0.0).x;
+}
+
+vec3 sample_texture_vec3(uint texture, vec2 uv) {
+    return textureLod(albedo_map, uv, 0.0).xyz;
+}
 
 vec3 getTriPlanarBlend(vec3 _wNorm){
 	vec3 blending = abs( _wNorm );
@@ -20,37 +38,63 @@ vec3 getTriPlanarBlend(vec3 _wNorm){
 	return blending;
 }
 
-vec3 triplanar_sample(sampler2D tex, vec3 n, vec3 pos) {
-    pos *= 0.2;
+float mat_param_float(uint inst, vec3 normal, vec3 p) {
+    Parameter param = material_buffer.data[inst];
 
-    vec3 blending = getTriPlanarBlend(n);
+    if (param.texture == 0xffffffffU || param.scale.x == 0.0) {
+        return param.base.x; // texture is absent or irrelevant
+    }
 
-    vec3 xaxis = textureLod(tex, pos.yz, 0.0).rgb;
-	vec3 yaxis = textureLod(tex, pos.xz, 0.0).rgb;
-	vec3 zaxis = textureLod(tex, pos.xy, 0.0).rgb;
+    vec3 triplanar_weights = getTriPlanarBlend(normal);
 
-    return xaxis * blending.x + yaxis * blending.y + zaxis * blending.z;
+    float yz_sample = sample_texture_float(param.texture, param.uv_offset + param.uv_scale * p.yz);
+    float xz_sample = sample_texture_float(param.texture, param.uv_offset + param.uv_scale * p.xz);
+    float xy_sample = sample_texture_float(param.texture, param.uv_offset + param.uv_scale * p.xy);
+
+    return param.base.x + param.scale.x * (yz_sample * triplanar_weights.x
+                                        +  xz_sample * triplanar_weights.y
+                                        +  xy_sample * triplanar_weights.z);
 }
 
+vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
+    Parameter param = material_buffer.data[inst];
+
+    if (param.texture == 0xffffffffU || param.scale.xyz == vec3(0.0)) {
+        return param.base.xyz; // the texture is absent or irrelevant
+    }
+
+    vec3 triplanar_weights = getTriPlanarBlend(normal);
+
+    vec3 yz_sample = sample_texture_vec3(param.texture, param.uv_offset + param.uv_scale * p.yz);
+    vec3 xz_sample = sample_texture_vec3(param.texture, param.uv_offset + param.uv_scale * p.xz);
+    vec3 xy_sample = sample_texture_vec3(param.texture, param.uv_offset + param.uv_scale * p.xy);
+
+    return param.base.xyz + param.scale.xyz * (yz_sample * triplanar_weights.x
+                                            +  xz_sample * triplanar_weights.y
+                                            +  xy_sample * triplanar_weights.z);
+}
+
+// TODO: find a better way for this; evaluating these parameters is now potentially expensive
+// but the macros make them look like cheap lookups. Probably just need to rename them slightly?
+
 // == LAMBERTIAN =================================================================================
-#define MAT_LAMBERTIAN_ALBEDO                               material_buffer.data[inst +  0U].xyz
+#define MAT_LAMBERTIAN_ALBEDO                               mat_param_vec3(inst +  0U, normal, p)
 // == IDEAL REFLECTION ===========================================================================
-#define MAT_IDEAL_REFLECTION_REFLECTANCE                    material_buffer.data[inst +  0U].xyz
+#define MAT_IDEAL_REFLECTION_REFLECTANCE                    mat_param_vec3(inst +  0U, normal, p)
 // == IDEAL REFRACTION ===========================================================================
-#define MAT_IDEAL_REFRACTION_TRANSMITTANCE                  material_buffer.data[inst +  0U].xyz
+#define MAT_IDEAL_REFRACTION_TRANSMITTANCE                  mat_param_vec3(inst +  0U, normal, p)
 // == PHONG ======================================================================================
-#define MAT_PHONG_EXPONENT                                  material_buffer.data[inst +  0U].w
-#define MAT_PHONG_ALBEDO                                    material_buffer.data[inst +  0U].xyz
+#define MAT_PHONG_ALBEDO                                    mat_param_vec3(inst +  0U, normal, p)
+#define MAT_PHONG_EXPONENT                                  mat_param_float(inst +  1U, normal, p)
 // == DIELECTRIC =================================================================================
-#define MAT_DIELECTRIC_BASE_COLOR                           material_buffer.data[inst +  0U].xyz
+#define MAT_DIELECTRIC_BASE_COLOR                           mat_param_vec3(inst +  0U, normal, p)
 // == OREN-NAYAR =================================================================================
-#define MAT_OREN_NAYAR_ALBEDO                               material_buffer.data[inst +  0U].xyz
-#define MAT_OREN_NAYAR_COEFF_A                              material_buffer.data[inst +  1U].x
-#define MAT_OREN_NAYAR_COEFF_B                              material_buffer.data[inst +  1U].y
+#define MAT_OREN_NAYAR_ALBEDO                               mat_param_vec3(inst +  0U, normal, p)
+#define MAT_OREN_NAYAR_ROUGHNESS                            mat_param_float(inst +  1U, normal, p)
 
 // == LAMBERTIAN BSDF ============================================================================
 
-vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
+vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 p) {
     float wi_n = dot(wi, normal);
 
     if (wi_n <= 0.0 || dot(wo, normal) <= 0.0) {
@@ -62,7 +106,7 @@ vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1
     return vec3(MAT_LAMBERTIAN_ALBEDO / M_PI);
 }
 
-vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
+vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 p) {
     float u1 = quasi_sample(quasi);
     float u2 = quasi_sample(quasi);
 
@@ -84,11 +128,11 @@ vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
 
 // == IDEAL REFLECTION BSDF ======================================================================
 
-vec3 mat_ideal_reflection_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
+vec3 mat_ideal_reflection_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 p) {
     return pdf = 0.0, vec3(0.0);
 }
 
-vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
+vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 p) {
     pdf = 1.0;
     wi = reflect(-wo, normal);
 
@@ -97,13 +141,13 @@ vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 
 // == IDEAL REFRACTION BSDF ======================================================================
 
-vec3 mat_ideal_refraction_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
+vec3 mat_ideal_refraction_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 p) {
     pdf = 0.0;
 
     return vec3(0.0);
 }
 
-vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
+vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 p) {
     pdf = 1.0;
 
     if (dot(wo, normal) >= 0.0) {
@@ -125,27 +169,29 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
 
 // == PHONG BSDF =================================================================================
 
-vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
+vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 p) {
     float wi_n = dot(wi, normal);
 
     if (wi_n <= 0.0 || dot(wo, normal) <= 0.0) {
         return pdf = 0.0, vec3(0.0);
     }
 
-    float exponent = 2.0 + (MAT_PHONG_EXPONENT - 2.0) * triplanar_sample(roughness_map, normal, pos).r;
+    float exponent = MAT_PHONG_EXPONENT;
+    vec3 albedo = MAT_PHONG_ALBEDO;
 
     float cos_alpha = pow(max(0.0, dot(reflect(-wo, normal), wi)), exponent);
 
     pdf = cos_alpha * (exponent + 1.0) / M_2PI;
 
-    return MAT_PHONG_ALBEDO * triplanar_sample(albedo_map, normal, pos) * (exponent + 2.0) / M_2PI * cos_alpha / max(1e-6, wi_n);
+    return albedo * (exponent + 2.0) / M_2PI * cos_alpha / max(1e-6, wi_n);
 }
 
-vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
+vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 p) {
     float u1 = quasi_sample(quasi);
     float u2 = quasi_sample(quasi);
 
-    float exponent = 2.0 + (MAT_PHONG_EXPONENT - 2.0) * triplanar_sample(roughness_map, normal, pos).r;
+    float exponent = MAT_PHONG_EXPONENT;
+    vec3 albedo = MAT_PHONG_ALBEDO;
 
     float phi = M_2PI * u1;
     float theta = acos(pow(u2, 1.0 / (exponent + 1.0)));
@@ -162,16 +208,16 @@ vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n
 
     pdf = cos_alpha * (exponent + 1.0) / M_2PI;
 
-    return MAT_PHONG_ALBEDO * triplanar_sample(albedo_map, normal, pos) * (exponent + 2.0) / (exponent + 1.0);
+    return albedo * (exponent + 2.0) / (exponent + 1.0);
 }
 
 // == DIELECTRIC BSDF ============================================================================
 
-vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
+vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 p) {
     return pdf = 0.0, vec3(0.0);
 }
 
-vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
+vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 p) {
     pdf = 1.0;
 
     float cosI = dot(-wo, normal);
@@ -206,12 +252,17 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
         wi = reflect(-wo, normal);
     }
 
-    return triplanar_sample(albedo_map, normal, pos) * MAT_DIELECTRIC_BASE_COLOR;
+    return MAT_DIELECTRIC_BASE_COLOR;
 }
 
 // == OREN-NAYAR BSDF ============================================================================
 
-float oren_nayar_term(float wi_n, float wo_n, vec3 wi, vec3 wo, vec3 normal, float a, float b) {
+float oren_nayar_term(float wi_n, float wo_n, vec3 wi, vec3 wo, vec3 normal, float roughness) {
+    float roughness2 = roughness * roughness;
+
+    float a = 1.0 - 0.5 * roughness2 / (roughness2 + 0.33);
+    float b = 0.45 * roughness2 / (roughness2 + 0.09);
+
     vec3 wi_proj = normalize(wi - normal * wi_n);
     vec3 wo_proj = normalize(wo - normal * wo_n);
 
@@ -222,7 +273,7 @@ float oren_nayar_term(float wi_n, float wo_n, vec3 wi, vec3 wo, vec3 normal, flo
                                                    * tan(min(theta_i, theta_o));
 }
 
-vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 pos) {
+vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf, vec3 p) {
     float wi_n = dot(wi, normal);
     float wo_n = dot(wo, normal);
 
@@ -232,10 +283,10 @@ vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1
 
     pdf = wi_n / M_PI;
 
-    return vec3(MAT_OREN_NAYAR_ALBEDO / M_PI) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
+    return vec3(MAT_OREN_NAYAR_ALBEDO / M_PI) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_ROUGHNESS);
 }
 
-vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 pos) {
+vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 p) {
     float u1 = quasi_sample(quasi);
     float u2 = quasi_sample(quasi);
 
@@ -253,7 +304,7 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
 
     pdf = wi_n / M_PI;
 
-    return vec3(MAT_OREN_NAYAR_ALBEDO) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_COEFF_A, MAT_OREN_NAYAR_COEFF_B);
+    return vec3(MAT_OREN_NAYAR_ALBEDO) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_ROUGHNESS);
 }
 
 #define MAT_IS_RECEIVER(material) \

@@ -16,7 +16,7 @@ pub struct Device {
     pub(crate) read_signal_tile_shader: Shader,
 
     pub(crate) geometry_buffer: UniformBuffer<[GeometryParameter]>,
-    pub(crate) material_buffer: UniformBuffer<[MaterialParameter]>,
+    pub(crate) material_buffer: UniformBuffer<[MaterialParameterData]>, // TODO: fix that
     pub(crate) instance_buffer: UniformBuffer<[SceneInstanceNode]>,
 
     pub(crate) envmap_marg_cdf: Texture<R16F>,

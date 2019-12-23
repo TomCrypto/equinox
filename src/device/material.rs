@@ -1,14 +1,20 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::{Device, Material};
+use crate::{Device, Material, MaterialParameter, TextureMapping};
 use js_sys::Error;
 use std::collections::BTreeMap;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Clone, Copy, Debug, Default)]
-pub struct MaterialParameter([f32; 4]);
+pub struct MaterialParameterData {
+    base: [f32; 4],
+    scale: [f32; 4],
+    texture: u32,
+    mapping_scale: f32,
+    mapping_offset: [f32; 2],
+}
 
 pub(crate) fn material_index(material: &Material) -> u16 {
     match material {
@@ -21,57 +27,102 @@ pub(crate) fn material_index(material: &Material) -> u16 {
     }
 }
 
-/// Returns the number of 4-float parameter blocks used by a material.
-pub(crate) fn material_parameter_block_count(material: &Material) -> usize {
+/// Returns the number of parameters used by a material.
+pub(crate) fn material_parameter_count(material: &Material) -> usize {
     match material {
         Material::Lambertian { .. } => 1,
         Material::IdealReflection { .. } => 1,
         Material::IdealRefraction { .. } => 1,
-        Material::Phong { .. } => 1,
+        Material::Phong { .. } => 2,
         Material::Dielectric { .. } => 1,
         Material::OrenNayar { .. } => 2,
     }
 }
 
-fn write_material_parameters(material: &Material, parameters: &mut [MaterialParameter]) {
+// TODO: refactor this to remove duplication
+
+// TODO: pass texture layer mapping here
+fn write_material_parameter_float(param: &MaterialParameter<f32>, out: &mut MaterialParameterData) {
+    out.base[0] = param.base();
+    out.scale[0] = param.scale();
+
+    if let Some((texture, mapping)) = param.texture() {
+        // TODO: look up texture layer from mapping
+        // and set the scale/offset appropriately
+
+        out.texture = 0;
+
+        match mapping {
+            TextureMapping::Triplanar { scale, offset } => {
+                out.mapping_scale = *scale;
+                out.mapping_offset = *offset;
+            }
+            TextureMapping::TriplanarStochastic { scale, offset } => {
+                out.mapping_scale = *scale;
+                out.mapping_offset = *offset;
+            }
+        }
+    } else {
+        out.texture = 0;
+    }
+}
+
+fn write_material_parameter_vec3(
+    param: &MaterialParameter<[f32; 3]>,
+    out: &mut MaterialParameterData,
+) {
+    let base = param.base();
+    let scale = param.scale();
+
+    out.base[0] = base[0];
+    out.base[1] = base[1];
+    out.base[2] = base[2];
+    out.scale[0] = scale[0];
+    out.scale[1] = scale[1];
+    out.scale[2] = scale[2];
+
+    if let Some((texture, mapping)) = param.texture() {
+        // TODO: look up texture layer from mapping
+        // and set the scale/offset appropriately
+
+        out.texture = 0;
+
+        match mapping {
+            TextureMapping::Triplanar { scale, offset } => {
+                out.mapping_scale = *scale;
+                out.mapping_offset = *offset;
+            }
+            TextureMapping::TriplanarStochastic { scale, offset } => {
+                out.mapping_scale = *scale;
+                out.mapping_offset = *offset;
+            }
+        }
+    } else {
+        out.texture = 0;
+    }
+}
+
+fn write_material_parameters(material: &Material, parameters: &mut [MaterialParameterData]) {
     match material {
         Material::Lambertian { albedo } => {
-            parameters[0].0[0] = albedo[0];
-            parameters[0].0[1] = albedo[1];
-            parameters[0].0[2] = albedo[2];
+            write_material_parameter_vec3(albedo, &mut parameters[0]);
         }
         Material::IdealReflection { reflectance } => {
-            parameters[0].0[0] = reflectance[0];
-            parameters[0].0[1] = reflectance[1];
-            parameters[0].0[2] = reflectance[2];
+            write_material_parameter_vec3(reflectance, &mut parameters[0]);
         }
         Material::IdealRefraction { transmittance } => {
-            parameters[0].0[0] = transmittance[0];
-            parameters[0].0[1] = transmittance[1];
-            parameters[0].0[2] = transmittance[2];
+            write_material_parameter_vec3(transmittance, &mut parameters[0]);
         }
         Material::Phong { albedo, shininess } => {
-            parameters[0].0[0] = albedo[0];
-            parameters[0].0[1] = albedo[1];
-            parameters[0].0[2] = albedo[2];
-            parameters[0].0[3] = *shininess;
+            write_material_parameter_vec3(albedo, &mut parameters[0]);
+            write_material_parameter_float(shininess, &mut parameters[1]);
         }
         Material::Dielectric { base_color } => {
-            parameters[0].0[0] = base_color[0];
-            parameters[0].0[1] = base_color[1];
-            parameters[0].0[2] = base_color[2];
+            write_material_parameter_vec3(base_color, &mut parameters[0]);
         }
         Material::OrenNayar { albedo, roughness } => {
-            let roughness2 = roughness.max(0.0).min(1.0).powi(2);
-
-            let coeff_a = 1.0 - 0.5 * roughness2 / (roughness2 + 0.33);
-            let coeff_b = 0.45 * roughness2 / (roughness2 + 0.09);
-
-            parameters[0].0[0] = albedo[0];
-            parameters[0].0[1] = albedo[1];
-            parameters[0].0[2] = albedo[2];
-            parameters[1].0[0] = coeff_a;
-            parameters[1].0[1] = coeff_b;
+            write_material_parameter_vec3(albedo, &mut parameters[0]);
+            write_material_parameter_float(roughness, &mut parameters[1]);
         }
     }
 }
@@ -81,17 +132,23 @@ impl Device {
         &mut self,
         materials: &BTreeMap<String, Material>,
     ) -> Result<(), Error> {
+        // TODO: here, gather all of the textures and upload them to the appropriate
+        // texture layer
+        // how do we avoid constantly rebuilding this?
+
         let mut parameter_count = 0;
 
         for material in materials.values() {
-            parameter_count += material_parameter_block_count(material);
+            parameter_count += material_parameter_count(material);
         }
 
-        let mut parameters = vec![MaterialParameter::default(); parameter_count];
+        let mut parameters = vec![MaterialParameterData::default(); parameter_count];
         let mut start = 0;
 
         for material in materials.values() {
-            let count = material_parameter_block_count(material);
+            let count = material_parameter_count(material);
+
+            // TODO: pass in the texture string -> layer mapping to this function...
 
             write_material_parameters(material, &mut parameters[start..start + count]);
 
