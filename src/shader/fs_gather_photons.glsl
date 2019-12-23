@@ -25,7 +25,7 @@ vec3 get_photon(cell_t cell, vec3 point, uint material, uint inst, vec3 normal, 
 
         #define MAT_SWITCH_LOGIC(eval, sample) {                                                  \
             float unused_pdf;                                                                     \
-            return throughput * eval(inst, normal, wi, wo, n1, n2, unused_pdf, position);         \
+            return throughput * eval(inst, normal, wi, wo, n1, n2, unused_pdf, point);            \
         }
 
         MAT_DO_SWITCH(material)

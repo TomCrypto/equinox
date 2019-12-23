@@ -133,8 +133,8 @@ fn write_material_parameters(
 }
 
 impl Device {
-    const MATERIAL_TEXTURE_COLS: usize = 1024;
-    const MATERIAL_TEXTURE_ROWS: usize = 1024;
+    const MATERIAL_TEXTURE_COLS: usize = 2048;
+    const MATERIAL_TEXTURE_ROWS: usize = 2048;
 
     fn textures_out_of_date(&self, textures: &[&str]) -> bool {
         if self.loaded_textures.len() != textures.len() {
