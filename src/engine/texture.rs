@@ -294,6 +294,8 @@ pub struct RGBA16F;
 pub struct D24S8;
 #[derive(Debug)]
 pub struct RGB10A2;
+#[derive(Debug)]
+pub struct SRGBA8;
 
 impl TextureFormat for RGBA32UI {
     type Data = u32;
@@ -455,4 +457,22 @@ impl TextureFormat for RGB10A2 {
     const GL_INTERNAL_FORMAT: u32 = Context::RGB10_A2;
     const GL_FORMAT: u32 = Context::RGBA;
     const GL_TYPE: u32 = Context::UNSIGNED_INT_2_10_10_10_REV;
+}
+
+impl TextureFormat for SRGBA8 {
+    type Data = u8;
+
+    type Compressed = False;
+    type Filterable = True;
+    type Renderable = Color;
+
+    const GL_INTERNAL_FORMAT: u32 = Context::SRGB8_ALPHA8;
+    const GL_FORMAT: u32 = Context::RGBA;
+    const GL_TYPE: u32 = Context::UNSIGNED_BYTE;
+
+    fn into_texture_source_data(cols: usize, rows: usize, layer: &[Self::Data]) -> Object {
+        assert!(layer.len() == cols * rows * 4);
+
+        Uint8Array::from(layer).into()
+    }
 }

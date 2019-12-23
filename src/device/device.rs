@@ -23,7 +23,7 @@ pub struct Device {
     pub(crate) envmap_cond_cdf: Texture<R16F>,
     pub(crate) envmap_color: Texture<RGBA16F>,
 
-    pub(crate) material_textures: Texture<RGBA8>,
+    pub(crate) material_textures: Texture<SRGBA8>,
     pub(crate) loaded_textures: Vec<String>,
 
     pub(crate) display_buffer: UniformBuffer<DisplayData>,

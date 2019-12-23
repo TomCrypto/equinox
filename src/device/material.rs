@@ -51,9 +51,6 @@ fn write_material_parameter_float(
     out.scale[0] = param.scale();
 
     if let Some((texture, mapping)) = param.texture() {
-        // TODO: add texture mapping mode (stochastic or not) in the texture index
-        // somehow
-
         out.texture = texture_layers[texture] as u32;
 
         match mapping {
@@ -64,6 +61,7 @@ fn write_material_parameter_float(
             TextureMapping::TriplanarStochastic { scale, offset } => {
                 out.mapping_scale = *scale;
                 out.mapping_offset = *offset;
+                out.texture |= 0x8000_0000;
             }
         }
     } else {
@@ -87,9 +85,6 @@ fn write_material_parameter_vec3(
     out.scale[2] = scale[2];
 
     if let Some((texture, mapping)) = param.texture() {
-        // TODO: add texture mapping mode (stochastic or not) in the texture index
-        // somehow
-
         out.texture = texture_layers[texture] as u32;
 
         match mapping {
@@ -100,6 +95,7 @@ fn write_material_parameter_vec3(
             TextureMapping::TriplanarStochastic { scale, offset } => {
                 out.mapping_scale = *scale;
                 out.mapping_offset = *offset;
+                out.texture |= 0x8000_0000;
             }
         }
     } else {

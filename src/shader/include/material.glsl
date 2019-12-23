@@ -29,8 +29,35 @@ vec3 getTriPlanarBlend(vec3 _wNorm){
 	return blending;
 }
 
-vec3 sample_texture_vec3(uint texture, vec2 uv) {
-    return srgb_to_linear(textureLod(material_textures, vec3(uv, float(texture)), 0.0).xyz);
+// Adapted from https://www.shadertoy.com/view/MdyfDV
+vec3 sample_texture_stochastic(uint texture, vec2 uv) {
+    vec2 V = vec2(uv.x - 0.57735 * uv.y, 1.1547 * uv.y);
+    vec2 I = floor(V);
+
+    vec3 F = vec3(V - I, 0.0);
+    F.z = 1.0 - F.x - F.y;
+
+    #define rnd22(p)   fract(sin((p) * mat2(127.1,311.7,269.5,183.3) )*43758.5453)
+
+    #define Z   8.0
+
+    #define C(X) textureLod(material_textures, vec3(uv - Z * (X), float(texture)), 0.0).xyz
+
+    vec3 cdx = C(rnd22(I + vec2(1.0, 0.0)));
+    vec3 cdy = C(rnd22(I + vec2(0.0, 1.0)));
+
+    vec3 c = C((F.z > 0.0) ? rnd22(I) : rnd22(I + 1.0));
+
+    return clamp(F.z > 0.0 ? F.x * cdx + F.y * cdy + F.z * c
+                           : (1.0 - F.x) * cdy + (1.0 - F.y) * cdx - F.z * c, 0.0, 1.0);
+}
+
+vec3 sample_texture(uint texture, vec2 uv) {
+    /*if ((texture & 0x80000000U) != 0U) {
+        return sample_texture_stochastic(texture & ~0x80000000U, uv);
+    } else {
+        */return textureLod(material_textures, vec3(uv, float(texture)), 0.0).xyz;
+    //}
 }
 
 vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
@@ -39,12 +66,26 @@ vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
     if (param.texture == 0xffffffffU || param.scale.xyz == vec3(0.0)) {
         return param.base.xyz; // the texture is absent or irrelevant
     }
+    
+    vec3 yz_sample, xz_sample, xy_sample;
+
+    if ((param.texture & 0x80000000U) != 0U) {
+        param.texture &= ~0x80000000U;
+
+        yz_sample = sample_texture_stochastic(param.texture, param.uv_offset + param.uv_scale * p.yz);
+        xz_sample = sample_texture_stochastic(param.texture, param.uv_offset + param.uv_scale * p.xz);
+        xy_sample = sample_texture_stochastic(param.texture, param.uv_offset + param.uv_scale * p.xy);
+    } else {
+        yz_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.yz);
+        xz_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.xz);
+        xy_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.xy);
+    }
+
+    /*vec3 yz_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.yz);
+    vec3 xz_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.xz);
+    vec3 xy_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.xy);*/
 
     vec3 triplanar_weights = getTriPlanarBlend(normal);
-
-    vec3 yz_sample = sample_texture_vec3(param.texture, param.uv_offset + param.uv_scale * p.yz);
-    vec3 xz_sample = sample_texture_vec3(param.texture, param.uv_offset + param.uv_scale * p.xz);
-    vec3 xy_sample = sample_texture_vec3(param.texture, param.uv_offset + param.uv_scale * p.xy);
 
     return param.base.xyz + param.scale.xyz * (yz_sample * triplanar_weights.x
                                             +  xz_sample * triplanar_weights.y
