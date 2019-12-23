@@ -35,6 +35,12 @@ float luminance(vec3 color) {
     return dot(color, vec3(0.2126, 0.7152, 0.0722));
 }
 
+vec3 srgb_to_linear(vec3 srgb) {
+    return mix(srgb / 12.92,
+               pow((srgb + 0.055) / 1.055, vec3(2.4)),
+               vec3(greaterThan(srgb, vec3(0.04045))));
+}
+
 // Takes a ray segment and a bounding box and clips the ray to be fully contained
 // inside the bounding box. Returns true if the ray intersected the bounding box.
 bool ray_bbox(vec3 org, vec3 idir, inout vec2 range, vec3 bbmin, vec3 bbmax) {

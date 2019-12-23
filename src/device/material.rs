@@ -168,12 +168,9 @@ impl Device {
                         return Err(Error::new("expected RGBA8 material texture"));
                     }
 
-                    // TODO: use SRGB color space for materials? makes the most sense I think
-                    // we can check for S3TC_SRGB support here and update the shader accordingly?
-
-                    /*if header.color_space.try_parse() != Some(ColorSpace::LinearSRGB) {
-                        return Err(Error::new("expected linear sRGB material texture"));
-                    }*/
+                    if header.color_space.try_parse() != Some(ColorSpace::SRGB) {
+                        return Err(Error::new("expected sRGB material texture"));
+                    }
 
                     if header.dimensions[0] as usize != Self::MATERIAL_TEXTURE_COLS {
                         return Err(Error::new("invalid material texture dimensions"));

@@ -30,8 +30,7 @@ vec3 getTriPlanarBlend(vec3 _wNorm){
 }
 
 vec3 sample_texture_vec3(uint texture, vec2 uv) {
-    // TODO: unpack sRGB if needed?
-    return textureLod(material_textures, vec3(uv, float(texture)), 0.0).xyz;
+    return srgb_to_linear(textureLod(material_textures, vec3(uv, float(texture)), 0.0).xyz);
 }
 
 vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
