@@ -69,10 +69,12 @@ so a good choice would be three 4-float blocks per material parameter
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum TextureMapping {
     Triplanar {
+        rotation: f32,
         scale: f32,
         offset: [f32; 2],
     },
     TriplanarStochastic {
+        rotation: f32,
         scale: f32,
         offset: [f32; 2],
         #[serde(default)]

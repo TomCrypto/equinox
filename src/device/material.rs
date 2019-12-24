@@ -57,11 +57,17 @@ fn write_material_parameter_float(
         out.stochastic_scale = 0.0;
 
         match mapping {
-            TextureMapping::Triplanar { scale, offset } => {
+            TextureMapping::Triplanar {
+                scale,
+                offset,
+                rotation,
+            } => {
                 out.uv_scale = *scale;
                 out.uv_offset = *offset;
+                out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
             }
             TextureMapping::TriplanarStochastic {
+                rotation,
                 scale,
                 offset,
                 factor,
@@ -69,6 +75,7 @@ fn write_material_parameter_float(
                 out.uv_scale = *scale;
                 out.uv_offset = *offset;
                 out.stochastic_scale = *factor;
+                out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
             }
         }
     } else {
@@ -96,11 +103,17 @@ fn write_material_parameter_vec3(
         out.stochastic_scale = 0.0;
 
         match mapping {
-            TextureMapping::Triplanar { scale, offset } => {
+            TextureMapping::Triplanar {
+                rotation,
+                scale,
+                offset,
+            } => {
                 out.uv_scale = *scale;
                 out.uv_offset = *offset;
+                out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
             }
             TextureMapping::TriplanarStochastic {
+                rotation,
                 scale,
                 offset,
                 factor,
@@ -108,6 +121,7 @@ fn write_material_parameter_vec3(
                 out.uv_scale = *scale;
                 out.uv_offset = *offset;
                 out.stochastic_scale = *factor;
+                out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
             }
         }
     } else {

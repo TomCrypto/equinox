@@ -65,9 +65,11 @@ vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
     vec3 yz_sample, xz_sample, xy_sample;
 
     if (param.stochastic_scale > 0.0) {
-        yz_sample = sample_texture_stochastic(param.layer, param.uv_offset + param.uv_scale * p.yz, param.stochastic_scale);
-        xz_sample = sample_texture_stochastic(param.layer, param.uv_offset + param.uv_scale * p.xz, param.stochastic_scale);
-        xy_sample = sample_texture_stochastic(param.layer, param.uv_offset + param.uv_scale * p.xy, param.stochastic_scale);
+        mat2 rotation = rotation_matrix_2d(param.uv_rotation);
+
+        yz_sample = sample_texture_stochastic(param.layer, param.uv_offset + rotation * param.uv_scale * p.yz, param.stochastic_scale);
+        xz_sample = sample_texture_stochastic(param.layer, param.uv_offset + rotation * param.uv_scale * p.xz, param.stochastic_scale);
+        xy_sample = sample_texture_stochastic(param.layer, param.uv_offset + rotation * param.uv_scale * p.xy, param.stochastic_scale);
     } else {
         yz_sample = sample_texture(param.layer, param.uv_offset + param.uv_scale * p.yz);
         xz_sample = sample_texture(param.layer, param.uv_offset + param.uv_scale * p.xz);
