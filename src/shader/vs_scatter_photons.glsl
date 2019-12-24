@@ -34,15 +34,15 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
             ray.org += ray.dir * traversal.range.y;
 
             vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
-            // normal = get_normal(normal, ray.org, ray.dir);
 
-            uint material = traversal.hit.y & 0xffffU;
+            uint mat_type = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
+            material_t material;
 
             // Note surfaces will NEVER receive first bounce photons. The "sample explicit" flag
             // is purely an optimization meant for when a surface cannot directly see any light.
 
-            bool is_receiver = MAT_IS_RECEIVER(material) && (bounce != 0U);
+            bool is_receiver = MAT_IS_RECEIVER(mat_type) && (bounce != 0U);
 
             float deposit_weight = is_receiver ? quasi_sample(quasi) : 0.0;
 
@@ -54,7 +54,7 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
             throughput *= medium_absorption(traversal.hit.x >> 16U, inside,
                                             traversal.range.y, n1, n2);
 
-            #define MAT_SWITCH_LOGIC(eval, sample) {                                              \
+            #define MAT_SWITCH_LOGIC(LOAD, EVAL, SAMPLE) {                                        \
                 if (is_receiver && deposit_weight < integrator.photon_rate) {                     \
                     deposit_photon(ray, throughput / integrator.photon_rate);                     \
                     return; /* rasterize this photon into the photon table */                     \
@@ -62,11 +62,13 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
                                                                                                   \
                 throughput /= is_receiver ? 1.0 - integrator.photon_rate : 1.0;                   \
                                                                                                   \
+                LOAD(mat_inst, normal, ray.org, material);                                        \
+                                                                                                  \
                 float unused_pdf; /* we don't use the PDF of the sampling method */               \
-                f = sample(mat_inst, normal, ray.dir, -ray.dir, n1, n2, unused_pdf, quasi, ray.org);       \
+                f = SAMPLE(material, normal, ray.dir, -ray.dir, n1, n2, unused_pdf, quasi);       \
             }
 
-            MAT_DO_SWITCH(material)
+            MAT_DO_SWITCH(mat_type)
             #undef MAT_SWITCH_LOGIC
 
             float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));
