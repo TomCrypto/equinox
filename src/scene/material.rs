@@ -68,8 +68,16 @@ so a good choice would be three 4-float blocks per material parameter
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum TextureMapping {
-    Triplanar { scale: f32, offset: [f32; 2] },
-    TriplanarStochastic { scale: f32, offset: [f32; 2] },
+    Triplanar {
+        scale: f32,
+        offset: [f32; 2],
+    },
+    TriplanarStochastic {
+        scale: f32,
+        offset: [f32; 2],
+        #[serde(default)]
+        factor: f32,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

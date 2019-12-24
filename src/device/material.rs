@@ -10,11 +10,13 @@ use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 #[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Clone, Copy, Debug, Default)]
 pub struct MaterialParameterData {
-    base: [f32; 4],
-    scale: [f32; 4],
-    texture: u32,
-    mapping_scale: f32,
-    mapping_offset: [f32; 2],
+    base: [f32; 3],
+    layer: f32,
+    scale: [f32; 3],
+    stochastic_scale: f32,
+    uv_rotation: f32,
+    uv_scale: f32,
+    uv_offset: [f32; 2],
 }
 
 pub(crate) fn material_index(material: &Material) -> u16 {
@@ -51,21 +53,26 @@ fn write_material_parameter_float(
     out.scale[0] = param.scale();
 
     if let Some((texture, mapping)) = param.texture() {
-        out.texture = texture_layers[texture] as u32;
+        out.layer = texture_layers[texture] as f32;
+        out.stochastic_scale = 0.0;
 
         match mapping {
             TextureMapping::Triplanar { scale, offset } => {
-                out.mapping_scale = *scale;
-                out.mapping_offset = *offset;
+                out.uv_scale = *scale;
+                out.uv_offset = *offset;
             }
-            TextureMapping::TriplanarStochastic { scale, offset } => {
-                out.mapping_scale = *scale;
-                out.mapping_offset = *offset;
-                out.texture |= 0x8000_0000;
+            TextureMapping::TriplanarStochastic {
+                scale,
+                offset,
+                factor,
+            } => {
+                out.uv_scale = *scale;
+                out.uv_offset = *offset;
+                out.stochastic_scale = *factor;
             }
         }
     } else {
-        out.texture = 0xffff_ffff;
+        out.layer = -1.0;
     }
 }
 
@@ -85,21 +92,26 @@ fn write_material_parameter_vec3(
     out.scale[2] = scale[2];
 
     if let Some((texture, mapping)) = param.texture() {
-        out.texture = texture_layers[texture] as u32;
+        out.layer = texture_layers[texture] as f32;
+        out.stochastic_scale = 0.0;
 
         match mapping {
             TextureMapping::Triplanar { scale, offset } => {
-                out.mapping_scale = *scale;
-                out.mapping_offset = *offset;
+                out.uv_scale = *scale;
+                out.uv_offset = *offset;
             }
-            TextureMapping::TriplanarStochastic { scale, offset } => {
-                out.mapping_scale = *scale;
-                out.mapping_offset = *offset;
-                out.texture |= 0x8000_0000;
+            TextureMapping::TriplanarStochastic {
+                scale,
+                offset,
+                factor,
+            } => {
+                out.uv_scale = *scale;
+                out.uv_offset = *offset;
+                out.stochastic_scale = *factor;
             }
         }
     } else {
-        out.texture = 0xffff_ffff;
+        out.layer = -1.0;
     }
 }
 

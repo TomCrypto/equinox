@@ -5,11 +5,12 @@
 #include <quasi.glsl>
 
 struct Parameter {
-    vec4 base;
-    vec4 scale;
+    vec3 base;
+    float layer;
+    vec3 scale;
+    float stochastic_scale;
 
-    uint texture;
-
+    float uv_rotation;
     float uv_scale;
     vec2 uv_offset;
 };
@@ -30,7 +31,7 @@ vec3 getTriPlanarBlend(vec3 _wNorm){
 }
 
 // Adapted from https://www.shadertoy.com/view/MdyfDV
-vec3 sample_texture_stochastic(uint texture, vec2 uv) {
+vec3 sample_texture_stochastic(float layer, vec2 uv, float scale) {
     vec2 V = vec2(uv.x - 0.57735 * uv.y, 1.1547 * uv.y);
     vec2 I = floor(V);
 
@@ -39,9 +40,7 @@ vec3 sample_texture_stochastic(uint texture, vec2 uv) {
 
     #define rnd22(p)   fract(sin((p) * mat2(127.1,311.7,269.5,183.3) )*43758.5453)
 
-    #define Z   8.0
-
-    #define C(X) textureLod(material_textures, vec3(uv - Z * (X), float(texture)), 0.0).xyz
+    #define C(X) textureLod(material_textures, vec3(uv - scale * (X), layer), 0.0).xyz
 
     vec3 cdx = C(rnd22(I + vec2(1.0, 0.0)));
     vec3 cdy = C(rnd22(I + vec2(0.0, 1.0)));
@@ -52,33 +51,27 @@ vec3 sample_texture_stochastic(uint texture, vec2 uv) {
                            : (1.0 - F.x) * cdy + (1.0 - F.y) * cdx - F.z * c, 0.0, 1.0);
 }
 
-vec3 sample_texture(uint texture, vec2 uv) {
-    /*if ((texture & 0x80000000U) != 0U) {
-        return sample_texture_stochastic(texture & ~0x80000000U, uv);
-    } else {
-        */return textureLod(material_textures, vec3(uv, float(texture)), 0.0).xyz;
-    //}
+vec3 sample_texture(float layer, vec2 uv) {
+    return textureLod(material_textures, vec3(uv, layer), 0.0).xyz;
 }
 
 vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
     Parameter param = material_buffer.data[inst];
 
-    if (param.texture == 0xffffffffU || param.scale.xyz == vec3(0.0)) {
-        return param.base.xyz; // the texture is absent or irrelevant
+    if (param.layer < 0.0 || param.scale.xyz == vec3(0.0)) {
+        return param.base.xyz; // texture absent/irrelevant
     }
     
     vec3 yz_sample, xz_sample, xy_sample;
 
-    if ((param.texture & 0x80000000U) != 0U) {
-        param.texture &= ~0x80000000U;
-
-        yz_sample = sample_texture_stochastic(param.texture, param.uv_offset + param.uv_scale * p.yz);
-        xz_sample = sample_texture_stochastic(param.texture, param.uv_offset + param.uv_scale * p.xz);
-        xy_sample = sample_texture_stochastic(param.texture, param.uv_offset + param.uv_scale * p.xy);
+    if (param.stochastic_scale > 0.0) {
+        yz_sample = sample_texture_stochastic(param.layer, param.uv_offset + param.uv_scale * p.yz, param.stochastic_scale);
+        xz_sample = sample_texture_stochastic(param.layer, param.uv_offset + param.uv_scale * p.xz, param.stochastic_scale);
+        xy_sample = sample_texture_stochastic(param.layer, param.uv_offset + param.uv_scale * p.xy, param.stochastic_scale);
     } else {
-        yz_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.yz);
-        xz_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.xz);
-        xy_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.xy);
+        yz_sample = sample_texture(param.layer, param.uv_offset + param.uv_scale * p.yz);
+        xz_sample = sample_texture(param.layer, param.uv_offset + param.uv_scale * p.xz);
+        xy_sample = sample_texture(param.layer, param.uv_offset + param.uv_scale * p.xy);
     }
 
     /*vec3 yz_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.yz);
