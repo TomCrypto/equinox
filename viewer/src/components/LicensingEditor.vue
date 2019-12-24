@@ -1,6 +1,10 @@
 <template>
   <div class="container">
     <div class="attribution">
+      <p>{{ version }}</p>
+
+      <hr />
+
       <p>
         All environment maps from
         <a href="https://hdrihaven.com/">HDRI Haven</a> and most textures from
@@ -22,6 +26,7 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 @Component
 export default class extends Vue {
   @Prop() private licensing!: string;
+  @Prop() private version!: string;
 }
 </script>
 

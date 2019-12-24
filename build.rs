@@ -9,6 +9,8 @@ use std::io::{ErrorKind, Result};
 use std::path::{Path, PathBuf};
 
 fn main() {
+    built::write_built_file().expect("failed to gather build information");
+
     if let Err(err) = preprocess_shaders("src/shader", "glsl", "include") {
         panic!("error: failed to preprocess GLSL shader files: {}", err);
     }

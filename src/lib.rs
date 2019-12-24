@@ -2,7 +2,7 @@
 
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::module_inception)]
-#![forbid(dead_code, unsafe_code)]
+#![forbid(unsafe_code, while_true)]
 
 mod device {
     pub mod camera;
@@ -245,10 +245,20 @@ impl WebDevice {
     }
 }
 
+#[allow(dead_code)]
+mod build_metadata {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
+
 /// Returns a version string for the WASM module.
 #[wasm_bindgen]
 pub fn version() -> String {
-    concat!("Equinox v", env!("CARGO_PKG_VERSION"), " (WebGL2)").to_owned()
+    format!(
+        "Equinox v{} ({}) built with {}",
+        build_metadata::PKG_VERSION,
+        build_metadata::GIT_VERSION.unwrap(),
+        build_metadata::RUSTC_VERSION,
+    )
 }
 
 /// Returns licensing information for the WASM module.

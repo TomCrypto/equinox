@@ -42,7 +42,10 @@
           >Licensing</template
         >
         <template slot="tab-panel-licensing">
-          <LicensingEditor :licensing="equinox.licensing()" />
+          <LicensingEditor
+            :licensing="equinox.licensing()"
+            :version="equinox.version()"
+          />
         </template>
       </EditorContainer>
     </div>
