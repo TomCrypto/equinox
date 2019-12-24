@@ -55,30 +55,40 @@ vec3 sample_texture(float layer, vec2 uv) {
     return textureLod(material_textures, vec3(uv, layer), 0.0).xyz;
 }
 
+mat3x2 uv_transform_matrix(float rotation, float scale, vec2 translation) {
+    float s = scale * sin(rotation);
+	float c = scale * cos(rotation);
+
+	return mat3x2(c, -s, s, c, translation);
+}
+
 vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
     Parameter param = material_buffer.data[inst];
 
     if (param.layer < 0.0 || param.scale.xyz == vec3(0.0)) {
         return param.base.xyz; // texture absent/irrelevant
     }
-    
+
+    mat3x2 xfm = uv_transform_matrix(param.uv_rotation, param.uv_scale, param.uv_offset);
+
+    // Offset all triplanar coordinates slightly based on the normal direction to
+    // randomize the mapping on e.g. parallel sides of a box or a sheet of glass.
+
+    vec2 yz_uv = xfm * vec3(p.yz + (normal.x > 0.0 ? 0.0 : 17.4326), 1.0);
+    vec2 xz_uv = xfm * vec3(p.xz + (normal.y > 0.0 ? 0.0 : 13.8193), 1.0);
+    vec2 xy_uv = xfm * vec3(p.xy + (normal.z > 0.0 ? 0.0 : 15.2175), 1.0);
+
     vec3 yz_sample, xz_sample, xy_sample;
 
     if (param.stochastic_scale > 0.0) {
-        mat2 rotation = rotation_matrix_2d(param.uv_rotation);
-
-        yz_sample = sample_texture_stochastic(param.layer, param.uv_offset + rotation * param.uv_scale * p.yz, param.stochastic_scale);
-        xz_sample = sample_texture_stochastic(param.layer, param.uv_offset + rotation * param.uv_scale * p.xz, param.stochastic_scale);
-        xy_sample = sample_texture_stochastic(param.layer, param.uv_offset + rotation * param.uv_scale * p.xy, param.stochastic_scale);
+        yz_sample = sample_texture_stochastic(param.layer, yz_uv, param.stochastic_scale);
+        xz_sample = sample_texture_stochastic(param.layer, xz_uv, param.stochastic_scale);
+        xy_sample = sample_texture_stochastic(param.layer, xy_uv, param.stochastic_scale);
     } else {
-        yz_sample = sample_texture(param.layer, param.uv_offset + param.uv_scale * p.yz);
-        xz_sample = sample_texture(param.layer, param.uv_offset + param.uv_scale * p.xz);
-        xy_sample = sample_texture(param.layer, param.uv_offset + param.uv_scale * p.xy);
+        yz_sample = sample_texture(param.layer, yz_uv);
+        xz_sample = sample_texture(param.layer, xz_uv);
+        xy_sample = sample_texture(param.layer, xy_uv);
     }
-
-    /*vec3 yz_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.yz);
-    vec3 xz_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.xz);
-    vec3 xy_sample = sample_texture(param.texture, param.uv_offset + param.uv_scale * p.xy);*/
 
     vec3 triplanar_weights = getTriPlanarBlend(normal);
 
@@ -237,6 +247,8 @@ vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1
 vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 p) {
     pdf = 1.0;
 
+    vec3 base_color = MAT_DIELECTRIC_BASE_COLOR;
+
     float cosI = dot(-wo, normal);
 
     if (cosI < 0.0) {
@@ -269,7 +281,7 @@ vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
         wi = reflect(-wo, normal);
     }
 
-    return MAT_DIELECTRIC_BASE_COLOR;
+    return base_color;
 }
 
 // == OREN-NAYAR BSDF ============================================================================
