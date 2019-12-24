@@ -101,23 +101,28 @@ float mat_param_float(uint inst, vec3 normal, vec3 p) {
     return luminance(mat_param_vec3(inst, normal, p));
 }
 
-// TODO: find a better way for this; evaluating these parameters is now potentially expensive
-// but the macros make them look like cheap lookups. Probably just need to rename them slightly?
-
 // == LAMBERTIAN =================================================================================
-#define MAT_LAMBERTIAN_ALBEDO                               clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
+#define MAT_FETCH_LAMBERTIAN_ALBEDO(normal, p)                                                   \
+    clamp(mat_param_vec3(inst + 0U, normal, p), 0.0, 1.0)
 // == IDEAL REFLECTION ===========================================================================
-#define MAT_IDEAL_REFLECTION_REFLECTANCE                    clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
+#define MAT_FETCH_IDEAL_REFLECTION_REFLECTANCE(normal, p)                                        \
+    clamp(mat_param_vec3(inst + 0U, normal, p), 0.0, 1.0)
 // == IDEAL REFRACTION ===========================================================================
-#define MAT_IDEAL_REFRACTION_TRANSMITTANCE                  clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
+#define MAT_FETCH_IDEAL_REFRACTION_TRANSMITTANCE(normal, p)                                      \
+    clamp(mat_param_vec3(inst + 0U, normal, p), 0.0, 1.0)
 // == PHONG ======================================================================================
-#define MAT_PHONG_ALBEDO                                    clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
-#define MAT_PHONG_EXPONENT                                  max(mat_param_float(inst +  1U, normal, p), 1.0)
+#define MAT_FETCH_PHONG_ALBEDO(normal, p)                                                        \
+    clamp(mat_param_vec3(inst + 0U, normal, p), 0.0, 1.0)
+#define MAT_FETCH_PHONG_EXPONENT(normal, p)                                                      \
+    max(mat_param_float(inst + 1U, normal, p), 1.0)
 // == DIELECTRIC =================================================================================
-#define MAT_DIELECTRIC_BASE_COLOR                           clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
+#define MAT_FETCH_DIELECTRIC_BASE_COLOR(normal, p)                                               \
+    clamp(mat_param_vec3(inst + 0U, normal, p), 0.0, 1.0)
 // == OREN-NAYAR =================================================================================
-#define MAT_OREN_NAYAR_ALBEDO                               clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
-#define MAT_OREN_NAYAR_ROUGHNESS                            clamp(mat_param_float(inst +  1U, normal, p), 0.0, 1.0)
+#define MAT_FETCH_OREN_NAYAR_ALBEDO(normal, p)                                                   \
+    clamp(mat_param_vec3(inst + 0U, normal, p), 0.0, 1.0)
+#define MAT_FETCH_OREN_NAYAR_ROUGHNESS(normal, p)                                                \
+    clamp(mat_param_float(inst + 1U, normal, p), 0.0, 1.0)
 
 // == LAMBERTIAN BSDF ============================================================================
 
@@ -130,7 +135,7 @@ vec3 mat_lambertian_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1
 
     pdf = wi_n / M_PI;
 
-    return vec3(MAT_LAMBERTIAN_ALBEDO / M_PI);
+    return MAT_FETCH_LAMBERTIAN_ALBEDO(normal, p) / M_PI;
 }
 
 vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 p) {
@@ -150,7 +155,7 @@ vec3 mat_lambertian_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
 
     pdf = wi_n / M_PI;
 
-    return vec3(MAT_LAMBERTIAN_ALBEDO);
+    return MAT_FETCH_LAMBERTIAN_ALBEDO(normal, p);
 }
 
 // == IDEAL REFLECTION BSDF ======================================================================
@@ -163,7 +168,7 @@ vec3 mat_ideal_reflection_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
     pdf = 1.0;
     wi = reflect(-wo, normal);
 
-    return MAT_IDEAL_REFLECTION_REFLECTANCE;
+    return MAT_FETCH_IDEAL_REFLECTION_REFLECTANCE(normal, p);
 }
 
 // == IDEAL REFRACTION BSDF ======================================================================
@@ -191,7 +196,7 @@ vec3 mat_ideal_refraction_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 
         }
     }
 
-    return MAT_IDEAL_REFRACTION_TRANSMITTANCE;
+    return MAT_FETCH_IDEAL_REFRACTION_TRANSMITTANCE(normal, p);
 }
 
 // == PHONG BSDF =================================================================================
@@ -203,22 +208,20 @@ vec3 mat_phong_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1, flo
         return pdf = 0.0, vec3(0.0);
     }
 
-    float exponent = MAT_PHONG_EXPONENT;
-    vec3 albedo = MAT_PHONG_ALBEDO;
+    float exponent = MAT_FETCH_PHONG_EXPONENT(normal, p);
 
     float cos_alpha = pow(max(0.0, dot(reflect(-wo, normal), wi)), exponent);
 
     pdf = cos_alpha * (exponent + 1.0) / M_2PI;
 
-    return albedo * (exponent + 2.0) / M_2PI * cos_alpha / max(1e-6, wi_n);
+    return MAT_FETCH_PHONG_ALBEDO(normal, p) * (exponent + 2.0) / M_2PI * cos_alpha / max(1e-6, wi_n);
 }
 
 vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 p) {
     float u1 = quasi_sample(quasi);
     float u2 = quasi_sample(quasi);
 
-    float exponent = MAT_PHONG_EXPONENT;
-    vec3 albedo = MAT_PHONG_ALBEDO;
+    float exponent = MAT_FETCH_PHONG_EXPONENT(normal, p);
 
     float phi = M_2PI * u1;
     float theta = acos(pow(u2, 1.0 / (exponent + 1.0)));
@@ -235,7 +238,7 @@ vec3 mat_phong_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n
 
     pdf = cos_alpha * (exponent + 1.0) / M_2PI;
 
-    return albedo * (exponent + 2.0) / (exponent + 1.0);
+    return MAT_FETCH_PHONG_ALBEDO(normal, p) * (exponent + 2.0) / (exponent + 1.0);
 }
 
 // == DIELECTRIC BSDF ============================================================================
@@ -247,7 +250,7 @@ vec3 mat_dielectric_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1
 vec3 mat_dielectric_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 p) {
     pdf = 1.0;
 
-    vec3 base_color = MAT_DIELECTRIC_BASE_COLOR;
+    vec3 base_color = MAT_FETCH_DIELECTRIC_BASE_COLOR(normal, p);
 
     float cosI = dot(-wo, normal);
 
@@ -312,7 +315,7 @@ vec3 mat_oren_nayar_eval_brdf(uint inst, vec3 normal, vec3 wi, vec3 wo, float n1
 
     pdf = wi_n / M_PI;
 
-    return vec3(MAT_OREN_NAYAR_ALBEDO / M_PI) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_ROUGHNESS);
+    return MAT_FETCH_OREN_NAYAR_ALBEDO(normal, p) / M_PI * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_FETCH_OREN_NAYAR_ROUGHNESS(normal, p));
 }
 
 vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi, vec3 p) {
@@ -333,7 +336,7 @@ vec3 mat_oren_nayar_sample_brdf(uint inst, vec3 normal, out vec3 wi, vec3 wo, fl
 
     pdf = wi_n / M_PI;
 
-    return vec3(MAT_OREN_NAYAR_ALBEDO) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_ROUGHNESS);
+    return MAT_FETCH_OREN_NAYAR_ALBEDO(normal, p) * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_FETCH_OREN_NAYAR_ROUGHNESS(normal, p));
 }
 
 #define MAT_IS_RECEIVER(material) \
