@@ -95,19 +95,19 @@ float mat_param_float(uint inst, vec3 normal, vec3 p) {
 // but the macros make them look like cheap lookups. Probably just need to rename them slightly?
 
 // == LAMBERTIAN =================================================================================
-#define MAT_LAMBERTIAN_ALBEDO                               mat_param_vec3(inst +  0U, normal, p)
+#define MAT_LAMBERTIAN_ALBEDO                               clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
 // == IDEAL REFLECTION ===========================================================================
-#define MAT_IDEAL_REFLECTION_REFLECTANCE                    mat_param_vec3(inst +  0U, normal, p)
+#define MAT_IDEAL_REFLECTION_REFLECTANCE                    clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
 // == IDEAL REFRACTION ===========================================================================
-#define MAT_IDEAL_REFRACTION_TRANSMITTANCE                  mat_param_vec3(inst +  0U, normal, p)
+#define MAT_IDEAL_REFRACTION_TRANSMITTANCE                  clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
 // == PHONG ======================================================================================
-#define MAT_PHONG_ALBEDO                                    mat_param_vec3(inst +  0U, normal, p)
-#define MAT_PHONG_EXPONENT                                  mat_param_float(inst +  1U, normal, p)
+#define MAT_PHONG_ALBEDO                                    clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
+#define MAT_PHONG_EXPONENT                                  max(mat_param_float(inst +  1U, normal, p), 1.0)
 // == DIELECTRIC =================================================================================
-#define MAT_DIELECTRIC_BASE_COLOR                           mat_param_vec3(inst +  0U, normal, p)
+#define MAT_DIELECTRIC_BASE_COLOR                           clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
 // == OREN-NAYAR =================================================================================
-#define MAT_OREN_NAYAR_ALBEDO                               mat_param_vec3(inst +  0U, normal, p)
-#define MAT_OREN_NAYAR_ROUGHNESS                            mat_param_float(inst +  1U, normal, p)
+#define MAT_OREN_NAYAR_ALBEDO                               clamp(mat_param_vec3(inst +  0U, normal, p), 0.0, 1.0)
+#define MAT_OREN_NAYAR_ROUGHNESS                            clamp(mat_param_float(inst +  1U, normal, p), 0.0, 1.0)
 
 // == LAMBERTIAN BSDF ============================================================================
 
