@@ -1,8 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::{Device, Material, MaterialParameter, TextureMapping};
-use half::f16;
+use crate::{Device, Material, MaterialParameter};
 use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
 use std::collections::{BTreeMap, HashMap};
@@ -54,35 +53,25 @@ fn write_material_parameter_float(
     out.base[0] = param.base();
     out.scale[0] = param.scale();
 
-    if let Some((texture, mapping)) = param.texture() {
-        out.layer = texture_layers[texture] as f32;
-        // out.stochastic_scale = 0.0;
+    if let MaterialParameter::Textured {
+        texture,
+        uv_scale,
+        uv_offset,
+        uv_rotation,
+        contrast,
+        stochastic,
+        ..
+    } = param
+    {
+        out.layer = texture_layers[texture.as_str()] as f32;
 
-        match mapping {
-            TextureMapping::Triplanar {
-                scale,
-                offset,
-                rotation,
-                contrast,
-            } => {
-                out.uv_scale = *scale;
-                out.uv_offset = *offset;
-                out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
-                out.contrast = -*contrast;
-            }
-            TextureMapping::TriplanarStochastic {
-                rotation,
-                scale,
-                offset,
-                factor,
-                contrast,
-            } => {
-                out.uv_scale = *scale;
-                out.uv_offset = *offset;
-                // out.stochastic_scale = *factor;
-                out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
-                out.contrast = *contrast;
-            }
+        out.uv_scale = *uv_scale;
+        out.uv_offset = *uv_offset;
+        out.uv_rotation = uv_rotation.rem_euclid(2.0 * std::f32::consts::PI);
+        out.contrast = *contrast;
+
+        if !stochastic {
+            out.contrast *= -1.0;
         }
     } else {
         out.layer = -1.0;
@@ -104,34 +93,25 @@ fn write_material_parameter_vec3(
     out.scale[1] = scale[1];
     out.scale[2] = scale[2];
 
-    if let Some((texture, mapping)) = param.texture() {
-        out.layer = texture_layers[texture] as f32;
+    if let MaterialParameter::Textured {
+        texture,
+        uv_scale,
+        uv_offset,
+        uv_rotation,
+        contrast,
+        stochastic,
+        ..
+    } = param
+    {
+        out.layer = texture_layers[texture.as_str()] as f32;
 
-        match mapping {
-            TextureMapping::Triplanar {
-                rotation,
-                scale,
-                offset,
-                contrast,
-            } => {
-                out.uv_scale = *scale;
-                out.uv_offset = *offset;
-                out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
-                out.contrast = -*contrast;
-            }
-            TextureMapping::TriplanarStochastic {
-                rotation,
-                scale,
-                offset,
-                factor,
-                contrast,
-            } => {
-                out.uv_scale = *scale;
-                out.uv_offset = *offset;
-                // out.stochastic_scale = *factor;
-                out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
-                out.contrast = *contrast;
-            }
+        out.uv_scale = *uv_scale;
+        out.uv_offset = *uv_offset;
+        out.uv_rotation = uv_rotation.rem_euclid(2.0 * std::f32::consts::PI);
+        out.contrast = *contrast;
+
+        if !stochastic {
+            out.contrast *= -1.0;
         }
     } else {
         out.layer = -1.0;
@@ -252,24 +232,24 @@ impl Device {
 
             match material {
                 Material::Lambertian { albedo } => {
-                    Self::add_texture(albedo.texture2(), &mut textures);
+                    Self::add_texture(albedo.texture(), &mut textures);
                 }
                 Material::IdealReflection { reflectance } => {
-                    Self::add_texture(reflectance.texture2(), &mut textures);
+                    Self::add_texture(reflectance.texture(), &mut textures);
                 }
                 Material::IdealRefraction { transmittance } => {
-                    Self::add_texture(transmittance.texture2(), &mut textures);
+                    Self::add_texture(transmittance.texture(), &mut textures);
                 }
                 Material::Phong { albedo, shininess } => {
-                    Self::add_texture(albedo.texture2(), &mut textures);
-                    Self::add_texture(shininess.texture2(), &mut textures);
+                    Self::add_texture(albedo.texture(), &mut textures);
+                    Self::add_texture(shininess.texture(), &mut textures);
                 }
                 Material::Dielectric { base_color } => {
-                    Self::add_texture(base_color.texture2(), &mut textures);
+                    Self::add_texture(base_color.texture(), &mut textures);
                 }
                 Material::OrenNayar { albedo, roughness } => {
-                    Self::add_texture(albedo.texture2(), &mut textures);
-                    Self::add_texture(roughness.texture2(), &mut textures);
+                    Self::add_texture(albedo.texture(), &mut textures);
+                    Self::add_texture(roughness.texture(), &mut textures);
                 }
             }
         }

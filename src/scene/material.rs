@@ -1,89 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/*
-
-base formula is:
-
-
-base + mix(color, texture * multiplier, mix_amount)
-
-
-base + color + (texture * multiplier - color) * mix_amount
-
-base + color + texture * multiplier * mix_amount - color * mix_amount
-
-base + texture * multiplier * mix_amount + color * (1 - mix_amount)
-
-
-
-
-for the "constant" variant this simply amounts to base = constant, color = black, mix_amount = 0
-
-
-
-
-a + (b - a) * texture
-
--> b - a is the multiplier, a is the base color
-
-fundamental form is:
-
-a + b texture
-
-
-
-to obtain the expression base + color + (texture * multiplier - color) * mix_amount we get:
-
-base + color + texture * multiplier * mix_amount - color * mix_amount
-
-a = base - color * mix_amount
-b = multiplier * mix_amount
-
-
-
-
-
-
-How to store this in material parameters?
-
-Each SCALAR parameter can occupy an 8-element block, consisting of:
-
- - the base color (n floats)
- - the scale factor (n floats)
- - the packed texture index + texturing mode (1 float)
- - the mapping scale + offset (3 floats)
-
-for a total of 2n + 4 floats per material parameter
-
-for n = 1, we get 6
-
-for n = 3, we get 10
-
-for n = 4 we get 12
-
-so a good choice would be three 4-float blocks per material parameter
-
-*/
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(tag = "type", rename_all = "kebab-case")]
-pub enum TextureMapping {
-    Triplanar {
-        rotation: f32,
-        scale: f32,
-        offset: [f32; 2],
-        contrast: f32,
-    },
-    TriplanarStochastic {
-        rotation: f32,
-        scale: f32,
-        offset: [f32; 2],
-        contrast: f32,
-        #[serde(default)]
-        factor: f32,
-    },
-}
-
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum MaterialParameter<T> {
@@ -92,7 +8,13 @@ pub enum MaterialParameter<T> {
         base: T,
         scale: T,
         texture: String,
-        mapping: TextureMapping,
+        contrast: f32,
+
+        uv_scale: f32,
+        uv_offset: [f32; 2],
+        uv_rotation: f32,
+
+        stochastic: bool,
     },
 }
 
@@ -111,16 +33,7 @@ impl<T: Copy + Default> MaterialParameter<T> {
         }
     }
 
-    pub fn texture(&self) -> Option<(&str, &TextureMapping)> {
-        match self {
-            Self::Constant(_) => None,
-            Self::Textured {
-                texture, mapping, ..
-            } => Some((texture, mapping)),
-        }
-    }
-
-    pub fn texture2(&self) -> Option<&str> {
+    pub fn texture(&self) -> Option<&str> {
         match self {
             Self::Constant(_) => None,
             Self::Textured { texture, .. } => Some(texture),
