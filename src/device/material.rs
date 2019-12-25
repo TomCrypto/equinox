@@ -9,11 +9,10 @@ use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 #[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Clone, Copy, Debug, Default)]
-pub struct MaterialParameterData {
+pub struct MaterialParamData {
     base: [f32; 3],
     layer: f32,
     scale: [f32; 3],
-    // stochastic_scale: f32,
     contrast: f32,
     uv_rotation: f32,
     uv_scale: f32,
@@ -47,7 +46,7 @@ pub(crate) fn material_parameter_count(material: &Material) -> usize {
 
 fn write_material_parameter_float(
     param: &MaterialParameter<f32>,
-    out: &mut MaterialParameterData,
+    out: &mut MaterialParamData,
     texture_layers: &BTreeMap<&str, usize>,
 ) {
     out.base[0] = param.base();
@@ -80,7 +79,7 @@ fn write_material_parameter_float(
 
 fn write_material_parameter_vec3(
     param: &MaterialParameter<[f32; 3]>,
-    out: &mut MaterialParameterData,
+    out: &mut MaterialParamData,
     texture_layers: &BTreeMap<&str, usize>,
 ) {
     let base = param.base();
@@ -120,7 +119,7 @@ fn write_material_parameter_vec3(
 
 fn write_material_parameters(
     material: &Material,
-    parameters: &mut [MaterialParameterData],
+    parameters: &mut [MaterialParamData],
     texture_layers: &BTreeMap<&str, usize>,
 ) {
     match material {
@@ -165,7 +164,7 @@ impl Device {
         textures: &[&str],
     ) -> Result<(), Error> {
         // TODO: in the future, add support for ASTC compression for mobile. This
-        // involves having a separate texture layer for that compression format,
+        // involves having a separate texture array for that compression format,
         // validating the asset format below, and hooking everything together.
         // The front-end will have to be responsible for providing the assets in the
         // right format, the details of which this renderer is not concerned with.
@@ -265,7 +264,7 @@ impl Device {
 
         self.upload_material_textures(assets, &textures)?;
 
-        let mut parameters = vec![MaterialParameterData::default(); parameter_count];
+        let mut parameters = vec![MaterialParamData::default(); parameter_count];
         let mut start = 0;
 
         for material in materials.values() {

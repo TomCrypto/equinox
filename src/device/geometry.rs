@@ -1,4 +1,4 @@
-use crate::{Geometry, Parameter};
+use crate::{Geometry, GeometryParameter};
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -352,10 +352,14 @@ impl GeometryGlslGenerator {
 
     // TODO: could make the "geometry_buffer" string a parameter possibly
 
-    fn lookup_parameter(&self, parameter: &Parameter, parameters: &HashMap<&str, usize>) -> String {
+    fn lookup_parameter(
+        &self,
+        parameter: &GeometryParameter,
+        parameters: &HashMap<&str, usize>,
+    ) -> String {
         match parameter {
-            Parameter::Constant(number) => format!("{:+e}", number),
-            Parameter::Symbolic(symbol) => {
+            GeometryParameter::Constant(number) => format!("{:+e}", number),
+            GeometryParameter::Symbolic(symbol) => {
                 self.lookup_symbolic_parameter(parameters[symbol.as_str()])
             }
         }

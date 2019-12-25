@@ -4,17 +4,17 @@ use cgmath::{Matrix3, Point3, Rad, Vector3};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Parameter
+/// GeometryParameter
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
-pub enum Parameter {
+pub enum GeometryParameter {
     /// Fixed value across all instances.
     Constant(f32),
     /// Reference into a parameter table.
     Symbolic(String),
 }
 
-impl Parameter {
+impl GeometryParameter {
     pub fn value(&self, symbolic_values: &BTreeMap<String, f32>) -> f32 {
         match self {
             Self::Constant(number) => *number,
@@ -27,21 +27,21 @@ impl Parameter {
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Geometry {
     Sphere {
-        radius: Parameter,
+        radius: GeometryParameter,
     },
     Ellipsoid {
-        radius: [Parameter; 3],
+        radius: [GeometryParameter; 3],
     },
     Cuboid {
-        dimensions: [Parameter; 3],
+        dimensions: [GeometryParameter; 3],
     },
     Cylinder {
-        height: Parameter,
-        radius: Parameter,
+        height: GeometryParameter,
+        radius: GeometryParameter,
     },
     InfiniteRepetition {
         child: Box<Geometry>,
-        period: [Parameter; 3],
+        period: [GeometryParameter; 3],
     },
     Union {
         children: Vec<Geometry>,
@@ -54,24 +54,24 @@ pub enum Geometry {
         rhs: Box<Geometry>,
     },
     Onion {
-        thickness: Parameter,
+        thickness: GeometryParameter,
         child: Box<Geometry>,
     },
     Scale {
-        factor: Parameter,
+        factor: GeometryParameter,
         child: Box<Geometry>,
     },
     Rotate {
-        axis: [Parameter; 3],
-        angle: Parameter,
+        axis: [GeometryParameter; 3],
+        angle: GeometryParameter,
         child: Box<Geometry>,
     },
     Translate {
-        translation: [Parameter; 3],
+        translation: [GeometryParameter; 3],
         child: Box<Geometry>,
     },
     Round {
-        radius: Parameter,
+        radius: GeometryParameter,
         child: Box<Geometry>,
     },
     ForceNumericalNormals {
@@ -350,8 +350,8 @@ impl Geometry {
         }
     }
 
-    fn record_parameter<'a>(parameters: &mut Vec<&'a str>, parameter: &'a Parameter) {
-        if let Parameter::Symbolic(symbol) = parameter {
+    fn record_parameter<'a>(parameters: &mut Vec<&'a str>, parameter: &'a GeometryParameter) {
+        if let GeometryParameter::Symbolic(symbol) = parameter {
             parameters.push(symbol);
         }
     }

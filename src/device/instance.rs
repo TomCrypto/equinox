@@ -101,17 +101,17 @@ impl Device {
             if let Some(parent) = &instance.parent {
                 let parent = &instance_list[parent];
 
-                params.push(GeometryParameter([
+                params.push(GeometryParamData([
                     parent.medium.extinction[0],
                     parent.medium.extinction[1],
                     parent.medium.extinction[2],
                     parent.medium.refractive_index,
                 ]));
             } else {
-                params.push(GeometryParameter([0.0, 0.0, 0.0, 1.0]));
+                params.push(GeometryParamData([0.0, 0.0, 0.0, 1.0]));
             }
 
-            params.push(GeometryParameter([
+            params.push(GeometryParamData([
                 instance.medium.extinction[0],
                 instance.medium.extinction[1],
                 instance.medium.extinction[2],
@@ -124,7 +124,7 @@ impl Device {
             let block_count = (parameters.len() + 3) / 4;
 
             for _ in 0..block_count {
-                params.push(GeometryParameter::default());
+                params.push(GeometryParamData::default());
             }
 
             let region = &mut params[offset..offset + block_count];
@@ -154,7 +154,7 @@ impl Device {
 
 #[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Clone, Copy, Debug, Default)]
-pub struct GeometryParameter([f32; 4]);
+pub struct GeometryParamData([f32; 4]);
 
 #[repr(align(32), C)]
 #[derive(AsBytes, FromBytes, Clone, Copy, Debug, Default)]

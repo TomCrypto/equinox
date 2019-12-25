@@ -4,7 +4,7 @@
 
 #include <quasi.glsl>
 
-struct Parameter {
+struct GeometryParameter {
     vec3 base;
     float layer;
     vec3 scale;
@@ -16,12 +16,10 @@ struct Parameter {
 };
 
 layout (std140) uniform Material {
-    Parameter data[MATERIAL_DATA_LEN];
+    GeometryParameter data[MATERIAL_DATA_LEN];
 } material_buffer;
 
 uniform sampler2DArray material_textures;
-
-// TODO: refactor this and split it out to a utility header? not sure...
 
 vec3 triplanar_weights(vec3 normal) {
     vec3 tri_weight = pow(abs(normal), vec3(12.0));
@@ -55,7 +53,7 @@ vec3 sample_texture_wraparound(float layer, vec2 uv) {
 }
 
 vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
-    Parameter param = material_buffer.data[inst];
+    GeometryParameter param = material_buffer.data[inst];
 
     if (param.layer < 0.0 || param.scale.xyz == vec3(0.0)) {
         return param.base.xyz; // texture absent/irrelevant
