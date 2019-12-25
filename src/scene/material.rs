@@ -98,4 +98,15 @@ impl Material {
             Self::OrenNayar { .. } => false,
         }
     }
+
+    pub fn parameters(&self) -> Vec<&MaterialParameter> {
+        match self {
+            Self::Lambertian { albedo } => vec![&albedo],
+            Self::IdealReflection { reflectance } => vec![&reflectance],
+            Self::IdealRefraction { transmittance } => vec![&transmittance],
+            Self::Phong { albedo, shininess } => vec![&albedo, &shininess],
+            Self::Dielectric { base_color } => vec![&base_color],
+            Self::OrenNayar { albedo, roughness } => vec![&albedo, &roughness],
+        }
+    }
 }

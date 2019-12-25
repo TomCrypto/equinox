@@ -1,6 +1,6 @@
 use crate::{
     Aperture, ApertureShape, Camera, Dirty, Display, Environment, Geometry, Instance, Integrator,
-    Material, Metadata, Raster,
+    Material, MaterialParameter, Metadata, Raster,
 };
 use js_sys::Error;
 use serde::{Deserialize, Serialize};
@@ -376,10 +376,24 @@ impl Scene {
         &self,
         material_list: &BTreeMap<String, Material>,
     ) -> Result<(), Error> {
-        for (name, _material) in material_list.iter() {
-            let _prefix = format!("material_list[\"{}\"]", name);
+        let assets = &self.assets;
 
-            // TODO: implement material validation
+        for (name, material) in material_list.iter() {
+            let prefix = format!("material_list[\"{}\"]", name);
+
+            for parameter in material.parameters() {
+                if let MaterialParameter::Textured {
+                    texture, contrast, ..
+                } = parameter
+                {
+                    let contrast = *contrast;
+
+                    validate!(prefix, contrast >= 0.0);
+                    validate!(prefix, contrast <= 1.0);
+
+                    validate_contains!(assets, prefix, texture);
+                }
+            }
         }
 
         Ok(())

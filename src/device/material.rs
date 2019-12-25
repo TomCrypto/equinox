@@ -67,7 +67,7 @@ fn write_material_parameter(
         out.uv_scale = *uv_scale;
         out.uv_offset = *uv_offset;
         out.uv_rotation = uv_rotation.rem_euclid(2.0 * std::f32::consts::PI);
-        out.contrast = *contrast;
+        out.contrast = contrast * 2.0;
 
         if !stochastic {
             out.contrast *= -1.0;
