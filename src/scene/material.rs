@@ -17,44 +17,24 @@ impl MaterialParameterType {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct TexturedMaterialParameter {
+    pub base: MaterialParameterType,
+    pub scale: MaterialParameterType,
+    pub texture: String,
+    pub contrast: f32,
+
+    pub uv_scale: f32,
+    pub uv_offset: [f32; 2],
+    pub uv_rotation: f32,
+
+    pub stochastic: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum MaterialParameter {
     Constant(MaterialParameterType),
-    Textured {
-        base: MaterialParameterType,
-        scale: MaterialParameterType,
-        texture: String,
-        contrast: f32,
-
-        uv_scale: f32,
-        uv_offset: [f32; 2],
-        uv_rotation: f32,
-
-        stochastic: bool,
-    },
-}
-
-impl MaterialParameter {
-    pub fn base(&self) -> [f32; 3] {
-        match self {
-            Self::Constant(base) => base.as_vec3(),
-            Self::Textured { base, .. } => base.as_vec3(),
-        }
-    }
-
-    pub fn scale(&self) -> [f32; 3] {
-        match self {
-            Self::Constant(_) => [0.0; 3],
-            Self::Textured { scale, .. } => scale.as_vec3(),
-        }
-    }
-
-    pub fn texture(&self) -> Option<&str> {
-        match self {
-            Self::Constant(_) => None,
-            Self::Textured { texture, .. } => Some(texture),
-        }
-    }
+    Textured(TexturedMaterialParameter),
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]

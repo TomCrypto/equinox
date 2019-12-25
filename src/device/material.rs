@@ -43,35 +43,30 @@ pub(crate) fn material_parameter_count(material: &Material) -> usize {
 }
 
 fn write_material_parameter(
-    param: &MaterialParameter,
+    parameter: &MaterialParameter,
     out: &mut MaterialParamData,
     texture_layers: &BTreeMap<&str, usize>,
 ) {
-    out.base = param.base();
-    out.scale = param.scale();
-
-    if let MaterialParameter::Textured {
-        texture,
-        uv_scale,
-        uv_offset,
-        uv_rotation,
-        contrast,
-        stochastic,
-        ..
-    } = param
-    {
-        out.layer = texture_layers[texture.as_str()] as f32;
-
-        out.uv_scale = *uv_scale;
-        out.uv_offset = *uv_offset;
-        out.uv_rotation = uv_rotation.rem_euclid(2.0 * std::f32::consts::PI);
-        out.contrast = contrast * 2.0;
-
-        if !stochastic {
-            out.contrast *= -1.0;
+    match parameter {
+        MaterialParameter::Constant(base) => {
+            out.layer = -1.0;
+            out.base = base.as_vec3();
+            out.scale = [0.0; 3];
         }
-    } else {
-        out.layer = -1.0;
+        MaterialParameter::Textured(info) => {
+            out.layer = texture_layers[info.texture.as_str()] as f32;
+            out.base = info.base.as_vec3();
+            out.scale = info.scale.as_vec3();
+
+            out.uv_scale = info.uv_scale;
+            out.uv_offset = info.uv_offset;
+            out.uv_rotation = info.uv_rotation.rem_euclid(2.0 * std::f32::consts::PI);
+            out.contrast = info.contrast * 2.0;
+
+            if !info.stochastic {
+                out.contrast *= -1.0;
+            }
+        }
     }
 }
 
@@ -141,12 +136,6 @@ impl Device {
         Ok(())
     }
 
-    fn add_texture<'a>(texture: Option<&'a str>, textures: &mut Vec<&'a str>) {
-        if let Some(texture) = texture {
-            textures.push(texture);
-        }
-    }
-
     pub(crate) fn update_materials(
         &mut self,
         materials: &BTreeMap<String, Material>,
@@ -159,7 +148,9 @@ impl Device {
             parameter_count += material_parameter_count(material);
 
             for (_, parameter) in material.parameters() {
-                Self::add_texture(parameter.texture(), &mut textures);
+                if let MaterialParameter::Textured(info) = parameter {
+                    textures.push(info.texture.as_str());
+                }
             }
         }
 
