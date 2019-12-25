@@ -78,13 +78,6 @@ export default class extends Vue {
 
   @Prop() private assetsInFlight!: number;
 
-  // NOT PENDING an expensive update:
-  //  - test if update will be expensive:
-  //     - if not, then perform the update
-  //     - if it will be, set PENDING and don't update this frame
-  // PENDING an expensive update:
-  //  - perform the update immediately and unset the expensive flag
-
   private isExpensiveUpdate: boolean = false;
 
   private device!: WebDevice;
