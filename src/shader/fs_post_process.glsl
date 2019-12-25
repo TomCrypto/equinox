@@ -5,8 +5,6 @@ out vec4 color;
 layout (std140) uniform Display {
     float exposure;
     float saturation;
-    uint has_camera_response;
-    vec4 camera_response[11];
 } display;
 
 vec3 LinearTosRGB(vec3 value) {
@@ -53,22 +51,6 @@ vec3 ACESFitted(vec3 color)
     return color;
 }
 
-vec3 camera_response(uint curve, vec3 x) {
-    if (curve == 0xffffffffU) {
-        return x; // no curve
-    }
-
-    vec3 xi = vec3(1.0);
-    vec3 yi = vec3(0.0);
-
-    for (uint i = 0U; i < 11U; ++i) {
-        yi += xi * display.camera_response[i].rgb;
-        xi *= x;
-    }
-
-    return yi;
-}
-
 void main() {
     vec4 value = texelFetch(samples, ivec2(gl_FragCoord.xy - 0.5), 0);
     value.rgb /= value.a;
@@ -81,10 +63,6 @@ void main() {
     }
 
     vec3 tone_mapped = ACESFitted(value.rgb * display.exposure);
-
-    if (display.has_camera_response != 0U) {
-        tone_mapped = camera_response(0U, tone_mapped);
-    }
     
     if (display.saturation != 1.0) {
         float luminance = sqrt(dot(tone_mapped, tone_mapped * vec3(0.299, 0.587, 0.114)));

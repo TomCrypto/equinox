@@ -146,8 +146,7 @@ export default {
     },
     display: {
       exposure: 0,
-      saturation: 1,
-      camera_response: null
+      saturation: 1
     },
     aperture: null,
     integrator: {

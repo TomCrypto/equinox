@@ -206,7 +206,6 @@ export default {
     display: {
       exposure: 0,
       saturation: 1,
-      camera_response: null,
       lens_flare_enabled: false,
       lens_flare_tiles_per_pass: 1
     },
