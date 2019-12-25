@@ -198,7 +198,7 @@ impl Scene {
         Ok(())
     }
 
-    pub fn has_photon_receivers(&self) -> bool {
+    pub(crate) fn has_photon_receivers(&self) -> bool {
         self.instance_list
             .values()
             .filter(|instance| instance.visible && instance.photon_receiver)

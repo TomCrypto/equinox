@@ -23,7 +23,7 @@ pub struct Device {
     pub(crate) envmap_cond_cdf: Texture<R16F>,
     pub(crate) envmap_color: Texture<RGBA16F>,
 
-    pub(crate) material_textures: Texture<SRGBA8>,
+    pub(crate) material_textures: Texture<SRGB_S3TC_DXT1>,
     pub(crate) loaded_textures: Vec<String>,
 
     pub(crate) display_buffer: UniformBuffer<DisplayData>,
@@ -74,6 +74,9 @@ pub struct Device {
     pub(crate) integrator_scatter_photons_shader: Shader,
     pub(crate) integrator_gather_photons_shader: Shader,
 
+    pub(crate) placeholder_texture: Texture<R8>,
+    pub(crate) placeholder_texture_array: Texture<R8>,
+
     device_lost: bool,
 
     pub(crate) state: IntegratorState,
@@ -88,6 +91,9 @@ impl Device {
 
             material_textures: Texture::new(gl.clone()),
             loaded_textures: vec![],
+
+            placeholder_texture: Texture::new(gl.clone()),
+            placeholder_texture_array: Texture::new(gl.clone()),
 
             composited_render: Texture::new(gl.clone()),
             composited_fbo: Framebuffer::new(gl.clone()),
@@ -199,6 +205,15 @@ impl Device {
         expensive |= Dirty::is_dirty(&scene.aperture);
 
         Ok(expensive)
+    }
+
+    /// Returns the texture compression family supported by this device.
+    pub fn supported_texture_compression(&mut self) -> Result<TextureCompression, Error> {
+        if let Some(texture_compression) = supported_texture_compression(&self.gl) {
+            Ok(texture_compression)
+        } else {
+            Err(Error::new("no texture compression format supported"))
+        }
     }
 
     /// Updates this device to render a given scene or returns an error.
@@ -327,12 +342,12 @@ impl Device {
             } else {
                 self.fft_signal_fbo.invalidate();
                 self.fft_buffer_fbo.invalidate();
-                self.fft_signal_tile_r.create(1, 1);
-                self.fft_signal_tile_g.create(1, 1);
-                self.fft_signal_tile_b.create(1, 1);
-                self.fft_buffer_tile_r.create(1, 1);
-                self.fft_buffer_tile_g.create(1, 1);
-                self.fft_buffer_tile_b.create(1, 1);
+                self.fft_signal_tile_r.reset();
+                self.fft_signal_tile_g.reset();
+                self.fft_signal_tile_b.reset();
+                self.fft_buffer_tile_r.reset();
+                self.fft_buffer_tile_g.reset();
+                self.fft_buffer_tile_b.reset();
             }
 
             Ok(())
@@ -528,6 +543,10 @@ impl Device {
         self.blit_to_canvas_shader.invalidate();
 
         self.material_textures.invalidate();
+
+        self.placeholder_texture.invalidate();
+        self.placeholder_texture.upload(1, 1, &[0]);
+        self.placeholder_texture_array.upload_array(1, 1, &[&[0]]);
 
         self.load_signal_tile_shader.invalidate();
         self.load_filter_tile_shader.invalidate();

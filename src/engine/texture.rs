@@ -2,9 +2,16 @@
 use log::{debug, info, warn};
 
 use crate::{AsAttachment, AsBindTarget, BindTarget};
-use js_sys::{Float32Array, Object, Uint16Array, Uint8Array};
+use js_sys::{Error, Float32Array, Object, Uint16Array, Uint8Array};
+use serde::Serialize;
 use std::marker::PhantomData;
-use web_sys::{WebGl2RenderingContext as Context, WebGlTexture};
+use web_sys::{WebGl2RenderingContext as Context, WebGlTexture, WebglCompressedTextureS3tcSrgb};
+
+#[derive(Debug, Serialize)]
+pub enum TextureCompression {
+    S3TC,
+    ASTC,
+}
 
 pub trait Boolean {
     const VALUE: bool;
@@ -28,6 +35,19 @@ pub struct NotRenderable;
 
 impl RenderTarget for Color {}
 impl RenderTarget for DepthStencil {}
+impl RenderTarget for NotRenderable {}
+
+pub fn supported_texture_compression(gl: &Context) -> Option<TextureCompression> {
+    if let Ok(Some(_)) = gl.get_extension("WEBGL_compressed_texture_s3tc_srgb") {
+        return Some(TextureCompression::S3TC);
+    }
+
+    if let Ok(Some(_)) = gl.get_extension("WEBGL_compressed_texture_astc") {
+        return Some(TextureCompression::ASTC);
+    }
+
+    None
+}
 
 #[derive(Debug)]
 pub struct Texture<T> {
@@ -62,6 +82,10 @@ impl<T> Texture<T> {
 
     pub fn invalidate(&mut self) {
         self.handle = None;
+    }
+
+    pub fn reset(&mut self) {
+        *self = Texture::new(self.gl.clone());
     }
 
     pub fn is_invalid(&self) -> bool {
@@ -121,15 +145,107 @@ impl<T: TextureFormat> Texture<T> {
 }
 
 impl<T: TextureFormat<Compressed = True>> Texture<T> {
-    // Compressed textures can never be rendered to by hardware, so they have to be
-    // initialized with data; it doesn't make sense to create an uninitialized one.
-
-    pub fn upload_compressed(&mut self, _rows: usize, _cols: usize, _layer: &[T::Data]) {
-        unimplemented!("compressed textures are not implemented yet")
+    pub fn create_compressed(
+        &mut self,
+        _rows: usize,
+        _cols: usize,
+        _layers: usize,
+    ) -> Result<(), Error> {
+        unreachable!("compressed textures not implemented yet")
+        // this would be the same as arrays but with TEXTURE_2D
     }
 
-    pub fn upload_array_compressed(&mut self, _rows: usize, _cols: usize, _layers: &[&[T::Data]]) {
-        unimplemented!("compressed texture arrays are not implemented yet")
+    pub fn create_array_compressed(
+        &mut self,
+        rows: usize,
+        cols: usize,
+        layers: usize,
+    ) -> Result<(), Error> {
+        assert_ne!(layers, 0, "texture array cannot have zero layers");
+
+        if self.create_texture(cols, rows, layers) {
+            return Ok(()); // texture already created
+        }
+
+        if let Some(format) = T::COMPRESSION_FORMAT {
+            self.check_compression_extension(format)?;
+        } else {
+            unreachable!("compressed texture format must declare COMPRESSION_FORMAT")
+        }
+
+        self.gl
+            .bind_texture(Context::TEXTURE_2D_ARRAY, self.handle.as_ref());
+
+        self.gl.tex_storage_3d(
+            Context::TEXTURE_2D_ARRAY,
+            1,
+            T::GL_INTERNAL_FORMAT,
+            cols as i32,
+            rows as i32,
+            layers as i32,
+        );
+
+        self.set_texture_parameters(Context::TEXTURE_2D_ARRAY);
+
+        Ok(())
+    }
+
+    pub fn upload_compressed(
+        &mut self,
+        _rows: usize,
+        _cols: usize,
+        _layer: &[T::Data],
+    ) -> Result<(), Error> {
+        unreachable!("compressed textures not implemented yet")
+        // this would be the same as arrays but with TEXTURE_2D
+    }
+
+    pub fn upload_array_compressed(
+        &mut self,
+        rows: usize,
+        cols: usize,
+        layers: &[&[T::Data]],
+    ) -> Result<(), Error> {
+        self.create_array_compressed(cols, rows, layers.len())?;
+
+        self.gl
+            .bind_texture(Context::TEXTURE_2D_ARRAY, self.handle.as_ref());
+
+        for (layer, data) in layers.iter().enumerate() {
+            self.gl.compressed_tex_sub_image_3d_with_array_buffer_view(
+                Context::TEXTURE_2D_ARRAY,
+                0,
+                0,
+                0,
+                layer as i32,
+                cols as i32,
+                rows as i32,
+                1,
+                T::GL_FORMAT,
+                &T::into_texture_source_data(cols, rows, data),
+            );
+        }
+
+        Ok(())
+    }
+
+    fn check_compression_extension(&mut self, format: TextureCompression) -> Result<(), Error> {
+        match format {
+            TextureCompression::S3TC => {
+                if let Err(_) | Ok(None) =
+                    self.gl.get_extension("WEBGL_compressed_texture_s3tc_srgb")
+                {
+                    return Err(Error::new("S3TC compression requested but not supported"));
+                }
+            }
+            TextureCompression::ASTC => {
+                if let Err(_) | Ok(None) = self.gl.get_extension("WEBGL_compressed_texture_astc") {
+                    return Err(Error::new("ASTC compression requested but not supported"));
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -156,8 +272,6 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
     pub fn upload(&mut self, cols: usize, rows: usize, layer: &[T::Data]) {
         self.create(cols, rows);
 
-        let texture_data = T::into_texture_source_data(cols, rows, layer);
-
         self.gl
             .bind_texture(Context::TEXTURE_2D, self.handle.as_ref());
 
@@ -171,13 +285,13 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
                 rows as i32,
                 T::GL_FORMAT,
                 T::GL_TYPE,
-                Some(&texture_data),
+                Some(&T::into_texture_source_data(cols, rows, layer)),
             )
             .unwrap();
     }
 
     pub fn create_array(&mut self, cols: usize, rows: usize, layers: usize) {
-        assert_ne!(layers, 0, "texture array must have at least one layer");
+        assert_ne!(layers, 0, "texture array cannot have zero layers");
 
         if self.create_texture(cols, rows, layers) {
             return; // texture already created
@@ -195,22 +309,16 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
             layers as i32,
         );
 
-        log::info!("Created 2D texture array with {} layers", layers);
-
         self.set_texture_parameters(Context::TEXTURE_2D_ARRAY);
     }
 
     pub fn upload_array(&mut self, cols: usize, rows: usize, layers: &[&[T::Data]]) {
         self.create_array(cols, rows, layers.len());
 
+        self.gl
+            .bind_texture(Context::TEXTURE_2D_ARRAY, self.handle.as_ref());
+
         for (layer, data) in layers.iter().enumerate() {
-            log::info!("uploading layer {} of texture array", layer);
-
-            let texture_data = T::into_texture_source_data(cols, rows, data);
-
-            self.gl
-                .bind_texture(Context::TEXTURE_2D_ARRAY, self.handle.as_ref());
-
             self.gl
                 .tex_sub_image_3d_with_opt_array_buffer_view(
                     Context::TEXTURE_2D_ARRAY,
@@ -223,7 +331,7 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
                     1,
                     T::GL_FORMAT,
                     T::GL_TYPE,
-                    Some(&texture_data),
+                    Some(&T::into_texture_source_data(cols, rows, data)),
                 )
                 .unwrap();
         }
@@ -263,6 +371,7 @@ pub trait TextureFormat {
     type Compressed: Boolean;
     type Renderable: RenderTarget;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression>;
     const GL_INTERNAL_FORMAT: u32;
     const GL_FORMAT: u32;
     const GL_TYPE: u32;
@@ -296,6 +405,9 @@ pub struct D24S8;
 pub struct RGB10A2;
 #[derive(Debug)]
 pub struct SRGBA8;
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+pub struct SRGB_S3TC_DXT1;
 
 impl TextureFormat for RGBA32UI {
     type Data = u32;
@@ -304,6 +416,7 @@ impl TextureFormat for RGBA32UI {
     type Filterable = False;
     type Renderable = Color;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::RGBA32UI;
     const GL_FORMAT: u32 = Context::RGBA_INTEGER;
     const GL_TYPE: u32 = Context::UNSIGNED_INT;
@@ -316,6 +429,7 @@ impl TextureFormat for RGBA32F {
     type Filterable = True;
     type Renderable = Color;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::RGBA32F;
     const GL_FORMAT: u32 = Context::RGBA;
     const GL_TYPE: u32 = Context::FLOAT;
@@ -328,6 +442,7 @@ impl TextureFormat for R32F {
     type Filterable = True;
     type Renderable = Color;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::R32F;
     const GL_FORMAT: u32 = Context::RED;
     const GL_TYPE: u32 = Context::FLOAT;
@@ -340,6 +455,7 @@ impl TextureFormat for R32UI {
     type Filterable = False;
     type Renderable = Color;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::R32UI;
     const GL_FORMAT: u32 = Context::RED;
     const GL_TYPE: u32 = Context::UNSIGNED_INT;
@@ -352,6 +468,7 @@ impl TextureFormat for RG32F {
     type Filterable = True;
     type Renderable = Color;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::RG32F;
     const GL_FORMAT: u32 = Context::RG;
     const GL_TYPE: u32 = Context::FLOAT;
@@ -370,6 +487,7 @@ impl TextureFormat for RGBA8 {
     type Filterable = True;
     type Renderable = Color;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::RGBA8;
     const GL_FORMAT: u32 = Context::RGBA;
     const GL_TYPE: u32 = Context::UNSIGNED_BYTE;
@@ -388,6 +506,7 @@ impl TextureFormat for R8 {
     type Filterable = True;
     type Renderable = Color;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::R8;
     const GL_FORMAT: u32 = Context::RED;
     const GL_TYPE: u32 = Context::UNSIGNED_BYTE;
@@ -406,6 +525,7 @@ impl TextureFormat for R16F {
     type Filterable = True;
     type Renderable = Color;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::R16F;
     const GL_FORMAT: u32 = Context::RED;
     const GL_TYPE: u32 = Context::HALF_FLOAT;
@@ -424,6 +544,7 @@ impl TextureFormat for RGBA16F {
     type Filterable = True;
     type Renderable = Color;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::RGBA16F;
     const GL_FORMAT: u32 = Context::RGBA;
     const GL_TYPE: u32 = Context::HALF_FLOAT;
@@ -442,6 +563,7 @@ impl TextureFormat for D24S8 {
     type Filterable = False;
     type Renderable = DepthStencil;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::DEPTH24_STENCIL8;
     const GL_FORMAT: u32 = Context::DEPTH_STENCIL;
     const GL_TYPE: u32 = Context::UNSIGNED_INT_24_8;
@@ -454,6 +576,7 @@ impl TextureFormat for RGB10A2 {
     type Filterable = True;
     type Renderable = Color;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::RGB10_A2;
     const GL_FORMAT: u32 = Context::RGBA;
     const GL_TYPE: u32 = Context::UNSIGNED_INT_2_10_10_10_REV;
@@ -466,12 +589,32 @@ impl TextureFormat for SRGBA8 {
     type Filterable = True;
     type Renderable = Color;
 
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
     const GL_INTERNAL_FORMAT: u32 = Context::SRGB8_ALPHA8;
     const GL_FORMAT: u32 = Context::RGBA;
     const GL_TYPE: u32 = Context::UNSIGNED_BYTE;
 
     fn into_texture_source_data(cols: usize, rows: usize, layer: &[Self::Data]) -> Object {
         assert!(layer.len() == cols * rows * 4);
+
+        Uint8Array::from(layer).into()
+    }
+}
+
+impl TextureFormat for SRGB_S3TC_DXT1 {
+    type Data = u8;
+
+    type Compressed = True;
+    type Filterable = True;
+    type Renderable = NotRenderable;
+
+    const COMPRESSION_FORMAT: Option<TextureCompression> = Some(TextureCompression::S3TC);
+    const GL_INTERNAL_FORMAT: u32 = WebglCompressedTextureS3tcSrgb::COMPRESSED_SRGB_S3TC_DXT1_EXT;
+    const GL_FORMAT: u32 = WebglCompressedTextureS3tcSrgb::COMPRESSED_SRGB_S3TC_DXT1_EXT;
+    const GL_TYPE: u32 = 0;
+
+    fn into_texture_source_data(cols: usize, rows: usize, layer: &[Self::Data]) -> Object {
+        assert!(layer.len() == cols * rows / 2);
 
         Uint8Array::from(layer).into()
     }

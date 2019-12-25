@@ -441,13 +441,14 @@ impl<'a> DrawCommand<'a> {
         if let Some(&BindingPoint::TextureUnit(slot)) = self.shader.binds.get(slot) {
             self.shader.gl.active_texture(Context::TEXTURE0 + slot);
 
-            if array {
-                self.shader
-                    .gl
-                    .bind_texture(Context::TEXTURE_2D_ARRAY, handle);
-            } else {
-                self.shader.gl.bind_texture(Context::TEXTURE_2D, handle);
-            }
+            self.shader.gl.bind_texture(
+                if array {
+                    Context::TEXTURE_2D_ARRAY
+                } else {
+                    Context::TEXTURE_2D
+                },
+                handle,
+            );
         } else {
             panic!("slot '{}' does not map to a binding point", slot);
         }

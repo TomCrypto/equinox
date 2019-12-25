@@ -76,12 +76,13 @@ version = "0.3"
 features = [
   'WebGl2RenderingContext',
   'WebGlBuffer',
+  'WebglCompressedTextureS3tcSrgb',
   'WebGlFramebuffer',
   'WebGlProgram',
   'WebGlShader',
   'WebGlTexture',
   'WebGlUniformLocation',
-  'WebGlVertexArrayObject'
+  'WebGlVertexArrayObject',
 ]
 
 [dependencies.zerocopy]

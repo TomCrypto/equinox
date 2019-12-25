@@ -175,9 +175,15 @@ impl Device {
         assets: &HashMap<String, Vec<u8>>,
         textures: &[&str],
     ) -> Result<(), Error> {
+        // TODO: in the future, add support for ASTC compression for mobile. This
+        // involves having a separate texture layer for that compression format,
+        // validating the asset format below, and hooking everything together.
+        // The front-end will have to be responsible for providing the assets in the
+        // right format, the details of which this renderer is not concerned with.
+
         if self.material_textures.is_invalid() || self.textures_out_of_date(textures) {
             if textures.is_empty() {
-                self.material_textures.create_array(1, 1, 1);
+                self.material_textures.reset();
             } else {
                 let mut layers = vec![];
 
@@ -186,8 +192,8 @@ impl Device {
                         LayoutVerified::<_, Header>::new_from_prefix(assets[texture].as_slice())
                             .unwrap();
 
-                    if header.data_format.try_parse() != Some(DataFormat::RGBA8) {
-                        return Err(Error::new("expected RGBA8 material texture"));
+                    if header.data_format.try_parse() != Some(DataFormat::BC1) {
+                        return Err(Error::new("expected BC1 material texture"));
                     }
 
                     if header.color_space.try_parse() != Some(ColorSpace::SRGB) {
@@ -205,11 +211,11 @@ impl Device {
                     layers.push(data);
                 }
 
-                self.material_textures.upload_array(
+                self.material_textures.upload_array_compressed(
                     Self::MATERIAL_TEXTURE_COLS,
                     Self::MATERIAL_TEXTURE_ROWS,
                     &layers,
-                );
+                )?;
             }
 
             self.loaded_textures = textures.iter().map(|&texture| texture.to_owned()).collect();
@@ -284,8 +290,6 @@ impl Device {
 
             start += count;
         }
-
-        log::info!("{:?}", parameters);
 
         self.material_buffer
             .write_array(self.material_buffer.max_len(), &parameters)?;

@@ -99,9 +99,9 @@ impl Device {
 
             self.envmap_color.upload(cols, rows, &envmap_pixels);
         } else {
-            self.envmap_cond_cdf.upload(1, 1, &[0]);
-            self.envmap_marg_cdf.upload(1, 1, &[0]);
-            self.envmap_color.upload(1, 1, &[0; 4]);
+            self.envmap_cond_cdf.reset();
+            self.envmap_marg_cdf.reset();
+            self.envmap_color.reset();
         }
 
         Ok(())

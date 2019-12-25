@@ -137,7 +137,7 @@ dependencies = [
  "console_error_panic_hook 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "console_log 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "half 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "img2raw 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "img2raw 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.8.1 (git+https://github.com/andersk/itertools-rs?rev=1e97bf25b59db7bf9b53eaf8ca33bd92744eed1f)",
  "js-sys 0.3.32 (registry+https://github.com/rust-lang/crates.io-index)",
  "lies 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -213,7 +213,7 @@ dependencies = [
 
 [[package]]
 name = "img2raw"
-version = "0.3.1"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "zerocopy 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -923,7 +923,7 @@ dependencies = [
 "checksum heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "20564e78d53d2bb135c343b3f47714a56af2061f1c928fdb541dc7b9fdd94205"
 "checksum hermit-abi 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "f629dc602392d3ec14bfc8a09b5e644d7ffd725102b48b81e59f90f2633621d7"
 "checksum idna 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "02e2673c30ee86b5b96a9cb52ad15718aa1f966f5ab9ad54a8b95d5ca33120a9"
-"checksum img2raw 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "26bc9810f228704ea2cf8181f9530218be55ba0389435d0579235ffcdf778b96"
+"checksum img2raw 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "0af2fcbad74aa67de5b1c086a2c47a2221630c3c5434f6f972e7efa519102b2b"
 "checksum itertools 0.8.1 (git+https://github.com/andersk/itertools-rs?rev=1e97bf25b59db7bf9b53eaf8ca33bd92744eed1f)" = "<none>"
 "checksum itoa 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "501266b7edd0174f8530248f87f99c88fbe60ca4ef3dd486835b8d8d53136f7f"
 "checksum jobserver 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)" = "f2b1d42ef453b30b7387e113da1c83ab1605d90c5b4e0eb8e96d016ed3b8c160"
