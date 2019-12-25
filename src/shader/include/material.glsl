@@ -23,13 +23,9 @@ uniform sampler2DArray material_textures;
 
 // TODO: refactor this and split it out to a utility header? not sure...
 
-vec3 triplanar_weights(vec3 _wNorm){
-	vec3 blending = abs( _wNorm );
-    blending = pow(blending, vec3(16.0));
-	blending = normalize(max(blending, 1e-6)); // Force weights to sum to 1.0
-	float b = (blending.x + blending.y + blending.z);
-	blending /= vec3(b, b, b);
-	return blending;
+vec3 triplanar_weights(vec3 normal) {
+    vec3 tri_weight = pow(abs(normal), vec3(12.0));
+	return tri_weight / dot(tri_weight, vec3(1.0));
 }
 
 // Adapted from https://www.shadertoy.com/view/MdyfDV
@@ -53,15 +49,8 @@ vec3 sample_texture_stochastic(float layer, vec2 uv) {
                            : (1.0 - F.x) * cdy + (1.0 - F.y) * cdx - F.z * c, 0.0, 1.0);
 }
 
-vec3 sample_texture(float layer, vec2 uv) {
+vec3 sample_texture_wraparound(float layer, vec2 uv) {
     return textureLod(material_textures, vec3(uv, layer), 0.0).xyz;
-}
-
-mat3x2 uv_transform_matrix(float rotation, float scale, vec2 translation) {
-    float s = scale * sin(rotation);
-	float c = scale * cos(rotation);
-
-	return mat3x2(c, -s, s, c, translation);
 }
 
 vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
@@ -71,40 +60,37 @@ vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
         return param.base.xyz; // texture absent/irrelevant
     }
 
-    mat3x2 xfm = uv_transform_matrix(param.uv_rotation, param.uv_scale, param.uv_offset);
+    float s = param.uv_scale * sin(param.uv_rotation);
+	float c = param.uv_scale * cos(param.uv_rotation);
+	mat3x2 xfm = mat3x2(c, -s, s, c, param.uv_offset);
 
     // Offset all triplanar coordinates slightly based on the normal direction to
-    // randomize the mapping on e.g. parallel sides of a box or a sheet of glass.
+    // randomize the texture on e.g. parallel sides of a box or a sheet of glass.
 
     vec2 yz_uv = xfm * vec3(p.yz + (normal.x > 0.0 ? 0.0 : 17.4326), 1.0);
     vec2 xz_uv = xfm * vec3(p.xz + (normal.y > 0.0 ? 0.0 : 13.8193), 1.0);
     vec2 xy_uv = xfm * vec3(p.xy + (normal.z > 0.0 ? 0.0 : 15.2175), 1.0);
 
     vec3 yz_sample, xz_sample, xy_sample;
-
-    vec3 weights = triplanar_weights(normal);
+    vec3 tri = triplanar_weights(normal);
 
     if (param.contrast > 0.0) {
-        yz_sample = weights.x < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, yz_uv);
-        xz_sample = weights.y < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, xz_uv);
-        xy_sample = weights.z < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, xy_uv);
+        yz_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, yz_uv);
+        xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, xz_uv);
+        xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, xy_uv);
     } else {
-        yz_sample = weights.x < 1e-4 ? vec3(0.0) : sample_texture(param.layer, yz_uv);
-        xz_sample = weights.y < 1e-4 ? vec3(0.0) : sample_texture(param.layer, xz_uv);
-        xy_sample = weights.z < 1e-4 ? vec3(0.0) : sample_texture(param.layer, xy_uv);
+        yz_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_wraparound(param.layer, yz_uv);
+        xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_wraparound(param.layer, xz_uv);
+        xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_wraparound(param.layer, xy_uv);
     }
 
     yz_sample = 0.5 + (yz_sample - 0.5) * abs(param.contrast);
     xz_sample = 0.5 + (xz_sample - 0.5) * abs(param.contrast);
     xy_sample = 0.5 + (xy_sample - 0.5) * abs(param.contrast);
 
-    // 0.5 + (s - 0.5) * c = 0.5 + s * c - 0.5 * c = 0.5 (1 - c) + s * c
-    // X + (s1 * w1) * c + X + (s2 * w2) * c + X + (s3 * w3) * c
-    // 3X + (s1 * w1 + s2 * w2 + s3 * s3) * c
-
-    return param.base.xyz + param.scale.xyz * (yz_sample * weights.x
-                                            +  xz_sample * weights.y
-                                            +  xy_sample * weights.z);
+    return param.base.xyz + param.scale.xyz * (yz_sample * tri.x
+                                            +  xz_sample * tri.y
+                                            +  xy_sample * tri.z);
 }
 
 float mat_param_float(uint inst, vec3 normal, vec3 p) {
