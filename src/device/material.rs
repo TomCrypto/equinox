@@ -42,8 +42,6 @@ pub(crate) fn material_parameter_count(material: &Material) -> usize {
     }
 }
 
-// TODO: refactor this to remove duplication
-
 fn write_material_parameter(
     param: &MaterialParameter,
     out: &mut MaterialParamData,
@@ -74,35 +72,6 @@ fn write_material_parameter(
         }
     } else {
         out.layer = -1.0;
-    }
-}
-
-fn write_material_parameters(
-    material: &Material,
-    parameters: &mut [MaterialParamData],
-    texture_layers: &BTreeMap<&str, usize>,
-) {
-    match material {
-        Material::Lambertian { albedo } => {
-            write_material_parameter(albedo, &mut parameters[0], texture_layers);
-        }
-        Material::IdealReflection { reflectance } => {
-            write_material_parameter(reflectance, &mut parameters[0], texture_layers);
-        }
-        Material::IdealRefraction { transmittance } => {
-            write_material_parameter(transmittance, &mut parameters[0], texture_layers);
-        }
-        Material::Phong { albedo, shininess } => {
-            write_material_parameter(albedo, &mut parameters[0], texture_layers);
-            write_material_parameter(shininess, &mut parameters[1], texture_layers);
-        }
-        Material::Dielectric { base_color } => {
-            write_material_parameter(base_color, &mut parameters[0], texture_layers);
-        }
-        Material::OrenNayar { albedo, roughness } => {
-            write_material_parameter(albedo, &mut parameters[0], texture_layers);
-            write_material_parameter(roughness, &mut parameters[1], texture_layers);
-        }
     }
 }
 
@@ -189,27 +158,8 @@ impl Device {
         for material in materials.values() {
             parameter_count += material_parameter_count(material);
 
-            match material {
-                Material::Lambertian { albedo } => {
-                    Self::add_texture(albedo.texture(), &mut textures);
-                }
-                Material::IdealReflection { reflectance } => {
-                    Self::add_texture(reflectance.texture(), &mut textures);
-                }
-                Material::IdealRefraction { transmittance } => {
-                    Self::add_texture(transmittance.texture(), &mut textures);
-                }
-                Material::Phong { albedo, shininess } => {
-                    Self::add_texture(albedo.texture(), &mut textures);
-                    Self::add_texture(shininess.texture(), &mut textures);
-                }
-                Material::Dielectric { base_color } => {
-                    Self::add_texture(base_color.texture(), &mut textures);
-                }
-                Material::OrenNayar { albedo, roughness } => {
-                    Self::add_texture(albedo.texture(), &mut textures);
-                    Self::add_texture(roughness.texture(), &mut textures);
-                }
+            for (_, parameter) in material.parameters() {
+                Self::add_texture(parameter.texture(), &mut textures);
             }
         }
 
@@ -230,11 +180,13 @@ impl Device {
         for material in materials.values() {
             let count = material_parameter_count(material);
 
-            write_material_parameters(
-                material,
-                &mut parameters[start..start + count],
-                &texture_layers,
-            );
+            for (index, (_, parameter)) in material.parameters().into_iter().enumerate() {
+                write_material_parameter(
+                    parameter,
+                    &mut parameters[start + index],
+                    &texture_layers,
+                );
+            }
 
             start += count;
         }

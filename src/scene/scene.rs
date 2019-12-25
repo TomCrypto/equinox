@@ -379,13 +379,13 @@ impl Scene {
         let assets = &self.assets;
 
         for (name, material) in material_list.iter() {
-            let prefix = format!("material_list[\"{}\"]", name);
-
-            for parameter in material.parameters() {
+            for (parameter_name, parameter) in material.parameters() {
                 if let MaterialParameter::Textured {
                     texture, contrast, ..
                 } = parameter
                 {
+                    let prefix = format!("material_list[\"{}\"].{}", name, parameter_name);
+
                     let contrast = *contrast;
 
                     validate!(prefix, contrast >= 0.0);
