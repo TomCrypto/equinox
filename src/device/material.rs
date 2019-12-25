@@ -44,53 +44,13 @@ pub(crate) fn material_parameter_count(material: &Material) -> usize {
 
 // TODO: refactor this to remove duplication
 
-fn write_material_parameter_float(
-    param: &MaterialParameter<f32>,
+fn write_material_parameter(
+    param: &MaterialParameter,
     out: &mut MaterialParamData,
     texture_layers: &BTreeMap<&str, usize>,
 ) {
-    out.base[0] = param.base();
-    out.scale[0] = param.scale();
-
-    if let MaterialParameter::Textured {
-        texture,
-        uv_scale,
-        uv_offset,
-        uv_rotation,
-        contrast,
-        stochastic,
-        ..
-    } = param
-    {
-        out.layer = texture_layers[texture.as_str()] as f32;
-
-        out.uv_scale = *uv_scale;
-        out.uv_offset = *uv_offset;
-        out.uv_rotation = uv_rotation.rem_euclid(2.0 * std::f32::consts::PI);
-        out.contrast = *contrast;
-
-        if !stochastic {
-            out.contrast *= -1.0;
-        }
-    } else {
-        out.layer = -1.0;
-    }
-}
-
-fn write_material_parameter_vec3(
-    param: &MaterialParameter<[f32; 3]>,
-    out: &mut MaterialParamData,
-    texture_layers: &BTreeMap<&str, usize>,
-) {
-    let base = param.base();
-    let scale = param.scale();
-
-    out.base[0] = base[0];
-    out.base[1] = base[1];
-    out.base[2] = base[2];
-    out.scale[0] = scale[0];
-    out.scale[1] = scale[1];
-    out.scale[2] = scale[2];
+    out.base = param.base();
+    out.scale = param.scale();
 
     if let MaterialParameter::Textured {
         texture,
@@ -124,24 +84,24 @@ fn write_material_parameters(
 ) {
     match material {
         Material::Lambertian { albedo } => {
-            write_material_parameter_vec3(albedo, &mut parameters[0], texture_layers);
+            write_material_parameter(albedo, &mut parameters[0], texture_layers);
         }
         Material::IdealReflection { reflectance } => {
-            write_material_parameter_vec3(reflectance, &mut parameters[0], texture_layers);
+            write_material_parameter(reflectance, &mut parameters[0], texture_layers);
         }
         Material::IdealRefraction { transmittance } => {
-            write_material_parameter_vec3(transmittance, &mut parameters[0], texture_layers);
+            write_material_parameter(transmittance, &mut parameters[0], texture_layers);
         }
         Material::Phong { albedo, shininess } => {
-            write_material_parameter_vec3(albedo, &mut parameters[0], texture_layers);
-            write_material_parameter_float(shininess, &mut parameters[1], texture_layers);
+            write_material_parameter(albedo, &mut parameters[0], texture_layers);
+            write_material_parameter(shininess, &mut parameters[1], texture_layers);
         }
         Material::Dielectric { base_color } => {
-            write_material_parameter_vec3(base_color, &mut parameters[0], texture_layers);
+            write_material_parameter(base_color, &mut parameters[0], texture_layers);
         }
         Material::OrenNayar { albedo, roughness } => {
-            write_material_parameter_vec3(albedo, &mut parameters[0], texture_layers);
-            write_material_parameter_float(roughness, &mut parameters[1], texture_layers);
+            write_material_parameter(albedo, &mut parameters[0], texture_layers);
+            write_material_parameter(roughness, &mut parameters[1], texture_layers);
         }
     }
 }

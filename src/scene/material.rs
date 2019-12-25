@@ -2,11 +2,27 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
-pub enum MaterialParameter<T> {
-    Constant(T),
+pub enum MaterialParameterType {
+    Scalar(f32),
+    Vector([f32; 3]),
+}
+
+impl MaterialParameterType {
+    pub fn as_vec3(&self) -> [f32; 3] {
+        match self {
+            Self::Scalar(c) => [*c; 3],
+            Self::Vector(v) => *v,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum MaterialParameter {
+    Constant(MaterialParameterType),
     Textured {
-        base: T,
-        scale: T,
+        base: MaterialParameterType,
+        scale: MaterialParameterType,
         texture: String,
         contrast: f32,
 
@@ -18,18 +34,18 @@ pub enum MaterialParameter<T> {
     },
 }
 
-impl<T: Copy + Default> MaterialParameter<T> {
-    pub fn base(&self) -> T {
+impl MaterialParameter {
+    pub fn base(&self) -> [f32; 3] {
         match self {
-            Self::Constant(base) => *base,
-            Self::Textured { base, .. } => *base,
+            Self::Constant(base) => base.as_vec3(),
+            Self::Textured { base, .. } => base.as_vec3(),
         }
     }
 
-    pub fn scale(&self) -> T {
+    pub fn scale(&self) -> [f32; 3] {
         match self {
-            Self::Constant(_) => T::default(),
-            Self::Textured { scale, .. } => *scale,
+            Self::Constant(_) => [0.0; 3],
+            Self::Textured { scale, .. } => scale.as_vec3(),
         }
     }
 
@@ -50,24 +66,24 @@ pub struct Materials {
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Material {
     Lambertian {
-        albedo: MaterialParameter<[f32; 3]>,
+        albedo: MaterialParameter,
     },
     IdealReflection {
-        reflectance: MaterialParameter<[f32; 3]>,
+        reflectance: MaterialParameter,
     },
     IdealRefraction {
-        transmittance: MaterialParameter<[f32; 3]>,
+        transmittance: MaterialParameter,
     },
     Phong {
-        albedo: MaterialParameter<[f32; 3]>,
-        shininess: MaterialParameter<f32>,
+        albedo: MaterialParameter,
+        shininess: MaterialParameter,
     },
     Dielectric {
-        base_color: MaterialParameter<[f32; 3]>,
+        base_color: MaterialParameter,
     },
     OrenNayar {
-        albedo: MaterialParameter<[f32; 3]>,
-        roughness: MaterialParameter<f32>,
+        albedo: MaterialParameter,
+        roughness: MaterialParameter,
     },
 }
 
