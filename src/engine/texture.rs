@@ -85,7 +85,11 @@ impl<T> Texture<T> {
     }
 
     pub fn reset(&mut self) {
-        *self = Texture::new(self.gl.clone());
+        if let Some(texture_handle) = &self.handle {
+            self.gl.delete_texture(Some(texture_handle));
+        }
+
+        self.invalidate();
     }
 
     pub fn is_invalid(&self) -> bool {
@@ -161,7 +165,7 @@ impl<T: TextureFormat<Compressed = True>> Texture<T> {
         cols: usize,
         layers: usize,
     ) -> Result<(), Error> {
-        assert_ne!(layers, 0, "texture array cannot have zero layers");
+        assert_ne!(layers, 0, "texture array must have at least one layer");
 
         if self.create_texture(cols, rows, layers) {
             return Ok(()); // texture already created
@@ -291,7 +295,7 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
     }
 
     pub fn create_array(&mut self, cols: usize, rows: usize, layers: usize) {
-        assert_ne!(layers, 0, "texture array cannot have zero layers");
+        assert_ne!(layers, 0, "texture array must have at least one layer");
 
         if self.create_texture(cols, rows, layers) {
             return; // texture already created
