@@ -72,11 +72,13 @@ pub enum TextureMapping {
         rotation: f32,
         scale: f32,
         offset: [f32; 2],
+        contrast: f32,
     },
     TriplanarStochastic {
         rotation: f32,
         scale: f32,
         offset: [f32; 2],
+        contrast: f32,
         #[serde(default)]
         factor: f32,
     },

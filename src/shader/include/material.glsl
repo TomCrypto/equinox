@@ -8,7 +8,7 @@ struct Parameter {
     vec3 base;
     float layer;
     vec3 scale;
-    float stochastic_scale;
+    float contrast;
 
     float uv_rotation;
     float uv_scale;
@@ -23,7 +23,7 @@ uniform sampler2DArray material_textures;
 
 // TODO: refactor this and split it out to a utility header? not sure...
 
-vec3 getTriPlanarBlend(vec3 _wNorm){
+vec3 triplanar_weights(vec3 _wNorm){
 	vec3 blending = abs( _wNorm );
     blending = pow(blending, vec3(16.0));
 	blending = normalize(max(blending, 1e-6)); // Force weights to sum to 1.0
@@ -33,7 +33,7 @@ vec3 getTriPlanarBlend(vec3 _wNorm){
 }
 
 // Adapted from https://www.shadertoy.com/view/MdyfDV
-vec3 sample_texture_stochastic(float layer, vec2 uv, float scale) {
+vec3 sample_texture_stochastic(float layer, vec2 uv) {
     vec2 V = vec2(uv.x - 0.57735 * uv.y, 1.1547 * uv.y);
     vec2 I = floor(V);
 
@@ -42,7 +42,7 @@ vec3 sample_texture_stochastic(float layer, vec2 uv, float scale) {
 
     #define rnd22(p)   fract(sin((p) * mat2(127.1,311.7,269.5,183.3) )*43758.5453)
 
-    #define C(X) textureLod(material_textures, vec3(uv - scale * (X), layer), 0.0).xyz
+    #define C(X) textureLod(material_textures, vec3(uv - M_2PI * (X), layer), 0.0).xyz
 
     vec3 cdx = C(rnd22(I + vec2(1.0, 0.0)));
     vec3 cdy = C(rnd22(I + vec2(0.0, 1.0)));
@@ -82,21 +82,29 @@ vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
 
     vec3 yz_sample, xz_sample, xy_sample;
 
-    if (param.stochastic_scale > 0.0) {
-        yz_sample = sample_texture_stochastic(param.layer, yz_uv, param.stochastic_scale);
-        xz_sample = sample_texture_stochastic(param.layer, xz_uv, param.stochastic_scale);
-        xy_sample = sample_texture_stochastic(param.layer, xy_uv, param.stochastic_scale);
+    vec3 weights = triplanar_weights(normal);
+
+    if (param.contrast > 0.0) {
+        yz_sample = weights.x < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, yz_uv);
+        xz_sample = weights.y < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, xz_uv);
+        xy_sample = weights.z < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, xy_uv);
     } else {
-        yz_sample = sample_texture(param.layer, yz_uv);
-        xz_sample = sample_texture(param.layer, xz_uv);
-        xy_sample = sample_texture(param.layer, xy_uv);
+        yz_sample = weights.x < 1e-4 ? vec3(0.0) : sample_texture(param.layer, yz_uv);
+        xz_sample = weights.y < 1e-4 ? vec3(0.0) : sample_texture(param.layer, xz_uv);
+        xy_sample = weights.z < 1e-4 ? vec3(0.0) : sample_texture(param.layer, xy_uv);
     }
 
-    vec3 triplanar_weights = getTriPlanarBlend(normal);
+    yz_sample = 0.5 + (yz_sample - 0.5) * abs(param.contrast);
+    xz_sample = 0.5 + (xz_sample - 0.5) * abs(param.contrast);
+    xy_sample = 0.5 + (xy_sample - 0.5) * abs(param.contrast);
 
-    return param.base.xyz + param.scale.xyz * (yz_sample * triplanar_weights.x
-                                            +  xz_sample * triplanar_weights.y
-                                            +  xy_sample * triplanar_weights.z);
+    // 0.5 + (s - 0.5) * c = 0.5 + s * c - 0.5 * c = 0.5 (1 - c) + s * c
+    // X + (s1 * w1) * c + X + (s2 * w2) * c + X + (s3 * w3) * c
+    // 3X + (s1 * w1 + s2 * w2 + s3 * s3) * c
+
+    return param.base.xyz + param.scale.xyz * (yz_sample * weights.x
+                                            +  xz_sample * weights.y
+                                            +  xy_sample * weights.z);
 }
 
 float mat_param_float(uint inst, vec3 normal, vec3 p) {

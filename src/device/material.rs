@@ -2,6 +2,7 @@
 use log::{debug, info, warn};
 
 use crate::{Device, Material, MaterialParameter, TextureMapping};
+use half::f16;
 use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
 use std::collections::{BTreeMap, HashMap};
@@ -13,7 +14,8 @@ pub struct MaterialParameterData {
     base: [f32; 3],
     layer: f32,
     scale: [f32; 3],
-    stochastic_scale: f32,
+    // stochastic_scale: f32,
+    contrast: f32,
     uv_rotation: f32,
     uv_scale: f32,
     uv_offset: [f32; 2],
@@ -54,28 +56,32 @@ fn write_material_parameter_float(
 
     if let Some((texture, mapping)) = param.texture() {
         out.layer = texture_layers[texture] as f32;
-        out.stochastic_scale = 0.0;
+        // out.stochastic_scale = 0.0;
 
         match mapping {
             TextureMapping::Triplanar {
                 scale,
                 offset,
                 rotation,
+                contrast,
             } => {
                 out.uv_scale = *scale;
                 out.uv_offset = *offset;
                 out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
+                out.contrast = -*contrast;
             }
             TextureMapping::TriplanarStochastic {
                 rotation,
                 scale,
                 offset,
                 factor,
+                contrast,
             } => {
                 out.uv_scale = *scale;
                 out.uv_offset = *offset;
-                out.stochastic_scale = *factor;
+                // out.stochastic_scale = *factor;
                 out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
+                out.contrast = *contrast;
             }
         }
     } else {
@@ -100,28 +106,31 @@ fn write_material_parameter_vec3(
 
     if let Some((texture, mapping)) = param.texture() {
         out.layer = texture_layers[texture] as f32;
-        out.stochastic_scale = 0.0;
 
         match mapping {
             TextureMapping::Triplanar {
                 rotation,
                 scale,
                 offset,
+                contrast,
             } => {
                 out.uv_scale = *scale;
                 out.uv_offset = *offset;
                 out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
+                out.contrast = -*contrast;
             }
             TextureMapping::TriplanarStochastic {
                 rotation,
                 scale,
                 offset,
                 factor,
+                contrast,
             } => {
                 out.uv_scale = *scale;
                 out.uv_offset = *offset;
-                out.stochastic_scale = *factor;
+                // out.stochastic_scale = *factor;
                 out.uv_rotation = rotation.rem_euclid(2.0 * std::f32::consts::PI);
+                out.contrast = *contrast;
             }
         }
     } else {
