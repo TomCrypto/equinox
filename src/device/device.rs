@@ -230,6 +230,9 @@ impl Device {
         let mut invalidated = false;
         let mut reset_tiles = false;
 
+        self.placeholder_texture.upload(1, 1, &[0]);
+        self.placeholder_texture_array.upload_array(1, 1, &[&[0]]);
+
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
             self.update_camera(camera)?;
 
@@ -545,8 +548,7 @@ impl Device {
         self.material_textures.invalidate();
 
         self.placeholder_texture.invalidate();
-        self.placeholder_texture.upload(1, 1, &[0]);
-        self.placeholder_texture_array.upload_array(1, 1, &[&[0]]);
+        self.placeholder_texture_array.invalidate();
 
         self.load_signal_tile_shader.invalidate();
         self.load_filter_tile_shader.invalidate();
