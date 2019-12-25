@@ -228,6 +228,14 @@ impl<T: TextureFormat<Compressed = True>> Texture<T> {
                 T::GL_FORMAT,
                 &T::into_texture_source_data(cols, rows, data),
             );
+
+            // I've seen this occur on Chrome, although the call still goes through. It
+            // doesn't happen on Firefox which suggests some browser inconsistency, but
+            // pretty sure this is allowed by the spec.
+
+            if self.gl.get_error() == Context::INVALID_ENUM {
+                log::warn!("spurious Chrome WebGL warning?");
+            }
         }
 
         Ok(())
