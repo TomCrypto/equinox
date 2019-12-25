@@ -30,15 +30,15 @@ vec3 triplanar_weights(vec3 normal) {
 
 // Adapted from https://www.shadertoy.com/view/MdyfDV
 vec3 sample_texture_stochastic(float layer, vec2 uv) {
-    vec2 V = vec2(uv.x - 0.57735 * uv.y, 1.1547 * uv.y);
+    vec2 V = 4.0 * vec2(uv.x - 0.57735 * uv.y, 1.1547 * uv.y);
     vec2 I = floor(V);
 
     vec3 F = vec3(V - I, 0.0);
     F.z = 1.0 - F.x - F.y;
 
-    #define rnd22(p)   fract(sin((p) * mat2(127.1,311.7,269.5,183.3) )*43758.5453)
+    #define rnd22(p) fract(sin((p) * mat2(127.1, 311.7, 269.5, 183.3) ) * 43758.5453)
 
-    #define C(X) textureLod(material_textures, vec3(uv - M_2PI * (X), layer), 0.0).xyz
+    #define C(X) textureLod(material_textures, vec3(uv - (X), layer), 0.0).xyz
 
     vec3 cdx = C(rnd22(I + vec2(1.0, 0.0)));
     vec3 cdy = C(rnd22(I + vec2(0.0, 1.0)));
@@ -46,7 +46,8 @@ vec3 sample_texture_stochastic(float layer, vec2 uv) {
     vec3 c = C((F.z > 0.0) ? rnd22(I) : rnd22(I + 1.0));
 
     return clamp(F.z > 0.0 ? F.x * cdx + F.y * cdy + F.z * c
-                           : (1.0 - F.x) * cdy + (1.0 - F.y) * cdx - F.z * c, 0.0, 1.0);
+                           : (1.0 - F.x) * cdy + (1.0 - F.y) * cdx - F.z * c,
+                 0.0, 1.0);
 }
 
 vec3 sample_texture_wraparound(float layer, vec2 uv) {
@@ -64,8 +65,8 @@ vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
 	float c = param.uv_scale * cos(param.uv_rotation);
 	mat3x2 xfm = mat3x2(c, -s, s, c, param.uv_offset);
 
-    // Offset all triplanar coordinates slightly based on the normal direction to
-    // randomize the texture on e.g. parallel sides of a box or a sheet of glass.
+    // Offset all triplanar coordinates slightly based on the normal direction
+    // in order to randomize e.g. parallel sides of a box or a sheet of glass.
 
     vec2 yz_uv = xfm * vec3(p.yz + (normal.x > 0.0 ? 0.0 : 17.4326), 1.0);
     vec2 xz_uv = xfm * vec3(p.xz + (normal.y > 0.0 ? 0.0 : 13.8193), 1.0);
