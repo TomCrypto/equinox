@@ -7,7 +7,7 @@
 struct GeometryParameter {
     vec3 base;
     float layer;
-    vec3 scale;
+    vec3 factor;
     float contrast;
 
     float uv_rotation;
@@ -55,7 +55,7 @@ vec3 sample_texture_wraparound(float layer, vec2 uv) {
 vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
     GeometryParameter param = material_buffer.data[inst];
 
-    if (param.layer < 0.0 || param.scale.xyz == vec3(0.0)) {
+    if (param.layer < 0.0 || param.factor.xyz == vec3(0.0)) {
         return param.base.xyz; // texture absent/irrelevant
     }
 
@@ -87,9 +87,9 @@ vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
     xz_sample = 0.5 + (xz_sample - 0.5) * abs(param.contrast);
     xy_sample = 0.5 + (xy_sample - 0.5) * abs(param.contrast);
 
-    return param.base.xyz + param.scale.xyz * (yz_sample * tri.x
-                                            +  xz_sample * tri.y
-                                            +  xy_sample * tri.z);
+    return param.base.xyz + param.factor.xyz * (yz_sample * tri.x
+                                             +  xz_sample * tri.y
+                                             +  xy_sample * tri.z);
 }
 
 float mat_param_float(uint inst, vec3 normal, vec3 p) {

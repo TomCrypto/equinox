@@ -12,7 +12,7 @@ use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 pub struct MaterialParamData {
     base: [f32; 3],
     layer: f32,
-    scale: [f32; 3],
+    factor: [f32; 3],
     contrast: f32,
     uv_rotation: f32,
     uv_scale: f32,
@@ -51,12 +51,12 @@ fn write_material_parameter(
         MaterialParameter::Constant(base) => {
             out.layer = -1.0;
             out.base = base.as_vec3();
-            out.scale = [0.0; 3];
+            out.factor = [0.0; 3];
         }
         MaterialParameter::Textured(info) => {
             out.layer = texture_layers[info.texture.as_str()] as f32;
             out.base = info.base.as_vec3();
-            out.scale = info.scale.as_vec3();
+            out.factor = info.factor.as_vec3();
 
             out.uv_scale = info.uv_scale;
             out.uv_offset = info.uv_offset;
