@@ -532,8 +532,6 @@ export default class extends Vue {
     dstW: number,
     dstH: number
   ): string {
-    console.log("Resizing canvas down to ", dstW, " x ", dstH);
-
     let dst = document.createElement("canvas");
     let srcW = src.width;
     let srcH = src.height;
@@ -542,12 +540,7 @@ export default class extends Vue {
 
     dst.getContext("2d")!.drawImage(src, 0, 0);
 
-    console.log("Starting with srcW = ", srcW, ", srcH = ", srcH);
-
     while (srcW / 2 >= dstW && srcH / 2 >= dstH) {
-      console.log("Downsampling by one half once");
-
-      // downsample dst canvas by one half
       const tmp = document.createElement("canvas");
       tmp.width = srcW / 2;
       tmp.height = srcH / 2;
@@ -555,16 +548,11 @@ export default class extends Vue {
       tmp
         .getContext("2d")!
         .drawImage(dst, 0, 0, dst.width, dst.height, 0, 0, srcW / 2, srcH / 2);
-      console.log(
-        `Downsampled ${dst.width}x${dst.height} => ${srcW / 2}x${srcH / 2}`
-      );
       dst = tmp;
 
       srcW /= 2;
       srcH /= 2;
     }
-
-    // downsample dst canvas by the rest, if needed
 
     if (dstW != srcW && dstH != srcH) {
       const final = document.createElement("canvas");
@@ -574,11 +562,8 @@ export default class extends Vue {
       final
         .getContext("2d")!
         .drawImage(dst, 0, 0, dst.width, dst.height, 0, 0, dstW, dstH);
-      console.log(`Downsampled ${dst.width}x${dst.height} => ${dstW}x${dstH}`);
       dst = final;
     }
-
-    console.log(`Returning final canvas of size ${dst.width}x${dst.height}`);
 
     return dst.toDataURL("image/jpeg", 0.9);
   }

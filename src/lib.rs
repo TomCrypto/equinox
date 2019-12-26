@@ -209,6 +209,10 @@ impl WebDevice {
         })
     }
 
+    pub fn texture_compression(&mut self) -> Result<JsValue, JsValue> {
+        Ok(JsValue::from_serde(&self.device.texture_compression()?).unwrap())
+    }
+
     /// Returns whether updating the device with a scene may be time-consuming.
     pub fn is_expensive_update(&mut self, scene: &WebScene) -> Result<bool, JsValue> {
         Ok(self.device.is_update_expensive(&scene.scene)?)

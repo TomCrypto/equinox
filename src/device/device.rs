@@ -207,13 +207,10 @@ impl Device {
         Ok(expensive)
     }
 
-    /// Returns the texture compression family supported by this device.
-    pub fn supported_texture_compression(&mut self) -> Result<TextureCompression, Error> {
-        if let Some(texture_compression) = supported_texture_compression(&self.gl) {
-            Ok(texture_compression)
-        } else {
-            Err(Error::new("no texture compression format supported"))
-        }
+    /// Returns the texture compression family which is required by this device.
+    pub fn texture_compression(&mut self) -> Result<TextureCompression, Error> {
+        supported_texture_compression(&self.gl)
+            .ok_or_else(|| Error::new("no texture compression family supported"))
     }
 
     /// Updates this device to render a given scene or returns an error.
