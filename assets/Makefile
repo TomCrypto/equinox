@@ -28,7 +28,74 @@ ASSETS := aft_lounge_8k.raw \
           sunny_vondelpark_8k.raw \
           aperture_filter_1.raw \
           aperture_filter_2.raw \
-          aperture_filter_3.raw
+          aperture_filter_3.raw \
+          bark_brown_01.diffuse.s3tc.raw \
+          bark_brown_01.roughness.s3tc.raw \
+          bark_brown_01.specular.s3tc.raw \
+          brown_mud_03.diffuse.s3tc.raw \
+          brown_mud_03.specular.s3tc.raw \
+          brown_mud_dry.diffuse.s3tc.raw \
+          brown_mud_dry.roughness.s3tc.raw \
+          brown_mud_dry.specular.s3tc.raw \
+          brown_mud_leaves_01.diffuse.s3tc.raw \
+          brown_mud_leaves_01.roughness.s3tc.raw \
+          brown_mud_leaves_01.specular.s3tc.raw \
+          cobblestone_05.diffuse.s3tc.raw \
+          cobblestone_05.roughness.s3tc.raw \
+          cobblestone_05.specular.s3tc.raw \
+          concrete_floor_painted.diffuse.s3tc.raw \
+          concrete_floor_painted.roughness.s3tc.raw \
+          forrest_ground_01.diffuse.s3tc.raw \
+          forrest_ground_01.roughness.s3tc.raw \
+          forrest_sand_01.diffuse.s3tc.raw \
+          forrest_sand_01.roughness.s3tc.raw \
+          forrest_sand_01.specular.s3tc.raw \
+          grass_path_3.diffuse.s3tc.raw \
+          grass_path_3.roughness.s3tc.raw \
+          grass_path_3.specular.s3tc.raw \
+          green_metal_rust.diffuse.s3tc.raw \
+          green_metal_rust.roughness.s3tc.raw \
+          green_metal_rust.specular.s3tc.raw \
+          grey_plaster.diffuse.s3tc.raw \
+          grey_plaster.roughness.s3tc.raw \
+          grey_plaster.specular.s3tc.raw \
+          marble_01.diffuse.s3tc.raw \
+          marble_01.roughness.s3tc.raw \
+          marble_01.specular.s3tc.raw \
+          moss_wood.diffuse.s3tc.raw \
+          moss_wood.roughness.s3tc.raw \
+          moss_wood.specular.s3tc.raw \
+          red_bricks_02.diffuse.s3tc.raw \
+          red_bricks_02.roughness.s3tc.raw \
+          red_dirt_mud_01.diffuse.s3tc.raw \
+          red_dirt_mud_01.roughness.s3tc.raw \
+          red_dirt_mud_01.specular.s3tc.raw \
+          red_mud_stones.diffuse.s3tc.raw \
+          red_mud_stones.roughness.s3tc.raw \
+          red_mud_stones.specular.s3tc.raw \
+          rock_05.diffuse.s3tc.raw \
+          rock_05.roughness.s3tc.raw \
+          rock_05.specular.s3tc.raw \
+          rock_3.diffuse.s3tc.raw \
+          rock_3.roughness.s3tc.raw \
+          rock_3.specular.s3tc.raw \
+          rusty_metal_02.diffuse.s3tc.raw \
+          rusty_metal_02.roughness.s3tc.raw \
+          rusty_metal_02.specular.s3tc.raw \
+          sand_01.diffuse.s3tc.raw \
+          sand_01.roughness.s3tc.raw \
+          sand_01.specular.s3tc.raw \
+          sandstone_cracks.roughness.s3tc.raw \
+          sandstone_cracks.specular.s3tc.raw \
+          snow_02.diffuse.s3tc.raw \
+          snow_02.roughness.s3tc.raw \
+          snow_02.specular.s3tc.raw \
+          wall_bricks_plaster.diffuse.s3tc.raw \
+          wall_bricks_plaster.roughness.s3tc.raw \
+          wall_bricks_plaster.specular.s3tc.raw \
+          white_rough_plaster.diffuse.s3tc.raw \
+          white_rough_plaster.roughness.s3tc.raw \
+          white_rough_plaster.specular.s3tc.raw
 
 download-assets: $(ASSETS)
 
