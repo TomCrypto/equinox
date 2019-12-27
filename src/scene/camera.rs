@@ -16,17 +16,8 @@ pub enum ApertureShape {
     },
 }
 
-impl ApertureShape {
-    pub fn radius(&self) -> f32 {
-        match self {
-            Self::Point => 0.0,
-            Self::Circle { radius } => *radius,
-            Self::Ngon { radius, .. } => *radius,
-        }
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, PartialEq, SmartDefault, Serialize)]
+#[serde(default)]
 pub struct Camera {
     #[default([0.0; 3])]
     pub position: [f32; 3],
@@ -42,6 +33,9 @@ pub struct Camera {
 
     #[default(1.0)]
     pub focal_distance: f32,
+
+    #[default(0.0)]
+    pub focal_curvature: f32,
 
     #[default(0.06)]
     pub focal_length: f32,

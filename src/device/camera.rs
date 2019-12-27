@@ -1,23 +1,20 @@
 use crate::{ApertureShape, Camera, Device};
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Point3, Vector3};
-use itertools::iproduct;
 use js_sys::Error;
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
 #[derive(AsBytes, FromBytes, Debug, Default)]
 pub struct CameraData {
-    origin_plane: [[f32; 4]; 4],
-    target_plane: [[f32; 4]; 4],
     aperture_settings: [f32; 4],
+    camera_transform: [[f32; 4]; 4],
+    camera_settings: [f32; 4],
 }
 
 impl Device {
     pub(crate) fn update_camera(&mut self, camera: &Camera) -> Result<(), Error> {
         let mut data = CameraData::default();
-
-        let fov_tan = camera.film_height / (2.0 * camera.focal_length);
 
         let position: Point3<f32> = camera.position.into();
         let mut direction: Vector3<f32> = camera.direction.into();
@@ -27,32 +24,17 @@ impl Device {
         up_vector = up_vector.normalize();
 
         // Matrix4::look_at uses a right-handed coordinate system, which is wrong for
-        // us. The easiest way to work around is to just negate the camera direction.
+        // us. The easiest way to work around it is by negating the camera direction.
 
-        let mut xfm: Matrix4<f32> = Transform::look_at(position, position - direction, up_vector);
-
-        xfm = xfm.inverse_transform().unwrap();
-
-        for (&x, &y) in iproduct!(&[-1i32, 1i32], &[-1i32, 1i32]) {
-            let plane_index = (y + 1 + (x + 1) / 2) as usize;
-
-            let origin = xfm.transform_point(Point3::new(
-                (x as f32) * camera.aperture.radius(),
-                (y as f32) * camera.aperture.radius(),
-                0.0,
-            ));
-
-            let target = xfm.transform_point(Point3::new(
-                (x as f32) * fov_tan * camera.focal_distance,
-                (y as f32) * fov_tan * camera.focal_distance,
-                camera.focal_distance,
-            ));
-
-            data.origin_plane[plane_index] = [origin.x, origin.y, origin.z, 1.0];
-            data.target_plane[plane_index] = [target.x, target.y, target.z, 1.0];
-        }
+        let xfm: Matrix4<f32> = Transform::look_at(position, position - direction, up_vector);
 
         data.aperture_settings = aperture_settings(&camera.aperture);
+        data.camera_transform = xfm.inverse_transform().unwrap().into();
+
+        data.camera_settings[0] = camera.film_height / (2.0 * camera.focal_length);
+        data.camera_settings[1] = camera.focal_distance;
+        data.camera_settings[2] = camera.focal_curvature;
+        data.camera_settings[3] = 0.0;
 
         self.camera_buffer.write(&data)
     }
@@ -60,10 +42,12 @@ impl Device {
 
 fn aperture_settings(aperture: &ApertureShape) -> [f32; 4] {
     match aperture {
-        ApertureShape::Point => [-1.0; 4],
-        ApertureShape::Circle { .. } => [0.0, 0.0, 0.0, 0.0],
+        ApertureShape::Point => [-1.0, 0.0, 0.0, 0.0],
+        ApertureShape::Circle { radius } => [0.0, 0.0, 0.0, *radius],
         ApertureShape::Ngon {
-            sides, rotation, ..
-        } => [1.0, *sides as f32, *rotation as f32, 1.0 / (*sides as f32)],
+            sides,
+            rotation,
+            radius,
+        } => [1.0, *sides as f32, *rotation as f32, *radius],
     }
 }

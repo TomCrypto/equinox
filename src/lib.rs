@@ -102,7 +102,9 @@ impl WebScene {
     /// This method will attempt to dirty the least amount of scene data
     /// possible, so it won't necessarily always dirty the entire scene.
     pub fn set_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
-        self.scene.patch_from_other(from_json(json)?);
+        let temporary: Scene = from_json(json)?;
+        temporary.validate()?;
+        self.scene.patch_from_other(temporary);
 
         Ok(())
     }

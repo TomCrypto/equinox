@@ -169,8 +169,7 @@ void main() {
 
     quasi_t quasi = quasi_init(integrator.current_pass, decorrelate_sample(seed));
 
-    ray_t ray;
-    evaluate_camera_ray(ray.org, ray.dir, quasi);
+    ray_t ray = evaluate_camera_ray(gl_FragCoord.xy - 0.5, quasi);
 
     radiance_estimate = vec4(gather_photons(ray, quasi), 1.0);
 }

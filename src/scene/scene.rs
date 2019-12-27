@@ -234,6 +234,7 @@ impl Scene {
         validate!(camera.focal_distance > 0.0);
         validate!(camera.focal_length > 0.0);
         validate!(camera.film_height > 0.0);
+        validate!(camera.focal_curvature >= 0.0);
         validate!(camera.direction != [0.0, 0.0, 0.0]);
         validate!(camera.up_vector != [0.0, 0.0, 0.0]);
 
@@ -241,9 +242,11 @@ impl Scene {
             ApertureShape::Point => {}
             ApertureShape::Circle { radius } => {
                 validate!("camera.aperture", radius >= 0.0);
+                validate!("camera.aperture", radius <= 100.0);
             }
             ApertureShape::Ngon { radius, sides, .. } => {
                 validate!("camera.aperture", radius >= 0.0);
+                validate!("camera.aperture", radius <= 100.0);
                 validate!("camera.aperture", sides >= 3);
             }
         }
