@@ -323,6 +323,10 @@ export default class extends Vue {
   private lastVsync: number = 0;
 
   private async performDeviceUpdate() {
+    if (this.isContextLost) {
+      return; // not ready
+    }
+
     // TODO: find a way to not call this repeatedly? maybe cache them until the scene changes OR
     // the texture compression changes? that we can do, in theory...
     const assets = this.scene.assets();
