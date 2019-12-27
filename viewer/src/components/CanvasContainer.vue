@@ -17,10 +17,7 @@
       v-on:contextmenu="$event.preventDefault()"
     />
 
-    <LoadingOverlay
-      :assets-in-flight="assetsInFlight"
-      :is-expensive-update="isExpensiveUpdate"
-    />
+    <LoadingOverlay :assets-in-flight="assetsInFlight" :is-expensive-update="isExpensiveUpdate" />
 
     <StatusBar
       v-if="showStatusBar"
@@ -324,13 +321,13 @@ export default class extends Vue {
       return; // not ready
     }
 
-    // TODO: find a way to not call this repeatedly? maybe cache them until the scene changes OR
-    // the texture compression changes? that we can do, in theory...
-    const assets = this.scene.assets();
+    // TODO: it would be nice to not have to call this each time since it scans the
+    // entire scene contents but it's not that slow; optimize only when we need to.
 
-    const compression = this.device.texture_compression();
-
-    await this.loadAssets(assets, compression);
+    await this.loadAssets(
+      this.scene.assets(),
+      this.device.texture_compression()
+    );
 
     this.device.update(this.scene, this.getAsset);
   }
