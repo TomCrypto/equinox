@@ -78,6 +78,12 @@ export default class extends Vue {
 
   @Prop() private assetsInFlight!: number;
 
+  @Prop() private loadAssets!: (
+    assets: string[],
+    compression: string
+  ) => Promise<void>;
+  @Prop() private getAsset!: (assets: string) => Uint8Array | null;
+
   private isExpensiveUpdate: boolean = false;
 
   private device!: WebDevice;
@@ -112,6 +118,7 @@ export default class extends Vue {
     });
 
     this.device = new this.equinox.WebDevice(this.context!);
+    this.$emit("device-created", this.device);
 
     this.canvas.focus();
 
@@ -231,13 +238,6 @@ export default class extends Vue {
     this.keys[key] = true;
   }
 
-  private sceneJson(): object {
-    return {
-      json: this.scene.json(),
-      assets: this.scene.assets()
-    };
-  }
-
   private saveScreenshot() {
     this.mustSaveRender = true;
   }
@@ -322,7 +322,19 @@ export default class extends Vue {
 
   private lastVsync: number = 0;
 
-  renderLoop() {
+  private async performDeviceUpdate() {
+    // TODO: find a way to not call this repeatedly? maybe cache them until the scene changes OR
+    // the texture compression changes? that we can do, in theory...
+    const assets = this.scene.assets();
+
+    const compression = this.device.texture_compression();
+
+    await this.loadAssets(assets, compression);
+
+    this.device.update(this.scene, this.getAsset);
+  }
+
+  async renderLoop() {
     const start = performance.now();
 
     if (this.lastVsync !== 0) {
@@ -407,12 +419,12 @@ export default class extends Vue {
       try {
         if (!this.isRenderPaused) {
           if (this.isExpensiveUpdate) {
-            this.device.update(this.scene);
+            await this.performDeviceUpdate();
             this.isExpensiveUpdate = false;
           } else if (this.device.is_expensive_update(this.scene)) {
             this.isExpensiveUpdate = true;
           } else {
-            this.device.update(this.scene);
+            await this.performDeviceUpdate();
           }
 
           if (!this.isExpensiveUpdate) {
@@ -477,7 +489,7 @@ export default class extends Vue {
         version: this.equinox.version()
       };
 
-      zip.file("scene.json", JSON.stringify(this.sceneJson(), null, 2));
+      zip.file("scene.json", JSON.stringify(this.scene.json(), null, 2));
       zip.file("meta.json", JSON.stringify(info, null, 2));
       zip.file("render.png", await render);
 
@@ -489,7 +501,6 @@ export default class extends Vue {
 
   private async performSceneSave() {
     const json = this.scene.json();
-    const assets = this.scene.assets();
     const name = this.scene.name();
 
     const thumbnailWidth = 320;
@@ -506,7 +517,6 @@ export default class extends Vue {
       "save-scene-response",
       name,
       json,
-      assets,
       this.createThumbnail(this.canvas!, w, h)
     );
   }

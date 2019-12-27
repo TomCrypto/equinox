@@ -5,7 +5,6 @@ use crate::{Device, Environment};
 use half::f16;
 use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
-use std::collections::HashMap;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 #[repr(align(16), C)]
@@ -22,12 +21,14 @@ pub struct EnvironmentData {
 impl Device {
     pub(crate) fn update_environment_map(
         &mut self,
-        assets: &HashMap<String, Vec<u8>>,
+        assets: &dyn Fn(&str) -> Result<Vec<u8>, Error>,
         map: Option<&str>,
     ) -> Result<(), Error> {
         if let Some(map) = map {
+            let asset_data = assets(map)?;
+
             let (header, data) =
-                LayoutVerified::<_, Header>::new_from_prefix(assets[map].as_slice()).unwrap();
+                LayoutVerified::<_, Header>::new_from_prefix(asset_data.as_slice()).unwrap();
 
             if header.data_format.try_parse() != Some(DataFormat::RGBE8) {
                 return Err(Error::new("expected RGBE8 environment map"));

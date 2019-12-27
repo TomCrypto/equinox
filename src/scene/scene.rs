@@ -4,7 +4,7 @@ use crate::{
 };
 use js_sys::Error;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 macro_rules! validate {
     ($cond: expr) => {
@@ -70,9 +70,6 @@ pub struct Scene {
     pub display: Dirty<Display>,
     pub aperture: Dirty<Option<Aperture>>,
     pub integrator: Dirty<Integrator>,
-
-    #[serde(skip)]
-    pub assets: HashMap<String, Vec<u8>>,
 }
 
 impl Scene {
@@ -92,6 +89,31 @@ impl Scene {
         Dirty::dirty(&mut self.display);
         Dirty::dirty(&mut self.aperture);
         Dirty::dirty(&mut self.integrator);
+    }
+
+    /// Returns all referenced assets.
+    pub fn assets(&self) -> Vec<&str> {
+        let mut assets = vec![];
+
+        if let Some(asset) = self.environment_map.as_ref() {
+            assets.push(asset.as_str());
+        }
+
+        if let Some(aperture) = self.aperture.as_ref() {
+            assets.push(&aperture.filter);
+        }
+
+        for material in self.material_list.values() {
+            for (_, parameter) in material.parameters() {
+                if let MaterialParameter::Textured(info) = parameter {
+                    assets.push(&info.texture);
+                }
+            }
+        }
+
+        assets.sort_unstable();
+        assets.dedup();
+        assets
     }
 
     /// Patches this scene to be equal to another scene.
@@ -142,14 +164,12 @@ impl Scene {
         if self.integrator != other.integrator {
             self.integrator = other.integrator;
         }
-
-        self.assets = other.assets;
     }
 
     /// Validates all dirty contents of this scene.
     ///
     /// If this method succeeds, then the scene should always be renderable
-    /// without errors, barring implementation limitations in the renderer.
+    /// without errors, excluding device limitations and/or missing assets.
     pub fn validate(&self) -> Result<(), Error> {
         if let Some(metadata) = Dirty::as_dirty(&self.metadata) {
             self.validate_metadata(metadata)?;
@@ -173,14 +193,6 @@ impl Scene {
 
         if let Some(integrator) = Dirty::as_dirty(&self.integrator) {
             self.validate_integrator(integrator)?;
-        }
-
-        if let Some(Some(aperture)) = Dirty::as_dirty(&self.aperture) {
-            self.validate_aperture(aperture)?;
-        }
-
-        if let Some(Some(environment_map)) = Dirty::as_dirty(&self.environment_map) {
-            self.validate_environment_map(environment_map)?;
         }
 
         if let Some(instance_list) = Dirty::as_dirty(&self.instance_list) {
@@ -295,22 +307,6 @@ impl Scene {
         Ok(())
     }
 
-    fn validate_aperture(&self, aperture: &Aperture) -> Result<(), Error> {
-        let assets = &self.assets;
-
-        validate_contains!(assets, aperture.filter);
-
-        Ok(())
-    }
-
-    fn validate_environment_map(&self, environment_map: &str) -> Result<(), Error> {
-        let assets = &self.assets;
-
-        validate_contains!(assets, environment_map);
-
-        Ok(())
-    }
-
     fn validate_instance_list(
         &self,
         instance_list: &BTreeMap<String, Instance>,
@@ -376,20 +372,15 @@ impl Scene {
         &self,
         material_list: &BTreeMap<String, Material>,
     ) -> Result<(), Error> {
-        let assets = &self.assets;
-
         for (name, material) in material_list.iter() {
             for (parameter_name, parameter) in material.parameters() {
                 if let MaterialParameter::Textured(info) = parameter {
                     let prefix = format!("material_list[\"{}\"].{}", name, parameter_name);
 
                     let contrast = info.contrast;
-                    let texture = &info.texture;
 
                     validate!(prefix, contrast >= 0.0);
                     validate!(prefix, contrast <= 1.0);
-
-                    validate_contains!(assets, prefix, texture);
                 }
             }
         }

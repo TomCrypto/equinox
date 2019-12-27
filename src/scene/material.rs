@@ -19,7 +19,6 @@ impl MaterialParameterType {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct TexturedMaterialParameter {
     pub base: MaterialParameterType,
-    #[serde(alias = "scale")] // TODO: remove when possible
     pub factor: MaterialParameterType,
     pub texture: String,
     pub contrast: f32,

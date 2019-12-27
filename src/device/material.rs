@@ -4,7 +4,7 @@ use log::{debug, info, warn};
 use crate::{Device, Material, MaterialParameter};
 use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 #[repr(align(16), C)]
@@ -84,7 +84,7 @@ impl Device {
 
     fn upload_material_textures(
         &mut self,
-        assets: &HashMap<String, Vec<u8>>,
+        assets: &dyn Fn(&str) -> Result<Vec<u8>, Error>,
         textures: &[&str],
     ) -> Result<(), Error> {
         // TODO: in the future, add support for ASTC compression for mobile. This
@@ -97,11 +97,19 @@ impl Device {
             if textures.is_empty() {
                 self.material_textures.reset();
             } else {
-                let mut layers = vec![];
+                // TODO: this sucks, can we fix it
+
+                let mut asset_data = vec![];
 
                 for &texture in textures {
+                    asset_data.push(assets(texture)?);
+                }
+
+                let mut layers = vec![];
+
+                for index in 0..textures.len() {
                     let (header, data) =
-                        LayoutVerified::<_, Header>::new_from_prefix(assets[texture].as_slice())
+                        LayoutVerified::<_, Header>::new_from_prefix(asset_data[index].as_slice())
                             .unwrap();
 
                     if header.data_format.try_parse() != Some(DataFormat::BC1) {
@@ -139,7 +147,7 @@ impl Device {
     pub(crate) fn update_materials(
         &mut self,
         materials: &BTreeMap<String, Material>,
-        assets: &HashMap<String, Vec<u8>>,
+        assets: &dyn Fn(&str) -> Result<Vec<u8>, Error>,
     ) -> Result<(), Error> {
         let mut parameter_count = 0;
         let mut textures = vec![];

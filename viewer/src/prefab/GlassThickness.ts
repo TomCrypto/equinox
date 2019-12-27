@@ -160,7 +160,6 @@ export default {
       max_gather_bounces: 8
     }
   },
-  assets: ["assets/green_point_park_8k.raw"],
   thumbnail: "prefab-glass-thickness.jpg",
   timestamp: ""
 };

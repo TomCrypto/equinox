@@ -31,7 +31,6 @@ import { WebScene } from "equinox";
 @Component
 export default class extends Vue {
   @Prop() private scene!: WebScene;
-  @Prop() private loadAssets!: (assets: string[]) => Promise<void>;
 
   private sceneJson: any = null;
 
@@ -60,14 +59,8 @@ export default class extends Vue {
   private async updateEnvironmentMap(url: string) {
     const oldEnvmap = this.sceneJson.environment_map as string | null;
 
-    await this.loadAssets([url]);
-
     this.scene.set_envmap(url);
     this.sceneJson = this.scene.json();
-
-    if (oldEnvmap !== null) {
-      this.scene.remove_asset(oldEnvmap);
-    }
   }
 
   private getUrlForMap(name: string): string {

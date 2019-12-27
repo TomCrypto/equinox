@@ -8,7 +8,6 @@ use crate::{
 use img2raw::{ColorSpace, DataFormat, Header};
 use itertools::{iproduct, Itertools, Position};
 use js_sys::Error;
-use std::collections::HashMap;
 use std::iter::{empty, repeat};
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
@@ -46,11 +45,12 @@ impl Device {
     pub(crate) fn update_aperture_filter(
         &mut self,
         aperture: &Aperture,
-        assets: &HashMap<String, Vec<u8>>,
+        assets: &dyn Fn(&str) -> Result<Vec<u8>, Error>,
     ) -> Result<(), Error> {
+        let asset_data = assets(&aperture.filter)?;
+
         let (header, data) =
-            LayoutVerified::<_, Header>::new_from_prefix(assets[&aperture.filter].as_slice())
-                .unwrap();
+            LayoutVerified::<_, Header>::new_from_prefix(asset_data.as_slice()).unwrap();
 
         if header.data_format.try_parse() != Some(DataFormat::RGBA16F) {
             return Err(Error::new("expected RGBA16F aperture filter"));

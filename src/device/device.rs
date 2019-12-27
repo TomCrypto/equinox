@@ -214,7 +214,11 @@ impl Device {
     }
 
     /// Updates this device to render a given scene or returns an error.
-    pub fn update(&mut self, scene: &mut Scene) -> Result<bool, Error> {
+    pub fn update(
+        &mut self,
+        scene: &mut Scene,
+        assets: impl Fn(&str) -> Result<Vec<u8>, Error>,
+    ) -> Result<bool, Error> {
         if self.device_lost && !self.try_restore(scene)? {
             return Ok(false); // context currently lost
         }
@@ -262,10 +266,8 @@ impl Device {
             Ok(())
         })?;
 
-        let assets = &scene.assets;
-
         invalidated |= Dirty::clean(&mut scene.material_list, |materials| {
-            self.update_materials(materials, assets)?;
+            self.update_materials(materials, &assets)?;
 
             Dirty::dirty(instances);
 
@@ -284,7 +286,7 @@ impl Device {
         let environment = &mut scene.environment;
 
         invalidated |= Dirty::clean(&mut scene.environment_map, |environment_map| {
-            self.update_environment_map(assets, environment_map.as_ref().map(String::as_str))?;
+            self.update_environment_map(&assets, environment_map.as_ref().map(String::as_str))?;
 
             Dirty::dirty(environment);
 
@@ -329,8 +331,6 @@ impl Device {
         self.execute_fft_pass_shader.rebuild()?;
         self.load_filter_tile_shader.rebuild()?;
 
-        let assets = &scene.assets;
-
         reset_tiles |= Dirty::clean(&mut scene.aperture, |aperture| {
             self.fft_filter_fbo.clear();
             self.fft_filter_tile_r.clear();
@@ -338,7 +338,7 @@ impl Device {
             self.fft_filter_tile_b.clear();
 
             if let Some(aperture) = aperture {
-                self.update_aperture_filter(aperture, assets)?;
+                self.update_aperture_filter(aperture, &assets)?;
             } else {
                 self.fft_signal_fbo.invalidate();
                 self.fft_buffer_fbo.invalidate();

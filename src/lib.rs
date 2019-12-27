@@ -60,9 +60,10 @@ pub mod shader {
 }
 
 use cgmath::{prelude::*, Basis3, Vector3};
-use js_sys::{Array, Error};
+use js_sys::{Array, Error, Function, Uint8Array};
 use serde::{de::DeserializeOwned, Serialize};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use web_sys::WebGl2RenderingContext;
 
 /// WASM binding for a scene.
@@ -101,23 +102,22 @@ impl WebScene {
     /// This method will attempt to dirty the least amount of scene data
     /// possible, so it won't necessarily always dirty the entire scene.
     pub fn set_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
-        let mut temporary: Scene = from_json(json)?;
-
-        std::mem::swap(&mut self.scene.assets, &mut temporary.assets);
-
-        if let Err(error) = temporary.validate() {
-            std::mem::swap(&mut self.scene.assets, &mut temporary.assets);
-            return Err(error.into()); // put the assets back on the scene
-        }
-
-        self.scene.patch_from_other(temporary);
+        self.scene.patch_from_other(from_json(json)?);
 
         Ok(())
     }
 
-    /// Returns the list of all assets in the scene as a JS string array.
+    /// Returns all assets which are referenced in this scene.
+    ///
+    /// All distinct assets will be returned in lexicographical order. Assets
+    /// which are referenced in the scene but aren't used are still returned.
     pub fn assets(&self) -> Array {
-        self.scene.assets.keys().map(JsValue::from).collect()
+        self.scene
+            .assets()
+            .into_iter()
+            .map(ToOwned::to_owned)
+            .map(JsValue::from)
+            .collect()
     }
 
     pub fn set_raster_dimensions(&mut self, width: u32, height: u32) {
@@ -128,14 +128,6 @@ impl WebScene {
         if self.scene.raster.height != height {
             self.scene.raster.height = height;
         }
-    }
-
-    pub fn insert_asset(&mut self, name: &str, data: &[u8]) {
-        self.scene.assets.insert(name.to_owned(), data.to_vec());
-    }
-
-    pub fn remove_asset(&mut self, name: &str) {
-        self.scene.assets.remove(name);
     }
 
     pub fn set_environment_rotation(&mut self, new_rotation: f32) {
@@ -219,8 +211,20 @@ impl WebDevice {
     }
 
     /// Updates the device with a scene, returning true if an update occurred.
-    pub fn update(&mut self, scene: &mut WebScene) -> Result<bool, JsValue> {
-        Ok(self.device.update(&mut scene.scene)?)
+    pub fn update(&mut self, scene: &mut WebScene, assets: &Function) -> Result<bool, JsValue> {
+        Ok(self.device.update(&mut scene.scene, |asset| {
+            let asset_data = assets.call1(&JsValue::NULL, &JsValue::from(asset))?;
+
+            if asset_data.is_null() || asset_data.is_undefined() {
+                return Err(Error::new("failed to fetch asset"));
+            }
+
+            if let Some(buffer) = asset_data.dyn_ref::<Uint8Array>() {
+                Ok(buffer.to_vec())
+            } else {
+                Err(Error::new("asset callback did not return Uint8Array"))
+            }
+        })?)
     }
 
     /// Refines the render using the integrator.

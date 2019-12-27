@@ -5,6 +5,8 @@
         :equinox="equinox"
         :scene="scene"
         :assets-in-flight="assetsInFlight"
+        :load-assets="loadAssets"
+        :get-asset="getAsset"
       />
     </div>
     <div class="editor-panel">
@@ -18,13 +20,13 @@
           >Advanced Editor</template
         >
         <template slot="tab-panel-advanced">
-          <AdvancedEditor :scene="scene" :load-assets="loadAssets" />
+          <AdvancedEditor :scene="scene" />
         </template>
         <template slot="tab-head-environment"
           >Environment</template
         >
         <template slot="tab-panel-environment">
-          <EnvironmentEditor :scene="scene" :load-assets="loadAssets" />
+          <EnvironmentEditor :scene="scene" />
         </template>
         <template slot="tab-head-documentation"
           >Documentation</template
@@ -36,7 +38,7 @@
           >Save/Load</template
         >
         <template slot="tab-panel-save-load">
-          <SaveLoadEditor :scene="scene" :load-assets="loadAssets" />
+          <SaveLoadEditor :scene="scene" />
         </template>
         <template slot="tab-head-licensing"
           >Licensing</template
@@ -95,23 +97,32 @@ export default class App extends Vue {
   private assetDownloads = new Map<string, Promise<ArrayBuffer>>();
   private assetsInFlight = 0;
 
+  private assets: Map<string, Uint8Array> = new Map();
+
   private readonly store = localforage.createInstance({
     driver: localforage.INDEXEDDB,
     name: "equinox-asset-data-v2"
   });
 
-  async loadAssets(assets: string[]): Promise<void> {
-    const sceneAssets = this.scene.assets() as string[];
+  getAsset(asset: string): Uint8Array | null {
+    return this.assets.get(asset) || null;
+  }
 
-    assets = assets.filter(asset => {
-      // asset is already loaded on scene
-      return !sceneAssets.includes(asset);
-    });
+  async loadAssets(assets: string[], compression: string): Promise<void> {
+    for (const asset of this.assets.keys()) {
+      if (!assets.includes(asset)) {
+        this.assets.delete(asset);
+      }
+    }
+
+    assets = assets.filter(asset => !this.assets.has(asset));
 
     const promises = [];
 
     for (const asset of assets) {
-      const promise = this.assetDownloads.get(asset) || this.fetchAsset(asset);
+      const url = this.url_for_asset(asset, compression);
+
+      const promise = this.assetDownloads.get(asset) || this.fetchAsset(url);
 
       promises.push(promise);
       this.assetDownloads.set(asset, promise);
@@ -120,7 +131,7 @@ export default class App extends Vue {
     this.assetsInFlight = this.assetDownloads.size;
 
     for (const [index, buffer] of (await Promise.all(promises)).entries()) {
-      this.scene.insert_asset(assets[index], new Uint8Array(buffer));
+      this.assets.set(assets[index], new Uint8Array(buffer));
     }
   }
 
@@ -140,6 +151,22 @@ export default class App extends Vue {
       this.assetDownloads.delete(url);
       this.assetsInFlight = this.assetDownloads.size;
     }
+  }
+
+  private url_for_asset(asset: string, texture_compression: string): string {
+    if (!asset.endsWith(".tc.raw")) {
+      return asset; // uncompressed
+    }
+
+    if (texture_compression == "S3TC") {
+      return asset.replace(".tc.raw", ".s3tc.raw");
+    }
+
+    if (texture_compression == "ASTC") {
+      return asset.replace(".tc.raw", ".astc.raw");
+    }
+
+    throw new Error("unknown texture compression format reported");
   }
 
   mounted() {

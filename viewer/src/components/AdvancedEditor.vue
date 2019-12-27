@@ -37,8 +37,6 @@ import CodeMirror from "codemirror";
 export default class extends Vue {
   @Prop() private scene!: WebScene;
 
-  @Prop() private loadAssets!: (assets: string[]) => Promise<void>;
-
   private error: string = "";
 
   mounted() {
@@ -58,24 +56,15 @@ export default class extends Vue {
       this.onJsonChange(editor.getValue());
     });
 
-    editor.setValue(JSON.stringify(this.sceneJson(), null, 2));
+    editor.setValue(JSON.stringify(this.scene.json(), null, 2));
     editor.clearHistory();
   }
 
-  private sceneJson(): object {
-    return {
-      json: this.scene.json(),
-      assets: this.scene.assets()
-    };
-  }
-
   private async onJsonChange(input: string) {
-    const result = this.validateJson(input);
+    const json = this.validateJson(input);
 
-    if (result !== null) {
-      const [json, assets] = result;
-
-      const error = await this.updateScene(json, assets);
+    if (json !== null) {
+      const error = this.updateScene(json);
 
       if (error !== null) {
         this.error = error;
@@ -85,48 +74,18 @@ export default class extends Vue {
     }
   }
 
-  private validateJson(value: string): [object, string[]] | null {
+  private validateJson(value: string): any | null {
     try {
-      const payload = JSON.parse(value);
-
-      if (!(payload["json"] instanceof Object)) {
-        this.error = `error: json should be an object`;
-        return null;
-      }
-
-      if (!(payload["assets"] instanceof Array)) {
-        this.error = `error: assets should be an array`;
-        return null;
-      }
-
-      for (const asset of payload["assets"]) {
-        if (!(typeof asset === "string")) {
-          this.error = `error: assets should be a string array`;
-          return null;
-        }
-      }
-
-      return [payload["json"], payload["assets"]];
+      return JSON.parse(value);
     } catch {
       this.error = "JSON syntax error";
       return null;
     }
   }
 
-  private async updateScene(
-    json: object,
-    assets: string[]
-  ): Promise<string | null> {
-    await this.loadAssets(assets);
-
+  private updateScene(json: object): string | null {
     try {
       this.scene.set_json(json);
-
-      for (const asset of this.scene.assets()) {
-        if (!assets.includes(asset)) {
-          this.scene.remove_asset(asset);
-        }
-      }
 
       return null;
     } catch (e) {

@@ -37,15 +37,12 @@ import DefaultScenePrefab from "../prefab/DefaultScene";
 export interface Metadata {
   thumbnail: string;
   json: object;
-  assets: string[];
   timestamp: string;
 }
 
 @Component
 export default class extends Vue {
   @Prop() private scene!: WebScene;
-
-  @Prop() private loadAssets!: (assets: string[]) => Promise<void>;
 
   private scenes: Map<string, Metadata> = new Map();
 
@@ -75,10 +72,9 @@ export default class extends Vue {
 
     this.$root.$on(
       "save-scene-response",
-      (name: string, json: object, assets: string[], thumbnail: string) =>
+      (name: string, json: object, thumbnail: string) =>
         this.saveScene(name, {
           json,
-          assets,
           thumbnail,
           timestamp: new Date().toISOString()
         })
@@ -106,17 +102,9 @@ export default class extends Vue {
       throw new Error("scene did not exist");
     }
 
-    await this.loadAssets(scene.assets);
-
-    // TODO: error handling here in case the scene is bad...
+    // TODO: error handling here in case the scene is bad?
 
     this.scene.set_json(scene.json);
-
-    for (const asset of this.scene.assets()) {
-      if (!scene.assets.includes(asset)) {
-        this.scene.remove_asset(asset);
-      }
-    }
   }
 
   private async updateFromStore() {

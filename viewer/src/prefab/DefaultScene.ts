@@ -221,7 +221,6 @@ export default {
       max_gather_bounces: 9
     }
   },
-  assets: [],
   thumbnail: "prefab-default-scene.jpg",
   timestamp: ""
 };
