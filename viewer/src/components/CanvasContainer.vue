@@ -17,7 +17,10 @@
       v-on:contextmenu="$event.preventDefault()"
     />
 
-    <LoadingOverlay :assets-in-flight="assetsInFlight" :is-expensive-update="isExpensiveUpdate" />
+    <LoadingOverlay
+      :assets-in-flight="assetsInFlight"
+      :is-expensive-update="isExpensiveUpdate"
+    />
 
     <StatusBar
       v-if="showStatusBar"
@@ -76,6 +79,7 @@ export default class extends Vue {
   @Prop() private assetsInFlight!: number;
 
   @Prop() private loadAssets!: (assets: string[], compression: string) => void;
+  @Prop() private clearAssets!: () => void;
   @Prop() private getAsset!: (assets: string) => Uint8Array | null;
 
   private isExpensiveUpdate: boolean = false;
@@ -107,6 +111,7 @@ export default class extends Vue {
 
     this.canvas.addEventListener("webglcontextlost", event => {
       this.gpuTimeQueries!.clear();
+      this.clearAssets();
       this.device.context_lost();
       event.preventDefault();
     });

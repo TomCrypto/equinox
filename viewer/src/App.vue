@@ -6,6 +6,7 @@
         :scene="scene"
         :assets-in-flight="assetsInFlight"
         :load-assets="loadAssets"
+        :clear-assets="clearAssets"
         :get-asset="getAsset"
       />
     </div>
@@ -108,6 +109,10 @@ export default class App extends Vue {
     return this.assets.get(asset) || null;
   }
 
+  clearAssets() {
+    this.assets.clear();
+  }
+
   async loadAssets(assets: string[], compression: string) {
     for (const asset of this.assets.keys()) {
       if (!assets.includes(asset)) {
@@ -122,10 +127,10 @@ export default class App extends Vue {
     for (const asset of assets) {
       const url = this.url_for_asset(asset, compression);
 
-      const promise = this.assetDownloads.get(asset) || this.fetchAsset(url);
+      const promise = this.assetDownloads.get(url) || this.fetchAsset(url);
 
       promises.push(promise);
-      this.assetDownloads.set(asset, promise);
+      this.assetDownloads.set(url, promise);
     }
 
     this.assetsInFlight = this.assetDownloads.size;
