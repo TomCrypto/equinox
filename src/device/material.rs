@@ -97,19 +97,17 @@ impl Device {
             if textures.is_empty() {
                 self.material_textures.reset();
             } else {
-                // TODO: this sucks, can we fix it
+                self.material_textures.create_array_compressed(
+                    Self::MATERIAL_TEXTURE_COLS,
+                    Self::MATERIAL_TEXTURE_ROWS,
+                    textures.len(),
+                )?;
 
-                let mut asset_data = vec![];
+                for (layer, texture) in textures.iter().enumerate() {
+                    let asset_data = assets(texture)?;
 
-                for &texture in textures {
-                    asset_data.push(assets(texture)?);
-                }
-
-                let mut layers = vec![];
-
-                for index in 0..textures.len() {
                     let (header, data) =
-                        LayoutVerified::<_, Header>::new_from_prefix(asset_data[index].as_slice())
+                        LayoutVerified::<_, Header>::new_from_prefix(asset_data.as_slice())
                             .unwrap();
 
                     if header.data_format.try_parse() != Some(DataFormat::BC1) {
@@ -128,14 +126,13 @@ impl Device {
                         return Err(Error::new("invalid material texture dimensions"));
                     }
 
-                    layers.push(data);
+                    self.material_textures.upload_layer_compressed(
+                        Self::MATERIAL_TEXTURE_COLS,
+                        Self::MATERIAL_TEXTURE_ROWS,
+                        layer,
+                        &data,
+                    );
                 }
-
-                self.material_textures.upload_array_compressed(
-                    Self::MATERIAL_TEXTURE_COLS,
-                    Self::MATERIAL_TEXTURE_ROWS,
-                    &layers,
-                )?;
             }
 
             self.loaded_textures = textures.iter().map(|&texture| texture.to_owned()).collect();

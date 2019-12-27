@@ -232,7 +232,8 @@ impl Device {
         let mut reset_tiles = false;
 
         self.placeholder_texture.upload(1, 1, &[0]);
-        self.placeholder_texture_array.upload_array(1, 1, &[&[0]]);
+        self.placeholder_texture_array.create_array(1, 1, 1);
+        self.placeholder_texture_array.upload_layer(1, 1, 0, &[0]);
 
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
             self.update_camera(camera)?;

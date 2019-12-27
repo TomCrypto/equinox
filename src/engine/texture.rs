@@ -81,6 +81,7 @@ impl<T> Texture<T> {
     }
 
     pub fn invalidate(&mut self) {
+        self.layout = (0, 0, 0);
         self.handle = None;
     }
 
@@ -153,7 +154,7 @@ impl<T: TextureFormat<Compressed = True>> Texture<T> {
         &mut self,
         _rows: usize,
         _cols: usize,
-        _layers: usize,
+        _data: usize,
     ) -> Result<(), Error> {
         unreachable!("compressed textures not implemented yet")
         // this would be the same as arrays but with TEXTURE_2D
@@ -198,47 +199,45 @@ impl<T: TextureFormat<Compressed = True>> Texture<T> {
         &mut self,
         _rows: usize,
         _cols: usize,
-        _layer: &[T::Data],
+        _data: &[T::Data],
     ) -> Result<(), Error> {
         unreachable!("compressed textures not implemented yet")
         // this would be the same as arrays but with TEXTURE_2D
     }
 
-    pub fn upload_array_compressed(
+    pub fn upload_layer_compressed(
         &mut self,
         rows: usize,
         cols: usize,
-        layers: &[&[T::Data]],
-    ) -> Result<(), Error> {
-        self.create_array_compressed(cols, rows, layers.len())?;
+        layer: usize,
+        data: &[T::Data],
+    ) {
+        assert!((rows, cols) == (self.rows(), self.cols()));
+        assert!(layer < self.layers());
 
         self.gl
             .bind_texture(Context::TEXTURE_2D_ARRAY, self.handle.as_ref());
 
-        for (layer, data) in layers.iter().enumerate() {
-            self.gl.compressed_tex_sub_image_3d_with_array_buffer_view(
-                Context::TEXTURE_2D_ARRAY,
-                0,
-                0,
-                0,
-                layer as i32,
-                cols as i32,
-                rows as i32,
-                1,
-                T::GL_FORMAT,
-                &T::into_texture_source_data(cols, rows, data),
-            );
+        self.gl.compressed_tex_sub_image_3d_with_array_buffer_view(
+            Context::TEXTURE_2D_ARRAY,
+            0,
+            0,
+            0,
+            layer as i32,
+            self.cols() as i32,
+            self.rows() as i32,
+            1,
+            T::GL_FORMAT,
+            &T::into_texture_source_data(cols, rows, data),
+        );
 
-            // I've seen this occur on Chrome, although the call still goes through. It
-            // doesn't happen on Firefox which suggests some browser inconsistency, but
-            // pretty sure this is allowed by the spec.
+        // I've seen this occur on Chrome, although the call still goes through. It
+        // doesn't happen on Firefox which suggests some browser inconsistency, but
+        // pretty sure this is allowed by the spec.
 
-            if self.gl.get_error() == Context::INVALID_ENUM {
-                log::warn!("spurious Chrome WebGL warning?");
-            }
+        if self.gl.get_error() == Context::INVALID_ENUM {
+            log::warn!("spurious Chrome WebGL warning?");
         }
-
-        Ok(())
     }
 
     fn check_compression_extension(&mut self, format: TextureCompression) -> Result<(), Error> {
@@ -281,7 +280,7 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
         self.set_texture_parameters(Context::TEXTURE_2D);
     }
 
-    pub fn upload(&mut self, cols: usize, rows: usize, layer: &[T::Data]) {
+    pub fn upload(&mut self, cols: usize, rows: usize, data: &[T::Data]) {
         self.create(cols, rows);
 
         self.gl
@@ -297,7 +296,7 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
                 rows as i32,
                 T::GL_FORMAT,
                 T::GL_TYPE,
-                Some(&T::into_texture_source_data(cols, rows, layer)),
+                Some(&T::into_texture_source_data(cols, rows, data)),
             )
             .unwrap();
     }
@@ -324,29 +323,28 @@ impl<T: TextureFormat<Compressed = False>> Texture<T> {
         self.set_texture_parameters(Context::TEXTURE_2D_ARRAY);
     }
 
-    pub fn upload_array(&mut self, cols: usize, rows: usize, layers: &[&[T::Data]]) {
-        self.create_array(cols, rows, layers.len());
+    pub fn upload_layer(&mut self, cols: usize, rows: usize, layer: usize, data: &[T::Data]) {
+        assert!((cols, rows) == (self.cols(), self.rows()));
+        assert!(layer < self.layers());
 
         self.gl
             .bind_texture(Context::TEXTURE_2D_ARRAY, self.handle.as_ref());
 
-        for (layer, data) in layers.iter().enumerate() {
-            self.gl
-                .tex_sub_image_3d_with_opt_array_buffer_view(
-                    Context::TEXTURE_2D_ARRAY,
-                    0,
-                    0,
-                    0,
-                    layer as i32,
-                    cols as i32,
-                    rows as i32,
-                    1,
-                    T::GL_FORMAT,
-                    T::GL_TYPE,
-                    Some(&T::into_texture_source_data(cols, rows, data)),
-                )
-                .unwrap();
-        }
+        self.gl
+            .tex_sub_image_3d_with_opt_array_buffer_view(
+                Context::TEXTURE_2D_ARRAY,
+                0,
+                0,
+                0,
+                layer as i32,
+                cols as i32,
+                rows as i32,
+                1,
+                T::GL_FORMAT,
+                T::GL_TYPE,
+                Some(&T::into_texture_source_data(cols, rows, data)),
+            )
+            .unwrap();
     }
 }
 
