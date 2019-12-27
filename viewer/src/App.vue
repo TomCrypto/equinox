@@ -108,7 +108,7 @@ export default class App extends Vue {
     return this.assets.get(asset) || null;
   }
 
-  async loadAssets(assets: string[], compression: string): Promise<void> {
+  async loadAssets(assets: string[], compression: string) {
     for (const asset of this.assets.keys()) {
       if (!assets.includes(asset)) {
         this.assets.delete(asset);

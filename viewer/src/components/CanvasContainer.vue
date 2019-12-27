@@ -78,10 +78,7 @@ export default class extends Vue {
 
   @Prop() private assetsInFlight!: number;
 
-  @Prop() private loadAssets!: (
-    assets: string[],
-    compression: string
-  ) => Promise<void>;
+  @Prop() private loadAssets!: (assets: string[], compression: string) => void;
   @Prop() private getAsset!: (assets: string) => Uint8Array | null;
 
   private isExpensiveUpdate: boolean = false;
