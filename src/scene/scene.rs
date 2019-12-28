@@ -106,7 +106,8 @@ impl Scene {
         for material in self.material_list.values() {
             for (_, parameter) in material.parameters() {
                 if let MaterialParameter::Textured(info) = parameter {
-                    assets.push(&info.texture);
+                    assets.push(info.texture.horz_texture());
+                    assets.push(info.texture.vert_texture());
                 }
             }
         }

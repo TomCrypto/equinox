@@ -6,7 +6,7 @@
 
 struct GeometryParameter {
     vec3 base;
-    float layer;
+    uint layer;
     vec3 factor;
     float contrast;
 
@@ -55,8 +55,8 @@ vec3 sample_texture_wraparound(float layer, vec2 uv) {
 vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
     GeometryParameter param = material_buffer.data[inst];
 
-    if (param.layer < 0.0 || param.factor.xyz == vec3(0.0)) {
-        return param.base.xyz; // texture absent/irrelevant
+    if (param.layer == 0xffffffffU || param.factor.xyz == vec3(0.0)) {
+        return param.base.xyz; // the texture is absent or irrelevant
     }
 
     float s = param.uv_scale * sin(param.uv_rotation);
@@ -73,14 +73,17 @@ vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
     vec3 yz_sample, xz_sample, xy_sample;
     vec3 tri = triplanar_weights(normal);
 
+    float vert_layer = float(param.layer & 0xffffU);
+    float horz_layer = float(param.layer >> 16U);
+
     if (param.contrast > 0.0) {
-        yz_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, yz_uv);
-        xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, xz_uv);
-        xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_stochastic(param.layer, xy_uv);
+        yz_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_stochastic(vert_layer, yz_uv);
+        xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_stochastic(horz_layer, xz_uv);
+        xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_stochastic(vert_layer, xy_uv);
     } else {
-        yz_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_wraparound(param.layer, yz_uv);
-        xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_wraparound(param.layer, xz_uv);
-        xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_wraparound(param.layer, xy_uv);
+        yz_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_wraparound(vert_layer, yz_uv);
+        xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_wraparound(horz_layer, xz_uv);
+        xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_wraparound(vert_layer, xy_uv);
     }
 
     yz_sample = 0.5 + (yz_sample - 0.5) * abs(param.contrast);

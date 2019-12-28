@@ -54,7 +54,7 @@ vec3 bilinear(vec4 p[4], vec2 uv) {
     return mix(mix(p[0].xyz, p[1].xyz, uv.x), mix(p[2].xyz, p[3].xyz, uv.x), uv.y);
 }
 
-void evaluate_primary_ray(out vec3 pos, out vec3 dir, inout quasi_t quasi) {
+void evaluate_camera_ray(out vec3 pos, out vec3 dir, inout quasi_t quasi) {
     vec2 raster_uv = (gl_FragCoord.xy + integrator.filter_offset) * raster.dimensions.w;
     raster_uv.x -= (raster.dimensions.x * raster.dimensions.w - 1.0) * 0.5;
 

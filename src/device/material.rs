@@ -11,7 +11,7 @@ use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 #[derive(AsBytes, FromBytes, Clone, Copy, Debug, Default)]
 pub struct MaterialParamData {
     base: [f32; 3],
-    layer: f32,
+    layer: u32,
     factor: [f32; 3],
     contrast: f32,
     uv_rotation: f32,
@@ -49,12 +49,15 @@ fn write_material_parameter(
 ) {
     match parameter {
         MaterialParameter::Constant(base) => {
-            out.layer = -1.0;
+            out.layer = 0xffff_ffff;
             out.base = base.as_vec3();
             out.factor = [0.0; 3];
         }
         MaterialParameter::Textured(info) => {
-            out.layer = texture_layers[info.texture.as_str()] as f32;
+            let horz = texture_layers[info.texture.horz_texture()] as u32;
+            let vert = texture_layers[info.texture.vert_texture()] as u32;
+
+            out.layer = vert + (horz << 16);
             out.base = info.base.as_vec3();
             out.factor = info.factor.as_vec3();
 
@@ -154,7 +157,8 @@ impl Device {
 
             for (_, parameter) in material.parameters() {
                 if let MaterialParameter::Textured(info) = parameter {
-                    textures.push(info.texture.as_str());
+                    textures.push(info.texture.horz_texture());
+                    textures.push(info.texture.vert_texture());
                 }
             }
         }
