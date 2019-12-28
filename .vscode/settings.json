@@ -24,24 +24,6 @@
     "editor.tabSize": 2
   },
 
-  "eslint.options": {
-    "extensions": [".ts", ".vue"]
-  },
-
-  "eslint.validate": [{
-    "language": "ts",
-    "autoFix": true
-  }, {
-    "language": "vue",
-    "autoFix": true
-  }],
-
-  "eslint.autoFixOnSave": true,
-  "editor.formatOnSave": false,
-  "vetur.validation.template": false,
-
-  "eslint.workingDirectories": ["./viewer"],
-
   "files.exclude": {
     "**/.gitignore": true,
     ".vscode": true,

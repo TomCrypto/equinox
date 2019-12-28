@@ -5,8 +5,7 @@
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "build": "vue-cli-service build"
   },
   "dependencies": {
     "core-js": "^2.6.5",
@@ -24,17 +23,10 @@
     "@types/pako": "^1.0.1",
     "@types/webgl2": "^0.0.5",
     "@vue/cli-plugin-babel": "^3.11.0",
-    "@vue/cli-plugin-eslint": "^3.11.0",
     "@vue/cli-plugin-typescript": "^3.11.0",
     "@vue/cli-service": "^3.11.0",
-    "@vue/eslint-config-prettier": "^5.0.0",
-    "@vue/eslint-config-typescript": "^4.0.0",
     "codemirror": "^5.49.2",
     "equinox": "file:../pkg",
-    "eslint": "^6.5.1",
-    "eslint-config-prettier": "^6.4.0",
-    "eslint-plugin-prettier": "^3.1.1",
-    "eslint-plugin-vue": "^5.2.3",
     "file-saver": "^2.0.2",
     "jsonlint-mod": "^1.7.5",
     "jszip": "^3.2.2",
@@ -43,7 +35,6 @@
     "pako": "^1.0.10",
     "prettier": "^1.18.2",
     "typescript": "^3.4.3",
-    "vue-eslint-parser": "^6.0.4",
     "vue-multiselect": "^2.1.6",
     "vue-slider-component": "^3.0.42",
     "vue-template-compiler": "^2.6.10"
@@ -52,21 +43,6 @@
     "presets": [
       "@vue/app"
     ]
-  },
-  "eslintConfig": {
-    "root": true,
-    "env": {
-      "node": true
-    },
-    "extends": [
-      "plugin:vue/essential",
-      "@vue/prettier",
-      "@vue/typescript"
-    ],
-    "rules": {},
-    "parserOptions": {
-      "parser": "@typescript-eslint/parser"
-    }
   },
   "postcss": {
     "plugins": {
