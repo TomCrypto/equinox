@@ -64,7 +64,7 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
                                                                                                   \
                 LOAD(mat_inst, normal, ray.org, material);                                        \
                                                                                                   \
-                float unused_pdf; /* we don't use the PDF of the sampling method */               \
+                float unused_pdf;                                                                 \
                 f = SAMPLE(material, normal, ray.dir, -ray.dir, n1, n2, unused_pdf, quasi);       \
             }
 
