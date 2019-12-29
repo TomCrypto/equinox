@@ -154,7 +154,7 @@ export default class App extends Vue {
 
       return new Response(data).arrayBuffer();
     } catch (e) {
-      throw new Error(`failed to fetch asset: ${e}`);
+      throw new Error(`failed to fetch asset: ${e.message}`);
     } finally {
       this.assetDownloads.delete(url);
       this.assetsInFlight = this.assetDownloads.size;
