@@ -10,8 +10,7 @@
           target="_blank"
           rel="noopener noreferrer"
           href="https://github.com/mrdoob/three.js/wiki/How-to-use-OpenGL-or-ANGLE-rendering-on-Windows"
-          >this link</a
-        >
+        >this link</a>
         for directions.
       </li>
       <li>
@@ -100,6 +99,10 @@ export default class extends Vue {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.root hr {
+  width: calc(100% - 8px);
 }
 
 .error {
