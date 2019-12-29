@@ -2,7 +2,7 @@
   <div>
     <div class="overlay" v-if="overlayType == 'error'">
       <font-awesome-icon class="icon error" icon="exclamation-triangle" size="lg" />
-      <p class="error">{{ errorText }}</p>
+      <p class="error">{{ errorMessage }}</p>
     </div>
 
     <div class="overlay info" v-if="overlayType == 'download'">
@@ -48,10 +48,6 @@ export default class extends Vue {
     } else {
       return "Downloading 1 asset";
     }
-  }
-
-  public get errorText(): string {
-    return `Error: ${this.errorMessage}`;
   }
 }
 </script>
