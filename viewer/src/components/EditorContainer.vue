@@ -57,6 +57,7 @@ export default class extends Vue {
 .container {
   display: flex;
   flex-direction: column;
+  background-color: #1a1a1a;
 }
 
 .container-header {

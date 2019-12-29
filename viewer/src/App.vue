@@ -17,38 +17,25 @@
         :tabs-below="editorTabsBelow"
         :defaultTab="defaultEditorTab"
       >
-        <template slot="tab-head-advanced"
-          >Advanced Editor</template
-        >
+        <template slot="tab-head-advanced">Advanced Editor</template>
         <template slot="tab-panel-advanced">
           <AdvancedEditor :scene="scene" />
         </template>
-        <template slot="tab-head-environment"
-          >Environment</template
-        >
+        <template slot="tab-head-environment">Environment</template>
         <template slot="tab-panel-environment">
           <EnvironmentEditor :scene="scene" />
         </template>
-        <template slot="tab-head-documentation"
-          >Documentation</template
-        >
+        <template slot="tab-head-documentation">Documentation</template>
         <template slot="tab-panel-documentation">
           <DocumentationEditor />
         </template>
-        <template slot="tab-head-save-load"
-          >Save/Load</template
-        >
+        <template slot="tab-head-save-load">Save/Load</template>
         <template slot="tab-panel-save-load">
           <SaveLoadEditor :scene="scene" />
         </template>
-        <template slot="tab-head-licensing"
-          >Licensing</template
-        >
+        <template slot="tab-head-licensing">Licensing</template>
         <template slot="tab-panel-licensing">
-          <LicensingEditor
-            :licensing="equinox.licensing()"
-            :version="equinox.version()"
-          />
+          <LicensingEditor :licensing="equinox.licensing()" :version="equinox.version()" />
         </template>
       </EditorContainer>
     </div>
@@ -186,8 +173,8 @@ body {
   overflow: hidden;
   font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande",
     "Lucida Sans", Arial, sans-serif;
-  user-select: none;
   background-color: #1a1a1a;
+  height: 100vh;
 }
 
 .canvas-panel {
