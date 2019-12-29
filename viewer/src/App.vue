@@ -21,6 +21,10 @@
         <template slot="tab-panel-advanced">
           <AdvancedEditor :scene="scene" />
         </template>
+        <template slot="tab-head-camera">Camera</template>
+        <template slot="tab-panel-camera">
+          <CameraEditor :scene="scene" />
+        </template>
         <template slot="tab-head-environment">Environment</template>
         <template slot="tab-panel-environment">
           <EnvironmentEditor :scene="scene" />
@@ -45,6 +49,7 @@
 <script lang="ts">
 import { Component, Prop, Vue } from "vue-property-decorator";
 import EnvironmentEditor from "@/components/EnvironmentEditor.vue";
+import CameraEditor from "@/components/CameraEditor.vue";
 import EditorContainer from "@/components/EditorContainer.vue";
 import DocumentationEditor from "@/components/DocumentationEditor.vue";
 import LicensingEditor from "@/components/LicensingEditor.vue";
@@ -60,6 +65,7 @@ import DefaultScene from "./prefab/DefaultScene";
 @Component({
   components: {
     EnvironmentEditor,
+    CameraEditor,
     EditorContainer,
     DocumentationEditor,
     LicensingEditor,
@@ -73,7 +79,7 @@ export default class App extends Vue {
 
   private scene = new this.equinox.WebScene();
 
-  private editorTabsAbove = ["environment"];
+  private editorTabsAbove = ["camera", "environment"];
   private editorTabsBelow = [
     "documentation",
     "save-load",
