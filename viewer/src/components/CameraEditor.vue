@@ -42,12 +42,43 @@
       @change="changeApertureRadius"
       @dragging="changeApertureRadius"
     />
+
+    <p>Focal distance</p>
+
+    <vue-slider
+      :min="0.001"
+      :max="100"
+      tooltip="none"
+      :interval="0.001"
+      :value="focalDistance"
+      contained="true"
+      @change="changeFocalDistance"
+      @dragging="changeFocalDistance"
+    />
   </div>
 </template>
 
 <script lang="ts">
 import { Component, Prop, Vue } from "vue-property-decorator";
 import { WebScene } from "equinox";
+
+interface SceneCamera {
+  aperture:
+    | {
+        type: "point";
+      }
+    | {
+        type: "circle";
+        radius: number;
+      }
+    | {
+        type: "ngon";
+        radius: number;
+        sides: number;
+        rotation: number;
+      };
+  focal_distance: number;
+}
 
 @Component
 export default class extends Vue {
@@ -77,49 +108,63 @@ export default class extends Vue {
     this.update();
   }
 
-  // This editor's internal view of the scene. The default values below
-  // are only specified to allow Vue to see the properties as reactive.
+  public changeFocalDistance(value: number) {
+    this.focalDistance = value;
+    this.update();
+  }
+
+  // This editor's internal view of the scene.
 
   apertureType: "point" | "circle" | "ngon" = "point";
   apertureRadius: number = 0;
-  apertureSides: number = 0;
+  apertureSides: number = 5;
   apertureRotation: number = 0;
+  focalDistance: number = 0;
 
   created() {
-    const json = this.scene.json();
+    const [_, camera] = this.getSceneData();
 
-    this.apertureType = json.camera.aperture.type;
+    this.apertureType = camera.aperture.type;
 
-    if (["circle", "ngon"].includes(this.apertureType)) {
-      this.apertureRadius = json.camera.aperture.radius;
-    } else {
-      this.apertureRadius = 0;
+    switch (camera.aperture.type) {
+      case "circle":
+        this.apertureRadius = camera.aperture.radius;
+        break;
+      case "ngon":
+        this.apertureRadius = camera.aperture.radius;
+        this.apertureSides = camera.aperture.sides;
+        this.apertureRotation = camera.aperture.rotation;
+        break;
     }
 
-    if (["ngon"].includes(this.apertureType)) {
-      this.apertureSides = json.camera.aperture.sides;
-      this.apertureRotation = json.camera.aperture.rotation;
-    } else {
-      this.apertureSides = 5;
-      this.apertureRotation = 0;
-    }
+    this.focalDistance = camera.focal_distance;
   }
 
   private update() {
-    const json = this.scene.json();
+    const [json, camera] = this.getSceneData();
 
-    json.camera.aperture.type = this.apertureType;
+    camera.aperture.type = this.apertureType;
 
-    if (["circle", "ngon"].includes(this.apertureType)) {
-      json.camera.aperture.radius = this.apertureRadius;
+    switch (camera.aperture.type) {
+      case "circle":
+        camera.aperture.radius = this.apertureRadius;
+        break;
+      case "ngon":
+        camera.aperture.radius = this.apertureRadius;
+        camera.aperture.sides = this.apertureSides;
+        camera.aperture.rotation = this.apertureRotation;
+        break;
     }
 
-    if (["ngon"].includes(this.apertureType)) {
-      json.camera.aperture.sides = this.apertureSides;
-      json.camera.aperture.rotation = this.apertureRotation;
-    }
+    camera.focal_distance = this.focalDistance;
 
     this.scene.set_json(json);
+  }
+
+  private getSceneData(): [any, SceneCamera] {
+    const json = this.scene.json();
+
+    return [json, json.camera as SceneCamera];
   }
 }
 </script>
