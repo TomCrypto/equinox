@@ -132,13 +132,29 @@ export default class App extends Vue {
       let data = (await this.store.getItem(url)) as Blob | null;
 
       if (data === null) {
-        const buffer = await (await fetch(new Request(url))).arrayBuffer();
+        const response = await fetch(new Request(url));
+
+        // In development fetching an unknown asset will actually succeed and return
+        // a 200 response for some reason, so the exception handling here will fail.
+
+        if (!response.ok) {
+          // S3 will return a 403 error if the object doesn't exist
+          if (response.status === 403 || response.status === 404) {
+            throw new Error("asset not found");
+          } else {
+            throw new Error(`network error: ${response.status}`);
+          }
+        }
+
+        const buffer = await response.arrayBuffer();
         data = new Blob([pako.inflate(new Uint8Array(buffer)).buffer]);
 
         await this.store.setItem(url, data);
       }
 
       return new Response(data).arrayBuffer();
+    } catch (e) {
+      throw new Error(`failed to fetch asset: ${e}`);
     } finally {
       this.assetDownloads.delete(url);
       this.assetsInFlight = this.assetDownloads.size;

@@ -17,9 +17,10 @@
       v-on:contextmenu="$event.preventDefault()"
     />
 
-    <LoadingOverlay
+    <CanvasOverlay
       :assets-in-flight="assetsInFlight"
       :is-expensive-update="isExpensiveUpdate"
+      :error-message="updateError"
     />
 
     <StatusBar
@@ -54,7 +55,7 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 import { WebScene, WebDevice } from "equinox";
 import StatusBar from "@/components/StatusBar.vue";
 import Toolbar from "@/components/Toolbar.vue";
-import LoadingOverlay from "@/components/LoadingOverlay.vue";
+import CanvasOverlay from "@/components/CanvasOverlay.vue";
 import Zip from "jszip";
 import FileSaver from "file-saver";
 import {
@@ -66,7 +67,7 @@ import MovingWindowEstimator from "../helpers/minimum_window";
 
 @Component({
   components: {
-    LoadingOverlay,
+    CanvasOverlay,
     StatusBar,
     Toolbar
   }
@@ -83,6 +84,7 @@ export default class extends Vue {
   @Prop() private getAsset!: (assets: string) => Uint8Array | null;
 
   private isExpensiveUpdate: boolean = false;
+  private updateError: string | null = null;
 
   private device!: WebDevice;
 
@@ -430,13 +432,15 @@ export default class extends Vue {
             await this.performDeviceUpdate();
           }
 
-          if (!this.isExpensiveUpdate) {
-            this.canvas.width = this.scene.raster_width();
-            this.canvas.height = this.scene.raster_height();
-            this.resizeAndMaintainAspectRatio();
-            this.canvasWidth = this.canvas.width;
-            this.canvasHeight = this.canvas.height;
-          }
+          this.updateError = null;
+        }
+
+        if (this.isRenderPaused || !this.isExpensiveUpdate) {
+          this.canvas.width = this.scene.raster_width();
+          this.canvas.height = this.scene.raster_height();
+          this.resizeAndMaintainAspectRatio();
+          this.canvasWidth = this.canvas.width;
+          this.canvasHeight = this.canvas.height;
         }
 
         const refineTime = this.gpuTimeQueries!.timeElapsed(() => {
@@ -459,7 +463,8 @@ export default class extends Vue {
 
         this.gpuFrameTimeEstimator.addSample(refineTime);
       } catch (e) {
-        console.error(e);
+        this.updateError = e.message;
+        this.isRenderPaused = true;
       }
     }
 

@@ -21,6 +21,7 @@ import {
   faCog,
   faCircleNotch,
   faExclamationCircle,
+  faExclamationTriangle,
   faPlay,
   faPause
 } from "@fortawesome/free-solid-svg-icons";
@@ -36,6 +37,7 @@ library.add(
   faCog,
   faCircleNotch,
   faExclamationCircle,
+  faExclamationTriangle,
   faPlay,
   faPause
 );
