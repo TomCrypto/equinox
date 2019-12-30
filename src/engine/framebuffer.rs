@@ -57,7 +57,7 @@ impl Framebuffer {
         }
 
         if let Err(_) | Ok(None) = self.gl.get_extension("EXT_float_blend") {
-            return Err(Error::new("extension `EXT_float_blend' missing"));
+            warn!("EXT_float_blend missing, browser may be out of date?");
         }
 
         assert!(!attachments.is_empty());
