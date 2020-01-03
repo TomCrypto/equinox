@@ -11,7 +11,7 @@ struct ray_t {
 
 // Maintains closest-hit information during a traversal.
 struct traversal_t {
-    uvec3 hit; // packed data for the closest SDF hit (geometry/material ID + parameter offsets)
+    uvec2 hit; // packed data for the closest SDF hit (geometry/material ID + parameter offsets)
     vec2 range; // min/max of the ray distance
 };
 
@@ -20,11 +20,11 @@ ray_t make_ray(vec3 org, vec3 dir, vec3 normal) {
 }
 
 traversal_t traversal_prepare() {
-    return traversal_t(uvec3(0xffffffffU), vec2(0.0, 1.0 / 0.0));
+    return traversal_t(uvec2(0xffffffffU), vec2(0.0, 1.0 / 0.0));
 }
 
-void traversal_record_hit(inout traversal_t traversal, float distance, uvec2 hit, uint index) {
-    traversal = traversal_t(uvec3(hit, index), vec2(traversal.range.x, distance));
+void traversal_record_hit(inout traversal_t traversal, float distance, uvec2 hit) {
+    traversal = traversal_t(uvec2(hit), vec2(traversal.range.x, distance));
 }
 
 bool traversal_has_hit(traversal_t traversal) {

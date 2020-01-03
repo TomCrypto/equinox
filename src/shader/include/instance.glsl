@@ -74,7 +74,7 @@ traversal_t traverse_scene(ray_t ray, uint start) {
 
         if (ray_bbox(ray.org, idir, range, bbmin, bbmax)) {
             if (word2 != 0xffffffffU && geo_intersect(word1 & 0xffffU, word1 >> 16U, ray, range)) {
-                traversal_record_hit(traversal, range.x, uvec2(word1, word2), index);
+                traversal_record_hit(traversal, range.x, uvec2(word1, word2));
             }
         } else if (word2 == 0xffffffffU) {
             index = word1;
