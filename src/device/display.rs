@@ -7,8 +7,7 @@ use zerocopy::{AsBytes, FromBytes};
 pub struct DisplayData {
     exposure: f32,
     saturation: f32,
-    has_camera_response: u32,
-    padding: f32,
+    padding: [f32; 2],
 }
 
 impl Device {
