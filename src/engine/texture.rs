@@ -109,10 +109,6 @@ impl<T> Texture<T> {
             self.handle = self.gl.create_texture();
             self.layout = (cols, rows, layers);
 
-            if let Err(_) | Ok(None) = self.gl.get_extension("OES_texture_float_linear") {
-                panic!("the WebGL2 extension `OES_texture_float_linear' is unavailable");
-            }
-
             false
         } else {
             true
@@ -438,7 +434,7 @@ impl TextureFormat for RGBA32F {
     type Data = f32;
 
     type Compressed = False;
-    type Filterable = True;
+    type Filterable = False;
     type Renderable = Color;
 
     const COMPRESSION_FORMAT: Option<TextureCompression> = None;
@@ -451,7 +447,7 @@ impl TextureFormat for R32F {
     type Data = f32;
 
     type Compressed = False;
-    type Filterable = True;
+    type Filterable = False;
     type Renderable = Color;
 
     const COMPRESSION_FORMAT: Option<TextureCompression> = None;
@@ -477,7 +473,7 @@ impl TextureFormat for RG32F {
     type Data = f32;
 
     type Compressed = False;
-    type Filterable = True;
+    type Filterable = False;
     type Renderable = Color;
 
     const COMPRESSION_FORMAT: Option<TextureCompression> = None;
