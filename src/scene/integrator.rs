@@ -29,7 +29,7 @@ pub struct Integrator {
     pub max_gather_bounces: u32,
 
     #[default(1e-3)]
-    pub scene_precision: f32,
+    pub geometry_precision: f32,
 
     #[default(5.0)]
     pub geometry_pushback: f32,
