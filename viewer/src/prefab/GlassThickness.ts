@@ -157,7 +157,9 @@ export default {
       min_search_radius: 0.0025,
       alpha: 0.75,
       max_scatter_bounces: 8,
-      max_gather_bounces: 8
+      max_gather_bounces: 8,
+      geometry_precision: 0.001,
+      geometry_pushback: 5
     }
   },
   thumbnail: "prefab-glass-thickness.jpg",

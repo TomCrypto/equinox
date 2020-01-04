@@ -218,7 +218,9 @@ export default {
       min_search_radius: 0.005,
       alpha: 0.7,
       max_scatter_bounces: 10,
-      max_gather_bounces: 9
+      max_gather_bounces: 9,
+      geometry_precision: 0.001,
+      geometry_pushback: 5
     }
   },
   thumbnail: "prefab-default-scene.jpg",
