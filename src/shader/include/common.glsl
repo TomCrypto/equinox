@@ -3,33 +3,9 @@ struct ray_t {
     vec3 dir;
 };
 
-#define PREC (1e-4) // general precision for interacting with the distance fields
-
 #define M_PI   3.14159265359
 #define M_2PI  6.28318530718
 #define M_4PI  12.5663706144
-
-// Maintains closest-hit information during a traversal.
-struct traversal_t {
-    uvec2 hit; // packed data for the closest SDF hit (geometry/material ID + parameter offsets)
-    vec2 range; // min/max of the ray distance
-};
-
-ray_t make_ray(vec3 org, vec3 dir, vec3 normal) {
-    return ray_t(org + normal * 50.0 * PREC * sign(dot(dir, normal)), dir);
-}
-
-traversal_t traversal_prepare() {
-    return traversal_t(uvec2(0xffffffffU), vec2(0.0, 1.0 / 0.0));
-}
-
-void traversal_record_hit(inout traversal_t traversal, float distance, uvec2 hit) {
-    traversal = traversal_t(uvec2(hit), vec2(traversal.range.x, distance));
-}
-
-bool traversal_has_hit(traversal_t traversal) {
-    return traversal.hit.x != 0xffffffffU;
-}
 
 float luminance(vec3 color) {
     return dot(color, vec3(0.2126, 0.7152, 0.0722));
@@ -38,8 +14,8 @@ float luminance(vec3 color) {
 // Takes a ray segment and a bounding box and clips the ray to be fully contained
 // inside the bounding box. Returns true if the ray intersected the bounding box.
 bool ray_bbox(vec3 org, vec3 idir, inout vec2 range, vec3 bbmin, vec3 bbmax) {
-    vec3 bot = (bbmin - PREC - org) * idir;
-    vec3 top = (bbmax + PREC - org) * idir;
+    vec3 bot = (bbmin - org) * idir;
+    vec3 top = (bbmax - org) * idir;
 
     vec3 tmin = min(bot, top);
     vec3 tmax = max(bot, top);

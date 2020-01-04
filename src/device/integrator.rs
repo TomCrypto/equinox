@@ -119,6 +119,14 @@ impl Device {
             .set_define("SAMPLER_MAX_DIMENSIONS", self.gather_quasi_buffer.len());
         self.integrator_scatter_photons_shader
             .set_define("SAMPLER_MAX_DIMENSIONS", self.scatter_quasi_buffer.len());
+        self.integrator_gather_photons_shader
+            .set_define("PREC", format!("{:.32}", integrator.scene_precision));
+        self.integrator_scatter_photons_shader
+            .set_define("PREC", format!("{:.32}", integrator.scene_precision));
+        self.integrator_gather_photons_shader
+            .set_define("PUSHBACK", format!("{:.32}", integrator.geometry_pushback));
+        self.integrator_scatter_photons_shader
+            .set_define("PUSHBACK", format!("{:.32}", integrator.geometry_pushback));
 
         Ok(())
     }
@@ -136,7 +144,10 @@ impl Device {
 
         self.state.kernel_radii = KernelRadiusSequence::new(
             self.state.integrator.max_search_radius,
-            self.state.integrator.min_search_radius,
+            self.state
+                .integrator
+                .min_search_radius
+                .max(self.state.integrator.scene_precision),
             self.state.integrator.alpha,
         );
 

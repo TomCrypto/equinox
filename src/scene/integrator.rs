@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, SmartDefault, Serialize)]
+#[serde(default)]
 pub struct Integrator {
     #[default(20)]
     pub hash_table_bits: u32,
@@ -26,4 +27,10 @@ pub struct Integrator {
 
     #[default(8)]
     pub max_gather_bounces: u32,
+
+    #[default(1e-3)]
+    pub scene_precision: f32,
+
+    #[default(5.0)]
+    pub geometry_pushback: f32,
 }

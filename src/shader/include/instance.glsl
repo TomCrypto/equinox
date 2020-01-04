@@ -1,7 +1,31 @@
 // requires-define INSTANCE_DATA_LEN
 // requires-define INSTANCE_DATA_PRESENT
+// requires-define PREC
+// requires-define PUSHBACK
 
 #include <geometry.glsl>
+
+// Maintains closest-hit information during a traversal.
+struct traversal_t {
+    uvec2 hit; // packed data for the closest SDF hit (geometry/material ID + parameter offsets)
+    vec2 range; // min/max of the ray distance
+};
+
+ray_t make_ray(vec3 org, vec3 dir, vec3 normal) {
+    return ray_t(org + normal * PUSHBACK * PREC * sign(dot(dir, normal)), dir);
+}
+
+traversal_t traversal_prepare() {
+    return traversal_t(uvec2(0xffffffffU), vec2(0.0, 1.0 / 0.0));
+}
+
+void traversal_record_hit(inout traversal_t traversal, float distance, uvec2 hit) {
+    traversal = traversal_t(uvec2(hit), vec2(traversal.range.x, distance));
+}
+
+bool traversal_has_hit(traversal_t traversal) {
+    return traversal.hit.x != 0xffffffffU;
+}
 
 struct BvhNode {
     float minx;
@@ -72,7 +96,7 @@ traversal_t traverse_scene(ray_t ray, uint start) {
 
         vec2 range = traversal.range;
 
-        if (ray_bbox(ray.org, idir, range, bbmin, bbmax)) {
+        if (ray_bbox(ray.org, idir, range, bbmin - PREC, bbmax + PREC)) {
             if (word2 != 0xffffffffU && geo_intersect(word1 & 0xffffU, word1 >> 16U, ray, range)) {
                 traversal_record_hit(traversal, range.x, uvec2(word1, word2));
             }
@@ -105,7 +129,7 @@ bool is_ray_occluded(ray_t ray, float limit) {
 
         vec2 range = vec2(0.0, limit);
 
-        if (ray_bbox(ray.org, idir, range, bbmin, bbmax)) {
+        if (ray_bbox(ray.org, idir, range, bbmin - PREC, bbmax + PREC)) {
             if (word2 != 0xffffffffU && geo_intersect(word1 & 0xffffU, word1 >> 16U, ray, range)) {
                 return true;
             }

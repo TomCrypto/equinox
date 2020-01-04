@@ -307,6 +307,9 @@ impl Scene {
         validate!(integrator.alpha <= 1.0);
         validate!(integrator.max_scatter_bounces > 0);
         validate!(integrator.max_gather_bounces > 0);
+        validate!(integrator.scene_precision >= 1e-5);
+        validate!(integrator.scene_precision <= 1e-2);
+        validate!(integrator.geometry_pushback >= 2.0);
 
         Ok(())
     }

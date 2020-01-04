@@ -203,6 +203,7 @@ impl Device {
         expensive |= Dirty::is_dirty(&scene.geometry_list);
         expensive |= Dirty::is_dirty(&scene.environment_map);
         expensive |= Dirty::is_dirty(&scene.aperture);
+        expensive |= Dirty::is_dirty(&scene.integrator);
 
         Ok(expensive)
     }

@@ -375,12 +375,12 @@ impl GeometryGlslGenerator {
     }
 
     fn gradient_estimate(distance: &DistanceFn) -> String {
-        let x1 = distance.call("vec3(p.x + PREC * 0.1, p.y, p.z)");
-        let y1 = distance.call("vec3(p.x, p.y + PREC * 0.1, p.z)");
-        let z1 = distance.call("vec3(p.x, p.y, p.z + PREC * 0.1)");
-        let x2 = distance.call("vec3(p.x - PREC * 0.1, p.y, p.z)");
-        let y2 = distance.call("vec3(p.x, p.y - PREC * 0.1, p.z)");
-        let z2 = distance.call("vec3(p.x, p.y, p.z - PREC * 0.1)");
+        let x1 = distance.call("vec3(p.x + PREC, p.y, p.z)");
+        let y1 = distance.call("vec3(p.x, p.y + PREC, p.z)");
+        let z1 = distance.call("vec3(p.x, p.y, p.z + PREC)");
+        let x2 = distance.call("vec3(p.x - PREC, p.y, p.z)");
+        let y2 = distance.call("vec3(p.x, p.y - PREC, p.z)");
+        let z2 = distance.call("vec3(p.x, p.y, p.z - PREC)");
 
         let dx = format!("{} - {}", x1, x2);
         let dy = format!("{} - {}", y1, y2);
