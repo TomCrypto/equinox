@@ -11,6 +11,7 @@ use web_sys::{WebGl2RenderingContext as Context, WebGlTexture, WebglCompressedTe
 pub enum TextureCompression {
     S3TC,
     ASTC,
+    None,
 }
 
 pub trait Boolean {
@@ -37,16 +38,16 @@ impl RenderTarget for Color {}
 impl RenderTarget for DepthStencil {}
 impl RenderTarget for NotRenderable {}
 
-pub fn supported_texture_compression(gl: &Context) -> Option<TextureCompression> {
+pub fn supported_texture_compression(gl: &Context) -> TextureCompression {
     if let Ok(Some(_)) = gl.get_extension("WEBGL_compressed_texture_s3tc_srgb") {
-        return Some(TextureCompression::S3TC);
+        return TextureCompression::S3TC;
     }
 
     if let Ok(Some(_)) = gl.get_extension("WEBGL_compressed_texture_astc") {
-        return Some(TextureCompression::ASTC);
+        return TextureCompression::ASTC;
     }
 
-    None
+    TextureCompression::None
 }
 
 #[derive(Debug)]
@@ -254,6 +255,7 @@ impl<T: TextureFormat<Compressed = True>> Texture<T> {
                     return Err(Error::new("ASTC compression requested but not supported"));
                 }
             }
+            TextureCompression::None => {}
         }
 
         Ok(())

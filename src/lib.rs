@@ -204,7 +204,7 @@ impl WebDevice {
     }
 
     pub fn texture_compression(&mut self) -> Result<JsValue, JsValue> {
-        Ok(JsValue::from_serde(&self.device.texture_compression()?).unwrap())
+        Ok(JsValue::from_serde(&self.device.texture_compression()).unwrap())
     }
 
     /// Returns whether updating the device with a scene may be time-consuming.

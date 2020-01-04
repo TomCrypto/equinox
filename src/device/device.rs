@@ -208,10 +208,9 @@ impl Device {
         Ok(expensive)
     }
 
-    /// Returns the texture compression family which is required by this device.
-    pub fn texture_compression(&mut self) -> Result<TextureCompression, Error> {
+    /// Returns the texture compression required by this device.
+    pub fn texture_compression(&mut self) -> TextureCompression {
         supported_texture_compression(&self.gl)
-            .ok_or_else(|| Error::new("no texture compression family supported"))
     }
 
     /// Updates this device to render a given scene or returns an error.

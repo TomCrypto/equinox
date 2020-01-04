@@ -174,7 +174,7 @@ export default class App extends Vue {
       return asset.replace(".tc.raw", ".astc.raw");
     }
 
-    throw new Error("unknown texture compression format reported");
+    throw new Error("no texture compression format supported");
   }
 
   mounted() {
