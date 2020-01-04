@@ -121,6 +121,14 @@ export default class extends Vue {
     this.device = new this.equinox.WebDevice(this.context!);
     this.$emit("device-created", this.device);
 
+    try {
+      console.info(`Texture compression: ${this.device.texture_compression()}`);
+    } catch {
+      alert(
+        "Your browser does not support compressed textures, some features may not work!"
+      );
+    }
+
     this.canvas.focus();
 
     this.animationFrame = requestAnimationFrame(this.renderLoop);
