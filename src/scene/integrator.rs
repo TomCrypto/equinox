@@ -22,10 +22,10 @@ pub struct Integrator {
     #[default(0.7)]
     pub alpha: f32,
 
-    #[default(8)]
+    #[default(5)]
     pub max_scatter_bounces: u32,
 
-    #[default(8)]
+    #[default(5)]
     pub max_gather_bounces: u32,
 
     #[default(1e-3)]
