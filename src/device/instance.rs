@@ -58,7 +58,11 @@ impl Device {
                 mat_inst: material_start[&instance.material],
             });
 
-            geometry_start += 2 + (instance.parameters.len() as u16 + 3) / 4;
+            // TODO: make this more efficient, this is starting to become O(n^2)
+
+            let parameters = geometry_list[&instance.geometry].symbolic_parameters();
+
+            geometry_start += 2 + (parameters.len() as u16 + 3) / 4;
         }
 
         let node_count = HierarchyBuilder::node_count_for_leaves(instance_info.len());
