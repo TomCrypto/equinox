@@ -1,60 +1,123 @@
 <template>
   <div>
-    <p>Aperture</p>
-
-    <div class="radio-group">
-      <input
-        type="radio"
-        id="point"
-        name="selector"
-        @click="selectPointAperture()"
-        :checked="apertureType == 'point'"
-      />
-      <label for="point">Point</label>
-      <input
-        type="radio"
-        id="circle"
-        name="selector"
-        @click="selectCircleAperture()"
-        :checked="apertureType == 'circle'"
-      />
-      <label for="circle">Circle</label>
-      <input
-        type="radio"
-        id="polygon"
-        name="selector"
-        @click="selectPolygonAperture()"
-        :checked="apertureType == 'ngon'"
-      />
-      <label for="polygon">Polygon</label>
+    <div class="settings">
+      <div class="settings-cell settings-label">Focal Curvature</div>
+      <div class="settings-cell">
+        <vue-slider
+          :min="0"
+          :max="2"
+          tooltip="none"
+          :interval="0.001"
+          :value="focalCurvature"
+          contained="true"
+          @change="changeFocalCurvature"
+          @dragging="changeFocalCurvature"
+        />
+      </div>
+      <div class="settings-cell settings-label">Focal Length</div>
+      <div class="settings-cell">
+        <vue-slider
+          :min="0.01"
+          :max="1"
+          tooltip="none"
+          :interval="0.01"
+          :value="focalLength"
+          contained="true"
+          @change="changeFocalLength"
+          @dragging="changeFocalLength"
+        />
+      </div>
+      <div class="settings-cell settings-label">Film Height</div>
+      <div class="settings-cell">
+        <vue-slider
+          :min="0.01"
+          :max="1"
+          tooltip="none"
+          :interval="0.01"
+          :value="filmHeight"
+          contained="true"
+          @change="changeFilmHeight"
+          @dragging="changeFilmHeight"
+        />
+      </div>
+      <div class="settings-cell settings-label">Aperture Type</div>
+      <div class="settings-cell">
+        <select :value="apertureType" @change="changeApertureType($event.target.value)" selected>
+          <option value="point">Point</option>
+          <option value="circle">Circle</option>
+          <option value="ngon">Polygon</option>
+        </select>
+      </div>
+      <div
+        class="settings-cell settings-label"
+        v-bind:class="{ 'settings-label-disabled': !hasApertureRadius }"
+      >Aperture Radius</div>
+      <div class="settings-cell">
+        <vue-slider
+          :min="0"
+          :max="1"
+          :disabled="!hasApertureRadius"
+          tooltip="none"
+          :interval="0.001"
+          :value="apertureRadius"
+          contained="true"
+          @change="changeApertureRadius"
+          @dragging="changeApertureRadius"
+        />
+      </div>
+      <div
+        class="settings-cell settings-label"
+        v-bind:class="{ 'settings-label-disabled': !hasApertureRadius }"
+      >Focal Distance</div>
+      <div class="settings-cell">
+        <vue-slider
+          :min="0.001"
+          :max="100"
+          :disabled="!hasApertureRadius"
+          tooltip="none"
+          :interval="0.001"
+          :value="focalDistance"
+          contained="true"
+          @change="changeFocalDistance"
+          @dragging="changeFocalDistance"
+        />
+      </div>
+      <div
+        class="settings-cell settings-label"
+        v-bind:class="{ 'settings-label-disabled': !isPolygonAperture }"
+      >Aperture Rotation</div>
+      <div class="settings-cell">
+        <vue-slider
+          :min="0"
+          :max="6.2832"
+          :disabled="!isPolygonAperture"
+          tooltip="none"
+          :interval="0.0001"
+          :value="apertureRotation"
+          contained="true"
+          @change="changeApertureRotation"
+          @dragging="changeApertureRotation"
+        />
+      </div>
+      <div
+        class="settings-cell settings-label"
+        v-bind:class="{ 'settings-label-disabled': !isPolygonAperture }"
+      >Aperture Sides</div>
+      <div class="settings-cell">
+        <vue-slider
+          :min="3"
+          :max="12"
+          :disabled="!isPolygonAperture"
+          tooltip="none"
+          :interval="1"
+          :adsorb="true"
+          :value="apertureSides"
+          contained="true"
+          @change="changeApertureSides"
+          @dragging="changeApertureSides"
+        />
+      </div>
     </div>
-
-    <p>Aperture Radius</p>
-
-    <vue-slider
-      :min="0"
-      :max="1"
-      :disabled="!hasApertureRadius"
-      tooltip="none"
-      :interval="0.001"
-      :value="apertureRadius"
-      contained="true"
-      @change="changeApertureRadius"
-      @dragging="changeApertureRadius"
-    />
-
-    <p>Focal distance</p>
-
-    <vue-slider
-      :min="0.001"
-      :max="100"
-      tooltip="none"
-      :interval="0.001"
-      :value="focalDistance"
-      contained="true"
-      @change="changeFocalDistance"
-      @dragging="changeFocalDistance"
-    />
   </div>
 </template>
 
@@ -78,29 +141,26 @@ interface SceneCamera {
         rotation: number;
       };
   focal_distance: number;
+  focal_curvature: number;
+  focal_length: number;
+  film_height: number;
 }
 
 @Component
 export default class extends Vue {
   @Prop() private scene!: WebScene;
 
-  public selectPointAperture() {
-    this.apertureType = "point";
-    this.update();
-  }
-
-  public selectCircleAperture() {
-    this.apertureType = "circle";
-    this.update();
-  }
-
-  public selectPolygonAperture() {
-    this.apertureType = "ngon";
+  private changeApertureType(value: "point" | "circle" | "ngon") {
+    this.apertureType = value;
     this.update();
   }
 
   public get hasApertureRadius() {
     return this.apertureType != "point";
+  }
+
+  public get isPolygonAperture() {
+    return this.apertureType == "ngon";
   }
 
   public changeApertureRadius(value: number) {
@@ -113,6 +173,31 @@ export default class extends Vue {
     this.update();
   }
 
+  public changeApertureRotation(value: number) {
+    this.apertureRotation = value;
+    this.update();
+  }
+
+  public changeApertureSides(value: number) {
+    this.apertureSides = value;
+    this.update();
+  }
+
+  public changeFocalCurvature(value: number) {
+    this.focalCurvature = value;
+    this.update();
+  }
+
+  public changeFocalLength(value: number) {
+    this.focalLength = value;
+    this.update();
+  }
+
+  public changeFilmHeight(value: number) {
+    this.filmHeight = value;
+    this.update();
+  }
+
   // This editor's internal view of the scene.
 
   apertureType: "point" | "circle" | "ngon" = "point";
@@ -120,6 +205,9 @@ export default class extends Vue {
   apertureSides: number = 5;
   apertureRotation: number = 0;
   focalDistance: number = 0;
+  focalCurvature: number = 0;
+  focalLength: number = 0;
+  filmHeight: number = 0;
 
   created() {
     const [_, camera] = this.getSceneData();
@@ -138,6 +226,9 @@ export default class extends Vue {
     }
 
     this.focalDistance = camera.focal_distance;
+    this.focalCurvature = camera.focal_curvature;
+    this.focalLength = camera.focal_length;
+    this.filmHeight = camera.film_height;
   }
 
   private update() {
@@ -157,6 +248,9 @@ export default class extends Vue {
     }
 
     camera.focal_distance = this.focalDistance;
+    camera.focal_curvature = this.focalCurvature;
+    camera.focal_length = this.focalLength;
+    camera.film_height = this.filmHeight;
 
     this.scene.set_json(json);
   }
@@ -170,34 +264,30 @@ export default class extends Vue {
 </script>
 
 <style scoped>
-input[type="radio"] {
-  position: absolute;
-  visibility: hidden;
-  display: none;
+.settings {
+  display: grid;
+  grid-template-columns: min-content auto;
+  white-space: nowrap;
+  border-top: 2px solid #333333;
+  border-left: 2px solid #333333;
 }
 
-label {
-  color: #332f35;
-  display: inline-block;
-  cursor: pointer;
-  font-weight: bold;
-  padding: 5px 20px;
+.settings-cell {
+  padding: 5px;
+  border-bottom: 2px solid #333333;
+  border-right: 2px solid #333333;
 }
 
-input[type="radio"]:checked + label {
-  color: #132f35;
-  background: #332f35;
+.settings-label {
+  padding: 5px 8px;
+  text-align: right;
 }
 
-label + input[type="radio"] + label {
-  border-left: solid 3px #332f35;
+.settings-label-disabled {
+  color: #888888;
 }
 
-.radio-group {
-  border: solid 3px #332f35;
-  display: inline-block;
-  margin: 20px;
-  border-radius: 10px;
-  overflow: hidden;
+select {
+  width: 100%;
 }
 </style>
