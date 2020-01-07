@@ -1,43 +1,30 @@
 <template>
   <div>
     <div class="settings">
+      <div class="settings-cell settings-label">Field of View</div>
+      <div class="settings-cell">
+        <vue-slider
+          :min="0.01"
+          :max="1.0"
+          tooltip="none"
+          :interval="0.001"
+          :value="fieldOfView"
+          contained="true"
+          @change="changeFieldOfView"
+          @dragging="changeFieldOfView"
+        />
+      </div>
       <div class="settings-cell settings-label">Focal Curvature</div>
       <div class="settings-cell">
         <vue-slider
           :min="0"
-          :max="2"
+          :max="1"
           tooltip="none"
           :interval="0.001"
           :value="focalCurvature"
           contained="true"
           @change="changeFocalCurvature"
           @dragging="changeFocalCurvature"
-        />
-      </div>
-      <div class="settings-cell settings-label">Focal Length</div>
-      <div class="settings-cell">
-        <vue-slider
-          :min="0.01"
-          :max="1"
-          tooltip="none"
-          :interval="0.01"
-          :value="focalLength"
-          contained="true"
-          @change="changeFocalLength"
-          @dragging="changeFocalLength"
-        />
-      </div>
-      <div class="settings-cell settings-label">Film Height</div>
-      <div class="settings-cell">
-        <vue-slider
-          :min="0.01"
-          :max="1"
-          tooltip="none"
-          :interval="0.01"
-          :value="filmHeight"
-          contained="true"
-          @change="changeFilmHeight"
-          @dragging="changeFilmHeight"
         />
       </div>
       <div class="settings-cell settings-label">Aperture Type</div>
@@ -142,8 +129,7 @@ interface SceneCamera {
       };
   focal_distance: number;
   focal_curvature: number;
-  focal_length: number;
-  film_height: number;
+  field_of_view: number;
 }
 
 @Component
@@ -188,13 +174,8 @@ export default class extends Vue {
     this.update();
   }
 
-  public changeFocalLength(value: number) {
-    this.focalLength = value;
-    this.update();
-  }
-
-  public changeFilmHeight(value: number) {
-    this.filmHeight = value;
+  public changeFieldOfView(value: number) {
+    this.fieldOfView = value;
     this.update();
   }
 
@@ -206,8 +187,7 @@ export default class extends Vue {
   apertureRotation: number = 0;
   focalDistance: number = 0;
   focalCurvature: number = 0;
-  focalLength: number = 0;
-  filmHeight: number = 0;
+  fieldOfView: number = 0;
 
   created() {
     const [_, camera] = this.getSceneData();
@@ -227,8 +207,7 @@ export default class extends Vue {
 
     this.focalDistance = camera.focal_distance;
     this.focalCurvature = camera.focal_curvature;
-    this.focalLength = camera.focal_length;
-    this.filmHeight = camera.film_height;
+    this.fieldOfView = camera.field_of_view;
   }
 
   private update() {
@@ -249,8 +228,7 @@ export default class extends Vue {
 
     camera.focal_distance = this.focalDistance;
     camera.focal_curvature = this.focalCurvature;
-    camera.focal_length = this.focalLength;
-    camera.film_height = this.filmHeight;
+    camera.field_of_view = this.fieldOfView;
 
     this.scene.set_json(json);
   }

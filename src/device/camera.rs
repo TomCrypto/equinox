@@ -31,7 +31,7 @@ impl Device {
         data.aperture_settings = aperture_settings(&camera.aperture);
         data.camera_transform = xfm.inverse_transform().unwrap().into();
 
-        data.camera_settings[0] = camera.film_height / (2.0 * camera.focal_length);
+        data.camera_settings[0] = camera.field_of_view;
         data.camera_settings[1] = camera.focal_distance;
         data.camera_settings[2] = camera.focal_curvature;
         data.camera_settings[3] = 0.0;

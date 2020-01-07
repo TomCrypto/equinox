@@ -232,8 +232,8 @@ impl Scene {
 
     fn validate_camera(&self, camera: &Camera) -> Result<(), Error> {
         validate!(camera.focal_distance > 0.0);
-        validate!(camera.focal_length > 0.0);
-        validate!(camera.film_height > 0.0);
+        validate!(camera.field_of_view > 0.0);
+        validate!(camera.field_of_view < 1.0);
         validate!(camera.focal_curvature >= 0.0);
         validate!(camera.direction != [0.0, 0.0, 0.0]);
         validate!(camera.up_vector != [0.0, 0.0, 0.0]);

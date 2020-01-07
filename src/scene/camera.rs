@@ -37,9 +37,6 @@ pub struct Camera {
     #[default(0.0)]
     pub focal_curvature: f32,
 
-    #[default(0.06)]
-    pub focal_length: f32,
-
-    #[default(0.024)]
-    pub film_height: f32,
+    #[default(0.2)]
+    pub field_of_view: f32,
 }
