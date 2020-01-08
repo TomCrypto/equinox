@@ -172,11 +172,11 @@ export default class App extends Vue {
       return asset; // uncompressed
     }
 
-    if (texture_compression == "S3TC") {
+    if (texture_compression === "S3TC") {
       return asset.replace(".tc.raw", ".s3tc.raw");
     }
 
-    if (texture_compression == "ASTC") {
+    if (texture_compression === "ASTC") {
       return asset.replace(".tc.raw", ".astc.raw");
     }
 

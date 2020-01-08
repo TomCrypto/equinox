@@ -142,11 +142,11 @@ export default class extends Vue {
   }
 
   public get hasApertureRadius() {
-    return this.apertureType != "point";
+    return this.apertureType !== "point";
   }
 
   public get isPolygonAperture() {
-    return this.apertureType == "ngon";
+    return this.apertureType === "ngon";
   }
 
   public changeApertureRadius(value: number) {
@@ -236,7 +236,7 @@ export default class extends Vue {
   private getSceneData(): [any, SceneCamera] {
     const json = this.scene.json();
 
-    return [json, json.camera as SceneCamera];
+    return [json, json.camera];
   }
 }
 </script>

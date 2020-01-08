@@ -1,235 +1,307 @@
 <template>
   <div>
-    <div class="radio-group">
-      <input type="radio" id="solid" name="selector" />
-      <label for="solid">Solid Background</label>
-      <input type="radio" id="map" name="selector" />
-      <label for="map">Environment Map</label>
-    </div>
+    <div class="settings">
+      <div class="settings-cell settings-label">Environment Type</div>
+      <div class="settings-cell">
+        <select
+          :value="environmentType"
+          @change="changeEnvironmentType($event.target.value)"
+          selected
+        >
+          <option value="solid">Solid</option>
+          <option value="map">Map</option>
+        </select>
+      </div>
 
-    <multiselect
-      :value="environmentMap"
-      :options="environmentMaps"
-      :show-labels="false"
-      @input="onSelectEnvironmentMap"
-    />
-    <vue-slider
-      :min="0"
-      :max="1"
-      tooltip="none"
-      :interval="0.001"
-      @change="changeRotation"
-      @dragging="changeRotation"
-    />
+      <div class="settings-cell settings-label">Environment Map</div>
+      <div class="settings-cell">
+        <select
+          :value="environmentMap"
+          :disabled="!isMapEnvironment"
+          @change="changeEnvironmentMap($event.target.value)"
+          selected
+        >
+          <option v-for="map in ENVIRONMENT_MAPS" :key="map.data" :value="map.data">{{ map.name }}</option>
+        </select>
+      </div>
+
+      <div class="settings-cell settings-label">Environment Tint</div>
+      <div class="settings-cell">
+        <input
+          type="color"
+          :value="environmentTintHex"
+          @change="changeEnvironmentTint($event.target.value)"
+        />
+      </div>
+
+      <div class="settings-cell settings-label">Environment Rotation</div>
+      <div class="settings-cell">
+        <vue-slider
+          :min="0"
+          :max="6.2832"
+          :disabled="!isMapEnvironment"
+          tooltip="none"
+          :interval="0.0001"
+          :value="environmentRotation"
+          contained="true"
+          @change="changeEnvironmentRotation"
+          @dragging="changeEnvironmentRotation"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import { Component, Prop, Vue } from "vue-property-decorator";
+import convert from "color-convert";
 import { WebScene } from "equinox";
+
+type SceneEnvironment =
+  | {
+      type: "solid";
+      tint: [number, number, number];
+    }
+  | {
+      type: "map";
+      tint: [number, number, number];
+      rotation: number;
+    };
 
 @Component
 export default class extends Vue {
   @Prop() private scene!: WebScene;
 
-  private sceneJson: any = null;
-
-  private changeRotation(value: number) {
-    this.scene.set_environment_rotation(value * 2.0 * Math.PI);
+  public get environmentTintHex(): string {
+    return this.rgbToHex(this.environmentTint);
   }
 
-  private get environmentMap(): string | null {
-    const environment: string | null = this.sceneJson.environment_map;
+  public changeEnvironmentMap(value: string) {
+    this.environmentMap = value;
+    this.update();
+  }
 
-    if (environment === null) {
-      return null;
+  private changeEnvironmentType(value: "solid" | "map") {
+    this.environmentType = value;
+
+    if (this.environmentType === "map" && this.environmentMap === null) {
+      this.environmentMap = this.ENVIRONMENT_MAPS[0].data;
     }
 
-    return this.getMapForUrl(environment);
+    this.update();
   }
 
-  private get environmentMaps(): string[] {
-    return this.MAPS.map(map => map.name);
+  public changeEnvironmentRotation(value: number) {
+    this.environmentRotation = value;
+    this.update();
   }
 
-  private onSelectEnvironmentMap(map: string) {
-    this.updateEnvironmentMap(this.getUrlForMap(map));
+  public changeEnvironmentTint(value: string) {
+    this.environmentTint = this.hexToRgb(value);
+    this.update();
   }
 
-  private async updateEnvironmentMap(url: string) {
-    const oldEnvmap = this.sceneJson.environment_map as string | null;
-
-    this.scene.set_envmap(url);
-    this.sceneJson = this.scene.json();
+  public get isMapEnvironment() {
+    return this.environmentType === "map";
   }
 
-  private getUrlForMap(name: string): string {
-    for (const map of this.MAPS) {
-      if (map.name === name) {
-        return map.url;
-      }
-    }
-
-    throw new Error("bad environment map");
+  private rgbToHex(rgb: [number, number, number]): string {
+    return `#${convert.rgb.hex([
+      rgb[0] * 255.0,
+      rgb[1] * 255.0,
+      rgb[2] * 255.0
+    ])}`;
   }
 
-  private getMapForUrl(url: string): string {
-    for (const map of this.MAPS) {
-      if (map.url === url) {
-        return map.name;
-      }
-    }
+  private hexToRgb(hex: string): [number, number, number] {
+    let rgb = convert.hex.rgb(hex);
 
-    throw new Error("bad environment map");
+    return [rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0];
   }
 
-  created() {
-    this.sceneJson = this.scene.json();
-  }
-
-  MAPS = [
+  ENVIRONMENT_MAPS = [
     {
       name: "Aft Lounge (8K)",
-      url: "assets/aft_lounge_8k.raw"
+      data: "assets/aft_lounge_8k.raw"
     },
     {
       name: "Bethnal Green Entrance (4K)",
-      url: "assets/bethnal_green_entrance_4k.raw"
+      data: "assets/bethnal_green_entrance_4k.raw"
     },
     {
       name: "Between Bridges (1K)",
-      url: "assets/between_bridges_1k.raw"
+      data: "assets/between_bridges_1k.raw"
     },
     {
       name: "Between Bridges (2K)",
-      url: "assets/between_bridges_2k.raw"
+      data: "assets/between_bridges_2k.raw"
     },
     {
       name: "Between Bridges (4K)",
-      url: "assets/between_bridges_4k.raw"
+      data: "assets/between_bridges_4k.raw"
     },
     {
       name: "Between Bridges (8K)",
-      url: "assets/between_bridges_8k.raw"
+      data: "assets/between_bridges_8k.raw"
     },
     {
       name: "Blue Grotto (4K)",
-      url: "assets/blue_grotto_4k.raw"
+      data: "assets/blue_grotto_4k.raw"
     },
     {
       name: "Blue Lagoon Night (4K)",
-      url: "assets/blue_lagoon_night_4k.raw"
+      data: "assets/blue_lagoon_night_4k.raw"
     },
     {
       name: "Blue Lagoon Night (8K)",
-      url: "assets/blue_lagoon_night_8k.raw"
+      data: "assets/blue_lagoon_night_8k.raw"
     },
     {
       name: "Carpentry Shop 02 (4K)",
-      url: "assets/carpentry_shop_02_4k.raw"
+      data: "assets/carpentry_shop_02_4k.raw"
     },
     {
       name: "Cayley Interior (8K)",
-      url: "assets/cayley_interior_8k.raw"
+      data: "assets/cayley_interior_8k.raw"
     },
     {
       name: "Cinema Lobby (4K)",
-      url: "assets/cinema_lobby_4k.raw"
+      data: "assets/cinema_lobby_4k.raw"
     },
     {
       name: "Cinema Lobby (8K)",
-      url: "assets/cinema_lobby_8k.raw"
+      data: "assets/cinema_lobby_8k.raw"
     },
     {
       name: "Green Point Park (8K)",
-      url: "assets/green_point_park_8k.raw"
+      data: "assets/green_point_park_8k.raw"
     },
     {
       name: "Lenong 2 (1K)",
-      url: "assets/lenong_2_1k.raw"
+      data: "assets/lenong_2_1k.raw"
     },
     {
       name: "Lenong 2 (2K)",
-      url: "assets/lenong_2_2k.raw"
+      data: "assets/lenong_2_2k.raw"
     },
     {
       name: "Lenong 2 (4K)",
-      url: "assets/lenong_2_4k.raw"
+      data: "assets/lenong_2_4k.raw"
     },
     {
       name: "Moonless Golf (4K)",
-      url: "assets/moonless_golf_4k.raw"
+      data: "assets/moonless_golf_4k.raw"
     },
     {
       name: "Moonless Golf (8K)",
-      url: "assets/moonless_golf_8k.raw"
+      data: "assets/moonless_golf_8k.raw"
     },
     {
       name: "Noon Grass (2K)",
-      url: "assets/noon_grass_2k.raw"
+      data: "assets/noon_grass_2k.raw"
     },
     {
       name: "Noon Grass (4K)",
-      url: "assets/noon_grass_4k.raw"
+      data: "assets/noon_grass_4k.raw"
     },
     {
       name: "Noon Grass (8K)",
-      url: "assets/noon_grass_8k.raw"
+      data: "assets/noon_grass_8k.raw"
     },
     {
       name: "Old Outdoor Theater (4K)",
-      url: "assets/old_outdoor_theater_4k.raw"
+      data: "assets/old_outdoor_theater_4k.raw"
     },
     {
       name: "Paul Lobe Haus (4K)",
-      url: "assets/paul_lobe_haus_4k.raw"
+      data: "assets/paul_lobe_haus_4k.raw"
     },
     {
       name: "Sunny Vondelpark (2K)",
-      url: "assets/sunny_vondelpark_2k.raw"
+      data: "assets/sunny_vondelpark_2k.raw"
     },
     {
       name: "Sunny Vondelpark (4K)",
-      url: "assets/sunny_vondelpark_4k.raw"
+      data: "assets/sunny_vondelpark_4k.raw"
     },
     {
       name: "Sunny Vondelpark (8K)",
-      url: "assets/sunny_vondelpark_8k.raw"
+      data: "assets/sunny_vondelpark_8k.raw"
     }
   ];
+
+  // This editor's internal view of the scene.
+
+  environmentType: "solid" | "map" = "solid";
+  environmentMap: string | null = null;
+  environmentTint: [number, number, number] = [1, 1, 1];
+  environmentRotation: number = 0;
+
+  created() {
+    const [json, environment] = this.getSceneData();
+
+    this.environmentType = environment.type;
+    this.environmentTint = environment.tint;
+
+    if (environment.type === "map") {
+      this.environmentRotation = environment.rotation;
+    }
+
+    this.environmentMap = json.environment_map;
+  }
+
+  private update() {
+    const [json, environment] = this.getSceneData();
+
+    environment.type = this.environmentType;
+    environment.tint = this.environmentTint;
+
+    if (environment.type === "map") {
+      environment.rotation = this.environmentRotation;
+    }
+
+    json.environment_map = this.environmentMap;
+
+    this.scene.set_json(json);
+  }
+
+  private getSceneData(): [any, SceneEnvironment] {
+    const json = this.scene.json();
+
+    return [json, json.environment];
+  }
 }
 </script>
 
-<style src="vue-multiselect/dist/vue-multiselect.min.css"></style>
-
 <style scoped>
-input[type="radio"] {
-  position: absolute;
-  visibility: hidden;
-  display: none;
+.settings {
+  display: grid;
+  grid-template-columns: min-content auto;
+  white-space: nowrap;
+  border-top: 2px solid #333333;
+  border-left: 2px solid #333333;
 }
 
-label {
-  color: #332f35;
-  display: inline-block;
-  cursor: pointer;
-  font-weight: bold;
-  padding: 5px 20px;
+.settings-cell {
+  padding: 5px;
+  border-bottom: 2px solid #333333;
+  border-right: 2px solid #333333;
 }
 
-input[type="radio"]:checked + label {
-  color: #132f35;
-  background: #332f35;
+.settings-label {
+  padding: 5px 8px;
+  text-align: right;
 }
 
-label + input[type="radio"] + label {
-  border-left: solid 3px #332f35;
+.settings-label-disabled {
+  color: #888888;
 }
-.radio-group {
-  border: solid 3px #332f35;
-  display: inline-block;
-  margin: 20px;
-  border-radius: 10px;
-  overflow: hidden;
+
+select {
+  width: 100%;
+}
+
+input {
+  width: 100%;
 }
 </style>

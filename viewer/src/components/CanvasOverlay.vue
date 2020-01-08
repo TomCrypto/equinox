@@ -1,16 +1,16 @@
 <template>
   <div>
-    <div class="overlay" v-if="overlayType == 'error'">
+    <div class="overlay" v-if="overlayType === 'error'">
       <font-awesome-icon class="icon error" icon="exclamation-triangle" size="lg" />
       <p class="error">{{ errorMessage }}</p>
     </div>
 
-    <div class="overlay info" v-if="overlayType == 'download'">
+    <div class="overlay info" v-if="overlayType === 'download'">
       <font-awesome-icon class="icon" icon="circle-notch" spin size="lg" />
       <p class="info">{{ downloadText }}</p>
     </div>
 
-    <div class="overlay info" v-if="overlayType == 'update'">
+    <div class="overlay info" v-if="overlayType === 'update'">
       <font-awesome-icon class="icon" icon="exclamation-circle" size="lg" />
       <p class="info">Updating scene...</p>
     </div>

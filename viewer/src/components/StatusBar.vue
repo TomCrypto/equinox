@@ -37,7 +37,7 @@ function displayTime(milliseconds: number): string {
 }
 
 function displayPhotons(amount: number): string {
-  if (amount == 1) {
+  if (amount === 1) {
     return "1 photon";
   }
 
@@ -77,7 +77,7 @@ export default class extends Vue {
   get passInfo(): string {
     if (this.isContextLost) {
       return "CONTEXT LOST!";
-    } else if (this.sppmPasses == 1) {
+    } else if (this.sppmPasses === 1) {
       return `1 pass, ${displayPhotons(this.sppmPhotons)}`;
     } else {
       return `${this.sppmPasses} passes, ${displayPhotons(this.sppmPhotons)}`;

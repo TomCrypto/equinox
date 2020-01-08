@@ -121,7 +121,7 @@ export default class extends Vue {
     this.device = new this.equinox.WebDevice(this.context!);
     this.$emit("device-created", this.device);
 
-    if (this.device.texture_compression() == "None") {
+    if (this.device.texture_compression() === "None") {
       alert(
         "Your device or browser does not support compressed textures, some features may not work!"
       );
