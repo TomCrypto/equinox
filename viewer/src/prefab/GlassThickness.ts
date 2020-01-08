@@ -13,8 +13,8 @@ export default {
         radius: 0
       },
       focal_distance: 1,
-      focal_length: 0.07,
-      film_height: 0.024
+      focal_curvature: 0,
+      field_of_view: 0.2
     },
     raster: {
       width: 1280,
@@ -146,7 +146,9 @@ export default {
     },
     display: {
       exposure: 0,
-      saturation: 1
+      saturation: 1,
+      lens_flare_enabled: false,
+      lens_flare_tiles_per_pass: 1
     },
     aperture: null,
     integrator: {

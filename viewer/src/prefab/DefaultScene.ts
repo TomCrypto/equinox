@@ -13,8 +13,8 @@ export default {
         radius: 0
       },
       focal_distance: 1,
-      focal_length: 0.06,
-      film_height: 0.024
+      focal_curvature: 0,
+      field_of_view: 0.2
     },
     raster: {
       width: 1280,
@@ -24,23 +24,6 @@ export default {
       }
     },
     instance_list: {
-      "matte-sphere": {
-        geometry: "sphere",
-        material: "matte",
-        parameters: {
-          x: -2,
-          y: 0.81,
-          z: 0
-        },
-        photon_receiver: true,
-        sample_explicit: true,
-        visible: true,
-        medium: {
-          extinction: [0, 0, 0],
-          refractive_index: 1
-        },
-        parent: null
-      },
       "glass-pane": {
         geometry: "pane",
         material: "glass-pane",
@@ -79,6 +62,23 @@ export default {
         geometry: "ground",
         material: "lambertian",
         parameters: {},
+        photon_receiver: true,
+        sample_explicit: true,
+        visible: true,
+        medium: {
+          extinction: [0, 0, 0],
+          refractive_index: 1
+        },
+        parent: null
+      },
+      "matte-sphere": {
+        geometry: "sphere",
+        material: "matte",
+        parameters: {
+          x: -2,
+          y: 0.81,
+          z: 0
+        },
         photon_receiver: true,
         sample_explicit: true,
         visible: true,
@@ -179,11 +179,6 @@ export default {
         albedo: [0.955, 0.637, 0.538],
         shininess: 150
       },
-      matte: {
-        type: "oren-nayar",
-        albedo: [0.25, 0.75, 0.25],
-        roughness: 1
-      },
       "glass-pane": {
         type: "dielectric",
         base_color: [1, 1, 1]
@@ -196,6 +191,11 @@ export default {
       lambertian: {
         type: "lambertian",
         albedo: [0.5, 0.5, 0.5]
+      },
+      matte: {
+        type: "oren-nayar",
+        albedo: [0.25, 0.75, 0.25],
+        roughness: 1
       }
     },
     environment_map: null,
