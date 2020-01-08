@@ -4,8 +4,7 @@ use log::{debug, info, warn};
 use crate::{BlendMode, Device, Integrator, RasterFilter, Scene};
 use js_sys::Error;
 use quasi_rd::Sequence;
-use rand::{RngCore, SeedableRng};
-use rand_chacha::ChaCha20Rng;
+use rand::{rngs::StdRng, RngCore, SeedableRng};
 use zerocopy::{AsBytes, FromBytes};
 
 #[repr(align(16), C)]
@@ -46,7 +45,7 @@ pub struct IntegratorPass {
 
 #[derive(Debug)]
 pub struct IntegratorState {
-    pub(crate) rng: ChaCha20Rng,
+    pub(crate) rng: StdRng,
     pub(crate) filter_rng: Sequence,
 
     pub(crate) filter: RasterFilter,
@@ -62,7 +61,7 @@ pub struct IntegratorState {
 impl Default for IntegratorState {
     fn default() -> Self {
         Self {
-            rng: ChaCha20Rng::seed_from_u64(0),
+            rng: StdRng::seed_from_u64(0),
             filter_rng: Sequence::new(2),
             filter: RasterFilter::default(),
             integrator: Integrator::default(),
@@ -132,7 +131,7 @@ impl Device {
     }
 
     pub(crate) fn reset_integrator_state(&mut self, scene: &mut Scene) {
-        self.state.rng = ChaCha20Rng::seed_from_u64(0);
+        self.state.rng = StdRng::seed_from_u64(0);
         self.state.filter_rng.seek(0);
         self.state.photon_count = 0.0;
         self.state.current_pass = 0;
