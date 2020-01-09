@@ -213,7 +213,8 @@ impl Device {
             return;
         }
 
-        self.integrator_scatter_fbo.clear(0, [std::f32::NAN; 4]);
+        self.integrator_scatter_fbo.clear(0, [0.0; 4]);
+        self.integrator_scatter_fbo.clear(1, [0.0; 4]);
         self.integrator_scatter_fbo.clear(2, [0.0; 4]);
 
         let command = self.integrator_scatter_photons_shader.begin_draw();

@@ -379,7 +379,9 @@ impl<'a> DrawCommand<'a> {
             }
             BlendMode::AlphaPredicatedAdd => {
                 self.shader.gl.blend_equation(Context::FUNC_ADD);
-                self.shader.gl.blend_func(Context::ONE, Context::SRC_ALPHA);
+                self.shader
+                    .gl
+                    .blend_func(Context::ONE, Context::ONE_MINUS_SRC_ALPHA);
             }
         }
     }
