@@ -1,6 +1,5 @@
 //! The Equinox stochastic photon mapper, see the README for more information.
 
-#![allow(clippy::too_many_arguments)]
 #![allow(clippy::module_inception)]
 #![forbid(unsafe_code, while_true)]
 
@@ -66,7 +65,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::WebGl2RenderingContext;
 
-/// WASM binding for a scene.
+/// WASM wrapper for a scene.
 #[wasm_bindgen]
 #[derive(Debug, Default)]
 pub struct WebScene {
@@ -100,7 +99,7 @@ impl WebScene {
     /// Reconfigures the scene using the provided scene JSON data.
     ///
     /// This method will attempt to dirty the least amount of scene data
-    /// possible, so it won't necessarily always dirty the entire scene.
+    /// possible, which should make later device updates more efficient.
     pub fn set_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
         let temporary: Scene = from_json(json)?;
         temporary.validate()?;
@@ -110,9 +109,6 @@ impl WebScene {
     }
 
     /// Returns all assets which are referenced in this scene.
-    ///
-    /// All distinct assets will be returned in lexicographical order. Assets
-    /// which are referenced in the scene but aren't used are still returned.
     pub fn assets(&self) -> Array {
         self.scene
             .assets()
@@ -120,41 +116,6 @@ impl WebScene {
             .map(ToOwned::to_owned)
             .map(JsValue::from)
             .collect()
-    }
-
-    pub fn set_raster_dimensions(&mut self, width: u32, height: u32) {
-        if self.scene.raster.width != width {
-            self.scene.raster.width = width;
-        }
-
-        if self.scene.raster.height != height {
-            self.scene.raster.height = height;
-        }
-    }
-
-    pub fn set_environment_rotation(&mut self, new_rotation: f32) {
-        Dirty::modify(&mut self.scene.environment, |environment| {
-            if let Environment::Map { rotation, .. } = environment {
-                *rotation = new_rotation;
-            }
-        });
-    }
-
-    pub fn set_envmap(&mut self, name: &str) {
-        Dirty::modify(&mut self.scene.environment_map, |environment_map| {
-            *environment_map = Some(name.to_owned());
-        });
-
-        Dirty::modify(&mut self.scene.environment, |environment| {
-            if let Environment::Map { .. } = environment {
-                // do nothing; we're already in map mode
-            } else {
-                *environment = Environment::Map {
-                    tint: [1.0; 3],
-                    rotation: 0.0,
-                };
-            }
-        });
     }
 
     /// Applies a camera-space translation to the camera position.
@@ -188,7 +149,7 @@ fn from_json<T: DeserializeOwned>(json: &JsValue) -> Result<T, JsValue> {
     Ok(json.into_serde().map_err(|e| Error::new(&e.to_string()))?)
 }
 
-/// WASM binding for a device.
+/// WASM wrapper for a device.
 #[wasm_bindgen]
 pub struct WebDevice {
     device: Device,
@@ -229,12 +190,12 @@ impl WebDevice {
         })?)
     }
 
-    /// Refines the render using the integrator.
+    /// Refines the render using the SPPN integrator.
     pub fn refine(&mut self) -> Result<(), JsValue> {
         Ok(self.device.refine()?)
     }
 
-    /// Presents the current integrator data.
+    /// Presents the current SPPM integrator render.
     pub fn present(&mut self) -> Result<(), JsValue> {
         Ok(self.device.present()?)
     }
@@ -249,7 +210,7 @@ impl WebDevice {
         self.device.state.current_pass
     }
 
-    /// Indicates to the device that its WebGL context has been lost.
+    /// Signals to the device that its WebGL context has been lost.
     pub fn context_lost(&mut self) {
         self.device.context_lost();
     }
@@ -278,9 +239,6 @@ pub fn licensing() -> String {
 }
 
 /// Configures browser logging functionality.
-///
-/// This initialization function is always safe to call more than once, so it
-/// can be called safely every time the UI is hot-reloaded without panicking.
 #[wasm_bindgen]
 pub fn initialize_logging() {
     console_error_panic_hook::set_once();
