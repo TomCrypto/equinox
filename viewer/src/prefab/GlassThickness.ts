@@ -138,7 +138,7 @@ export default {
         albedo: [0.7, 0.7, 0.7]
       }
     },
-    environment_map: "assets/green_point_park_8k.raw",
+    environment_map: "green_point_park_8k.raw",
     environment: {
       type: "map",
       tint: [1, 1, 1],

@@ -122,111 +122,111 @@ export default class extends Vue {
   ENVIRONMENT_MAPS = [
     {
       name: "Aft Lounge (8K)",
-      data: "assets/aft_lounge_8k.raw"
+      data: "aft_lounge_8k.raw"
     },
     {
       name: "Bethnal Green Entrance (4K)",
-      data: "assets/bethnal_green_entrance_4k.raw"
+      data: "bethnal_green_entrance_4k.raw"
     },
     {
       name: "Between Bridges (1K)",
-      data: "assets/between_bridges_1k.raw"
+      data: "between_bridges_1k.raw"
     },
     {
       name: "Between Bridges (2K)",
-      data: "assets/between_bridges_2k.raw"
+      data: "between_bridges_2k.raw"
     },
     {
       name: "Between Bridges (4K)",
-      data: "assets/between_bridges_4k.raw"
+      data: "between_bridges_4k.raw"
     },
     {
       name: "Between Bridges (8K)",
-      data: "assets/between_bridges_8k.raw"
+      data: "between_bridges_8k.raw"
     },
     {
       name: "Blue Grotto (4K)",
-      data: "assets/blue_grotto_4k.raw"
+      data: "blue_grotto_4k.raw"
     },
     {
       name: "Blue Lagoon Night (4K)",
-      data: "assets/blue_lagoon_night_4k.raw"
+      data: "blue_lagoon_night_4k.raw"
     },
     {
       name: "Blue Lagoon Night (8K)",
-      data: "assets/blue_lagoon_night_8k.raw"
+      data: "blue_lagoon_night_8k.raw"
     },
     {
       name: "Carpentry Shop 02 (4K)",
-      data: "assets/carpentry_shop_02_4k.raw"
+      data: "carpentry_shop_02_4k.raw"
     },
     {
       name: "Cayley Interior (8K)",
-      data: "assets/cayley_interior_8k.raw"
+      data: "cayley_interior_8k.raw"
     },
     {
       name: "Cinema Lobby (4K)",
-      data: "assets/cinema_lobby_4k.raw"
+      data: "cinema_lobby_4k.raw"
     },
     {
       name: "Cinema Lobby (8K)",
-      data: "assets/cinema_lobby_8k.raw"
+      data: "cinema_lobby_8k.raw"
     },
     {
       name: "Green Point Park (8K)",
-      data: "assets/green_point_park_8k.raw"
+      data: "green_point_park_8k.raw"
     },
     {
       name: "Lenong 2 (1K)",
-      data: "assets/lenong_2_1k.raw"
+      data: "lenong_2_1k.raw"
     },
     {
       name: "Lenong 2 (2K)",
-      data: "assets/lenong_2_2k.raw"
+      data: "lenong_2_2k.raw"
     },
     {
       name: "Lenong 2 (4K)",
-      data: "assets/lenong_2_4k.raw"
+      data: "lenong_2_4k.raw"
     },
     {
       name: "Moonless Golf (4K)",
-      data: "assets/moonless_golf_4k.raw"
+      data: "moonless_golf_4k.raw"
     },
     {
       name: "Moonless Golf (8K)",
-      data: "assets/moonless_golf_8k.raw"
+      data: "moonless_golf_8k.raw"
     },
     {
       name: "Noon Grass (2K)",
-      data: "assets/noon_grass_2k.raw"
+      data: "noon_grass_2k.raw"
     },
     {
       name: "Noon Grass (4K)",
-      data: "assets/noon_grass_4k.raw"
+      data: "noon_grass_4k.raw"
     },
     {
       name: "Noon Grass (8K)",
-      data: "assets/noon_grass_8k.raw"
+      data: "noon_grass_8k.raw"
     },
     {
       name: "Old Outdoor Theater (4K)",
-      data: "assets/old_outdoor_theater_4k.raw"
+      data: "old_outdoor_theater_4k.raw"
     },
     {
       name: "Paul Lobe Haus (4K)",
-      data: "assets/paul_lobe_haus_4k.raw"
+      data: "paul_lobe_haus_4k.raw"
     },
     {
       name: "Sunny Vondelpark (2K)",
-      data: "assets/sunny_vondelpark_2k.raw"
+      data: "sunny_vondelpark_2k.raw"
     },
     {
       name: "Sunny Vondelpark (4K)",
-      data: "assets/sunny_vondelpark_4k.raw"
+      data: "sunny_vondelpark_4k.raw"
     },
     {
       name: "Sunny Vondelpark (8K)",
-      data: "assets/sunny_vondelpark_8k.raw"
+      data: "sunny_vondelpark_8k.raw"
     }
   ];
 

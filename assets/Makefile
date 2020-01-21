@@ -1,4 +1,4 @@
-SOURCE := https://equinox.bitwise.me/assets
+SOURCE := https://equinox-assets.s3-ap-southeast-2.amazonaws.com
 ASSETS := aft_lounge_8k.raw \
           bethnal_green_entrance_4k.raw \
           between_bridges_1k.raw \

@@ -39,7 +39,10 @@
         </template>
         <template slot="tab-head-licensing">Licensing</template>
         <template slot="tab-panel-licensing">
-          <LicensingEditor :licensing="equinox.licensing()" :version="equinox.version()" />
+          <LicensingEditor
+            :licensing="equinox.licensing()"
+            :version="equinox.version()"
+          />
         </template>
       </EditorContainer>
     </div>
@@ -98,6 +101,10 @@ export default class App extends Vue {
     name: "equinox-asset-data-v2"
   });
 
+  mounted() {
+    this.scene.set_json(DefaultScene.json);
+  }
+
   getAsset(asset: string): Uint8Array | null {
     return this.assets.get(asset) || null;
   }
@@ -118,7 +125,7 @@ export default class App extends Vue {
     const promises = [];
 
     for (const asset of assets) {
-      const url = this.url_for_asset(asset, compression);
+      const url = this.urlForAsset(asset, compression);
 
       const promise = this.assetDownloads.get(url) || this.fetchAsset(url);
 
@@ -167,7 +174,9 @@ export default class App extends Vue {
     }
   }
 
-  private url_for_asset(asset: string, texture_compression: string): string {
+  private urlForAsset(asset: string, texture_compression: string): string {
+    asset = this.assetRoot() + asset;
+
     if (!asset.endsWith(".tc.raw")) {
       return asset; // uncompressed
     }
@@ -183,8 +192,12 @@ export default class App extends Vue {
     throw new Error("no texture compression format supported");
   }
 
-  mounted() {
-    this.scene.set_json(DefaultScene.json);
+  private assetRoot(): string {
+    if (Vue.config.devtools) {
+      return "assets/";
+    } else {
+      return "https://equinox-assets.s3-ap-southeast-2.amazonaws.com/";
+    }
   }
 }
 </script>
