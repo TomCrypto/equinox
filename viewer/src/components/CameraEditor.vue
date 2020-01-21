@@ -66,11 +66,11 @@
       </div>
       <div class="settings-cell">
         <vue-slider
-          :min="0.001"
+          :min="0.01"
           :max="100"
           :disabled="!hasApertureRadius"
           tooltip="none"
-          :interval="0.01"
+          :interval="0.001"
           :value="focalDistance"
           contained="true"
           @change="changeFocalDistance"
