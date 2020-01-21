@@ -29,7 +29,7 @@ Use `wasm-pack` (more info [here](https://github.com/rustwasm/wasm-pack)) to bui
 
 The `viewer` front-end will use the built module in the `pkg` folder, it's suggested to `yarn link` it for development so that any `wasm-pack` builds will automatically trigger a front-end rebuild. To serve the front-end locally, run the following:
 
-    cd viewer && yarn install && yarn serve
+    cd viewer && yarn && yarn serve
 
 You should download all assets (a few gigabytes total) for local use by running the Makefile in the `assets` folder.
 
