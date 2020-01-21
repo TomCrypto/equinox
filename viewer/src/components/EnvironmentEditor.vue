@@ -21,7 +21,12 @@
           @change="changeEnvironmentMap($event.target.value)"
           selected
         >
-          <option v-for="map in ENVIRONMENT_MAPS" :key="map.data" :value="map.data">{{ map.name }}</option>
+          <option
+            v-for="map in ENVIRONMENT_MAPS"
+            :key="map.data"
+            :value="map.data"
+            >{{ map.name }}</option
+          >
         </select>
       </div>
 
@@ -120,6 +125,18 @@ export default class extends Vue {
   }
 
   ENVIRONMENT_MAPS = [
+    {
+      name: "Aft Lounge (1K)",
+      data: "aft_lounge_1k.raw"
+    },
+    {
+      name: "Aft Lounge (2K)",
+      data: "aft_lounge_2k.raw"
+    },
+    {
+      name: "Aft Lounge (4K)",
+      data: "aft_lounge_4k.raw"
+    },
     {
       name: "Aft Lounge (8K)",
       data: "aft_lounge_8k.raw"
