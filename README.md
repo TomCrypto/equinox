@@ -2,6 +2,8 @@
 
 Equinox is a WebGL2 stochastic progressive photon mapper written in modern Rust targeting WebAssembly. Its goal is to provide me with an efficient playground to experiment with new computer graphics ideas and generate pretty renders. The renderer itself is completely safe Rust and forbids unsafe code.
 
+Check out the [live demo](https://tomcrypto.github.io/equinox/), note that the front-end is currently designed with desktops in mind and the renderer has not yet received much testing on mobile devices or Intel graphics cards.
+
 ## Features
 
 - Stochastic progressive photon mapping
@@ -36,5 +38,3 @@ You should download all assets (a few gigabytes total) for local use by running 
 ## License
 
 This software is provided under the MIT license.
-
-## Gallery
