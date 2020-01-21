@@ -18,8 +18,6 @@ float inverse_transform(sampler2D texture, int y, float u, int size, out int ind
     int low = 0, high = size;
     float this_cdf, next_cdf;
 
-    // TODO: is the while(true) formula here faster?
-
     while (low < high) {
         int mid = (low + high) / 2;
 

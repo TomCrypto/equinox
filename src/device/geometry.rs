@@ -131,8 +131,6 @@ impl GeometryGlslGenerator {
                 let height = self.lookup_parameter(height, parameters);
                 let radius = self.lookup_parameter(radius, parameters);
 
-                // TODO: may not be valid inside the cylinder
-
                 format!(
                     r#"
                     vec2 d = abs(vec2(length(p.xz), p.y)) - vec2({}, {});
