@@ -5,14 +5,14 @@ export default {
       name: "[Prefab] Default Scene"
     },
     camera: {
-      position: [9.164212, 4.2127805, 10.355862],
-      direction: [-0.63988286, -0.2624869, -0.7222538],
+      position: [6.8313575, 3.796789, -6.400666],
+      direction: [-0.6979423, -0.3206336, 0.64036757],
       up_vector: [0, 1, 0],
       aperture: {
         type: "circle",
         radius: 0
       },
-      focal_distance: 1,
+      focal_distance: 0.001,
       focal_curvature: 0,
       field_of_view: 0.2
     },
@@ -24,37 +24,37 @@ export default {
       }
     },
     instance_list: {
-      "glass-pane": {
-        geometry: "pane",
-        material: "glass-pane",
-        parameters: {
-          x: 3.02,
-          y: 1.27,
-          z: 0
-        },
-        photon_receiver: true,
-        sample_explicit: true,
-        visible: true,
-        medium: {
-          extinction: [1e-9, 0.000002, 0.000004],
-          refractive_index: 1.65
-        },
-        parent: null
-      },
-      "glass-sphere": {
-        geometry: "two-spheres",
-        material: "copper",
+      "glass-cylinder": {
+        geometry: "cylinder",
+        material: "glass",
         parameters: {
           x: 1,
-          y: 0.81,
+          y: 0.955,
           z: 0
         },
         photon_receiver: false,
         sample_explicit: true,
         visible: true,
         medium: {
-          extinction: [0, 0, 0],
-          refractive_index: 1
+          extinction: [9e-8, 5e-8, 2e-9],
+          refractive_index: 1.45
+        },
+        parent: null
+      },
+      "glass-sphere": {
+        geometry: "sphere",
+        material: "glass",
+        parameters: {
+          x: 0,
+          y: 1.11,
+          z: -1.5
+        },
+        photon_receiver: false,
+        sample_explicit: true,
+        visible: true,
+        medium: {
+          extinction: [1e-8, 6e-8, 6e-8],
+          refractive_index: 1.65
         },
         parent: null
       },
@@ -71,32 +71,15 @@ export default {
         },
         parent: null
       },
-      "matte-sphere": {
-        geometry: "sphere",
+      "matte-cube": {
+        geometry: "cube",
         material: "matte",
         parameters: {
-          x: -2,
+          x: -0.3,
           y: 0.81,
-          z: 0
+          z: 1.5
         },
         photon_receiver: true,
-        sample_explicit: true,
-        visible: true,
-        medium: {
-          extinction: [0, 0, 0],
-          refractive_index: 1
-        },
-        parent: null
-      },
-      "test-sphere": {
-        geometry: "cube",
-        material: "gold",
-        parameters: {
-          x: -2,
-          y: 0.81,
-          z: 2.1
-        },
-        photon_receiver: false,
         sample_explicit: true,
         visible: true,
         medium: {
@@ -119,21 +102,18 @@ export default {
           }
         }
       },
-      ground: {
-        type: "cuboid",
-        dimensions: [3, 0.01, 3]
-      },
-      pane: {
+      cylinder: {
         type: "translate",
         translation: ["x", "y", "z"],
         child: {
-          type: "round",
-          radius: 0.02,
-          child: {
-            type: "cuboid",
-            dimensions: [0, 1.25, 3]
-          }
+          type: "cylinder",
+          height: 0.799,
+          radius: 0.4
         }
+      },
+      ground: {
+        type: "cuboid",
+        dimensions: [3, 0.01, 3]
       },
       sphere: {
         type: "translate",
@@ -142,51 +122,12 @@ export default {
           type: "sphere",
           radius: 0.799
         }
-      },
-      "two-spheres": {
-        type: "translate",
-        translation: ["x", "y", "z"],
-        child: {
-          type: "union",
-          children: [
-            {
-              type: "sphere",
-              radius: 0.799
-            },
-            {
-              type: "translate",
-              translation: [0.8, 0.7, 0],
-              child: {
-                type: "sphere",
-                radius: 0.4
-              }
-            },
-            {
-              type: "translate",
-              translation: [-0.8, 0.8, 0],
-              child: {
-                type: "sphere",
-                radius: 0.6
-              }
-            }
-          ]
-        }
       }
     },
     material_list: {
-      copper: {
-        type: "phong",
-        albedo: [0.955, 0.637, 0.538],
-        shininess: 150
-      },
-      "glass-pane": {
+      glass: {
         type: "dielectric",
         base_color: [1, 1, 1]
-      },
-      gold: {
-        type: "phong",
-        albedo: [1, 0.766, 0.336],
-        shininess: 1200
       },
       lambertian: {
         type: "lambertian",
@@ -212,13 +153,13 @@ export default {
     aperture: null,
     integrator: {
       hash_table_bits: 18,
-      photons_per_pass: 2000000,
+      photons_per_pass: 100000,
       photon_rate: 0.5,
-      max_search_radius: 0.1,
+      max_search_radius: 0.05,
       min_search_radius: 0.005,
       alpha: 0.7,
-      max_scatter_bounces: 10,
-      max_gather_bounces: 9,
+      max_scatter_bounces: 3,
+      max_gather_bounces: 5,
       geometry_precision: 0.001,
       geometry_pushback: 5
     }
