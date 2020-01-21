@@ -12,7 +12,7 @@ export default {
         type: "circle",
         radius: 0
       },
-      focal_distance: 0.001,
+      focal_distance: 0.01,
       focal_curvature: 0,
       field_of_view: 0.2
     },

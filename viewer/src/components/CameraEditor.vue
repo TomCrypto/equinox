@@ -29,7 +29,11 @@
       </div>
       <div class="settings-cell settings-label">Aperture Type</div>
       <div class="settings-cell">
-        <select :value="apertureType" @change="changeApertureType($event.target.value)" selected>
+        <select
+          :value="apertureType"
+          @change="changeApertureType($event.target.value)"
+          selected
+        >
           <option value="point">Point</option>
           <option value="circle">Circle</option>
           <option value="ngon">Polygon</option>
@@ -38,7 +42,9 @@
       <div
         class="settings-cell settings-label"
         v-bind:class="{ 'settings-label-disabled': !hasApertureRadius }"
-      >Aperture Radius</div>
+      >
+        Aperture Radius
+      </div>
       <div class="settings-cell">
         <vue-slider
           :min="0"
@@ -55,14 +61,16 @@
       <div
         class="settings-cell settings-label"
         v-bind:class="{ 'settings-label-disabled': !hasApertureRadius }"
-      >Focal Distance</div>
+      >
+        Focal Distance
+      </div>
       <div class="settings-cell">
         <vue-slider
           :min="0.001"
           :max="100"
           :disabled="!hasApertureRadius"
           tooltip="none"
-          :interval="0.001"
+          :interval="0.01"
           :value="focalDistance"
           contained="true"
           @change="changeFocalDistance"
@@ -72,7 +80,9 @@
       <div
         class="settings-cell settings-label"
         v-bind:class="{ 'settings-label-disabled': !isPolygonAperture }"
-      >Aperture Rotation</div>
+      >
+        Aperture Rotation
+      </div>
       <div class="settings-cell">
         <vue-slider
           :min="0"
@@ -89,7 +99,9 @@
       <div
         class="settings-cell settings-label"
         v-bind:class="{ 'settings-label-disabled': !isPolygonAperture }"
-      >Aperture Sides</div>
+      >
+        Aperture Sides
+      </div>
       <div class="settings-cell">
         <vue-slider
           :min="3"
