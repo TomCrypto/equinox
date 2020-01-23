@@ -78,6 +78,12 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
 
             bool inside = dot(ray.dir, normal) > 0.0;
 
+            float u1 = quasi_sample(quasi);
+            float u2 = quasi_sample(quasi);
+            float u3 = quasi_sample(quasi);
+            float u4 = quasi_sample(quasi);
+            float u5 = quasi_sample(quasi);
+
             float n1, n2;
 
             throughput *= medium_absorption(traversal.hit.x >> 16U, inside,
@@ -90,7 +96,7 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
             float mis_material_pdf;
 
             light_pdf = 0.0;
-            vec3 light = mis ? env_sample_light(mis_wi, light_pdf, quasi) : vec3(0.0);
+            vec3 light = mis ? env_sample_light(mis_wi, light_pdf, u1, u2) : vec3(0.0);
 
             #define MAT_SWITCH_LOGIC(LOAD, EVAL, SAMPLE) {                                        \
                 LOAD(mat_inst, normal, ray.org, material);                                        \
@@ -100,7 +106,7 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
                           * abs(dot(mis_wi, normal)) * throughput;                                \
                 }                                                                                 \
                                                                                                   \
-                f = SAMPLE(material, normal, wi, -ray.dir, n1, n2, material_pdf, quasi);          \
+                f = SAMPLE(material, normal, wi, -ray.dir, n1, n2, material_pdf, u3, u4);         \
             }
 
             MAT_DO_SWITCH(mat_type)
@@ -109,7 +115,7 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
             if (!is_receiver) {
                 float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));
 
-                if (quasi_sample(quasi) < q) {
+                if (u5 < q) {
                     return radiance;
                 }
 

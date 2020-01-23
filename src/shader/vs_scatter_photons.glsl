@@ -39,12 +39,17 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
             uint mat_inst = traversal.hit.y >> 16U;
             material_t material;
 
+            float u1 = quasi_sample(quasi);
+            float u2 = quasi_sample(quasi);
+            float u3 = quasi_sample(quasi);
+            float u4 = quasi_sample(quasi);
+
             // Note surfaces will NEVER receive first bounce photons. The "sample explicit" flag
             // is purely an optimization meant for when a surface cannot directly see any light.
 
             bool is_receiver = MAT_IS_RECEIVER(mat_type) && (bounce != 0U);
 
-            float deposit_weight = is_receiver ? quasi_sample(quasi) : 0.0;
+            float deposit_weight = is_receiver ? u1 : 0.0;
 
             bool inside = dot(ray.dir, normal) > 0.0;
             vec3 f;
@@ -65,7 +70,7 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
                 LOAD(mat_inst, normal, ray.org, material);                                        \
                                                                                                   \
                 float unused_pdf;                                                                 \
-                f = SAMPLE(material, normal, ray.dir, -ray.dir, n1, n2, unused_pdf, quasi);       \
+                f = SAMPLE(material, normal, ray.dir, -ray.dir, n1, n2, unused_pdf, u2, u3);      \
             }
 
             MAT_DO_SWITCH(mat_type)
@@ -73,7 +78,7 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
 
             float q = max(0.0, 1.0 - luminance(throughput * f) / luminance(throughput));
 
-            if (quasi_sample(quasi) < q) {
+            if (u4 < q) {
                 return;
             }
 
@@ -91,8 +96,11 @@ ray_t generate_photon_ray(out vec3 throughput, inout quasi_t quasi) {
 
     get_scene_bbox(bbmin, bbmax);
 
+    float u1 = quasi_sample(quasi);
+    float u2 = quasi_sample(quasi);
+
     float unused_pdf;
-    throughput = env_sample_light(wi, unused_pdf, quasi);
+    throughput = env_sample_light(wi, unused_pdf, u1, u2);
     wi = -wi;
 
     vec3 coords = ceil(-wi);

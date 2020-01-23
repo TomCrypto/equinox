@@ -2,8 +2,6 @@
 
 #include <common.glsl>
 
-#include <quasi.glsl>
-
 struct GeometryParameter {
     vec3 base;
     uint layer;
@@ -140,10 +138,7 @@ vec3 mat_lambertian_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, flo
     return MAT_LAMBERTIAN_ALBEDO / M_PI;
 }
 
-vec3 mat_lambertian_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
-    float u1 = quasi_sample(quasi);
-    float u2 = quasi_sample(quasi);
-
+vec3 mat_lambertian_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, float u1, float u2) {
     float r = sqrt(u1);
     float phi = M_2PI * u2;
 
@@ -170,7 +165,7 @@ vec3 mat_ideal_reflection_eval(material_t material, vec3 normal, vec3 wi, vec3 w
     return pdf = 0.0, vec3(0.0);
 }
 
-vec3 mat_ideal_reflection_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
+vec3 mat_ideal_reflection_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, float u1, float u2) {
     pdf = 1.0;
     wi = reflect(-wo, normal);
 
@@ -189,7 +184,7 @@ vec3 mat_ideal_refraction_eval(material_t material, vec3 normal, vec3 wi, vec3 w
     return vec3(0.0);
 }
 
-vec3 mat_ideal_refraction_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
+vec3 mat_ideal_refraction_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, float u1, float u2) {
     pdf = 1.0;
 
     if (dot(wo, normal) >= 0.0) {
@@ -230,10 +225,7 @@ vec3 mat_phong_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, float n1
     return MAT_PHONG_ALBEDO * (MAT_PHONG_EXPONENT + 2.0) / M_2PI * cos_alpha / wi_n;
 }
 
-vec3 mat_phong_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
-    float u1 = quasi_sample(quasi);
-    float u2 = quasi_sample(quasi);
-
+vec3 mat_phong_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, float u1, float u2) {
     float phi = M_2PI * u1;
     float theta = acos(pow(u2, 1.0 / (MAT_PHONG_EXPONENT + 1.0)));
 
@@ -262,7 +254,7 @@ vec3 mat_dielectric_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, flo
     return pdf = 0.0, vec3(0.0);
 }
 
-vec3 mat_dielectric_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
+vec3 mat_dielectric_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, float u1, float u2) {
     pdf = 1.0;
 
     float cosI = dot(-wo, normal);
@@ -288,7 +280,7 @@ vec3 mat_dielectric_sample(material_t material, vec3 normal, out vec3 wi, vec3 w
         float tp = 1.0 / (n1 * cosT + n2 * cosI); // p-polarized fresnel
         float t = 2.0 * (ts * ts + tp * tp) * (n1 * cosI) * (n2 * cosT);
 
-        if (quasi_sample(quasi) < t) {
+        if (u1 < t) {
             wi = (eta * cosI - cosT) * normal - eta * wo;
         } else {
             wi = reflect(-wo, normal);
@@ -336,10 +328,7 @@ vec3 mat_oren_nayar_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, flo
     return MAT_OREN_NAYAR_ALBEDO / M_PI * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_ROUGHNESS);
 }
 
-vec3 mat_oren_nayar_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, inout quasi_t quasi) {
-    float u1 = quasi_sample(quasi);
-    float u2 = quasi_sample(quasi);
-
+vec3 mat_oren_nayar_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, float u1, float u2) {
     float r = sqrt(u1);
     float phi = M_2PI * u2;
 
