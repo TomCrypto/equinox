@@ -55,11 +55,8 @@ void main() {
     vec4 value = texelFetch(samples, ivec2(gl_FragCoord.xy - 0.5), 0);
     value.rgb /= value.a;
 
-    // For debugging purposes only
-
-    if (any(isnan(value)) || any(isinf(value))) {
-        color = vec4(1.0, 0.0, 1.0, 1.0);
-        return;
+    if (any(isinf(value.rgb)) || any(isnan(value.rgb))) {
+        value.rgb = vec3(0.0);
     }
 
     vec3 tone_mapped = ACESFitted(value.rgb * display.exposure);
