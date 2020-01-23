@@ -30,12 +30,45 @@
         </select>
       </div>
 
-      <div class="settings-cell settings-label">Environment Tint</div>
+      <div class="settings-cell settings-label">Environment Tint (R)</div>
       <div class="settings-cell">
-        <input
-          type="color"
-          :value="environmentTintHex"
-          @change="changeEnvironmentTint($event.target.value)"
+        <vue-slider
+          :min="0"
+          :max="1"
+          tooltip="none"
+          :interval="0.0001"
+          :value="environmentTint[0]"
+          contained="true"
+          @change="changeEnvironmentTintR"
+          @dragging="changeEnvironmentTintR"
+        />
+      </div>
+
+      <div class="settings-cell settings-label">Environment Tint (G)</div>
+      <div class="settings-cell">
+        <vue-slider
+          :min="0"
+          :max="1"
+          tooltip="none"
+          :interval="0.0001"
+          :value="environmentTint[1]"
+          contained="true"
+          @change="changeEnvironmentTintG"
+          @dragging="changeEnvironmentTintG"
+        />
+      </div>
+
+      <div class="settings-cell settings-label">Environment Tint (B)</div>
+      <div class="settings-cell">
+        <vue-slider
+          :min="0"
+          :max="1"
+          tooltip="none"
+          :interval="0.0001"
+          :value="environmentTint[2]"
+          contained="true"
+          @change="changeEnvironmentTintB"
+          @dragging="changeEnvironmentTintB"
         />
       </div>
 
@@ -59,7 +92,6 @@
 
 <script lang="ts">
 import { Component, Prop, Vue } from "vue-property-decorator";
-import convert from "color-convert";
 import { WebScene } from "equinox";
 
 type SceneEnvironment =
@@ -76,10 +108,6 @@ type SceneEnvironment =
 @Component
 export default class extends Vue {
   @Prop() private scene!: WebScene;
-
-  public get environmentTintHex(): string {
-    return this.rgbToHex(this.environmentTint);
-  }
 
   public changeEnvironmentMap(value: string) {
     this.environmentMap = value;
@@ -101,27 +129,23 @@ export default class extends Vue {
     this.update();
   }
 
-  public changeEnvironmentTint(value: string) {
-    this.environmentTint = this.hexToRgb(value);
+  public changeEnvironmentTintR(value: number) {
+    this.environmentTint[0] = value;
+    this.update();
+  }
+
+  public changeEnvironmentTintG(value: number) {
+    this.environmentTint[1] = value;
+    this.update();
+  }
+
+  public changeEnvironmentTintB(value: number) {
+    this.environmentTint[2] = value;
     this.update();
   }
 
   public get isMapEnvironment() {
     return this.environmentType === "map";
-  }
-
-  private rgbToHex(rgb: [number, number, number]): string {
-    return `#${convert.rgb.hex([
-      rgb[0] * 255.0,
-      rgb[1] * 255.0,
-      rgb[2] * 255.0
-    ])}`;
-  }
-
-  private hexToRgb(hex: string): [number, number, number] {
-    let rgb = convert.hex.rgb(hex);
-
-    return [rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0];
   }
 
   ENVIRONMENT_MAPS = [
