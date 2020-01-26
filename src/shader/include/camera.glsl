@@ -12,19 +12,13 @@ layout (std140) uniform Raster {
     vec4 dimensions;
 } raster;
 
-vec2 evaluate_circular_aperture_point(inout quasi_t quasi) {
-    float u1 = quasi_sample(quasi);
-    float u2 = quasi_sample(quasi);
-
+vec2 evaluate_circular_aperture_point(float u1, float u2) {
     float a = u1 * M_2PI;
 
     return sqrt(u2) * vec2(cos(a), sin(a)) * camera.aperture_settings.w;
 }
 
-vec2 evaluate_polygon_aperture_point(inout quasi_t quasi) {
-    float u1 = quasi_sample(quasi);
-    float u2 = quasi_sample(quasi);
-
+vec2 evaluate_polygon_aperture_point(float u1, float u2) {
     float corner = floor(u1 * camera.aperture_settings.y);
 
     float u = 1.0 - sqrt(u1 * camera.aperture_settings.y - corner);
@@ -43,9 +37,12 @@ vec2 evaluate_polygon_aperture_point(inout quasi_t quasi) {
 }
 
 vec2 evaluate_aperture_point(inout quasi_t quasi) {
+    float u1 = quasi_sample(quasi);
+    float u2 = quasi_sample(quasi);
+
     switch (int(camera.aperture_settings.x)) {
-        case 0: return evaluate_circular_aperture_point(quasi);
-        case 1: return evaluate_polygon_aperture_point(quasi);       
+        case 0: return evaluate_circular_aperture_point(u1, u2);
+        case 1: return evaluate_polygon_aperture_point(u1, u2);
     }
 
     return vec2(0.0);
