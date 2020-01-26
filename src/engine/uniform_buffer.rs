@@ -105,12 +105,12 @@ impl<T: ?Sized> UniformBuffer<T> {
     }
 
     fn maximum_size(&self) -> usize {
-        (self
+        self
             .gl
             .get_parameter(Context::MAX_UNIFORM_BLOCK_SIZE)
             .unwrap()
             .as_f64()
-            .unwrap() as usize)
+            .unwrap() as usize
     }
 }
 
