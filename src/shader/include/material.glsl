@@ -64,31 +64,31 @@ vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
     // Offset all triplanar coordinates slightly based on the normal direction
     // in order to randomize e.g. parallel sides of a box or a sheet of glass.
 
-    vec2 yz_uv = xfm * vec3(p.yz + (normal.x > 0.0 ? 0.0 : 17.4326), 1.0);
+    vec2 zy_uv = xfm * vec3(p.zy + (normal.x > 0.0 ? 0.0 : 17.4326), 1.0);
     vec2 xz_uv = xfm * vec3(p.xz + (normal.y > 0.0 ? 0.0 : 13.8193), 1.0);
     vec2 xy_uv = xfm * vec3(p.xy + (normal.z > 0.0 ? 0.0 : 15.2175), 1.0);
 
-    vec3 yz_sample, xz_sample, xy_sample;
+    vec3 zy_sample, xz_sample, xy_sample;
     vec3 tri = triplanar_weights(normal);
 
     float vert_layer = float(param.layer & 0xffffU);
     float horz_layer = float(param.layer >> 16U);
 
     if (param.contrast > 0.0) {
-        yz_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_stochastic(vert_layer, yz_uv);
+        zy_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_stochastic(vert_layer, zy_uv);
         xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_stochastic(horz_layer, xz_uv);
         xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_stochastic(vert_layer, xy_uv);
     } else {
-        yz_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_wraparound(vert_layer, yz_uv);
+        zy_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_wraparound(vert_layer, zy_uv);
         xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_wraparound(horz_layer, xz_uv);
         xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_wraparound(vert_layer, xy_uv);
     }
 
-    yz_sample = 0.5 + (yz_sample - 0.5) * abs(param.contrast);
+    zy_sample = 0.5 + (zy_sample - 0.5) * abs(param.contrast);
     xz_sample = 0.5 + (xz_sample - 0.5) * abs(param.contrast);
     xy_sample = 0.5 + (xy_sample - 0.5) * abs(param.contrast);
 
-    return param.base.xyz + param.factor.xyz * (yz_sample * tri.x
+    return param.base.xyz + param.factor.xyz * (zy_sample * tri.x
                                              +  xz_sample * tri.y
                                              +  xy_sample * tri.z);
 }
