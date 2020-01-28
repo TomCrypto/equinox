@@ -35,6 +35,10 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
 
             vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
 
+            bool inside = dot(ray.dir, normal) > 0.0;
+
+            normal = mat_normal_mapping(normal, ray.org, inside ? ray.dir : -ray.dir);
+
             uint mat_type = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
             material_t material;
@@ -51,7 +55,6 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
 
             float deposit_weight = is_receiver ? u1 : 0.0;
 
-            bool inside = dot(ray.dir, normal) > 0.0;
             vec3 f;
 
             float n1, n2;

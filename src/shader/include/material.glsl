@@ -97,6 +97,32 @@ float mat_param_float(uint inst, vec3 normal, vec3 p) {
     return luminance(mat_param_vec3(inst, normal, p));
 }
 
+// TODO: turn into a 2D texture array
+// TODO: turn into RG8 texture
+uniform sampler2D normal_map;
+
+// TODO: make this accept some kind of UV transform + the texture to sample
+// (where do we store this?)
+vec3 mat_normal_mapping(vec3 world_normal, vec3 world_pos, vec3 view) {
+    vec3 blending = triplanar_weights(world_normal);
+
+    // TODO: unpack RG8 with square root trick
+    vec3 xaxis = textureLod(normal_map, world_pos.zy * 0.2, 0.0).rbg * 2.0 - 1.0;
+    vec3 yaxis = textureLod(normal_map, world_pos.xz * 0.2, 0.0).rbg * 2.0 - 1.0;
+    vec3 zaxis = textureLod(normal_map, world_pos.xy * 0.2, 0.0).rbg * 2.0 - 1.0;
+
+    // TODO: apply xfm and random offset
+    xaxis.xz *= world_normal.x < 0.0 ? +1.0 : -1.0;
+    yaxis.xz *= world_normal.y < 0.0 ? -1.0 : +1.0;
+    zaxis.xz *= world_normal.z < 0.0 ? +1.0 : -1.0;
+
+    vec3 normal = rotate(normalize(xaxis * blending.x
+                                 + yaxis * blending.y
+                                 + zaxis * blending.z), world_normal);
+
+    return (dot(normal, view) > 0.0) ? normal : reflect(normal, view);
+}
+
 // Prior to using a material, its parameters must be loaded as a function of normal and shading
 // point, which may involve many texture fetches. These are cached into the `material_t` struct
 // below so that the actual BRDF evaluation logic never has to do any texture fetches directly.
