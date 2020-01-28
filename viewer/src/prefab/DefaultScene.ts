@@ -106,9 +106,13 @@ export default {
         type: "translate",
         translation: ["x", "y", "z"],
         child: {
-          type: "cylinder",
-          height: 0.799,
-          radius: 0.4
+          type: "round",
+          radius: 0.1,
+          child: {
+            type: "cylinder",
+            height: 0.799,
+            radius: 0.4
+          }
         }
       },
       ground: {

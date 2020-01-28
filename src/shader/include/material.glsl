@@ -106,12 +106,20 @@ uniform sampler2D normal_map;
 vec3 mat_normal_mapping(vec3 world_normal, vec3 world_pos, vec3 view) {
     vec3 blending = triplanar_weights(world_normal);
 
-    // TODO: unpack RG8 with square root trick
-    vec3 xaxis = textureLod(normal_map, world_pos.zy * 0.2, 0.0).rbg * 2.0 - 1.0;
-    vec3 yaxis = textureLod(normal_map, world_pos.xz * 0.2, 0.0).rbg * 2.0 - 1.0;
-    vec3 zaxis = textureLod(normal_map, world_pos.xy * 0.2, 0.0).rbg * 2.0 - 1.0;
+    // TODO: unpack RG8 with square root trick + apply xfm and stuff to input UV
+    vec3 xaxis = textureLod(normal_map, world_pos.zy * 1.0, 0.0).rbg * 2.0 - 1.0;
+    vec3 yaxis = textureLod(normal_map, world_pos.xz * 1.0, 0.0).rbg * 2.0 - 1.0;
+    vec3 zaxis = textureLod(normal_map, world_pos.xy * 1.0, 0.0).rbg * 2.0 - 1.0;
 
-    // TODO: apply xfm and random offset
+    // TODO: strength parameter??
+    xaxis.y *= 5.0;
+    yaxis.y *= 5.0;
+    zaxis.y *= 5.0;
+    xaxis = normalize(xaxis);
+    yaxis = normalize(yaxis);
+    zaxis = normalize(zaxis);
+
+    // TODO: what the fuck is this?
     xaxis.xz *= world_normal.x < 0.0 ? +1.0 : -1.0;
     yaxis.xz *= world_normal.y < 0.0 ? -1.0 : +1.0;
     zaxis.xz *= world_normal.z < 0.0 ? +1.0 : -1.0;
