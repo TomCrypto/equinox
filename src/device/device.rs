@@ -26,7 +26,7 @@ pub struct Device {
     pub(crate) material_textures: Texture<SRGB_S3TC_DXT1>,
     pub(crate) loaded_textures: Vec<String>,
 
-    pub(crate) normal_map: Texture<RGBA8>,
+    pub(crate) normal_map: Texture<RG8>,
 
     pub(crate) display_buffer: UniformBuffer<DisplayData>,
     pub(crate) camera_buffer: UniformBuffer<CameraData>,
@@ -235,9 +235,9 @@ impl Device {
         let mut invalidated = false;
         let mut reset_tiles = false;
 
-        self.placeholder_texture.upload(1, 1, &[0]);
+        self.placeholder_texture.upload(1, 1, &[0; 4]);
         self.placeholder_texture_array.create_array(1, 1, 1);
-        self.placeholder_texture_array.upload_layer(1, 1, 0, &[0]);
+        self.placeholder_texture_array.upload_layer(1, 1, 0, &[0; 4]);
 
         invalidated |= Dirty::clean(&mut scene.camera, |camera| {
             self.update_camera(camera)?;
@@ -284,7 +284,7 @@ impl Device {
             let (header, data) =
                 LayoutVerified::<_, Header>::new_from_prefix(tmp.as_slice()).expect("FAILED");
 
-            if header.data_format.try_parse() != Some(DataFormat::RGBA8) {
+            if header.data_format.try_parse() != Some(DataFormat::RG8) {
                 return Err(Error::new("expected RGBA8 normal map"));
             }
 

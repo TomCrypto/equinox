@@ -98,26 +98,21 @@ float mat_param_float(uint inst, vec3 normal, vec3 p) {
 }
 
 // TODO: turn into a 2D texture array
-// TODO: turn into RG8 texture
 uniform sampler2D normal_map;
+
+vec3 unpack_normal(vec2 uv, float strength) {
+    vec2 xz = (textureLod(normal_map, uv, 0.0).rg * 2.0 - 1.0) * strength;
+    return vec3(xz.x, sqrt(max(0.0, 1.0 - dot(xz, xz))), xz.y);
+}
 
 // TODO: make this accept some kind of UV transform + the texture to sample
 // (where do we store this?)
 vec3 mat_normal_mapping(vec3 world_normal, vec3 world_pos, vec3 view) {
     vec3 blending = triplanar_weights(world_normal);
 
-    // TODO: unpack RG8 with square root trick + apply xfm and stuff to input UV
-    vec3 xaxis = textureLod(normal_map, world_pos.zy * 1.0, 0.0).rbg * 2.0 - 1.0;
-    vec3 yaxis = textureLod(normal_map, world_pos.xz * 1.0, 0.0).rbg * 2.0 - 1.0;
-    vec3 zaxis = textureLod(normal_map, world_pos.xy * 1.0, 0.0).rbg * 2.0 - 1.0;
-
-    // TODO: strength parameter??
-    xaxis.y *= 5.0;
-    yaxis.y *= 5.0;
-    zaxis.y *= 5.0;
-    xaxis = normalize(xaxis);
-    yaxis = normalize(yaxis);
-    zaxis = normalize(zaxis);
+    vec3 xaxis = unpack_normal(world_pos.zy * 1.0, 1.0);
+    vec3 yaxis = unpack_normal(world_pos.xz * 1.0, 1.0);
+    vec3 zaxis = unpack_normal(world_pos.xy * 1.0, 1.0);
 
     // TODO: what the fuck is this?
     xaxis.xz *= world_normal.x < 0.0 ? +1.0 : -1.0;

@@ -404,6 +404,8 @@ pub struct RGBA8;
 #[derive(Debug)]
 pub struct R8;
 #[derive(Debug)]
+pub struct RG8;
+#[derive(Debug)]
 pub struct R16F;
 #[derive(Debug)]
 pub struct RGBA16F;
@@ -520,7 +522,30 @@ impl TextureFormat for R8 {
     const GL_TYPE: u32 = Context::UNSIGNED_BYTE;
 
     fn into_texture_source_data(cols: usize, rows: usize, layer: &[Self::Data]) -> Object {
-        assert!(layer.len() == cols * rows);
+        let padded_cols = cols + (4 - cols % 4) % 4;
+
+        assert!(layer.len() == padded_cols * rows);
+
+        Uint8Array::from(layer).into()
+    }
+}
+
+impl TextureFormat for RG8 {
+    type Data = u8;
+
+    type Compressed = False;
+    type Filterable = True;
+    type Renderable = Color;
+
+    const COMPRESSION_FORMAT: Option<TextureCompression> = None;
+    const GL_INTERNAL_FORMAT: u32 = Context::RG8;
+    const GL_FORMAT: u32 = Context::RG;
+    const GL_TYPE: u32 = Context::UNSIGNED_BYTE;
+
+    fn into_texture_source_data(cols: usize, rows: usize, layer: &[Self::Data]) -> Object {
+        let padded_cols = cols + cols % 2;
+
+        assert!(layer.len() == padded_cols * rows * 2);
 
         Uint8Array::from(layer).into()
     }
