@@ -106,7 +106,7 @@ vec3 unpack_normal(vec2 uv, float strength) {
 }
 
 // TODO: make this accept the material inst, and store the normal info in the first mat block
-vec3 mat_normal_mapping(vec3 world_normal, vec3 world_pos, vec3 view) {
+vec3 mat_normal_mapping(vec3 world_normal, vec3 p, vec3 view) {
     // TODO: check if there is a normal map, if not immediately return world_normal again
 
     // TODO: fetch all relevant parameters here, including strength (pack it somewhere)
@@ -115,13 +115,13 @@ vec3 mat_normal_mapping(vec3 world_normal, vec3 world_pos, vec3 view) {
 	float c = /*param.uv_scale * */cos(/*param.uv_rotation*/0.0);
 	mat3x2 xfm = mat3x2(c, -s, s, c, /*param.uv_offset*/vec2(0.0));
 
-    vec2 zy_uv = xfm * vec3(world_pos.zy + (world_normal.x > 0.0 ? 0.0 : 17.4326), 1.0);
-    vec2 xz_uv = xfm * vec3(world_pos.xz + (world_normal.y > 0.0 ? 0.0 : 13.8193), 1.0);
-    vec2 xy_uv = xfm * vec3(world_pos.xy + (world_normal.z > 0.0 ? 0.0 : 15.2175), 1.0);
+    vec2 zy_uv = xfm * vec3(p.zy + (world_normal.x > 0.0 ? 0.0 : 17.4326), 1.0);
+    vec2 xz_uv = xfm * vec3(p.xz + (world_normal.y > 0.0 ? 0.0 : 13.8193), 1.0);
+    vec2 xy_uv = xfm * vec3(p.xy + (world_normal.z > 0.0 ? 0.0 : 15.2175), 1.0);
 
     float strength = 1.0;
 
-    // TODO: stochastic sampling?
+    // TODO: stochastic sampling? is it possible? (contrast adjustment??)
 
     vec3 xaxis = unpack_normal(zy_uv, strength);
     vec3 yaxis = unpack_normal(xz_uv, strength);
