@@ -102,7 +102,6 @@ vec3 unpack_normal(float layer, vec2 uv, float strength) {
     return vec3(xz.x, sqrt(max(0.0, 1.0 - dot(xz, xz))), xz.y); // extract normals from RG8
 }
 
-// TODO: make this accept the material inst, and store the normal info in the first mat block
 vec3 mat_normal_mapping(uint inst, vec3 world_normal, vec3 p, vec3 view) {
     GeometryParameter param = material_buffer.data[inst];
 
