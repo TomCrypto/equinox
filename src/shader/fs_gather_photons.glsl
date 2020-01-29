@@ -74,6 +74,8 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
 
             normal = mat_normal_mapping(normal, ray.org, inside ? ray.dir : -ray.dir);
 
+            return normal * 0.5 + 0.5;
+
             uint mat_type = traversal.hit.y & 0xffffU;
             uint mat_inst = traversal.hit.y >> 16U;
             material_t material;

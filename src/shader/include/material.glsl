@@ -108,20 +108,32 @@ vec3 unpack_normal(vec2 uv, float strength) {
 // TODO: make this accept some kind of UV transform + the texture to sample
 // (where do we store this?)
 vec3 mat_normal_mapping(vec3 world_normal, vec3 world_pos, vec3 view) {
-    vec3 blending = triplanar_weights(world_normal);
+    // check if there is a normal map, if not immediately return world_normal again
 
-    vec3 xaxis = unpack_normal(world_pos.zy * 1.0, 1.0);
-    vec3 yaxis = unpack_normal(world_pos.xz * 1.0, 1.0);
-    vec3 zaxis = unpack_normal(world_pos.xy * 1.0, 1.0);
+    float s = /*param.uv_scale * */sin(/*param.uv_rotation*/0.0);
+	float c = /*param.uv_scale * */cos(/*param.uv_rotation*/0.0);
+	mat3x2 xfm = mat3x2(c, -s, s, c, /*param.uv_offset*/vec2(0.0));
 
-    // TODO: what the fuck is this?
-    xaxis.xz *= world_normal.x < 0.0 ? +1.0 : -1.0;
-    yaxis.xz *= world_normal.y < 0.0 ? -1.0 : +1.0;
-    zaxis.xz *= world_normal.z < 0.0 ? +1.0 : -1.0;
+    // Offset all triplanar coordinates slightly based on the normal direction
+    // in order to randomize e.g. parallel sides of a box or a sheet of glass.
 
-    vec3 normal = rotate(normalize(xaxis * blending.x
-                                 + yaxis * blending.y
-                                 + zaxis * blending.z), world_normal);
+    vec2 zy_uv = xfm * vec3(p.zy + (normal.x > 0.0 ? 0.0 : 17.4326), 1.0);
+    vec2 xz_uv = xfm * vec3(p.xz + (normal.y > 0.0 ? 0.0 : 13.8193), 1.0);
+    vec2 xy_uv = xfm * vec3(p.xy + (normal.z > 0.0 ? 0.0 : 15.2175), 1.0);
+
+    float strength = 1.0;
+
+    // TODO: stochastic sampling?
+
+    vec3 xaxis = unpack_normal(zy_uv, strength);
+    vec3 yaxis = unpack_normal(xz_uv, strength);
+    vec3 zaxis = unpack_normal(xy_uv, strength);
+
+    vec3 triplanar_weights = triplanar_weights(world_normal);
+
+    vec3 normal = rotate(normalize(xaxis * triplanar_weights.x
+                                 + yaxis * triplanar_weights.y
+                                 + zaxis * triplanar_weights.z), world_normal);
 
     return (dot(normal, view) > 0.0) ? normal : reflect(normal, view);
 }
