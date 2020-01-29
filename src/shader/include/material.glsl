@@ -105,21 +105,19 @@ vec3 unpack_normal(vec2 uv, float strength) {
     return vec3(xz.x, sqrt(max(0.0, 1.0 - dot(xz, xz))), xz.y);
 }
 
-// TODO: make this accept some kind of UV transform + the texture to sample
-// (where do we store this?)
+// TODO: make this accept the material inst, and store the normal info in the first mat block
 vec3 mat_normal_mapping(vec3 world_normal, vec3 world_pos, vec3 view) {
-    // check if there is a normal map, if not immediately return world_normal again
+    // TODO: check if there is a normal map, if not immediately return world_normal again
+
+    // TODO: fetch all relevant parameters here, including strength (pack it somewhere)
 
     float s = /*param.uv_scale * */sin(/*param.uv_rotation*/0.0);
 	float c = /*param.uv_scale * */cos(/*param.uv_rotation*/0.0);
 	mat3x2 xfm = mat3x2(c, -s, s, c, /*param.uv_offset*/vec2(0.0));
 
-    // Offset all triplanar coordinates slightly based on the normal direction
-    // in order to randomize e.g. parallel sides of a box or a sheet of glass.
-
-    vec2 zy_uv = xfm * vec3(p.zy + (normal.x > 0.0 ? 0.0 : 17.4326), 1.0);
-    vec2 xz_uv = xfm * vec3(p.xz + (normal.y > 0.0 ? 0.0 : 13.8193), 1.0);
-    vec2 xy_uv = xfm * vec3(p.xy + (normal.z > 0.0 ? 0.0 : 15.2175), 1.0);
+    vec2 zy_uv = xfm * vec3(world_pos.zy + (world_normal.x > 0.0 ? 0.0 : 17.4326), 1.0);
+    vec2 xz_uv = xfm * vec3(world_pos.xz + (world_normal.y > 0.0 ? 0.0 : 13.8193), 1.0);
+    vec2 xy_uv = xfm * vec3(world_pos.xy + (world_normal.z > 0.0 ? 0.0 : 15.2175), 1.0);
 
     float strength = 1.0;
 
