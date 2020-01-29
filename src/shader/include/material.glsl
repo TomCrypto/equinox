@@ -106,32 +106,32 @@ vec3 unpack_normal(vec2 uv, float strength) {
 }
 
 // TODO: make this accept the material inst, and store the normal info in the first mat block
-vec3 mat_normal_mapping(vec3 world_normal, vec3 p, vec3 view) {
-    // TODO: check if there is a normal map, if not immediately return world_normal again
+vec3 mat_normal_mapping(uint inst, vec3 world_normal, vec3 p, vec3 view) {
+    GeometryParameter param = material_buffer.data[inst];
 
-    // TODO: fetch all relevant parameters here, including strength (pack it somewhere)
+    if (param.layer == 0xffffffffU || param.base.x == 0.0) {
+        return world_normal; // no normal map was assigned
+    }
 
-    float s = /*param.uv_scale * */sin(/*param.uv_rotation*/0.0);
-	float c = /*param.uv_scale * */cos(/*param.uv_rotation*/0.0);
-	mat3x2 xfm = mat3x2(c, -s, s, c, /*param.uv_offset*/vec2(0.0));
+    float s = param.uv_scale * sin(param.uv_rotation);
+	float c = param.uv_scale * cos(param.uv_rotation);
+	mat3x2 xfm = mat3x2(c, -s, s, c, param.uv_offset);
 
     vec2 zy_uv = xfm * vec3(p.zy + (world_normal.x > 0.0 ? 0.0 : 17.4326), 1.0);
     vec2 xz_uv = xfm * vec3(p.xz + (world_normal.y > 0.0 ? 0.0 : 13.8193), 1.0);
     vec2 xy_uv = xfm * vec3(p.xy + (world_normal.z > 0.0 ? 0.0 : 15.2175), 1.0);
 
-    float strength = 1.0;
-
     // TODO: stochastic sampling? is it possible? (contrast adjustment??)
 
-    vec3 xaxis = unpack_normal(zy_uv, strength);
-    vec3 yaxis = unpack_normal(xz_uv, strength);
-    vec3 zaxis = unpack_normal(xy_uv, strength);
+    vec3 xaxis = unpack_normal(zy_uv, param.base.x);
+    vec3 yaxis = unpack_normal(xz_uv, param.base.x);
+    vec3 zaxis = unpack_normal(xy_uv, param.base.x);
 
-    vec3 triplanar_weights = triplanar_weights(world_normal);
+    vec3 tri = triplanar_weights(world_normal);
 
-    vec3 normal = rotate(normalize(xaxis * triplanar_weights.x
-                                 + yaxis * triplanar_weights.y
-                                 + zaxis * triplanar_weights.z), world_normal);
+    vec3 normal = rotate(normalize(xaxis * tri.x
+                                 + yaxis * tri.y
+                                 + zaxis * tri.z), world_normal);
 
     return (dot(normal, view) > 0.0) ? normal : reflect(normal, view);
 }
@@ -162,7 +162,7 @@ struct material_t {
 // == LAMBERTIAN BRDF ============================================================================
 
 void mat_lambertian_load(uint inst, vec3 normal, vec3 point, out material_t material) {
-    MAT_LAMBERTIAN_ALBEDO = clamp(mat_param_vec3(inst + 0U, normal, point), 0.0, 1.0);
+    MAT_LAMBERTIAN_ALBEDO = clamp(mat_param_vec3(inst + 1U, normal, point), 0.0, 1.0);
 }
 
 vec3 mat_lambertian_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
@@ -197,7 +197,7 @@ vec3 mat_lambertian_sample(material_t material, vec3 normal, out vec3 wi, vec3 w
 // == IDEAL REFLECTION BRDF ======================================================================
 
 void mat_ideal_reflection_load(uint inst, vec3 normal, vec3 point, out material_t material) {
-    MAT_IDEAL_REFLECTION_REFLECTANCE = clamp(mat_param_vec3(inst + 0U, normal, point), 0.0, 1.0);
+    MAT_IDEAL_REFLECTION_REFLECTANCE = clamp(mat_param_vec3(inst + 1U, normal, point), 0.0, 1.0);
 }
 
 vec3 mat_ideal_reflection_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
@@ -214,7 +214,7 @@ vec3 mat_ideal_reflection_sample(material_t material, vec3 normal, out vec3 wi, 
 // == IDEAL REFRACTION BSDF ======================================================================
 
 void mat_ideal_refraction_load(uint inst, vec3 normal, vec3 point, out material_t material) {
-    MAT_IDEAL_REFRACTION_TRANSMITTANCE = clamp(mat_param_vec3(inst + 0U, normal, point), 0.0, 1.0);
+    MAT_IDEAL_REFRACTION_TRANSMITTANCE = clamp(mat_param_vec3(inst + 1U, normal, point), 0.0, 1.0);
 }
 
 vec3 mat_ideal_refraction_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
@@ -246,8 +246,8 @@ vec3 mat_ideal_refraction_sample(material_t material, vec3 normal, out vec3 wi, 
 // == PHONG BRDF =================================================================================
 
 void mat_phong_load(uint inst, vec3 normal, vec3 point, out material_t material) {
-    MAT_PHONG_ALBEDO = clamp(mat_param_vec3(inst + 0U, normal, point), 0.0, 1.0);
-    MAT_PHONG_EXPONENT = max(mat_param_float(inst + 1U, normal, point), 1.0);
+    MAT_PHONG_ALBEDO = clamp(mat_param_vec3(inst + 1U, normal, point), 0.0, 1.0);
+    MAT_PHONG_EXPONENT = max(mat_param_float(inst + 2U, normal, point), 1.0);
 }
 
 vec3 mat_phong_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
@@ -286,7 +286,7 @@ vec3 mat_phong_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, fl
 // == DIELECTRIC BSDF ============================================================================
 
 void mat_dielectric_load(uint inst, vec3 normal, vec3 point, out material_t material) {
-    MAT_DIELECTRIC_BASE_COLOR = clamp(mat_param_vec3(inst + 0U, normal, point), 0.0, 1.0);
+    MAT_DIELECTRIC_BASE_COLOR = clamp(mat_param_vec3(inst + 1U, normal, point), 0.0, 1.0);
 }
 
 vec3 mat_dielectric_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
@@ -350,8 +350,8 @@ float oren_nayar_term(float wi_n, float wo_n, vec3 wi, vec3 wo, vec3 normal, flo
 }
 
 void mat_oren_nayar_load(uint inst, vec3 normal, vec3 point, out material_t material) {
-    MAT_OREN_NAYAR_ALBEDO = clamp(mat_param_vec3(inst + 0U, normal, point), 0.0, 1.0);
-    MAT_OREN_NAYAR_ROUGHNESS = clamp(mat_param_float(inst + 1U, normal, point), 0.0, 1.0);
+    MAT_OREN_NAYAR_ALBEDO = clamp(mat_param_vec3(inst + 1U, normal, point), 0.0, 1.0);
+    MAT_OREN_NAYAR_ROUGHNESS = clamp(mat_param_float(inst + 2U, normal, point), 0.0, 1.0);
 }
 
 vec3 mat_oren_nayar_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {

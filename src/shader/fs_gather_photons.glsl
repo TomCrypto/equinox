@@ -68,15 +68,15 @@ vec3 gather_photons(ray_t ray, quasi_t quasi) {
         if (traversal_has_hit(traversal)) {
             ray.org += ray.dir * traversal.range.y;
 
+            uint mat_type = traversal.hit.y & 0xffffU;
+            uint mat_inst = traversal.hit.y >> 16U;
+            material_t material;
+
             vec3 normal = geo_normal(traversal.hit.x & 0xffffU, traversal.hit.x >> 16U, ray.org);
 
             bool inside = dot(ray.dir, normal) > 0.0;
 
-            normal = mat_normal_mapping(normal, ray.org, inside ? ray.dir : -ray.dir);
-
-            uint mat_type = traversal.hit.y & 0xffffU;
-            uint mat_inst = traversal.hit.y >> 16U;
-            material_t material;
+            normal = mat_normal_mapping(mat_inst, normal, ray.org, inside ? ray.dir : -ray.dir);
 
             bool is_receiver = MAT_IS_RECEIVER(mat_type);
 

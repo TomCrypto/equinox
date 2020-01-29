@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::{Device, Material, MaterialParameter};
+use crate::{Device, Material, MaterialParameter, NormalMapParameter};
 use img2raw::{ColorSpace, DataFormat, Header};
 use js_sys::Error;
 use std::collections::BTreeMap;
@@ -33,12 +33,12 @@ pub(crate) fn material_index(material: &Material) -> u16 {
 /// Returns the number of parameters used by a material.
 pub(crate) fn material_parameter_count(material: &Material) -> usize {
     match material {
-        Material::Lambertian { .. } => 1,
-        Material::IdealReflection { .. } => 1,
-        Material::IdealRefraction { .. } => 1,
-        Material::Phong { .. } => 2,
-        Material::Dielectric { .. } => 1,
-        Material::OrenNayar { .. } => 2,
+        Material::Lambertian { .. } => 2,
+        Material::IdealReflection { .. } => 2,
+        Material::IdealRefraction { .. } => 2,
+        Material::Phong { .. } => 3,
+        Material::Dielectric { .. } => 2,
+        Material::OrenNayar { .. } => 3,
     }
 }
 
@@ -70,6 +70,35 @@ fn write_material_parameter(
                 out.contrast *= -1.0;
             }
         }
+    }
+}
+
+fn write_normal_map_parameter(
+    parameter: Option<&NormalMapParameter>,
+    out: &mut MaterialParamData,
+    // texture_layers: &BTreeMap<&str, usize>,
+) {
+    if let Some(parameter) = parameter {
+        out.layer = 0x0; // TODO: look up texture layer...
+
+        /*
+
+        let horz = texture_layers[info.texture.horz_texture()] as u32;
+        let vert = texture_layers[info.texture.vert_texture()] as u32;
+
+        out.layer = vert + (horz << 16);
+
+        */
+
+        out.uv_scale = parameter.uv_scale;
+        out.uv_offset = parameter.uv_offset;
+        out.uv_rotation = parameter.uv_rotation.rem_euclid(2.0 * std::f32::consts::PI);
+
+        out.base[0] = parameter.strength;
+
+        // TODO: stochastic/constrast?
+    } else {
+        out.layer = 0xffff_ffff;
     }
 }
 
@@ -155,6 +184,8 @@ impl Device {
         for material in materials.values() {
             parameter_count += material_parameter_count(material);
 
+            // TODO: add normal map texture to normals list if present
+
             for (_, parameter) in material.parameters() {
                 if let MaterialParameter::Textured(info) = parameter {
                     textures.push(info.texture.horz_texture());
@@ -162,6 +193,8 @@ impl Device {
                 }
             }
         }
+
+        //  TODO: dedup normal textures
 
         textures.sort_unstable();
         textures.dedup();
@@ -180,10 +213,13 @@ impl Device {
         for material in materials.values() {
             let count = material_parameter_count(material);
 
+            // TODO: pass normal layers
+            write_normal_map_parameter(material.normal_map(), &mut parameters[start]);
+            
             for (index, (_, parameter)) in material.parameters().into_iter().enumerate() {
                 write_material_parameter(
                     parameter,
-                    &mut parameters[start + index],
+                    &mut parameters[start + index + 1],
                     &texture_layers,
                 );
             }
