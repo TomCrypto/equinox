@@ -18,6 +18,7 @@ layout (std140) uniform Material {
 } material_buffer;
 
 uniform sampler2DArray material_textures;
+uniform sampler2DArray normal_textures;
 
 vec3 triplanar_weights(vec3 normal) {
     vec3 tri_weight = pow(abs(normal), vec3(12.0));
@@ -71,17 +72,16 @@ vec3 mat_param_vec3(uint inst, vec3 normal, vec3 p) {
     vec3 zy_sample, xz_sample, xy_sample;
     vec3 tri = triplanar_weights(normal);
 
-    float vert_layer = float(param.layer & 0xffffU);
-    float horz_layer = float(param.layer >> 16U);
+    float layer = float(param.layer);
 
     if (param.contrast > 0.0) {
-        zy_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_stochastic(vert_layer, zy_uv);
-        xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_stochastic(horz_layer, xz_uv);
-        xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_stochastic(vert_layer, xy_uv);
+        zy_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_stochastic(layer, zy_uv);
+        xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_stochastic(layer, xz_uv);
+        xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_stochastic(layer, xy_uv);
     } else {
-        zy_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_wraparound(vert_layer, zy_uv);
-        xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_wraparound(horz_layer, xz_uv);
-        xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_wraparound(vert_layer, xy_uv);
+        zy_sample = tri.x < 1e-4 ? vec3(0.0) : sample_texture_wraparound(layer, zy_uv);
+        xz_sample = tri.y < 1e-4 ? vec3(0.0) : sample_texture_wraparound(layer, xz_uv);
+        xy_sample = tri.z < 1e-4 ? vec3(0.0) : sample_texture_wraparound(layer, xy_uv);
     }
 
     zy_sample = 0.5 + (zy_sample - 0.5) * abs(param.contrast);
@@ -97,12 +97,9 @@ float mat_param_float(uint inst, vec3 normal, vec3 p) {
     return luminance(mat_param_vec3(inst, normal, p));
 }
 
-// TODO: turn into a 2D texture array
-uniform sampler2D normal_map;
-
-vec3 unpack_normal(vec2 uv, float strength) {
-    vec2 xz = (textureLod(normal_map, uv, 0.0).rg * 2.0 - 1.0) * strength;
-    return vec3(xz.x, sqrt(max(0.0, 1.0 - dot(xz, xz))), xz.y);
+vec3 unpack_normal(float layer, vec2 uv, float strength) {
+    vec2 xz = (textureLod(normal_textures, vec3(uv, layer), 0.0).rg * 2.0 - 1.0) * strength;
+    return vec3(xz.x, sqrt(max(0.0, 1.0 - dot(xz, xz))), xz.y); // extract normals from RG8
 }
 
 // TODO: make this accept the material inst, and store the normal info in the first mat block
@@ -123,9 +120,11 @@ vec3 mat_normal_mapping(uint inst, vec3 world_normal, vec3 p, vec3 view) {
 
     // TODO: stochastic sampling? is it possible? (contrast adjustment??)
 
-    vec3 xaxis = unpack_normal(zy_uv, param.base.x);
-    vec3 yaxis = unpack_normal(xz_uv, param.base.x);
-    vec3 zaxis = unpack_normal(xy_uv, param.base.x);
+    float layer = float(param.layer);
+
+    vec3 xaxis = unpack_normal(layer, zy_uv, param.base.x);
+    vec3 yaxis = unpack_normal(layer, xz_uv, param.base.x);
+    vec3 zaxis = unpack_normal(layer, xy_uv, param.base.x);
 
     vec3 tri = triplanar_weights(world_normal);
 

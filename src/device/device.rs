@@ -24,9 +24,10 @@ pub struct Device {
     pub(crate) envmap_color: Texture<RGBA16F>,
 
     pub(crate) material_textures: Texture<SRGB_S3TC_DXT1>,
-    pub(crate) loaded_textures: Vec<String>,
+    pub(crate) loaded_material_textures: Vec<String>,
 
-    pub(crate) normal_map: Texture<RG8>,
+    pub(crate) normal_textures: Texture<RG8>,
+    pub(crate) loaded_normal_textures: Vec<String>,
 
     pub(crate) display_buffer: UniformBuffer<DisplayData>,
     pub(crate) camera_buffer: UniformBuffer<CameraData>,
@@ -92,9 +93,10 @@ impl Device {
             gl: gl.clone(),
 
             material_textures: Texture::new(gl.clone()),
-            loaded_textures: vec![],
+            loaded_material_textures: vec![],
 
-            normal_map: Texture::new(gl.clone()),
+            normal_textures: Texture::new(gl.clone()),
+            loaded_normal_textures: vec![],
 
             placeholder_texture: Texture::new(gl.clone()),
             placeholder_texture_array: Texture::new(gl.clone()),
@@ -273,34 +275,6 @@ impl Device {
 
         invalidated |= Dirty::clean(&mut scene.material_list, |materials| {
             self.update_materials(materials, &assets)?;
-
-            use img2raw::{ColorSpace, DataFormat, Header};
-            use zerocopy::LayoutVerified;
-
-            let bytes = &include_bytes!("../../assets/normal_map.raw")[..];
-
-            let tmp = bytes.to_vec();
-
-            let (header, data) =
-                LayoutVerified::<_, Header>::new_from_prefix(tmp.as_slice()).expect("FAILED");
-
-            if header.data_format.try_parse() != Some(DataFormat::RG8) {
-                return Err(Error::new("expected RGBA8 normal map"));
-            }
-
-            if header.color_space.try_parse() != Some(ColorSpace::NonColor) {
-                return Err(Error::new("expected non-color normal map"));
-            }
-
-            if header.dimensions[0] == 0 || header.dimensions[1] == 0 {
-                return Err(Error::new("invalid normal map dimensions"));
-            }
-
-            self.normal_map.upload(
-                header.dimensions[0] as usize,
-                header.dimensions[1] as usize,
-                &data,
-            );
 
             Dirty::dirty(instances);
 
@@ -576,6 +550,10 @@ impl Device {
         self.blit_to_canvas_shader.invalidate();
 
         self.material_textures.invalidate();
+        self.loaded_material_textures.clear();
+
+        self.normal_textures.invalidate();
+        self.loaded_normal_textures.clear();
 
         self.placeholder_texture.invalidate();
         self.placeholder_texture_array.invalidate();
@@ -614,8 +592,6 @@ impl Device {
         self.scatter_quasi_buffer.invalidate();
 
         self.integrator_radiance_estimate.invalidate();
-
-        self.normal_map.invalidate();
 
         self.integrator_gather_fbo.invalidate();
 

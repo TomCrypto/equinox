@@ -17,33 +17,10 @@ impl MaterialParameterType {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(untagged)]
-pub enum MaterialParameterTexture {
-    Single(String),
-    Multi { horz: String, vert: String },
-}
-
-impl MaterialParameterTexture {
-    pub fn horz_texture(&self) -> &str {
-        match self {
-            Self::Single(texture) => texture,
-            Self::Multi { horz, .. } => horz,
-        }
-    }
-
-    pub fn vert_texture(&self) -> &str {
-        match self {
-            Self::Single(texture) => texture,
-            Self::Multi { vert, .. } => vert,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct TexturedMaterialParameter {
     pub base: MaterialParameterType,
     pub factor: MaterialParameterType,
-    pub texture: MaterialParameterTexture,
+    pub texture: String,
     pub contrast: f32,
 
     pub uv_scale: f32,
@@ -62,7 +39,7 @@ pub enum MaterialParameter {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct NormalMapParameter {
-    pub texture: MaterialParameterTexture,
+    pub texture: String,
     pub strength: f32,
 
     pub uv_scale: f32,

@@ -93,10 +93,10 @@ impl Scene {
 
     /// Returns all referenced assets.
     pub fn assets(&self) -> Vec<&str> {
-        let mut assets = vec![];
+        let mut assets: Vec<&str> = vec![];
 
         if let Some(asset) = self.environment_map.as_ref() {
-            assets.push(asset.as_str());
+            assets.push(&asset);
         }
 
         if let Some(aperture) = self.aperture.as_ref() {
@@ -104,10 +104,13 @@ impl Scene {
         }
 
         for material in self.material_list.values() {
+            if let Some(parameter) = material.normal_map() {
+                assets.push(&parameter.texture);
+            }
+
             for (_, parameter) in material.parameters() {
                 if let MaterialParameter::Textured(info) = parameter {
-                    assets.push(info.texture.horz_texture());
-                    assets.push(info.texture.vert_texture());
+                    assets.push(&info.texture);
                 }
             }
         }
@@ -380,9 +383,16 @@ impl Scene {
         material_list: &BTreeMap<String, Material>,
     ) -> Result<(), Error> {
         for (name, material) in material_list.iter() {
+            let prefix = format!("material_list[\"{}\"]", name);
+
+            if let Some(normal_map) = material.normal_map() {
+                validate!(prefix, normal_map.strength >= 0.0);
+                validate!(prefix, normal_map.strength <= 1.0);
+            }
+
             for (parameter_name, parameter) in material.parameters() {
                 if let MaterialParameter::Textured(info) = parameter {
-                    let prefix = format!("material_list[\"{}\"].{}", name, parameter_name);
+                    let prefix = format!("{}.{}", prefix, parameter_name);
 
                     let contrast = info.contrast;
 

@@ -54,10 +54,7 @@ fn write_material_parameter(
             out.factor = [0.0; 3];
         }
         MaterialParameter::Textured(info) => {
-            let horz = texture_layers[info.texture.horz_texture()] as u32;
-            let vert = texture_layers[info.texture.vert_texture()] as u32;
-
-            out.layer = vert + (horz << 16);
+            out.layer = texture_layers[info.texture.as_str()] as u32;
             out.base = info.base.as_vec3();
             out.factor = info.factor.as_vec3();
 
@@ -76,19 +73,10 @@ fn write_material_parameter(
 fn write_normal_map_parameter(
     parameter: Option<&NormalMapParameter>,
     out: &mut MaterialParamData,
-    // texture_layers: &BTreeMap<&str, usize>,
+    texture_layers: &BTreeMap<&str, usize>,
 ) {
     if let Some(parameter) = parameter {
-        out.layer = 0x0; // TODO: look up texture layer...
-
-        /*
-
-        let horz = texture_layers[info.texture.horz_texture()] as u32;
-        let vert = texture_layers[info.texture.vert_texture()] as u32;
-
-        out.layer = vert + (horz << 16);
-
-        */
+        out.layer = texture_layers[parameter.texture.as_str()] as u32;
 
         out.uv_scale = parameter.uv_scale;
         out.uv_offset = parameter.uv_offset;
@@ -106,12 +94,20 @@ impl Device {
     const MATERIAL_TEXTURE_COLS: usize = 2048;
     const MATERIAL_TEXTURE_ROWS: usize = 2048;
 
-    fn textures_out_of_date(&self, textures: &[&str]) -> bool {
-        if self.loaded_textures.len() != textures.len() {
+    fn material_textures_out_of_date(&self, textures: &[&str]) -> bool {
+        if self.loaded_material_textures.len() != textures.len() {
             return true;
         }
 
-        !textures.iter().eq(self.loaded_textures.iter())
+        !textures.iter().eq(self.loaded_material_textures.iter())
+    }
+
+    fn normal_textures_out_of_date(&self, textures: &[&str]) -> bool {
+        if self.loaded_normal_textures.len() != textures.len() {
+            return true;
+        }
+
+        !textures.iter().eq(self.loaded_normal_textures.iter())
     }
 
     fn upload_material_textures(
@@ -125,7 +121,7 @@ impl Device {
         // The front-end will have to be responsible for providing the assets in the
         // right format, the details of which this renderer is not concerned with.
 
-        if self.material_textures.is_invalid() || self.textures_out_of_date(textures) {
+        if self.material_textures.is_invalid() || self.material_textures_out_of_date(textures) {
             if textures.is_empty() {
                 self.material_textures.reset();
             } else {
@@ -167,7 +163,60 @@ impl Device {
                 }
             }
 
-            self.loaded_textures = textures.iter().map(|&texture| texture.to_owned()).collect();
+            self.loaded_material_textures = textures.iter().map(|&texture| texture.to_owned()).collect();
+        }
+
+        Ok(())
+    }
+
+    fn upload_normal_textures(
+        &mut self,
+        assets: &dyn Fn(&str) -> Result<Vec<u8>, Error>,
+        textures: &[&str],
+    ) -> Result<(), Error> {
+        if self.normal_textures.is_invalid() || self.normal_textures_out_of_date(textures) {
+            if textures.is_empty() {
+                self.normal_textures.reset();
+            } else {
+                self.normal_textures.create_array(
+                    Self::MATERIAL_TEXTURE_COLS,
+                    Self::MATERIAL_TEXTURE_ROWS,
+                    textures.len(),
+                );
+
+                for (layer, texture) in textures.iter().enumerate() {
+                    let asset_data = assets(texture)?;
+
+                    let (header, data) =
+                        LayoutVerified::<_, Header>::new_from_prefix(asset_data.as_slice())
+                            .unwrap();
+
+                    if header.data_format.try_parse() != Some(DataFormat::RG8) {
+                        return Err(Error::new("expected RG8 normal texture"));
+                    }
+
+                    if header.color_space.try_parse() != Some(ColorSpace::NonColor) {
+                        return Err(Error::new("expected non-color normal texture"));
+                    }
+
+                    if header.dimensions[0] as usize != Self::MATERIAL_TEXTURE_COLS {
+                        return Err(Error::new("invalid normal texture dimensions"));
+                    }
+
+                    if header.dimensions[1] as usize != Self::MATERIAL_TEXTURE_ROWS {
+                        return Err(Error::new("invalid normal texture dimensions"));
+                    }
+
+                    self.normal_textures.upload_layer(
+                        Self::MATERIAL_TEXTURE_COLS,
+                        Self::MATERIAL_TEXTURE_ROWS,
+                        layer,
+                        &data,
+                    );
+                }
+            }
+
+            self.loaded_normal_textures = textures.iter().map(|&texture| texture.to_owned()).collect();
         }
 
         Ok(())
@@ -179,33 +228,41 @@ impl Device {
         assets: &dyn Fn(&str) -> Result<Vec<u8>, Error>,
     ) -> Result<(), Error> {
         let mut parameter_count = 0;
-        let mut textures = vec![];
+        let mut material_textures: Vec<&str> = vec![];
+        let mut normal_textures: Vec<&str> = vec![];
 
         for material in materials.values() {
             parameter_count += material_parameter_count(material);
 
-            // TODO: add normal map texture to normals list if present
+            if let Some(parameter) = material.normal_map() {
+                normal_textures.push(&parameter.texture);
+            }
 
             for (_, parameter) in material.parameters() {
                 if let MaterialParameter::Textured(info) = parameter {
-                    textures.push(info.texture.horz_texture());
-                    textures.push(info.texture.vert_texture());
+                    material_textures.push(&info.texture);
                 }
             }
         }
 
-        //  TODO: dedup normal textures
+        material_textures.sort_unstable();
+        material_textures.dedup();
+        normal_textures.sort_unstable();
+        normal_textures.dedup();
 
-        textures.sort_unstable();
-        textures.dedup();
+        let mut material_texture_layers = BTreeMap::new();
+        let mut normal_texture_layers = BTreeMap::new();
 
-        let mut texture_layers = BTreeMap::new();
-
-        for (index, &texture) in textures.iter().enumerate() {
-            texture_layers.insert(texture, index);
+        for (index, &texture) in material_textures.iter().enumerate() {
+            material_texture_layers.insert(texture, index);
         }
 
-        self.upload_material_textures(assets, &textures)?;
+        for (index, &texture) in normal_textures.iter().enumerate() {
+            normal_texture_layers.insert(texture, index);
+        }
+
+        self.upload_material_textures(assets, &material_textures)?;
+        self.upload_normal_textures(assets, &normal_textures)?;
 
         let mut parameters = vec![MaterialParamData::default(); parameter_count];
         let mut start = 0;
@@ -213,14 +270,13 @@ impl Device {
         for material in materials.values() {
             let count = material_parameter_count(material);
 
-            // TODO: pass normal layers
-            write_normal_map_parameter(material.normal_map(), &mut parameters[start]);
+            write_normal_map_parameter(material.normal_map(), &mut parameters[start], &normal_texture_layers);
             
             for (index, (_, parameter)) in material.parameters().into_iter().enumerate() {
                 write_material_parameter(
                     parameter,
                     &mut parameters[start + index + 1],
-                    &texture_layers,
+                    &material_texture_layers,
                 );
             }
 

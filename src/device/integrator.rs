@@ -226,7 +226,6 @@ impl Device {
         command.bind(&self.raster_buffer, "Raster");
         command.bind(&self.environment_buffer, "Environment");
         command.bind(&self.scatter_quasi_buffer, "QuasiSampler");
-        command.bind(&self.normal_map, "normal_map");
 
         if self.envmap_color.is_invalid() {
             command.bind(&self.placeholder_texture, "envmap_color");
@@ -250,6 +249,12 @@ impl Device {
             command.bind(&self.placeholder_texture_array, "material_textures");
         } else {
             command.bind(&self.material_textures, "material_textures");
+        }
+
+        if self.normal_textures.is_invalid() {
+            command.bind(&self.placeholder_texture_array, "normal_textures");
+        } else {
+            command.bind(&self.normal_textures, "normal_textures");
         }
 
         command.set_viewport(
@@ -280,7 +285,6 @@ impl Device {
         command.bind(&self.integrator_photon_table_pos, "photon_table_pos");
         command.bind(&self.integrator_photon_table_dir, "photon_table_dir");
         command.bind(&self.integrator_photon_table_sum, "photon_table_sum");
-        command.bind(&self.normal_map, "normal_map");
 
         if self.envmap_color.is_invalid() {
             command.bind(&self.placeholder_texture, "envmap_color");
@@ -304,6 +308,12 @@ impl Device {
             command.bind(&self.placeholder_texture_array, "material_textures");
         } else {
             command.bind(&self.material_textures, "material_textures");
+        }
+
+        if self.normal_textures.is_invalid() {
+            command.bind(&self.placeholder_texture_array, "normal_textures");
+        } else {
+            command.bind(&self.normal_textures, "normal_textures");
         }
 
         command.set_framebuffer(&self.integrator_gather_fbo);
