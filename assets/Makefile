@@ -1,5 +1,8 @@
 SOURCE := https://equinox-assets.s3-ap-southeast-2.amazonaws.com
-ASSETS := aft_lounge_8k.raw \
+ASSETS := aft_lounge_1k.raw \
+          aft_lounge_2k.raw \
+          aft_lounge_4k.raw \
+          aft_lounge_8k.raw \
           bethnal_green_entrance_4k.raw \
           between_bridges_1k.raw \
           between_bridges_2k.raw \
