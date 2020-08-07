@@ -39,10 +39,6 @@ pub enum Geometry {
         height: GeometryParameter,
         radius: GeometryParameter,
     },
-    InfiniteRepetition {
-        child: Box<Geometry>,
-        period: [GeometryParameter; 3],
-    },
     Union {
         children: Vec<Geometry>,
     },
@@ -77,6 +73,11 @@ pub enum Geometry {
     ForceNumericalNormals {
         child: Box<Geometry>,
     },
+    CustomModifier {
+        code: String,
+        expansion: [f32; 3],
+        child: Box<Geometry>,
+    },
 }
 
 impl Geometry {
@@ -88,7 +89,6 @@ impl Geometry {
             Self::Ellipsoid { .. } => 1.0,
             Self::Cuboid { .. } => 1.5,
             Self::Cylinder { .. } => 2.0,
-            Self::InfiniteRepetition { child, .. } => 0.5 + child.evaluation_cost(),
             Self::Union { children } => children.iter().map(|x| 0.25 + x.evaluation_cost()).sum(),
             Self::Intersection { children } => {
                 children.iter().map(|x| 0.5 + x.evaluation_cost()).sum()
@@ -100,6 +100,7 @@ impl Geometry {
             Self::Translate { child, .. } => child.evaluation_cost() + 0.25,
             Self::Round { child, .. } => child.evaluation_cost() + 0.25,
             Self::ForceNumericalNormals { child } => child.evaluation_cost(),
+            Self::CustomModifier { child, .. } => child.evaluation_cost() + 3.0,
         }
     }
 
@@ -163,14 +164,6 @@ impl Geometry {
                     scale_factor: 1.0,
                 }
             }
-            // TODO: this is wrong (also we should bound repetition anyway)
-            Self::InfiniteRepetition { .. } => GeometryBounds {
-                bbox: BoundingBox {
-                    min: Point3::new(-100.0, -2.0, -100.0),
-                    max: Point3::new(100.0, 2.0, 100.0),
-                },
-                scale_factor: 1.0,
-            },
             Self::Union { children } => {
                 let mut bbox = BoundingBox::neg_infinity_bounds();
                 let mut scale_factor: f32 = 0.0;
@@ -266,6 +259,21 @@ impl Geometry {
                 bounds
             }
             Self::ForceNumericalNormals { child } => child.bounds(parameters),
+            Self::CustomModifier {
+                child, expansion, ..
+            } => {
+                let mut bounds = child.bounds(parameters);
+
+                bounds.bbox.min.x -= expansion[0];
+                bounds.bbox.min.y -= expansion[1];
+                bounds.bbox.min.z -= expansion[2];
+
+                bounds.bbox.max.x += expansion[0];
+                bounds.bbox.max.y += expansion[1];
+                bounds.bbox.max.z += expansion[2];
+
+                bounds
+            }
         }
     }
 
@@ -297,13 +305,6 @@ impl Geometry {
             Self::Cylinder { height, radius } => {
                 Self::record_parameter(parameters, height);
                 Self::record_parameter(parameters, radius);
-            }
-            Self::InfiniteRepetition { child, period } => {
-                Self::record_parameter(parameters, &period[0]);
-                Self::record_parameter(parameters, &period[1]);
-                Self::record_parameter(parameters, &period[2]);
-
-                child.symbolic_parameters_recursive(parameters);
             }
             Self::Union { children } | Self::Intersection { children } => {
                 for child in children {
@@ -345,6 +346,9 @@ impl Geometry {
                 child.symbolic_parameters_recursive(parameters);
             }
             Self::ForceNumericalNormals { child } => {
+                child.symbolic_parameters_recursive(parameters);
+            }
+            Self::CustomModifier { child, .. } => {
                 child.symbolic_parameters_recursive(parameters);
             }
         }

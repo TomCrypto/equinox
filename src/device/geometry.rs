@@ -139,22 +139,6 @@ impl GeometryGlslGenerator {
                     radius, height
                 )
             }
-            Geometry::InfiniteRepetition { child, period } => {
-                let period_x = self.lookup_parameter(&period[0], parameters);
-                let period_y = self.lookup_parameter(&period[1], parameters);
-                let period_z = self.lookup_parameter(&period[2], parameters);
-
-                let function = self.distance_recursive(child, parameters);
-
-                format!(
-                    "vec3 c = vec3({}, {}, {});
-                    return {};",
-                    period_x,
-                    period_y,
-                    period_z,
-                    function.call("mod(p + 0.5 * c, c) - 0.5 * c")
-                )
-            }
             Geometry::Union { children } => self.nary_operator(children, parameters, "min"),
             Geometry::Intersection { children } => self.nary_operator(children, parameters, "max"),
             Geometry::Subtraction { lhs, rhs } => {
@@ -233,6 +217,11 @@ impl GeometryGlslGenerator {
                 "return {};",
                 self.distance_recursive(child, parameters).call("p")
             ),
+            Geometry::CustomModifier { child, code, .. } => {
+                let function = self.distance_recursive(child, parameters);
+
+                code.replace("f(", &format!("{}(", function.name()))
+            }
         };
 
         self.register_distance_function(code.trim())
