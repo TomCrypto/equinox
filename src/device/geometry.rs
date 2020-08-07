@@ -238,7 +238,7 @@ impl GeometryGlslGenerator {
                     float c = cos(2.0 * 3.14159265 * k * p.y);
                     float s = sin(2.0 * 3.14159265 * k * p.y);
                     vec3 q = vec3(p.x * c + p.z * s, -p.x * s + p.z * c, p.y);
-                    return {} / {};
+                    return {} * {};
                 "#,
                     amount,
                     function.call("q"),
