@@ -1,5 +1,4 @@
 out vec3 photon_pos_data;
-out vec3 photon_dir_data;
 out vec3 photon_sum_data;
 
 #include <common.glsl>
@@ -19,7 +18,6 @@ void deposit_photon(ray_t ray, vec3 throughput) {
     ivec2 coords = hash_entry_for_cell(cell_for_point(ray.org));
 
     photon_pos_data = ray.org;
-    photon_dir_data = 0.5 - 0.5 * ray.dir;
     photon_sum_data = throughput / 65536.0;
 
     vec2 clip_space = 2.0 * (vec2(0.5) + vec2(coords)) / integrator.hash_dimensions - 1.0;
@@ -60,12 +58,10 @@ void scatter_photon(ray_t ray, vec3 throughput, quasi_t quasi) {
                                             traversal.range.y, n1, n2);
 
             #define MAT_SWITCH_LOGIC(LOAD, EVAL, SAMPLE) {                                        \
-                if (is_receiver && deposit_weight < integrator.photon_rate) {                     \
-                    deposit_photon(ray, throughput / integrator.photon_rate);                     \
-                    return; /* rasterize this photon into the photon table */                     \
+                if (is_receiver) {                                                                \
+                    deposit_photon(ray, throughput);                                              \
+                    return; /* record this photon */                                              \
                 }                                                                                 \
-                                                                                                  \
-                throughput /= is_receiver ? 1.0 - integrator.photon_rate : 1.0;                   \
                                                                                                   \
                 LOAD(mat_inst, normal, ray.org, material);                                        \
                                                                                                   \

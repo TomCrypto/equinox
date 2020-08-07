@@ -10,9 +10,6 @@ pub struct Integrator {
     #[default(400_000)]
     pub photons_per_pass: usize,
 
-    #[default(0.5)]
-    pub photon_rate: f32,
-
     #[default(0.05)]
     pub max_search_radius: f32,
 

@@ -26,7 +26,6 @@ pub(crate) fn material_index(material: &Material) -> u16 {
         Material::Phong { .. } => 2,
         Material::IdealRefraction { .. } => 3,
         Material::Dielectric { .. } => 4,
-        Material::OrenNayar { .. } => 5,
     }
 }
 
@@ -38,7 +37,6 @@ pub(crate) fn material_parameter_count(material: &Material) -> usize {
         Material::IdealRefraction { .. } => 1,
         Material::Phong { .. } => 2,
         Material::Dielectric { .. } => 1,
-        Material::OrenNayar { .. } => 2,
     }
 }
 

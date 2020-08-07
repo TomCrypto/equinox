@@ -50,7 +50,7 @@ impl Device {
             instance_info.push(InstanceInfo {
                 bbox,
                 cost: geometry.evaluation_cost(),
-                photon_receiver: instance.photon_receiver && !material.has_delta_bsdf(),
+                photon_receiver: material.is_photon_receiver(),
                 sample_explicit: instance.sample_explicit && !material.has_delta_bsdf(),
                 geometry: geometry_index[&instance.geometry] as u16,
                 geo_inst: geometry_start,

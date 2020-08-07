@@ -84,10 +84,6 @@ pub enum Material {
     Dielectric {
         base_color: MaterialParameter,
     },
-    OrenNayar {
-        albedo: MaterialParameter,
-        roughness: MaterialParameter,
-    },
 }
 
 impl Material {
@@ -98,8 +94,11 @@ impl Material {
             Self::IdealRefraction { .. } => true,
             Self::Phong { .. } => false,
             Self::Dielectric { .. } => true,
-            Self::OrenNayar { .. } => false,
         }
+    }
+
+    pub fn is_photon_receiver(&self) -> bool {
+        matches!(self, Self::Lambertian { .. })
     }
 
     /// Returns a list of parameters referenced by this material.
@@ -112,9 +111,6 @@ impl Material {
                 vec![("albedo", &albedo), ("shininess", &shininess)]
             }
             Self::Dielectric { base_color } => vec![("base_color", &base_color)],
-            Self::OrenNayar { albedo, roughness } => {
-                vec![("albedo", &albedo), ("roughness", &roughness)]
-            }
         }
     }
 }

@@ -2,18 +2,6 @@
   <div class="root">
     <ul>
       <li>
-        <b>WARNING</b>: On Windows, shader builds can be extremely slow due to
-        ANGLE; it is recommended to configure your browser to use native OpenGL
-        if possible to improve build times; see
-        <a
-          class="hyperlink"
-          target="_blank"
-          rel="noopener noreferrer"
-          href="https://github.com/mrdoob/three.js/wiki/How-to-use-OpenGL-or-ANGLE-rendering-on-Windows"
-        >this link</a>
-        for directions.
-      </li>
-      <li>
         <b>Note</b>: any camera interaction performed while this editor is open
         will be rolled back on any change to the scene JSON; the JSON will not
         update automatically.

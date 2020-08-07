@@ -7,9 +7,9 @@ layout (std140) uniform Integrator {
     vec2 filter_offset;
 
     uint current_pass;
-    float photon_rate;
     float photon_count;
     float sppm_alpha;
+    uint padding;
 
     float search_radius;
     float search_radius_squared;

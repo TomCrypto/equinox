@@ -14,8 +14,6 @@ pub struct Instance {
     #[serde(default)]
     pub parameters: BTreeMap<String, f32>,
     #[serde(default = "true_default")]
-    pub photon_receiver: bool,
-    #[serde(default = "true_default")]
     pub sample_explicit: bool,
     #[serde(default = "true_default")]
     pub visible: bool,

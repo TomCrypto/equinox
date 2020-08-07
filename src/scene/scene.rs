@@ -214,10 +214,10 @@ impl Scene {
     pub(crate) fn has_photon_receivers(&self) -> bool {
         self.instance_list
             .values()
-            .filter(|instance| instance.visible && instance.photon_receiver)
+            .filter(|instance| instance.visible)
             .any(|instance| {
                 if let Some(material) = self.material_list.get(&instance.material) {
-                    !material.has_delta_bsdf()
+                    material.is_photon_receiver()
                 } else {
                     false
                 }
@@ -299,8 +299,6 @@ impl Scene {
         validate!(integrator.hash_table_bits >= 18);
         validate!(integrator.hash_table_bits <= 24);
         validate!(integrator.photons_per_pass > 0);
-        validate!(integrator.photon_rate >= 0.1);
-        validate!(integrator.photon_rate <= 0.9);
         validate!(integrator.max_search_radius > 0.0);
         validate!(integrator.min_search_radius > 0.0);
         validate!(integrator.alpha >= 0.0);

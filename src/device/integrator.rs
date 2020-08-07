@@ -20,9 +20,9 @@ pub struct IntegratorData {
     filter_offset: [f32; 2],
 
     current_pass: u32,
-    photon_rate: f32,
     photon_count: f32,
     sppm_alpha: f32,
+    padding: u32,
 
     search_radius: f32,
     search_radius_squared: f32,
@@ -191,7 +191,6 @@ impl Device {
         data.hash_key[2] = self.state.rng.next_u32();
         data.hash_key[3] = 0;
         data.current_pass = self.state.current_pass;
-        data.photon_rate = self.state.integrator.photon_rate;
         data.photon_count = self.state.photon_count.max(1.0);
         data.sppm_alpha = self.state.integrator.alpha;
         data.search_radius = pass.search_radius;
@@ -277,7 +276,6 @@ impl Device {
         command.bind(&self.environment_buffer, "Environment");
         command.bind(&self.gather_quasi_buffer, "QuasiSampler");
         command.bind(&self.integrator_photon_table_pos, "photon_table_pos");
-        command.bind(&self.integrator_photon_table_dir, "photon_table_dir");
         command.bind(&self.integrator_photon_table_sum, "photon_table_sum");
 
         if self.envmap_color.is_invalid() {
@@ -321,7 +319,6 @@ impl Device {
 
     fn clamp_integrator_settings(integrator: &mut Integrator) {
         integrator.alpha = integrator.alpha.max(0.0).min(1.0);
-        integrator.photon_rate = integrator.photon_rate.max(0.05).min(0.95);
         integrator.max_scatter_bounces = integrator.max_scatter_bounces.max(2);
         integrator.max_gather_bounces = integrator.max_gather_bounces.max(2);
     }

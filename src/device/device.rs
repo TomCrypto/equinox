@@ -63,7 +63,6 @@ pub struct Device {
     pub(crate) convolution_output_fbo: Framebuffer,
 
     pub(crate) integrator_photon_table_pos: Texture<RGBA32F>,
-    pub(crate) integrator_photon_table_dir: Texture<RGB10A2>,
     pub(crate) integrator_photon_table_sum: Texture<RGBA16F>,
 
     pub(crate) integrator_radiance_estimate: Texture<RGBA32F>,
@@ -142,7 +141,6 @@ impl Device {
                 &shader::FS_GATHER_PHOTONS,
             ),
             integrator_photon_table_pos: Texture::new(gl.clone()),
-            integrator_photon_table_dir: Texture::new(gl.clone()),
             integrator_photon_table_sum: Texture::new(gl.clone()),
             signal_fft_passes: VertexArray::new(gl.clone()),
             filter_fft_passes: VertexArray::new(gl.clone()),
@@ -364,13 +362,11 @@ impl Device {
             let rows = 2usize.pow(row_bits);
 
             self.integrator_photon_table_pos.create(cols, rows);
-            self.integrator_photon_table_dir.create(cols, rows);
             self.integrator_photon_table_sum.create(cols, rows);
 
             self.integrator_scatter_fbo.rebuild(
                 &[
                     &self.integrator_photon_table_pos,
-                    &self.integrator_photon_table_dir,
                     &self.integrator_photon_table_sum,
                 ],
                 None,
@@ -575,7 +571,6 @@ impl Device {
         self.convolution_signal_fbo.invalidate();
 
         self.integrator_photon_table_pos.invalidate();
-        self.integrator_photon_table_dir.invalidate();
         self.integrator_photon_table_sum.invalidate();
         self.integrator_scatter_fbo.invalidate();
         self.gather_quasi_buffer.invalidate();

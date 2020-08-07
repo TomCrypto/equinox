@@ -9,7 +9,6 @@
 #include <quasi.glsl>
 
 uniform sampler2D photon_table_pos;
-uniform sampler2D photon_table_dir;
 uniform sampler2D photon_table_sum;
 
 layout(location = 0) out vec4 radiance_estimate;
@@ -21,12 +20,11 @@ vec3 get_photon(cell_t cell, vec3 point, uint mat_type, material_t material, vec
     vec3 position = pos_data.xyz / pos_data.w;
 
     if (dot(point - position, point - position) <= integrator.search_radius_squared) {
-        vec3 photon_wi = 2.0 * texelFetch(photon_table_dir, coords, 0).rgb - 1.0;
         vec3 throughput = 65536.0 * texelFetch(photon_table_sum, coords, 0).rgb;
 
         #define MAT_SWITCH_LOGIC(LOAD, EVAL, SAMPLE) {                                            \
             float unused_pdf;                                                                     \
-            return throughput * EVAL(material, normal, photon_wi, wo, n1, n2, unused_pdf);        \
+            return throughput * EVAL(material, normal, wo, wo, n1, n2, unused_pdf);               \
         }
 
         MAT_DO_SWITCH(mat_type)

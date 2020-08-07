@@ -116,9 +116,6 @@ struct material_t {
 #define MAT_PHONG_EXPONENT                                                   material.data[0].w
 // == DIELECTRIC =================================================================================
 #define MAT_DIELECTRIC_BASE_COLOR                                            material.data[0].xyz
-// == OREN-NAYAR =================================================================================
-#define MAT_OREN_NAYAR_ALBEDO                                                material.data[0].xyz
-#define MAT_OREN_NAYAR_ROUGHNESS                                             material.data[0].w
 
 // == LAMBERTIAN BRDF ============================================================================
 
@@ -292,60 +289,6 @@ vec3 mat_dielectric_sample(material_t material, vec3 normal, out vec3 wi, vec3 w
     return MAT_DIELECTRIC_BASE_COLOR;
 }
 
-// == OREN-NAYAR BRDF ============================================================================
-
-float oren_nayar_term(float wi_n, float wo_n, vec3 wi, vec3 wo, vec3 normal, float roughness) {
-    float roughness2 = roughness * roughness;
-
-    float a = 1.0 - 0.5 * roughness2 / (roughness2 + 0.33);
-    float b = 0.45 * roughness2 / (roughness2 + 0.09);
-
-    vec3 wi_proj = normalize(wi - normal * wi_n);
-    vec3 wo_proj = normalize(wo - normal * wo_n);
-
-    float theta_i = acos(wi_n);
-    float theta_o = acos(wo_n);
-
-    return a + b * max(0.0, dot(wi_proj, wo_proj)) * sin(max(theta_i, theta_o))
-                                                   * tan(min(theta_i, theta_o));
-}
-
-void mat_oren_nayar_load(uint inst, vec3 normal, vec3 point, out material_t material) {
-    MAT_OREN_NAYAR_ALBEDO = clamp(mat_param_vec3(inst + 0U, normal, point), 0.0, 1.0);
-    MAT_OREN_NAYAR_ROUGHNESS = clamp(mat_param_float(inst + 1U, normal, point), 0.0, 1.0);
-}
-
-vec3 mat_oren_nayar_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
-    float wi_n = dot(wi, normal);
-    float wo_n = dot(wo, normal);
-
-    if (wi_n <= 0.0 || wo_n <= 0.0) {
-        return pdf = 0.0, vec3(0.0);
-    }
-
-    pdf = wi_n / M_PI;
-
-    return MAT_OREN_NAYAR_ALBEDO / M_PI * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_ROUGHNESS);
-}
-
-vec3 mat_oren_nayar_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, float n1, float n2, out float pdf, float u1, float u2) {
-    float r = sqrt(u1);
-    float phi = M_2PI * u2;
-
-    wi = rotate(vec3(r * cos(phi), sqrt(1.0 - u1), r * sin(phi)), normal);
-
-    float wi_n = dot(wi, normal);
-    float wo_n = dot(wo, normal);
-
-    if (wi_n <= 0.0 || wo_n <= 0.0) {
-        return pdf = 0.0, vec3(0.0);
-    }
-
-    pdf = wi_n / M_PI;
-
-    return MAT_OREN_NAYAR_ALBEDO * oren_nayar_term(wi_n, wo_n, wi, wo, normal, MAT_OREN_NAYAR_ROUGHNESS);
-}
-
 #define MAT_IS_RECEIVER(mat_type) \
     ((mat_type & 0x8000U) != 0U)
 
@@ -381,10 +324,5 @@ vec3 mat_oren_nayar_sample(material_t material, vec3 normal, out vec3 wi, vec3 w
             MAT_SWITCH_LOGIC(mat_dielectric_load,                                                 \
                              mat_dielectric_eval,                                                 \
                              mat_dielectric_sample)                                               \
-            break;                                                                                \
-        case 5U:                                                                                  \
-            MAT_SWITCH_LOGIC(mat_oren_nayar_load,                                                 \
-                             mat_oren_nayar_eval,                                                 \
-                             mat_oren_nayar_sample)                                               \
             break;                                                                                \
     }
