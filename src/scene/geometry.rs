@@ -1,6 +1,6 @@
 use crate::BoundingBox;
 use cgmath::prelude::*;
-use cgmath::{Matrix3, Point3, Rad, Vector3};
+use cgmath::{Matrix3, Rad, Vector3};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -78,6 +78,11 @@ pub enum Geometry {
         expansion: [f32; 3],
         child: Box<Geometry>,
     },
+    Twist {
+        amount: GeometryParameter,
+        step: GeometryParameter,
+        child: Box<Geometry>,
+    },
 }
 
 impl Geometry {
@@ -101,6 +106,7 @@ impl Geometry {
             Self::Round { child, .. } => child.evaluation_cost() + 0.25,
             Self::ForceNumericalNormals { child } => child.evaluation_cost(),
             Self::CustomModifier { child, .. } => child.evaluation_cost() + 3.0,
+            Self::Twist { child, .. } => child.evaluation_cost() + 1.0,
         }
     }
 
@@ -274,6 +280,23 @@ impl Geometry {
 
                 bounds
             }
+            Self::Twist { child, .. } => {
+                let mut bounds = child.bounds(parameters);
+
+                let dx = bounds.bbox.max.x - bounds.bbox.min.x;
+                let dy = bounds.bbox.max.y - bounds.bbox.min.y;
+                let dz = bounds.bbox.max.z - bounds.bbox.min.z;
+
+                bounds.bbox.min.x -= dx * 0.5;
+                bounds.bbox.min.y -= dy * 0.5;
+                bounds.bbox.min.z -= dz * 0.5;
+
+                bounds.bbox.max.x += dx * 0.5;
+                bounds.bbox.max.y += dy * 0.5;
+                bounds.bbox.max.z += dz * 0.5;
+
+                bounds
+            }
         }
     }
 
@@ -349,6 +372,16 @@ impl Geometry {
                 child.symbolic_parameters_recursive(parameters);
             }
             Self::CustomModifier { child, .. } => {
+                child.symbolic_parameters_recursive(parameters);
+            }
+            Self::Twist {
+                child,
+                amount,
+                step,
+            } => {
+                Self::record_parameter(parameters, amount);
+                Self::record_parameter(parameters, step);
+
                 child.symbolic_parameters_recursive(parameters);
             }
         }
