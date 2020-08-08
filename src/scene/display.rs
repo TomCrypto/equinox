@@ -14,4 +14,6 @@ pub struct Display {
     pub lens_flare_enabled: bool,
     #[default(1)]
     pub lens_flare_tiles_per_pass: u32,
+    #[default(None)]
+    pub render_region: Option<[u32; 4]>,
 }

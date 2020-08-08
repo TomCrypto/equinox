@@ -60,6 +60,12 @@ pub enum MaterialParameter {
     Textured(TexturedMaterialParameter),
 }
 
+impl Default for MaterialParameter {
+    fn default() -> MaterialParameter {
+        MaterialParameter::Constant(MaterialParameterType::Scalar(0.0))
+    }
+}
+
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Materials {
     pub list: Vec<Material>,
@@ -83,6 +89,8 @@ pub enum Material {
     },
     Dielectric {
         base_color: MaterialParameter,
+        #[serde(default)]
+        roughness: MaterialParameter,
     },
 }
 
@@ -110,7 +118,10 @@ impl Material {
             Self::Phong { albedo, shininess } => {
                 vec![("albedo", &albedo), ("shininess", &shininess)]
             }
-            Self::Dielectric { base_color } => vec![("base_color", &base_color)],
+            Self::Dielectric {
+                base_color,
+                roughness,
+            } => vec![("base_color", &base_color), ("roughness", &roughness)],
         }
     }
 }

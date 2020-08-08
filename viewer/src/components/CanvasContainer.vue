@@ -181,6 +181,8 @@ export default class extends Vue {
   private mouseMoved: boolean = false;
   private thetaEstimator = new MovingWindowEstimator(10);
   private phiEstimator = new MovingWindowEstimator(10);
+  private lastMouseX: number = 0;
+  private lastMouseY: number = 0;
 
   private captured: boolean = false;
 
@@ -238,6 +240,11 @@ export default class extends Vue {
   }
 
   private pressKey(key: string) {
+    if (key === "r") {
+      this.keys["r"] = true;
+      return;
+    }
+
     if (!this.captured) {
       return;
     }
@@ -254,6 +261,11 @@ export default class extends Vue {
   }
 
   private moveCamera(event: MouseEvent) {
+    const rect = this.canvas.getBoundingClientRect();
+
+    this.lastMouseX = event.clientX - rect.x;
+    this.lastMouseY = event.clientY - rect.y;
+
     if (!this.captured) {
       return;
     }
@@ -423,6 +435,26 @@ export default class extends Vue {
 
         this.mouseMoved = false;
       }
+
+      const json = this.scene.json();
+
+      if (this.keys["r"]) {
+        const cx = Math.round(
+          (this.lastMouseX / this.canvas.clientWidth) * json.raster.width
+        );
+        const cy = Math.round(
+          (1 - this.lastMouseY / this.canvas.clientHeight) * json.raster.height
+        );
+
+        const x = Math.max(0, cx - 25);
+        const y = Math.max(0, cy - 25);
+
+        json.display.render_region = [x, y, 50, 50];
+      } else {
+        json.display.render_region = null;
+      }
+
+      this.scene.set_json(json);
 
       this.sppmPhotons = this.device.sppm_photons();
       this.sppmPasses = this.device.sppm_passes();

@@ -29,17 +29,6 @@ pub(crate) fn material_index(material: &Material) -> u16 {
     }
 }
 
-/// Returns the number of parameters used by a material.
-pub(crate) fn material_parameter_count(material: &Material) -> usize {
-    match material {
-        Material::Lambertian { .. } => 1,
-        Material::IdealReflection { .. } => 1,
-        Material::IdealRefraction { .. } => 1,
-        Material::Phong { .. } => 2,
-        Material::Dielectric { .. } => 1,
-    }
-}
-
 fn write_material_parameter(
     parameter: &MaterialParameter,
     out: &mut MaterialParamData,
@@ -151,9 +140,10 @@ impl Device {
         let mut textures = vec![];
 
         for material in materials.values() {
-            parameter_count += material_parameter_count(material);
+            let parameters = material.parameters();
+            parameter_count += parameters.len();
 
-            for (_, parameter) in material.parameters() {
+            for (_, parameter) in parameters {
                 if let MaterialParameter::Textured(info) = parameter {
                     textures.push(info.texture.horz_texture());
                     textures.push(info.texture.vert_texture());
@@ -176,9 +166,10 @@ impl Device {
         let mut start = 0;
 
         for material in materials.values() {
-            let count = material_parameter_count(material);
+            let material_parameters = material.parameters();
+            let count = material_parameters.len();
 
-            for (index, (_, parameter)) in material.parameters().into_iter().enumerate() {
+            for (index, (_, parameter)) in material_parameters.into_iter().enumerate() {
                 write_material_parameter(
                     parameter,
                     &mut parameters[start + index],

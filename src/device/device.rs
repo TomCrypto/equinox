@@ -80,6 +80,8 @@ pub struct Device {
 
     pub(crate) state: IntegratorState,
     pub(crate) postproc: PostProcState,
+
+    pub(crate) render_region: Option<[u32; 4]>,
 }
 
 impl Device {
@@ -180,6 +182,7 @@ impl Device {
             device_lost: true,
             state: IntegratorState::default(),
             postproc: PostProcState::default(),
+            render_region: None,
         })
     }
 

@@ -124,6 +124,7 @@ export default {
       glass: {
         type: "dielectric",
         base_color: [1, 1, 1],
+        roughness: 0,
       },
       lambertian: {
         type: "lambertian",

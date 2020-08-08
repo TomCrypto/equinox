@@ -237,7 +237,7 @@ impl GeometryGlslGenerator {
                     float k = {} / sqrt(p.x * p.x + p.z * p.z);
                     float c = cos(2.0 * 3.14159265 * k * p.y);
                     float s = sin(2.0 * 3.14159265 * k * p.y);
-                    vec3 q = vec3(p.x * c + p.z * s, -p.x * s + p.z * c, p.y);
+                    vec3 q = vec3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);
                     return {} * {};
                 "#,
                     amount,

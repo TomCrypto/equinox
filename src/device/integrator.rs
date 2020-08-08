@@ -304,12 +304,16 @@ impl Device {
 
         command.set_framebuffer(&self.integrator_gather_fbo);
 
-        command.set_viewport(
-            0,
-            0,
-            self.integrator_gather_fbo.cols() as i32,
-            self.integrator_gather_fbo.rows() as i32,
-        );
+        if let Some([x, y, w, h]) = self.render_region {
+            command.set_viewport(x as i32, y as i32, w as i32, h as i32);
+        } else {
+            command.set_viewport(
+                0,
+                0,
+                self.integrator_gather_fbo.cols() as i32,
+                self.integrator_gather_fbo.rows() as i32,
+            );
+        }
 
         command.set_blend_mode(BlendMode::Add);
 

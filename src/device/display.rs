@@ -12,6 +12,8 @@ pub struct DisplayData {
 
 impl Device {
     pub(crate) fn update_display(&mut self, display: &Display) -> Result<(), Error> {
+        self.render_region = display.render_region;
+
         let mut data = DisplayData::default();
 
         data.exposure = (2.0f32).powf(display.exposure);

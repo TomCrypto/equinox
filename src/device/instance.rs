@@ -1,9 +1,7 @@
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 
-use crate::{
-    material_index, material_parameter_count, BoundingBox, Device, Geometry, Instance, Material,
-};
+use crate::{material_index, BoundingBox, Device, Geometry, Instance, Material};
 use itertools::izip;
 use js_sys::Error;
 use std::cmp::Ordering;
@@ -27,7 +25,7 @@ impl Device {
         for (name, material) in material_list {
             material_start.insert(name.to_owned(), count);
 
-            count += material_parameter_count(material) as u16;
+            count += material.parameters().len() as u16;
         }
 
         for (index, name) in geometry_list.keys().enumerate() {
