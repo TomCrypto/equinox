@@ -116,7 +116,7 @@ struct material_t {
 #define MAT_PHONG_EXPONENT                                                   material.data[0].w
 // == DIELECTRIC =================================================================================
 #define MAT_DIELECTRIC_BASE_COLOR                                            material.data[0].xyz
-#define MAT_DIELECTRIC_ROUGHNESS                                             material.data[0].w
+#define MAT_DIELECTRIC_CONE_ANGLE                                            material.data[0].w
 
 // == LAMBERTIAN BRDF ============================================================================
 
@@ -246,7 +246,7 @@ vec3 mat_phong_sample(material_t material, vec3 normal, out vec3 wi, vec3 wo, fl
 
 void mat_dielectric_load(uint inst, vec3 normal, vec3 point, out material_t material) {
     MAT_DIELECTRIC_BASE_COLOR = clamp(mat_param_vec3(inst + 0U, normal, point), 0.0, 1.0);
-    MAT_DIELECTRIC_ROUGHNESS = clamp(mat_param_float(inst + 1U, normal, point), 0.0, 1.0);
+    MAT_DIELECTRIC_CONE_ANGLE = cos(clamp(mat_param_float(inst + 1U, normal, point), 0.0, M_PI * 0.5));
 }
 
 vec3 mat_dielectric_eval(material_t material, vec3 normal, vec3 wi, vec3 wo, float n1, float n2, out float pdf) {
@@ -288,16 +288,14 @@ vec3 mat_dielectric_sample(material_t material, vec3 normal, out vec3 wi, vec3 w
         wi = reflect(-wo, normal);
     }
 
-    // adjust wi randomly in a cone around itself. to do this, generate a cone sample around (0, 1, 0) then rotate it about wi!
+    // For basic, but not physically-based roughness support, adjust the sampled vector
+    // in a small cone of configurable angle around itself to simulate a rough surface.
 
-    if (MAT_DIELECTRIC_ROUGHNESS > 0.0) {
-        float z = mix(1.0 - MAT_DIELECTRIC_ROUGHNESS, 1.0, u1);
-        float phi = M_2PI * u2;
+    if (MAT_DIELECTRIC_CONE_ANGLE < 1.0) {
+        float z = mix(MAT_DIELECTRIC_CONE_ANGLE, 1.0, u1);
         float r = sqrt(1.0 - z * z);
 
-        vec3 cone = vec3(r * cos(phi), z, r * sin(phi));
-
-        wi = rotate(cone, wi);
+        wi = rotate(vec3(r * cos(M_2PI * u2), z, r * sin(M_2PI * u2)), wi);
     }
 
     return MAT_DIELECTRIC_BASE_COLOR;
