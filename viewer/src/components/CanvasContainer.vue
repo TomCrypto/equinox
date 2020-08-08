@@ -261,7 +261,7 @@ export default class extends Vue {
   }
 
   private moveCamera(event: MouseEvent) {
-    const rect = this.canvas.getBoundingClientRect();
+    const rect = this.canvas!.getBoundingClientRect();
 
     this.lastMouseX = event.clientX - rect.x;
     this.lastMouseY = event.clientY - rect.y;

@@ -134,6 +134,7 @@ impl WebScene {
         self.scene.camera.position[2] += rotated_dir[2];
     }
 
+    #[allow(clippy::float_cmp)]
     pub fn set_camera_direction(&mut self, x: f32, y: f32, z: f32) {
         if self.scene.camera.direction != [x, y, z] {
             self.scene.camera.direction = [x, y, z];
