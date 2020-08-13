@@ -1,7 +1,13 @@
-Gallery
-=======
+# Gallery
 
 Below are some high resolution renders produced by Equinox.
+
+<p align="center">
+<img src="./complex-render.png?raw=true" alt="Textured Render"/>
+</p>
+This production-quality render exhibits most features currently available in the renderer.
+
+---
 
 <p align="center">
 <img src="./textured-render.png?raw=true" alt="Textured Render"/>
