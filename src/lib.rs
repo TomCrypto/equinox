@@ -143,7 +143,9 @@ impl WebScene {
 }
 
 fn as_json<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
-    Ok(serde_wasm_bindgen::to_value(value).map_err(|e| Error::new(&e.to_string()))?)
+    Ok(value
+        .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+        .map_err(|e| Error::new(&e.to_string()))?)
 }
 
 fn from_json<T: DeserializeOwned>(json: JsValue) -> Result<T, JsValue> {
