@@ -358,8 +358,8 @@ impl<'a> HierarchyBuilder<'a> {
                 let lhs_area = lhs_bbox.surface_area();
                 let rhs_area = rhs_bbox.surface_area();
 
-                lhs_cost *= lhs_area;
-                rhs_cost *= rhs_area;
+                lhs_cost *= lhs_area * pos as f32;
+                rhs_cost *= rhs_area * (leaves.len() - pos) as f32;
 
                 let swap = lhs_area < rhs_area;
                 let cost = lhs_cost + rhs_cost;
