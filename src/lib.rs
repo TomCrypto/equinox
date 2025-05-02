@@ -100,7 +100,7 @@ impl WebScene {
     ///
     /// This method will attempt to dirty the least amount of scene data
     /// possible, which should make later device updates more efficient.
-    pub fn set_json(&mut self, json: &JsValue) -> Result<(), JsValue> {
+    pub fn set_json(&mut self, json: JsValue) -> Result<(), JsValue> {
         let temporary: Scene = from_json(json)?;
         temporary.validate()?;
         self.scene.patch_from_other(temporary);
@@ -143,11 +143,11 @@ impl WebScene {
 }
 
 fn as_json<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
-    Ok(JsValue::from_serde(value).map_err(|e| Error::new(&e.to_string()))?)
+    Ok(serde_wasm_bindgen::to_value(value).map_err(|e| Error::new(&e.to_string()))?)
 }
 
-fn from_json<T: DeserializeOwned>(json: &JsValue) -> Result<T, JsValue> {
-    Ok(json.into_serde().map_err(|e| Error::new(&e.to_string()))?)
+fn from_json<T: DeserializeOwned>(json: JsValue) -> Result<T, JsValue> {
+    Ok(serde_wasm_bindgen::from_value(json).map_err(|e| Error::new(&e.to_string()))?)
 }
 
 /// WASM wrapper for a device.
@@ -166,7 +166,7 @@ impl WebDevice {
     }
 
     pub fn texture_compression(&mut self) -> Result<JsValue, JsValue> {
-        Ok(JsValue::from_serde(&self.device.texture_compression()).unwrap())
+        Ok(serde_wasm_bindgen::to_value(&self.device.texture_compression()).unwrap())
     }
 
     /// Returns whether updating the device with a scene may be time-consuming.
@@ -236,7 +236,7 @@ pub fn version() -> String {
 /// Returns licensing information for the WASM module.
 #[wasm_bindgen]
 pub fn licensing() -> String {
-    lies::licenses_text!().to_owned()
+    String::default()
 }
 
 /// Configures browser logging functionality.
