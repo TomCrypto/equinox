@@ -437,6 +437,7 @@ export default class extends Vue {
       }
 
       const json = this.scene.json();
+      const currentActiveJson = json;
 
       if (this.keys["r"]) {
         const cx = Math.round(
@@ -454,7 +455,9 @@ export default class extends Vue {
         json.display.render_region = null;
       }
 
-      this.scene.set_json(json);
+      if (json != currentActiveJson) {
+        this.scene.set_json(json);
+      }
 
       this.sppmPhotons = this.device.sppm_photons();
       this.sppmPasses = this.device.sppm_passes();
