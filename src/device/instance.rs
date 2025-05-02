@@ -411,8 +411,8 @@ impl<'a> HierarchyBuilder<'a> {
 
     fn sort_by_leaf_centroid_on_axis(leaves: &mut [InstanceInfo], axis: usize) {
         leaves.sort_unstable_by(|lhs, rhs| {
-            let lhs_centroid = lhs.bbox.max[axis] - lhs.bbox.min[axis];
-            let rhs_centroid = rhs.bbox.max[axis] - rhs.bbox.min[axis];
+            let lhs_centroid = (lhs.bbox.max[axis] + lhs.bbox.min[axis]) / 2.0;
+            let rhs_centroid = (rhs.bbox.max[axis] + rhs.bbox.min[axis]) / 2.0;
 
             let ordering = lhs_centroid.partial_cmp(&rhs_centroid);
             ordering.unwrap_or(Ordering::Less) // we assume no NaNs
