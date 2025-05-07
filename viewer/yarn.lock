@@ -1247,7 +1247,7 @@ acorn-walk@^6.1.1:
 
 acorn@^6.0.7, acorn@^6.1.1, acorn@^6.2.1:
   version "6.4.1"
-  resolved "https://registry.yarnpkg.com/acorn/-/acorn-6.4.1.tgz#531e58ba3f51b9dacb9a6646ca4debf5b14ca474"  
+  resolved "https://registry.yarnpkg.com/acorn/-/acorn-6.4.1.tgz#531e58ba3f51b9dacb9a6646ca4debf5b14ca474"
   integrity sha512-ZVA9k326Nwrj3Cj9jlh3wGFutC2ZornPNARZwsNYqQYgN0EsV2d53w5RN/co65Ohn4sUAUtb1rSUAOD6XN9idA==
 
 address@^1.0.3:
@@ -7265,9 +7265,9 @@ uglify-js@^3.1.4:
     source-map "~0.6.1"
 
 underscore@^1.9.1:
-  version "1.9.1"
-  resolved "https://registry.yarnpkg.com/underscore/-/underscore-1.9.1.tgz#06dce34a0e68a7babc29b365b8e74b8925203961"
-  integrity sha512-5/4etnCkd9c8gwgowi5/om/mYO5ajCaOgdzj/oW+0eQV9WxKBDZw5+ycmKmeaTXjInS/W0BzpGLo2xR2aBwZdg==
+  version "1.13.1"
+  resolved "https://registry.yarnpkg.com/underscore/-/underscore-1.13.1.tgz#0c1c6bd2df54b6b69f2314066d65b6cde6fcf9d1"
+  integrity sha512-hzSoAVtJF+3ZtiFX0VgfFPHEDRm7Y/QPjGyNo4TVdnDTdft3tr8hEkD25a1jC+TjTuE7tkHGKkhwCgs9dgBB2g==
 
 unicode-canonical-property-names-ecmascript@^1.0.4:
   version "1.0.4"
