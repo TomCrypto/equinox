@@ -26,7 +26,7 @@
     "@vue/cli-plugin-babel": "^3.11.0",
     "@vue/cli-plugin-typescript": "^3.11.0",
     "@vue/cli-service": "^3.11.0",
-    "codemirror": "^5.49.2",
+    "codemirror": "^5.58.2",
     "color-convert": "^2.0.1",
     "equinox": "file:../pkg",
     "file-saver": "^2.0.2",
