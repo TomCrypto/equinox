@@ -31,7 +31,7 @@
     "equinox": "file:../pkg",
     "file-saver": "^2.0.2",
     "jsonlint-mod": "^1.7.5",
-    "jszip": "^3.2.2",
+    "jszip": "^3.7.0",
     "localforage": "^1.7.3",
     "mobile-device-detect": "^0.3.3",
     "pako": "^1.0.10",
